@@ -45,18 +45,18 @@
         ]
       }));
 
-      /* ---- KPI hero ---------------------------------------------------- */
+      /* ---- KPI hero (each tile drills into the detail behind the number) */
       var kpis = el('div.kpi-grid.stagger');
-      kpiTile(kpis, 'Group Revenue', ui.money(snap.revenue, { compact: true }), 'graph-up-arrow',
-        trendFrom(series.revenue), series.revenue, 'trailing 12 months');
-      kpiTile(kpis, 'Net Profit', ui.money(snap.profit, { compact: true }), 'cash-stack',
-        trendFrom(series.profit), series.profit, ui.pct(snap.margin) + ' net margin');
+      kpiTile(kpis, 'Group Revenue', snap.revenue, 'graph-up-arrow',
+        trendFrom(series.revenue), series.revenue, 'trailing 12 months', 'group/finance');
+      kpiTile(kpis, 'Net Profit', snap.profit, 'cash-stack',
+        trendFrom(series.profit), series.profit, ui.pct(snap.margin) + ' net margin', 'group/finance/pnl');
       kpiTile(kpis, 'Blended Margin', ui.pct(snap.margin), 'pie-chart-fill',
-        { dir: snap.margin >= 20 ? 'up' : 'down', val: '' }, series.profit.map(function (p, i) { return series.revenue[i] ? p / series.revenue[i] * 100 : 0; }), 'across all concerns', true);
+        { dir: snap.margin >= 20 ? 'up' : 'down', val: '' }, series.profit.map(function (p, i) { return series.revenue[i] ? p / series.revenue[i] * 100 : 0; }), 'across all concerns', 'group/analytics');
       kpiTile(kpis, 'Workforce', ui.num(snap.headcount), 'people-fill',
-        { dir: 'up', val: '+3' }, null, 'active employees');
-      kpiTile(kpis, 'Pipeline Value', ui.money(snap.pipelineValue, { compact: true }), 'funnel-fill',
-        { dir: 'up', val: snap.openLeads + ' open' }, null, 'weighted leads (Group CRM)');
+        { dir: 'up', val: '+3' }, null, 'active employees', 'group/employees/directory');
+      kpiTile(kpis, 'Pipeline Value', snap.pipelineValue, 'funnel-fill',
+        { dir: 'up', val: snap.openLeads + ' open' }, null, 'weighted leads (Group CRM)', 'group/crm/pipeline');
       page.appendChild(kpis);
 
       /* ---- trend + mix ------------------------------------------------- */
@@ -80,11 +80,13 @@
       var strip = el('div.co-strip.stagger');
       snap.companies.forEach(function (c) {
         var momUp = c.mom >= 0;
+        var hl = c.risk < 30 ? ['g', 'Healthy'] : c.risk < 55 ? ['y', 'Watch'] : ['r', 'At Risk'];
         strip.appendChild(el('div.co-perf', { style:{ '--co': c.accent }, onclick: function () { EPAL.app.gotoCompany(c.id); } }, [
           el('div.co-perf-head', null, [
             el('div.co-perf-ico', { style:{ background:c.accent }, html: '<i class="bi bi-' + c.icon + '"></i>' }),
-            el('div', null, [ el('div.co-perf-name', { text: c.short }),
-              el('div.text-mute.xs', { text: c.employees + ' staff · risk ' + c.risk }) ])
+            el('div.flex-1', null, [ el('div.co-perf-name', { text: c.short }),
+              el('div.text-mute.xs', { text: c.employees + ' staff · risk ' + c.risk }) ]),
+            el('span.health.' + hl[0], { text: hl[1] })
           ]),
           el('div.co-perf-rev', { text: ui.money(c.revenue, { compact: true }) }),
           el('div.co-perf-meta', null, [
@@ -106,23 +108,40 @@
       row3.appendChild(buildAlertsCard(snap));
       page.appendChild(row3);
 
-      /* ---- activity timeline ------------------------------------------- */
-      page.appendChild(el('div.section-label', { text: 'Group Activity' }));
-      var actCard = el('div.card', null, [ el('div.card-body', null, [ buildTimeline() ]) ]);
-      page.appendChild(actCard);
+      /* ---- smart signals + activity ------------------------------------ */
+      var row4 = el('div.two-col');
+      row4.appendChild(buildSmartSignals(snap));
+      row4.appendChild(el('div.card', null, [
+        el('div.card-head', null, [ el('h3', { html: ui.icon('clock-history') + ' Group Activity' }) ]),
+        el('div.card-body', null, [ buildTimeline() ]) ]));
+      page.appendChild(el('div.section-label', { text: 'Intelligence & Activity' }));
+      page.appendChild(row4);
 
       ctx.mount.appendChild(page);
 
       /* ---- charts (after DOM is in the document) ----------------------- */
       requestAnimationFrame(function () {
-        charts.area(ui.$('#chart-trend'), {
-          labels: series.labels,
+        // 2-month least-squares projection appended to the revenue line (dashed)
+        var fc = EPAL.forecast ? EPAL.forecast(series.revenue, 2) : [];
+        var labels = series.labels.concat(fc.map(function (_, i) { return '+' + (i + 1); }));
+        var pad = function (arr) { return arr.concat(fc.map(function () { return null; })); };
+        var projected = series.revenue.map(function () { return null; });
+        if (fc.length) projected[projected.length - 1] = series.revenue[series.revenue.length - 1];
+        var trendChart = charts.area(ui.$('#chart-trend'), {
+          labels: labels,
           datasets: [
-            { label: 'Revenue', data: series.revenue, color: getAccent('group') },
-            { label: 'Profit', data: series.profit, color: '#23c17e' },
-            { label: 'Expense', data: series.expense, color: '#f0506e' }
+            { label: 'Revenue', data: pad(series.revenue), color: getAccent('group') },
+            { label: 'Profit', data: pad(series.profit), color: '#23c17e' },
+            { label: 'Expense', data: pad(series.expense), color: '#f0506e' },
+            { label: 'Projection', data: projected.concat(fc), color: '#f4b740' }
           ]
         });
+        if (trendChart && trendChart.data.datasets[3]) {
+          trendChart.data.datasets[3].borderDash = [6, 5];
+          trendChart.data.datasets[3].fill = false;
+          trendChart.data.datasets[3].pointRadius = 3;
+          trendChart.update();
+        }
         charts.doughnut(ui.$('#chart-mix'), {
           labels: snap.companies.map(function (c) { return c.short; }),
           data: snap.companies.map(function (c) { return c.revenue; }),
@@ -150,18 +169,23 @@
     return { dir: pct > 0.5 ? 'up' : pct < -0.5 ? 'down' : 'flat', val: (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%' };
   }
 
-  function kpiTile(host, label, value, icon, trend, spark, foot, isPct) {
+  function kpiTile(host, label, value, icon, trend, spark, foot, drill) {
     var id = ui.uid('spark');
-    var tile = el('div.kpi-card', null, [
+    var valueEl = el('div.kpi-value');
+    var tile = el('div.kpi-card' + (drill ? '.drill' : ''),
+      drill ? { onclick: function () { EPAL.router.navigate(drill); }, title: 'Open ' + label } : null, [
       el('div.kpi-top', null, [ el('span.kpi-label', { text: label }),
         el('span.kpi-ico', { html: '<i class="bi bi-' + icon + '"></i>' }) ]),
-      el('div.kpi-value', { text: value }),
+      valueEl,
       el('div.kpi-foot', null, [
         trend.val ? el('span.kpi-trend.' + trend.dir, { html: ui.icon(trend.dir === 'up' ? 'arrow-up-right' : trend.dir === 'down' ? 'arrow-down-right' : 'dash') + ' ' + trend.val }) : null,
         el('span.text-muted', { text: foot })
       ]),
       spark ? el('canvas.kpi-spark', { id: id }) : null
     ]);
+    // money values count up softly; preformatted strings render instantly
+    if (typeof value === 'number') ui.countUp(valueEl, value, function (v) { return ui.money(v, { compact: true }); });
+    else valueEl.textContent = value;
     host.appendChild(tile);
     if (spark) requestAnimationFrame(function () { var c = document.getElementById(id); if (c) EPAL.charts.spark(c, spark, trend.dir === 'down' ? '#f0506e' : '#23c17e'); });
   }
@@ -191,6 +215,42 @@
           ]);
         }))
       ])
+    ]);
+  }
+
+  /* Smart signals — the "all-seeing owner" digest: who's rising, who's
+   * bleeding, most valuable client, weakest performer. All computed live.   */
+  function buildSmartSignals(snap) {
+    var byMom = snap.companies.slice().sort(function (a, b) { return b.mom - a.mom; });
+    var rising = byMom[0], bleeding = byMom[byMom.length - 1];
+    var topClient = db.customers().slice().sort(function (a, b) { return (b.value || 0) - (a.value || 0); })[0];
+    var weakest = db.employees().filter(function (e) { return e.role !== 'owner'; })
+      .sort(function (a, b) { return (a.rating || 0) - (b.rating || 0); })[0];
+    var bestMargin = snap.companies.slice().sort(function (a, b) { return b.margin - a.margin; })[0];
+
+    function signal(icon, tone, title, text, drill) {
+      return el('div.data-row', { style: drill ? { cursor: 'pointer' } : null,
+        onclick: drill ? function () { EPAL.router.navigate(drill); } : null }, [
+        ui.frag('<span class="notif-ico notif-' + tone + '">' + ui.icon(icon) + '</span>'),
+        el('div.flex-1', null, [ el('div.fw-600.sm', { text: title }), el('div.text-mute.xs', { text: text }) ]),
+        drill ? ui.frag('<i class="bi bi-chevron-right text-mute"></i>') : null
+      ]);
+    }
+    return el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('stars') + ' Smart Signals' }),
+        el('span.card-sub', { text: 'computed live from group data' }) ]),
+      el('div.card-body', null, [ el('div.data-list', null, [
+        rising ? signal('rocket-takeoff', 'success', rising.short + ' is rising fastest',
+          '+' + rising.mom.toFixed(1) + '% month-over-month revenue growth', rising.id + '/analytics') : null,
+        bleeding && bleeding.mom < 0 ? signal('droplet-half', 'error', bleeding.short + ' is bleeding',
+          bleeding.mom.toFixed(1) + '% MoM — review pricing and pipeline', bleeding.id + '/analytics') : null,
+        bestMargin ? signal('gem', 'info', bestMargin.short + ' has the best margin',
+          ui.pct(bestMargin.margin) + ' net — the group benchmark', bestMargin.id + '/analytics') : null,
+        topClient ? signal('trophy', 'warning', topClient.name + ' is the most valuable client',
+          ui.money(topClient.value, { compact: true }) + ' lifetime · known by ' + (topClient.companyIds || []).length + ' concern(s)', 'group/crm/customers') : null,
+        weakest ? signal('person-dash', 'error', weakest.name + ' needs attention',
+          'Lowest performance rating (' + (weakest.rating || 0).toFixed(1) + ') · ' + weakest.designation, 'group/employees/performance') : null
+      ]) ])
     ]);
   }
 
