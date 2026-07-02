@@ -1,0 +1,47 @@
+/* ============================================================================
+ * EPAL GROUP ERP  ·  css/animations.css
+ * ----------------------------------------------------------------------------
+ * MOTION LANGUAGE — keyframes + entrance helpers. Subtle by design: motion
+ * should feel like polish, never distraction. Respects prefers-reduced-motion.
+ * ==========================================================================*/
+
+@keyframes pulseGlow {
+  0%,100% { box-shadow: 0 0 0 1px var(--warn), 0 0 18px -6px var(--warn); }
+  50%     { box-shadow: 0 0 0 1px var(--warn), 0 0 28px -2px var(--warn); }
+}
+@keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes bootSlide { 0% { transform: translateX(-120%); } 100% { transform: translateX(360%); } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { 100% { background-position: 200% 0; } }
+@keyframes ringSpin { to { transform: rotate(360deg); } }
+
+/* The content region fades/rises in on every route change ------------------*/
+.content > .page, .content > * { animation: fadeUp .38s var(--e-out) both; }
+
+/* Stagger children (add .stagger to a container) ---------------------------*/
+.stagger > * { animation: fadeUp .42s var(--e-out) both; }
+.stagger > *:nth-child(1){animation-delay:.02s}.stagger > *:nth-child(2){animation-delay:.06s}
+.stagger > *:nth-child(3){animation-delay:.10s}.stagger > *:nth-child(4){animation-delay:.14s}
+.stagger > *:nth-child(5){animation-delay:.18s}.stagger > *:nth-child(6){animation-delay:.22s}
+.stagger > *:nth-child(7){animation-delay:.26s}.stagger > *:nth-child(8){animation-delay:.30s}
+
+/* Skeleton loading shimmer -------------------------------------------------*/
+.skeleton { background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 37%, var(--surface-2) 63%);
+  background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: var(--r-sm); }
+
+/* Spinner ------------------------------------------------------------------*/
+.spinner { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid var(--surface-3); border-top-color: var(--accent); animation: ringSpin .7s linear infinite; }
+
+/* Count-up numbers get a soft entrance ------------------------------------*/
+.kpi-value, .co-perf-rev { animation: popIn .5s var(--e-out) both; }
+
+/* Live "recording" pulse dot (task timers) --------------------------------*/
+.rec-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); position: relative; }
+.rec-dot::after { content:''; position: absolute; inset: 0; border-radius: 50%; background: var(--good); animation: recPing 1.4s var(--e-out) infinite; }
+@keyframes recPing { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(3.2); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

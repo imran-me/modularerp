@@ -1,0 +1,120 @@
+/* ============================================================================
+ * EPAL GROUP ERP  ·  css/tokens.css
+ * ----------------------------------------------------------------------------
+ * DESIGN TOKENS — the single source of truth for the visual language.
+ *
+ * Aesthetic direction: "Private Office" — a calm, expensive, command-center
+ * feel. Deep navy canvas, platinum text, a restrained gold accent, and a
+ * per-company accent colour injected at runtime via --accent.
+ *
+ * Two themes (dark = default, light) driven by [data-theme] on <html>.
+ * Every colour, radius, shadow, and easing lives here so the whole system can
+ * be re-skinned by editing ONE file.
+ * ==========================================================================*/
+
+:root {
+  /* Typography ------------------------------------------------------------*/
+  --font-sans: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Sora', 'Plus Jakarta Sans', var(--font-sans);
+  --font-mono: 'JetBrains Mono', 'DM Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Brand accents (also declared in config.js per company) ---------------*/
+  --gold: #c8a24a;
+  --gold-soft: #e4c987;
+  --brand-travels: #2f6bff;
+  --brand-woodart: #6f9c1c;
+  --brand-it: #7b5cff;
+  --brand-shop: #e0356e;
+  --brand-construction: #e2721b;
+
+  /* Semantic status -------------------------------------------------------*/
+  --good: #23c17e;   --good-soft: rgba(35,193,126,.14);
+  --warn: #f4b740;   --warn-soft: rgba(244,183,64,.14);
+  --bad:  #f0506e;   --bad-soft:  rgba(240,80,110,.14);
+  --info: #3b82f6;   --info-soft: rgba(59,130,246,.14);
+
+  /* Runtime accent (router sets this per company) ------------------------*/
+  --accent: var(--gold);
+
+  /* Radii -----------------------------------------------------------------*/
+  --r-xs: 7px; --r-sm: 10px; --r-md: 14px; --r-lg: 18px; --r-xl: 24px; --r-pill: 999px;
+
+  /* Motion ----------------------------------------------------------------*/
+  --e-out: cubic-bezier(.16,.84,.44,1);
+  --e-inout: cubic-bezier(.65,.05,.36,1);
+  --t-fast: .14s; --t: .24s; --t-slow: .4s;
+
+  /* Layout metrics --------------------------------------------------------*/
+  --rail-w: 68px;
+  --sidebar-w: 268px;
+  --topbar-h: 62px;
+  --content-max: 1600px;
+}
+
+/* ============================ DARK (default) ============================= */
+:root, [data-theme="dark"] {
+  --bg:        #070b14;
+  --bg-2:      #0a0f1c;
+  --surface:   #0e1524;
+  --surface-2: #131b2d;
+  --surface-3: #1a2338;
+  --surface-hi:#212c45;
+
+  --border:        rgba(255,255,255,.07);
+  --border-strong: rgba(255,255,255,.13);
+  --border-accent: color-mix(in srgb, var(--accent) 45%, transparent);
+
+  --text:      #eaeefb;
+  --text-dim:  #9aa6c2;
+  --text-mute: #5c6884;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow:    0 8px 30px rgba(0,0,0,.35);
+  --shadow-lg: 0 24px 70px rgba(0,0,0,.55);
+  --glow:      0 0 0 1px var(--border-accent), 0 10px 40px -12px color-mix(in srgb, var(--accent) 55%, transparent);
+
+  --glass:      color-mix(in srgb, var(--surface) 72%, transparent);
+  --glass-brd:  rgba(255,255,255,.08);
+  --grid-line:  rgba(255,255,255,.045);
+  --scrim:      rgba(3,6,12,.66);
+
+  color-scheme: dark;
+}
+
+/* =============================== LIGHT =================================== */
+[data-theme="light"] {
+  --bg:        #eef1f8;
+  --bg-2:      #e7ebf4;
+  --surface:   #ffffff;
+  --surface-2: #f6f8fd;
+  --surface-3: #eef2f9;
+  --surface-hi:#e5ebf6;
+
+  --border:        rgba(16,26,48,.09);
+  --border-strong: rgba(16,26,48,.16);
+  --border-accent: color-mix(in srgb, var(--accent) 40%, transparent);
+
+  --text:      #131a2c;
+  --text-dim:  #56617c;
+  --text-mute: #8a93a9;
+
+  --shadow-sm: 0 1px 2px rgba(20,30,60,.06);
+  --shadow:    0 10px 30px rgba(20,30,60,.10);
+  --shadow-lg: 0 26px 70px rgba(20,30,60,.18);
+  --glow:      0 0 0 1px var(--border-accent), 0 12px 40px -14px color-mix(in srgb, var(--accent) 50%, transparent);
+
+  --glass:      color-mix(in srgb, #ffffff 78%, transparent);
+  --glass-brd:  rgba(16,26,48,.08);
+  --grid-line:  rgba(16,26,48,.05);
+  --scrim:      rgba(20,30,60,.35);
+
+  color-scheme: light;
+}
+
+/* Company accent helper classes (used by rail + theming) ----------------- */
+[data-co="group"]        { --accent: var(--gold); }
+[data-co="travels"]      { --accent: var(--brand-travels); }
+[data-co="woodart"]      { --accent: var(--brand-woodart); }
+[data-co="it"]           { --accent: var(--brand-it); }
+[data-co="shop"]         { --accent: var(--brand-shop); }
+[data-co="construction"] { --accent: var(--brand-construction); }
