@@ -124,13 +124,26 @@ Dashboard + their own Tasks + their own Profile only. Use the topbar avatar →
 **Fully built & operational:** the whole runtime, modular engine, premium design
 system, Group Command Center, Module Control, Workforce/Employee Management (with
 downloadable profile reports + payroll + CSV export), the Task Board (Kanban, phase
-timers, admin comment-glow, restrict/red-flag, drag-drop), Travels Dashboard, and the
-**Visa Processing** module end-to-end (categories CRUD, application intake with
-auto-pricing, drag-drop stage board, sales ledger + CSV, rates, embassy tracker,
-document checklists, analytics charts).
+timers, admin comment-glow, restrict/red-flag, drag-drop), Travels Dashboard, the
+**Visa Processing** module end-to-end, and the **Air Ticketing** module (Direct Sale
+issue, Manage Sales ledger + detail drawer with void/re-issue/refund/pay-status,
+Airlines & Airports masters, BSP/ADM reconciliation, Refund Tracker — issuing a ticket
+fires `db.postSale()` so Travels + Group finance move live).
 
-**Live-but-scaffolded:** every other module across all five concerns renders a real
-navigable workspace via the placeholder — ready to graduate one file at a time.
+Also live: the **group command layer** (CRM, Consolidated Finance, Analytics, Reports,
+Companies, Automation, Notifications, Settings) and **shared wildcard company views**
+(`*/dashboard`, `*/hrm`, `*/accounts`, `*/ledgers`, `*/reports`, `*/analytics`,
+`*/customers`, `*/crm`, `*/settings`) that give every sister concern real screens, plus
+the runtime kit `core/forms.js` · `core/datatable.js` (`EPAL.table`) · `core/entity.js`
+(CRUD factory) · `core/seed-bd.js` (deep all-company seed).
+
+> ⚠️ **Every new file MUST be added as a `<script>` in `index.html`** (there is no
+> dynamic loader). A whole batch was once written and committed but left unwired, so it
+> silently fell back to the scaffold. A boot sweep (Chrome headless over all 180 routes)
+> is the fast regression check — every route must render real content with no console error.
+
+**Live-but-scaffolded:** the remaining per-concern modules still render a real navigable
+workspace via the placeholder — ready to graduate one file at a time.
 
 ## 9. Roadmap / next graduations (priority order)
 

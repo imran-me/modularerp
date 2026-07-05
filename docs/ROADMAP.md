@@ -17,14 +17,25 @@ Each item is one `views/**` file following `docs/VIEWS-GUIDE.md`.
   counter, weighted % completion), admin comment-glow, restrict + red-flag, assign,
   employee ESS view, per-employee persistence.
 - **Travels Dashboard** + **Visa Processing** (end-to-end, see `docs/travels-visa.md`).
+- **Travels ▸ Air Ticketing** — Direct Sale (issue), Manage Sales ledger + detail
+  drawer (void/re-issue/refund/pay-status), Airlines & Airports masters, BSP/ADM
+  reconciliation, Refund Tracker. Issuing fires `db.postSale()` → live group finance.
+- **Group command layer** — CRM (customer 360 + pipeline), Consolidated Finance
+  (P&L, cash flow, balance sheet, AR/AP, banks), Analytics, Reports, Companies,
+  Automation, Notifications, Settings.
+- **Shared company workspaces** — wildcard views (`*/dashboard`, `*/hrm`, `*/accounts`,
+  `*/ledgers`, `*/reports`, `*/analytics`, `*/customers`, `*/crm`, `*/settings`) give
+  every sister concern real screens; a specific view overrides them per company.
+- **Runtime kit** — `core/forms.js` (schema form builder), `core/datatable.js`
+  (`EPAL.table`), `core/entity.js` (CRUD factory), `core/seed-bd.js` (deep all-company
+  operational seed). All wired into `index.html` and boot-verified (180 routes, 0 errors).
 
 ## 🎯 Next (high value)
-1. **Travels ▸ Air Ticketing** — Direct Sale hub (Issue/Re-issue/Refund/Void/EMD),
-   Manage Sales, Airlines/Airports masters, BSP/ADM recon. Fields in `oldprojectmap.md` §8.
+1. **Travels ▸ Air Ticketing depth** — repeatable multi-pax cards, EMD/ancillary tab,
+   payable/receivable schedules, branded invoice/PDF, TTL deadline queue.
 2. **Travels ▸ Vendor & Agent** — party ledgers, ageing buckets, credit limits, commission.
-3. **Group ▸ CRM** — unified customer 360, pipeline Kanban, follow-ups, comms log
-   (shared across all concerns via the existing customer store).
-4. **Group ▸ Consolidated Finance** — P&L, cash flow, balance sheet, AR/AP aging, banks.
+3. **Contract Flight** — group/charter seat blocks (Umrah/Hajj/worker) off the airline master.
+4. Graduate the remaining scaffolded per-concern modules (Shop POS, Construction BOQ…).
 
 ## 🧱 Per-concern build-out
 - **Epal Shop** — POS terminal, Products (catalog/variants/barcodes), Inventory

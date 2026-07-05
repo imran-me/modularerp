@@ -18,6 +18,11 @@
  *   tasks.<empId>  [{id, title, phases[], ...}]            per-employee board
  *   visaApps       [{id, applicant, country, stage, ...}]  (Travels exemplar)
  *   visaCats       [{id, country, type, cost, sale, days}]
+ *   airTickets     [{id, pnr, passenger, route, airline, cost, sale, status}]
+ *   airlines       [{id, name, iata, country, status}]     Air Ticketing masters
+ *   airports       [{id, name, iata, city, country}]
+ *   airRefunds     [{id, pnr, passenger, gross, netRefund, status}]
+ *   airBsp         {txns[], adms[], unused[], api{}}        BSP/ADM recon (object)
  *   vendors        [{id, name, type, balance, ...}]
  *   notifications  [{id, level, title, read, ...}]
  *   activity       [{id, at, actor, text, companyId}]      audit trail
@@ -237,6 +242,97 @@
     ];
   }
 
+  /* --- Travels: Air Ticketing seed ---------------------------------------*/
+  function seedAirlines() {
+    return [
+      { id:'AL-BG', name:'Biman Bangladesh Airlines', iata:'BG', country:'Bangladesh',  status:'active' },
+      { id:'AL-BS', name:'US-Bangla Airlines',        iata:'BS', country:'Bangladesh',  status:'active' },
+      { id:'AL-EK', name:'Emirates',                  iata:'EK', country:'UAE',          status:'active' },
+      { id:'AL-QR', name:'Qatar Airways',             iata:'QR', country:'Qatar',        status:'active' },
+      { id:'AL-SV', name:'Saudia',                    iata:'SV', country:'Saudi Arabia', status:'active' },
+      { id:'AL-EY', name:'Etihad Airways',            iata:'EY', country:'UAE',          status:'active' },
+      { id:'AL-TK', name:'Turkish Airlines',          iata:'TK', country:'Turkey',       status:'active' },
+      { id:'AL-MH', name:'Malaysia Airlines',         iata:'MH', country:'Malaysia',     status:'active' },
+      { id:'AL-SQ', name:'Singapore Airlines',        iata:'SQ', country:'Singapore',    status:'active' },
+      { id:'AL-FZ', name:'Flydubai',                  iata:'FZ', country:'UAE',          status:'active' }
+    ];
+  }
+  function seedAirports() {
+    return [
+      { id:'AP-DAC', name:'Hazrat Shahjalal Intl',        iata:'DAC', city:'Dhaka',        country:'Bangladesh' },
+      { id:'AP-CGP', name:'Shah Amanat Intl',             iata:'CGP', city:'Chittagong',   country:'Bangladesh' },
+      { id:'AP-DXB', name:'Dubai Intl',                   iata:'DXB', city:'Dubai',        country:'UAE' },
+      { id:'AP-DOH', name:'Hamad Intl',                   iata:'DOH', city:'Doha',         country:'Qatar' },
+      { id:'AP-JED', name:'King Abdulaziz Intl',          iata:'JED', city:'Jeddah',       country:'Saudi Arabia' },
+      { id:'AP-RUH', name:'King Khalid Intl',             iata:'RUH', city:'Riyadh',       country:'Saudi Arabia' },
+      { id:'AP-KUL', name:'Kuala Lumpur Intl',            iata:'KUL', city:'Kuala Lumpur', country:'Malaysia' },
+      { id:'AP-SIN', name:'Changi',                       iata:'SIN', city:'Singapore',    country:'Singapore' },
+      { id:'AP-IST', name:'Istanbul',                     iata:'IST', city:'Istanbul',     country:'Turkey' },
+      { id:'AP-LHR', name:'Heathrow',                     iata:'LHR', city:'London',       country:'United Kingdom' },
+      { id:'AP-CCU', name:'Netaji Subhas Chandra Bose',   iata:'CCU', city:'Kolkata',      country:'India' },
+      { id:'AP-BKK', name:'Suvarnabhumi',                 iata:'BKK', city:'Bangkok',      country:'Thailand' }
+    ];
+  }
+  var TKT_STATUSES = ['Issued','Issued','Confirmed','Hold','Issued','Re-issued','Void','Refunded'];
+  function seedAirTickets() {
+    var airlines = seedAirlines(), out = [];
+    var routes = [['DAC','DXB'],['DAC','JED'],['DAC','KUL'],['DAC','DOH'],['DAC','SIN'],
+                  ['CGP','DXB'],['DAC','IST'],['DAC','LHR'],['DAC','RUH'],['DAC','CCU'],['DAC','BKK']];
+    for (var i = 0; i < 18; i++) {
+      var al = pick(airlines), rt = pick(routes);
+      var cost = ri(38, 120) * 1000;
+      var sale = Math.round(cost * (1.06 + rnd() * 0.14));
+      out.push({
+        id:'TK-' + (7001 + i),
+        pnr: String.fromCharCode(65 + ri(0,25)) + String.fromCharCode(65 + ri(0,25)) + ri(1000, 9999),
+        ticketNo: '057-' + ri(1000000000, 9999999999),
+        passenger: pick(FIRST) + ' ' + pick(LAST),
+        phone:'+88016' + ri(10000000, 99999999), passport:'A' + ri(1000000, 9999999),
+        fromCode: rt[0], toCode: rt[1], route: rt[0] + ' → ' + rt[1],
+        tripType: pick(['One-way','Round','Round','Multi-City']),
+        airlineCode: al.iata, airline: al.name, flightNo: al.iata + ri(100, 999),
+        vendor: pick(['Galaxy GSA','GDS Aggregator BD','Emirates GSA','Direct Airline']),
+        portal: pick(['Sabre','Amadeus','Galileo','Direct']),
+        travelDate:'2026-' + String(ri(7,12)).padStart(2,'0') + '-' + String(ri(1,28)).padStart(2,'0'),
+        purchaseDate:'2026-0' + ri(4,6) + '-' + String(ri(1,28)).padStart(2,'0'),
+        cost: cost, sale: sale, costPaid: pick([cost, cost, 0, Math.round(cost/2)]),
+        payStatus: pick(['Paid','Paid','Partial','Due']),
+        agent:'EPL-' + String(ri(2,8)).padStart(4,'0'),
+        currency:'BDT', status: pick(TKT_STATUSES),
+        created:'2026-0' + ri(4,6) + '-' + String(ri(1,28)).padStart(2,'0'),
+        timeline:[{ at: Date.now() - ri(1,40) * 86400000, text:'Ticket issued' }]
+      });
+    }
+    return out;
+  }
+  function seedAirRefunds() {
+    var al = seedAirlines();
+    return [0,1,2,3,4].map(function (i) {
+      var a = pick(al), gross = ri(40,110) * 1000, penalty = ri(3,12) * 1000, fee = ri(1,4) * 1000;
+      return { id:'RF-' + (9001 + i), pnr: String.fromCharCode(65+ri(0,25)) + String.fromCharCode(65+ri(0,25)) + ri(1000,9999),
+        passenger: pick(FIRST) + ' ' + pick(LAST), airline: a.name, ticketNo:'057-' + ri(1000000000, 9999999999),
+        gross: gross, airlineRefund: gross - penalty, penalty: penalty, fee: fee, netRefund: gross - penalty - fee,
+        method: pick(['Bank','bKash','Cash','Card Reversal']),
+        status: pick(['Requested','Filed','Received','Paid','Rejected']),
+        date:'2026-0' + ri(4,6) + '-' + String(ri(1,28)).padStart(2,'0') };
+    });
+  }
+  function seedAirBsp() {
+    var al = seedAirlines();
+    function txn(i, st) { var a = pick(al), comm = ri(1,6) * 1000, agency = ri(30,90) * 1000;
+      return { id:'BX-' + (1 + i), passenger: pick(FIRST) + ' ' + pick(LAST), airline: a.name,
+        issueDate:'2026-06-' + String(ri(1,28)).padStart(2,'0'), comm: comm, agencyAmt: agency,
+        bspAmt: st === 'Discrepancy' ? agency + ri(1,5) * 1000 : agency, status: st }; }
+    return {
+      txns: [txn(0,'Matched'), txn(1,'Matched'), txn(2,'Matched'), txn(3,'Unmatched'), txn(4,'Discrepancy'), txn(5,'Matched')],
+      adms: [ { id:'ADM-1', airline:'Emirates', ticketNo:'176-2210045566', reason:'Fare rule violation', amount: 8400, date:'2026-06-18', status:'Open' },
+              { id:'ADM-2', airline:'Qatar Airways', ticketNo:'157-3340012211', reason:'Incorrect tax', amount: 3200, date:'2026-06-22', status:'Disputed' } ],
+      unused: [ { id:'UN-1', passenger:'Rakib Hasan', airline:'Biman Bangladesh Airlines', value: 46000, expiry:'2026-09-30' },
+                { id:'UN-2', passenger:'Tania Islam', airline:'Saudia', value: 61000, expiry:'2026-08-15' } ],
+      api: { connected: true, endpoint:'bsplink.iata.org', keyMasked:'••••4821', lastSync:'2026-07-05 09:12' }
+    };
+  }
+
   function seedNotifications() {
     return [
       { id:'N1', level:'warning', title:'AR Aging Alert', text:'৳12.4L overdue >60 days in Construction.', companyId:'construction', at: Date.now()-7200000, read:false, icon:'exclamation-triangle-fill' },
@@ -258,6 +354,11 @@
       S.seedOnce('visaCats', seedVisaCats());
       S.seedOnce('visaApps', seedVisaApps());
       S.seedOnce('vendors', seedVendors());
+      S.seedOnce('airlines', seedAirlines());
+      S.seedOnce('airports', seedAirports());
+      S.seedOnce('airTickets', seedAirTickets());
+      S.seedOnce('airRefunds', seedAirRefunds());
+      S.seedOnce('airBsp', seedAirBsp());
       S.seedOnce('notifications', seedNotifications());
       S.seedOnce('tasks.EPL-DEV1', seedTasksForDemoDev());
       S.seedOnce('activity', [{ id:'A1', at: Date.now(), actor:'System', text:'ERP initialised · demo data seeded', companyId:'group' }]);
@@ -286,6 +387,11 @@
     visaCats: function () { return S.list('visaCats'); },
     visaApps: function () { return S.list('visaApps'); },
     vendors: function () { return S.list('vendors'); },
+    airlines: function () { return S.list('airlines'); },
+    airports: function () { return S.list('airports'); },
+    airTickets: function () { return S.list('airTickets'); },
+    airRefunds: function () { return S.list('airRefunds'); },
+    airBsp: function () { return S.get('airBsp', { txns:[], adms:[], unused:[], api:{} }); },
     notifications: function () { return S.list('notifications').sort(function (a, b) { return b.at - a.at; }); },
     activity: function () { return S.list('activity').sort(function (a, b) { return b.at - a.at; }); },
     tasksFor: function (empId) { return S.list('tasks.' + empId); },
@@ -426,6 +532,16 @@
       this.log('EPL-0001', 'Visa application ' + app.id + ' saved (' + app.country + ')', 'travels');
       return app;
     },
+    saveAirTicket: function (t) {
+      if (!t.id) t.id = 'TK-' + Date.now().toString().slice(-5);
+      S.upsert('airTickets', t);
+      bus.emit('data:changed', { store:'airTickets', action:'upsert', record: t });
+      this.log('EPL-0001', 'Air ticket ' + t.id + ' saved (' + (t.route || '') + ')', 'travels');
+      return t;
+    },
+    saveAirline: function (a) { S.upsert('airlines', a); bus.emit('data:changed', { store:'airlines', action:'upsert', record:a }); return a; },
+    saveAirport: function (a) { S.upsert('airports', a); bus.emit('data:changed', { store:'airports', action:'upsert', record:a }); return a; },
+    saveAirRefund: function (r) { S.upsert('airRefunds', r); bus.emit('data:changed', { store:'airRefunds', action:'upsert', record:r }); return r; },
     saveEmployee: function (e) { S.upsert('employees', e); bus.emit('data:changed', { store:'employees', action:'upsert', record:e }); return e; },
     saveCustomer: function (c) { S.upsert('customers', c); bus.emit('customer:upserted', { customerId:c.id }); return c; },
     saveVisaCat: function (c) { S.upsert('visaCats', c); bus.emit('data:changed', { store:'visaCats', action:'upsert', record:c }); return c; },
