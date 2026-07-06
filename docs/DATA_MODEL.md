@@ -3,7 +3,7 @@
 **Architect-grade data reference.** Every entity, every field, every relation.
 
 This document is the authoritative map of the persisted state of the Epal Group ERP.
-It is derived directly from the source (`core/database.js`, `core/seed-bd.js`, the Deep
+It is derived directly from the source (`data/database.js`, `data/seed-bd.js`, the Deep
 Core engines, and the module views that own their own stores). If code and this doc
 disagree, code wins — but this doc is kept faithful to the code it was generated from.
 
@@ -15,7 +15,7 @@ disagree, code wins — but this doc is kept faithful to the code it was generat
 
 The ERP is a no-build, browser-only SPA. There is **no server and no database**. All
 state lives in the browser's `localStorage`, accessed through one narrow door:
-`EPAL.store` (`core/state.js`). Swapping this single file for real API calls is the
+`EPAL.store` (`data/state.js`). Swapping this single file for real API calls is the
 intended migration path — nothing else in the app touches `localStorage` directly.
 
 ### 1.2 Namespace: `epal.v1.`
@@ -248,7 +248,7 @@ Seeded with 40 rows; runtime `postSale()` appends here. See §4.
 
 ### 2.B Finance & Ledger (double-entry)
 
-#### `coa` — Chart of Accounts (`core/ledger.js`)
+#### `coa` — Chart of Accounts (`engines/ledger.js`)
 Singleton-per-account rows. The standard 22-account chart.
 
 | Field | Type | Notes |
@@ -585,7 +585,7 @@ note, at:ms`. Each punch also increments the counter on `employees.attendance`.
 
 ### 2.I Trust — audit / approvals / permissions
 
-#### `audit_log` — tamper-evident "who did what, when" (`core/audit.js`)
+#### `audit_log` — tamper-evident "who did what, when" (`engines/audit.js`)
 Append-only, **capped at the most-recent 500 rows** (`capStore`).
 
 | Field | Type | Notes |
@@ -608,7 +608,7 @@ Only stores present in the `LABELS` map are auto-audited; noise stores (`audit_l
 ignored. The ledger self-audits its own postings (so `gl_entries` is skipped here to
 avoid double-logging).
 
-#### `approvals` — maker-checker requests (`core/approvals.js`)
+#### `approvals` — maker-checker requests (`engines/approvals.js`)
 | Field | Type | Notes |
 |---|---|---|
 | id | str | `AP-3001…` / `uid('APR')` |
@@ -637,7 +637,7 @@ Default bands: payment 50k–500k → `[Finance Manager]`; payment ≥500k → `
 Manager, MD]`; refund any → `[Finance Manager]`; salary-change → `[MD]`;
 credit-limit-override → `[MD]`; client-delete → `[admin]`.
 
-#### `role_templates` — action-level permission grants (`core/permissions.js`)
+#### `role_templates` — action-level permission grants (`engines/permissions.js`)
 | Field | Type | Notes |
 |---|---|---|
 | id | str | `RT-owner`, `RT-admin`, … |
@@ -652,7 +652,7 @@ and `approve` are hard-enforced for non-admins without a covering grant.
 
 ### 2.J Documents / Comments / Automation / Serials
 
-#### `documents` — Document Center metadata (`core/documents.js`)
+#### `documents` — Document Center metadata (`engines/documents.js`)
 | Field | Type | Notes |
 |---|---|---|
 | id | str | `DOC-0001…` / `uid('DOC')` |
@@ -668,7 +668,7 @@ and `approve` are hard-enforced for non-admins without a covering grant.
 Type→prefix map: invoice INV · receipt RCP · voucher JV · workorder WO · salary SAL ·
 quotation QUO · po PO · visacover VISA · ticket TKT.
 
-#### `comments` — collaboration threads + @mentions (`core/comments.js`)
+#### `comments` — collaboration threads + @mentions (`engines/comments.js`)
 | Field | Type | Notes |
 |---|---|---|
 | id | str | `uid('CMT')` |
@@ -679,7 +679,7 @@ quotation QUO · po PO · visacover VISA · ticket TKT.
 | text | str | raw text (rendered safely; `@Name` highlighted) |
 | mentions | [str] | resolved `employees.id[]`; each is notified |
 
-#### `automation_rules` — the rule book (`core/rules.js`)
+#### `automation_rules` — the rule book (`engines/rules.js`)
 | Field | Type | Notes |
 |---|---|---|
 | id | str | `AR-01…` |
@@ -698,7 +698,7 @@ quotation QUO · po PO · visacover VISA · ticket TKT.
 #### `automation_meta` — automation bookkeeping (**singleton object**)
 `{ escalatedDay: 'YYYY-MM-DD' }` — guards once-per-day MD escalation.
 
-#### `serials` — gapless document counters (**singleton object**, `core/serial.js`)
+#### `serials` — gapless document counters (**singleton object**, `engines/serial.js`)
 Map of `"<company?>:<PREFIX>:<fiscalYear>" → highest issued int`, e.g.
 `{ "INV:2026": 42, "travels:JV:2026": 7 }`. Format `PREFIX/FY/000NNN`. Reconciled on
 first read against seeded `documents` serials so runtime numbers never collide with
@@ -810,7 +810,7 @@ lockstep. An auditor can trace any figure end-to-end through this chain:
         │        └── company dashboard, Accounts, Group Command Center all move
         │
         ├─(3) bus.emit('sale:recorded', rec)                   ← the key event
-        │        └── core/ledger.js boot() listener AUTO-POSTS a balanced GL entry:
+        │        └── engines/ledger.js boot() listener AUTO-POSTS a balanced GL entry:
         │              DR 1200 Accounts Receivable   amount
         │              CR 4000 Sales Revenue         amount
         │              (if cost>0)

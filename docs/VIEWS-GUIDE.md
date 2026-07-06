@@ -46,7 +46,7 @@ Everything you need to turn a scaffolded nav item into a real screen. Copy, rena
 
 ## 2. Register the script
 
-Add one line to `index.html` (in the VIEWS block, **before** `core/app.js`):
+Add one line to `index.html` (in the VIEWS block, **before** `kernel/app.js`):
 
 ```html
 <script src="assets/js/views/shop/inventory.js"></script>

@@ -1,19 +1,44 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/app.js
+ * EPAL GROUP ERP  ·  assets/js/kernel/app.js
  * ----------------------------------------------------------------------------
- * THE APPLICATION SHELL + BOOTSTRAP.
+ * WHAT: THE APPLICATION SHELL + BOOTSTRAP. This is the composition root. It seeds
+ *   data, applies saved module on/off overrides, paints the theme, then builds the
+ *   whole chrome around the router-rendered content — the company-switcher RAIL,
+ *   the per-company module SIDEBAR (collapsible single-open accordion), and the
+ *   TOPBAR (breadcrumb, command palette, notifications, quick-add, user menu) —
+ *   and finally starts the router and the deep-core engines. Everything in the
+ *   rail/sidebar/palette is generated from the config registry and filtered by
+ *   module-enabled AND auth-permission, so the UI reshapes itself per role/toggles.
  *
- * Assembles the whole chrome around the router-rendered content:
- *   ┌──────┬───────────────┬──────────────────────────────────────┐
- *   │ RAIL │   SIDEBAR      │  TOPBAR                               │
- *   │ (co  │  (modules of   ├──────────────────────────────────────┤
- *   │ swch)│   active co)   │  CONTENT  (router mounts views here)  │
- *   └──────┴───────────────┴──────────────────────────────────────┘
+ * DATA IT OWNS (localStorage stores):
+ *   ui.theme — 'dark' | 'light'  (the persisted colour theme; applied before first
+ *              paint, toggled from the rail, emits theme:changed).
  *
- * Everything (rail companies, sidebar modules) is generated from the config
- * registry and filtered by module-enabled + auth-permission. Boot order is
- * important and documented inline below.
- * ==========================================================================*/
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - BOOT ORDER MATTERS (see init): seed -> applyOverrides -> theme -> shell ->
+ *     bindings -> set router mount -> router.start -> bootEngines. Engines boot
+ *     AFTER the router so their post-boot hooks run against a live view.
+ *   - The rail hides companies that are switched off or not permitted; the sidebar
+ *     hides modules the same way — the single source of truth is isEnabled + can.
+ *   - refreshNav() is called explicitly in renderShell because the first route's
+ *     company equals the default, so onRoute's "company changed?" guard won't fire.
+ *   - The module nav is a SINGLE-OPEN accordion (opening one group collapses the
+ *     rest) and keeps NO persisted open-state, so nothing piles up.
+ *   - Ctrl/Cmd+K opens the command palette which searches BOTH modules and, via
+ *     EPAL.search, live data records (customers, tickets, invoices, ...).
+ *
+ * PUBLIC API (window.EPAL.app):
+ *   .init()                 -> boot the whole app (auto-invoked at file end)
+ *   .toggleTheme() / .applyTheme()
+ *   .gotoCompany(id), .refreshNav(), .openCommandPalette()
+ *   .openNotifications(e), .openUserMenu(e), .openQuickAdd(e), .toggleSidebar(force)
+ *   (also window.EPAL._closePop -> closes the active anchored popover)
+ *
+ * ==> LARAVEL / PHP MAPPING: AppServiceProvider::boot (seeders/config) PLUS the
+ *     main layout Blade (`layouts/app.blade.php`) that renders rail/sidebar/topbar
+ *     from the modules the Gate permits; a Blade `@yield('content')` replaces the
+ *     #view mount. The command palette / notifications become small API endpoints.
+ * ========================================================================*/
 
 (function (EPAL) {
   'use strict';

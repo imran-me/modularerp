@@ -1,29 +1,48 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/intel.js
+ * EPAL GROUP ERP  ·  assets/js/engines/intel.js
  * ----------------------------------------------------------------------------
- * THE INTELLIGENCE LAYER — EPAL.intel.
+ * WHAT: The INTELLIGENCE LAYER (EPAL.intel) — a pure read-model / analytics
+ *   service. Every number it returns is COMPUTED on demand from the live data
+ *   already in EPAL.db / EPAL.store (sales, employees, tasks, financials,
+ *   refunds, vendors, ledger). It derives customer analytics (RFM segments,
+ *   lifetime value, top / sleeping / at-risk), a workforce productivity index,
+ *   anomaly detection, a per-company risk register, and the narrated MD daily
+ *   briefing (headline KPIs, exceptions, per-company table, top collections).
  *
- * This engine owns NO store of its own. It is a pure read-model: every number
- * it returns is COMPUTED on demand from the live data already in EPAL.db and
- * EPAL.store (sales, employees, tasks, financials, refunds, vendors, ledger…).
- * Because it never persists, it can never drift out of sync with the source of
- * truth — it simply re-derives the answer each time a view asks.
+ * DATA IT OWNS (localStorage stores):
+ *   intel_config — { id, today:'YYYY-MM-DD', rfmQuintiles:5,
+ *                    thresholds:{ sleepingDays, expenseSpikePct, refundAlert,
+ *                    marginDropPct } } — an idempotent config MARKER only.
+ *                    intel persists NO analytics; it re-derives every call.
  *
- * What it derives:
- *   - Customer analytics: RFM segmentation, lifetime value, top / sleeping /
- *     at-risk customers (keyed by the `sales.customer` name string).
- *   - Workforce: an employee productivity index blending Kanban task progress,
- *     timesheets, ratings and attendance.
- *   - Risk & exceptions: anomaly detection (negative-margin sales, expense
- *     spikes, unusual refunds, over-credit-limit parties, margin drops) and a
- *     per-company risk register (financial / operational / hr).
- *   - The MD Briefing: a narrated executive snapshot with headline KPIs,
- *     exceptions, a per-company table and a top-collections list.
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Read-model only: because it never persists results, it can never drift
+ *     out of sync with the source of truth — it re-derives on every call.
+ *   - Customers are keyed by the `sales.customer` NAME STRING (no customer id).
+ *   - RFM: quintile ranking (1..5) when >=10 customers; falls back to fixed
+ *     absolute bands when too few to quintile meaningfully. Recency is INVERTED
+ *     (fewer days since last purchase = higher score).
+ *   - Segment grid is computed from recency (r) vs a fused freq+monetary (fm).
+ *   - Demo clock is frozen at 2026-07-05 so every recency/aging calc is
+ *     deterministic across reloads.
+ *   - Every EPAL.ledger / EPAL.approvals reference is GUARDED so intel is safe
+ *     even if those engines have not booted yet (falls back to schedules etc.).
+ *   - The chairman (role 'owner') is excluded from productivity scoring.
  *
- * It self-registers with core/engines.js. seed() only stamps an idempotent
- * config marker (there is no data store); boot() is a no-op — everything is
- * lazy. Every EPAL.ledger / EPAL.approvals reference is guarded so the engine
- * is safe even if those engines have not booted yet.
+ * PUBLIC API (window.EPAL.intel.<x>):
+ *   rfm() -> [{name,r,f,m,score,segment,recencyDays,frequency,monetary}]
+ *   ltv(name) -> number — predictive lifetime value for one customer.
+ *   topCustomers(n) / sleepingCustomers() / atRisk() -> customer arrays.
+ *   employeeProductivity() -> [{empId,name,score,completion,hours,onTimePct,…}]
+ *   anomalies() -> [{type,severity,companyId,title,detail,route}]
+ *   riskRegister(companyId) -> [{area,severity,title,detail}] (max 6).
+ *   mdBriefing() -> {date,narrative(html),headline[],exceptions[],perCompany[],
+ *                    collections[]} — the executive daily snapshot.
+ *
+ * ==> LARAVEL / PHP MAPPING: an Analytics/Reporting Service class (or query
+ *     objects) — e.g. IntelService with rfm(), mdBriefing() reading via Eloquent
+ *     aggregates. Nothing to migrate as a table (intel_config is a config value).
+ *     Heavy briefings could be a cached read-model or a scheduled snapshot job.
  *
  * ES5 only (no arrow fns / let / const / template literals / classes). Never
  * write a literal star-slash inside this comment (it would close it).

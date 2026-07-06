@@ -1,16 +1,35 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/ui.js
+ * EPAL GROUP ERP  ·  assets/js/kernel/ui.js
  * ----------------------------------------------------------------------------
- * THE UI TOOLKIT — tiny, dependency-free helpers used by every view:
- *   - DOM: $, $$, el(), frag(), on()
- *   - formatting: money(), num(), pct(), date(), ago(), compact()
- *   - identity: uid(), initials(), colorFor(), escapeHtml()
- *   - feedback: toast(), modal(), confirm(), sheet()
- *   - misc: debounce(), icon(), copy()
+ * WHAT: THE DOM + FORMATTING KIT — tiny, dependency-free, no-innerHTML helpers
+ *   that every view builds itself from. Provides a hyperscript element builder,
+ *   locale-aware money/number/date formatting, deterministic avatar colours, and
+ *   the toast / modal / confirm feedback primitives. Framework-free on purpose so
+ *   the system needs no build step and stays trivially portable.
  *
- * Everything here is intentionally framework-free vanilla JS so the system has
- * no build step and stays trivially portable.
- * ==========================================================================*/
+ * DATA IT OWNS (localStorage stores): none. Reads EPAL.config.group for the
+ *   currency symbol/locale used by money()/date(); holds only an in-memory uid seq.
+ *
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - el() with `text:`/escapeHtml() is the safe path — user data must never be
+ *     interpolated as raw innerHTML (XSS). Prefer el(...) over string HTML.
+ *   - money()/compact() use Bangladeshi numbering: Lakh (1e5 -> "L") and Crore
+ *     (1e7 -> "Cr"), NOT the Western K/M/B scale — keep this for local correctness.
+ *   - countUp() and motion respect prefers-reduced-motion (instant set when reduced).
+ *   - money(null) / date(invalid) render an em-dash, never "NaN" — reports must be clean.
+ *
+ * PUBLIC API (window.EPAL.ui):
+ *   DOM:     $(sel,root), $$(sel,root), el(spec,attrs,children), frag(html),
+ *            on(node,evt,sel,fn) [delegated], appendChildren(node,children)
+ *   Format:  num, money, compact, pct, date(d,style), ago(d), dur(ms)
+ *   Identity:uid(prefix), initials(name), colorFor(str), escapeHtml(s), debounce
+ *   Feedback:toast(msg,level,opts), modal(opts)->{close,box,body}, confirm(opts)->Promise<bool>
+ *   Misc:    icon(name,cls), copy(text), countUp(node,target,fmt,dur)
+ *
+ * ==> LARAVEL / PHP MAPPING: server-side this becomes Blade components/partials
+ *     (modal, toast) plus formatting helpers/casts (a Money value object, Carbon
+ *     for dates, an `e()`-style escaper). The DOM builders have no backend analogue.
+ * ========================================================================*/
 
 (function (EPAL) {
   'use strict';

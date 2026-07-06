@@ -1,31 +1,88 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/database.js
+ * EPAL GROUP ERP  ·  assets/js/data/database.js
  * ----------------------------------------------------------------------------
- * THE DOMAIN DATA LAYER.
+ * WHAT: The domain data layer — a browser-only mock "database" (localStorage
+ *   via state.js) that behaves like a real backend. It SEEDS once with
+ *   realistic, self-consistent, deterministic data across ALL companies;
+ *   exposes query + aggregation helpers (the "intelligence"); and every
+ *   mutation EMITS an event on EPAL.bus so dashboards and sister companies
+ *   update live. Swap this file for real API calls and the rest of the app is
+ *   unchanged. It also delegates to seed-bd.js (deep per-company data) and the
+ *   engine registry (ledger/audit/approvals…) during seed().
  *
- * This is a browser-only mock "database" (localStorage under the hood) that
- * behaves like a real backend: it seeds once with realistic, self-consistent
- * data across ALL companies, exposes query + mutation helpers, and — crucially
- * — every mutation emits an event on EPAL.bus so dashboards and other
- * companies update live. Swap this file for real API calls later and the rest
- * of the app is unchanged.
+ * DATA IT OWNS (localStorage stores; all namespaced by state.js):
+ *   financials     [{companyId, ym:'YYYY-MM', revenue:int, expense:int}]  12 mo x company
+ *   employees      [{id, name, companyId, dept, designation, role:enum(owner|manager|
+ *                    accountant|employee), email, phone, joinDate, salary, status:enum(
+ *                    active|on-leave), attendance:{present,absent,late,leave}, rating}]
+ *   customers      [{id, name, companyIds:[], contact, phone, email, value, since,
+ *                    tier:enum(Standard|Silver|Gold|Platinum), status}]  <- shared graph
+ *   leads          [{id, companyId, name, source, stage:enum(New|Contacted|Qualified|
+ *                    Proposal|Negotiation|Won|Lost), value, owner, created}]
+ *   sales          [{id, companyId, date, amount, cost, profit, ref, desc, customer}]
+ *                    <- the group-wide sales ledger; postSale() appends here
+ *   tasks.<empId>  [{id, title, desc, status:enum(todo|inprogress|review|done|cancelled),
+ *                    priority, due, labels[], restricted, redFlag, comments[],
+ *                    phases:[{id,name,pct,accumMs,running,startedAt,done}]}]  per-employee board
+ *   visaCats       [{id, country, flag, type, cost, sale, days, status}]
+ *   visaApps       [{id, applicant, phone, passport, country, visaType, catId, cost, sale,
+ *                    stage:enum(New|Documents|Submitted|Under Process|Approved|Rejected),
+ *                    travelDate, agent, payStatus}]   (Travels exemplar)
+ *   airlines       [{id, name, iata, country, status}]        Air Ticketing master
+ *   airports       [{id, name, iata, city, country}]          Air Ticketing master
+ *   airTickets     [{id, pnr, ticketNo, passenger, fromCode, toCode, route, tripType,
+ *                    airlineCode, airline, flightNo, vendor, portal, cost, sale, costPaid,
+ *                    payStatus, agent, status:enum(Issued|Confirmed|Hold|Re-issued|Void|
+ *                    Refunded), timeline[]}]
+ *   airRefunds     [{id, pnr, passenger, airline, gross, airlineRefund, penalty, fee,
+ *                    netRefund, method, status}]
+ *   airBsp         {txns[], adms[], unused[], api{}}           BSP/ADM recon (single object)
+ *   vendors        [{id, name, type, balance, creditLimit, terms}]
+ *   notifications  [{id, level:enum(info|success|warning|error), title, text, companyId,
+ *                    at:ms, read, icon}]
+ *   activity       [{id, at:ms, actor, text, companyId}]       lightweight activity feed
  *
- * STORES (localStorage keys, all namespaced by state.js):
- *   financials     [{companyId, ym, revenue, expense}]     12 months × company
- *   employees      [{id, name, companyId, dept, role, ...}]
- *   customers      [{id, name, companyIds[], value, ...}]  ← shared graph
- *   leads          [{id, companyId, stage, value, ...}]
- *   tasks.<empId>  [{id, title, phases[], ...}]            per-employee board
- *   visaApps       [{id, applicant, country, stage, ...}]  (Travels exemplar)
- *   visaCats       [{id, country, type, cost, sale, days}]
- *   airTickets     [{id, pnr, passenger, route, airline, cost, sale, status}]
- *   airlines       [{id, name, iata, country, status}]     Air Ticketing masters
- *   airports       [{id, name, iata, city, country}]
- *   airRefunds     [{id, pnr, passenger, gross, netRefund, status}]
- *   airBsp         {txns[], adms[], unused[], api{}}        BSP/ADM recon (object)
- *   vendors        [{id, name, type, balance, ...}]
- *   notifications  [{id, level, title, read, ...}]
- *   activity       [{id, at, actor, text, companyId}]      audit trail
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Deterministic seed: a fixed-seed PRNG (mulberry32) makes demo data stable
+ *     across reloads — same data every boot, so screenshots/tests are reproducible.
+ *   - Idempotent: every store goes through seedOnce; reseeding never overwrites.
+ *   - postSale() is THE cross-company artery: it appends to `sales`, ROLLS the
+ *     amount into that company's CURRENT-month financials row (so company +
+ *     group finance both move), and emits `sale:recorded` (which the ledger
+ *     engine listens to and auto-posts a balanced double-entry against).
+ *   - Seeded `sales` rows are ALREADY reflected inside seeded `financials`, so
+ *     they must NOT re-roll into financials (only runtime postSale does that) —
+ *     else demo revenue would be double-counted.
+ *   - Every mutation emits `data:changed` (and often a specific event) so the
+ *     event bus keeps the whole group in sync; audit/intel engines subscribe.
+ *   - financials revenue/expense are MONTHLY summaries; margin/risk/MoM are
+ *     derived, never stored.
+ *
+ * PUBLIC API (window.EPAL.db):
+ *   seed() / reset()                       — idempotent seed all stores / nuke+reseed
+ *   financials()/employees(f)/employee(id)/customers(cid)/leads(cid)/visaCats()/
+ *   visaApps()/vendors()/airlines()/airports()/airTickets()/airRefunds()/airBsp()/
+ *   notifications()/activity()/tasksFor(empId)/sales(cid)  — collection reads
+ *   col(name)/save(name,rec)/remove(name,id)               — generic CRUD (emits events)
+ *   finance(cid,months)->{revenue,expense,profit,margin}   — summed finances
+ *   series(cid)->{labels,revenue,expense,profit}           — 12-mo chart series
+ *   momRevenue(cid)/riskScore(cid)                         — derived KPIs
+ *   groupSnapshot()                                        — everything the Command Center needs
+ *   postSale(cid,sale)->rec                                — record a sale + fan out
+ *   saveTask/deleteTask/saveVisaApp/saveAirTicket/saveAirline/saveAirport/
+ *   saveAirRefund/saveEmployee/saveCustomer/saveVisaCat    — typed mutations (emit events)
+ *   notify(n)/markNotificationsRead()/log(actor,text,cid)  — notifications + activity feed
+ *
+ * ==> LARAVEL / PHP MAPPING: Each store becomes an Eloquent Model + migration
+ *     (Financial, Employee, Customer, Lead, Sale, Task, VisaApplication,
+ *     Airline, Airport, AirTicket, ...) with the columns/enums above; the
+ *     seed*() functions become DatabaseSeeder classes (deterministic faker).
+ *     The read helpers are Eloquent scopes/queries; finance/series/groupSnapshot
+ *     are a ReportingService (SQL GROUP BY month/company). postSale() is a
+ *     SalesService::record() in a DB transaction that also dispatches a
+ *     `SaleRecorded` event -> a listener posts the ledger journal (see
+ *     ledger.js). The bus emits map to Laravel Events/Observers. This file +
+ *     state.js are the ONLY two you rewrite to attach a real backend.
  * ==========================================================================*/
 
 (function (EPAL) {

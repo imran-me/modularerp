@@ -73,7 +73,7 @@ modal → delete-with-confirm → auto analytics (monthly trend + breakdown doug
 `modal({title,icon,size:'sm'|'lg'|'xl',body,actions:[{label,variant,onClick}]})` ·
 `confirm({title,text,danger,confirmLabel})→Promise<bool>`
 
-### Table (`EPAL.table`) — see core/datatable.js header for the full option list
+### Table (`EPAL.table`) — see kit/datatable.js header for the full option list
 Column: `{key,label,num,money,date,badge:{val:'good'|'warn'|'bad'|'info'|'accent'},render(r),sortVal(r),exportVal(r),sort:false}`
 
 ### Forms (`EPAL.form(fields,record)` / `EPAL.formModal({title,icon,fields,record,onSave})`)
@@ -106,7 +106,7 @@ Layout classes: `.page .kpi-grid .kpi-card .two-col .three-col .grid-auto .card
 .badge-good|warn|bad|info|accent .health.g|y|r .progress>.progress-bar .kanban
 .kb-col .kb-list .kb-card .data-list .data-row .timeline>.tl-item .pos-layout` …
 
-## STORE SHAPES (seeded in core/seed-bd.js — authoritative)
+## STORE SHAPES (seeded in data/seed-bd.js — authoritative)
 
 | Store | Shape (fields) |
 |---|---|

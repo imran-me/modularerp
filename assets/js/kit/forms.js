@@ -1,22 +1,52 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/forms.js
+ * EPAL GROUP ERP  ·  assets/js/kit/forms.js
  * ----------------------------------------------------------------------------
- * SCHEMA-DRIVEN FORMS — declare fields once, get a premium form with inline
- * validation, sensible widgets, section titles and a save modal.
+ * WHAT: The reusable form engine. You declare a schema (an array of field
+ * specs) once and get back a rendered, validated, two-column premium form —
+ * text/number/money/date/select/textarea/checkbox widgets, section dividers,
+ * conditional (showIf) fields, and an embedded LINE-ITEM REPEATER (type:'items')
+ * for multi-row data (passengers, journal lines, BOQ rows, invoice lines).
+ * EPAL.formModal wraps a form in a Cancel/Save modal with validation. This file
+ * owns NO data — it only builds DOM and reads/validates user input; persistence
+ * is the caller's job (usually via EPAL.entity / EPAL.db).
  *
- * Field spec:
+ * DATA IT OWNS (localStorage stores): none. Pure UI toolkit.
+ *
+ * FIELD SPEC:
  *   { key:'name', label:'Client Name', type:'text', required:true, col2:true,
  *     placeholder:'…', hint:'…', default:'', readonly:false,
- *     min:0, max:100, pattern:/regex/,
+ *     min:0, max:100, step:'any', pattern:/regex/, patternMsg:'…',
  *     options:['A','B'] | [['val','Label'],…] | optionsFrom:function(){…},
  *     showIf:function(values){return bool;} }
- * Types: text · number · money · date · email · phone · select · textarea ·
- *        checkbox · section (visual divider: {type:'section', label:'…'})
+ *   Types: text · number · money · date · email · phone · select · textarea ·
+ *          checkbox · section ({type:'section', label:'…'} visual divider) ·
+ *          items (line-item repeater — see the 'items' spec below).
+ *   ITEMS field: { type:'items', key, label, required, min, addLabel, emptyText,
+ *     columns:[{key,label,type,width,options,step,default}],
+ *     footer:function(rows){return html;}, onChange:function(rows,wrapEl){} }
  *
- * API:
- *   var f = EPAL.form(fields, record);   // f.el, f.values(), f.validate()
- *   EPAL.formModal({ title, icon, size, fields, record, saveLabel,
- *                    onSave:function(values, record){ … return false to keep open } });
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Required + type validation (number range, email, phone, regex) runs client
+ *     side before onSave; onSave must not fire on invalid input.
+ *   - showIf fields that are hidden are SKIPPED by validation (a hidden required
+ *     field must not block save).
+ *   - money/number values are coerced to Number (empty -> null), so downstream
+ *     math and ledger postings never see strings.
+ *   - The items repeater enforces a minimum row count (min, or 1 when required).
+ *
+ * PUBLIC API (window.EPAL.*):
+ *   EPAL.form(fields, record) -> { el, values(), validate(), setErr(k,msg), ctrls }
+ *       — build a form; values() returns the typed record, validate() paints
+ *         inline errors and returns bool.
+ *   EPAL.formModal({title,icon,size,fields,record,saveLabel,onSave}) -> modal
+ *       — onSave(values, record); return false to keep the modal open.
+ *
+ * ==> LARAVEL / PHP MAPPING: the field schema becomes a reusable Blade form
+ *     component set (<x-form> + <x-field> partials driven by a $fields array, or
+ *     a Form Builder like Filament/Livewire). Validation rules (required, min/max,
+ *     email, regex) map to a FormRequest's rules(). The items repeater maps to a
+ *     hasMany relation edited via a repeater component; each row becomes a child
+ *     model saved in one transaction with the parent.
  * ==========================================================================*/
 
 (function (EPAL) {
@@ -186,8 +216,10 @@
       Object.keys(ctrls).forEach(function (k) {
         var f = ctrls[k].spec, v = vals[k];
         clearErr(k);
+        // A field hidden by showIf must never block save, even if required.
         if (f.showIf && !f.showIf(vals)) return;               // hidden → skip
         if (ctrls[k].isItems) {
+          // Line-item minimum: explicit min, else 1 when required, else 0.
           var need = f.min != null ? f.min : (f.required ? 1 : 0);
           if ((v ? v.length : 0) < need) { setErr(k, 'Add at least ' + need + ' ' + (need === 1 ? 'row' : 'rows')); ok = false; }
           return;

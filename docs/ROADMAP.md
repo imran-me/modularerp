@@ -26,28 +26,28 @@ Each item is one `views/**` file following `docs/VIEWS-GUIDE.md`.
 - **Shared company workspaces** — wildcard views (`*/dashboard`, `*/hrm`, `*/accounts`,
   `*/ledgers`, `*/reports`, `*/analytics`, `*/customers`, `*/crm`, `*/settings`) give
   every sister concern real screens; a specific view overrides them per company.
-- **Runtime kit** — `core/forms.js` (schema form builder), `core/datatable.js`
-  (`EPAL.table`), `core/entity.js` (CRUD factory), `core/seed-bd.js` (deep all-company
+- **Runtime kit** — `kit/forms.js` (schema form builder), `kit/datatable.js`
+  (`EPAL.table`), `kit/entity.js` (CRUD factory), `data/seed-bd.js` (deep all-company
   operational seed). All wired into `index.html` and boot-verified (180 routes, 0 errors).
 
 ## ✅ Deep Core Pass (v0.3.0) — the operating brain (done + hostile-inspected)
-- **Double-entry accounting** (`core/ledger.js`): chart of accounts, balanced journal,
+- **Double-entry accounting** (`engines/ledger.js`): chart of accounts, balanced journal,
   trial balance, GL, party subledger, AR/AP ageing, P&L, balance sheet; auto-posts sales.
-- **Trust backbone**: append-only audit trail (`core/audit.js` → Activity Log),
-  maker-checker approvals (`core/approvals.js` → Approvals inbox), action-level
-  permissions (`core/permissions.js`).
-- **Document engine** (`core/documents.js` + `core/serial.js`): branded navy/gold
+- **Trust backbone**: append-only audit trail (`engines/audit.js` → Activity Log),
+  maker-checker approvals (`engines/approvals.js` → Approvals inbox), action-level
+  permissions (`engines/permissions.js`).
+- **Document engine** (`engines/documents.js` + `engines/serial.js`): branded navy/gold
   invoices/receipts/vouchers/slips/statements, gapless serials, Document Center.
-- **Intelligence** (`core/intel.js`): MD Briefing, RFM/LTV, anomaly flags, risk register.
-- **Automation** (`core/rules.js`): reminder/escalation/recurring scheduler.
-- **Comms & search**: @mention threads (`core/comments.js`), Ctrl+K data search (`core/search.js`).
+- **Intelligence** (`engines/intel.js`): MD Briefing, RFM/LTV, anomaly flags, risk register.
+- **Automation** (`engines/rules.js`): reminder/escalation/recurring scheduler.
+- **Comms & search**: @mention threads (`engines/comments.js`), Ctrl+K data search (`engines/search.js`).
 - **Modules deepened/added**: Air Ticketing (multi-pax + commission + reissue/refund/void
   + invoice), Visa (fee breakdown + posting), **Vendor & Agent** ledgers, **Contract
   Flight** seats, **Shop POS**, **Construction** BOQ→billing→retention, **Woodart**, **IT**,
   HR leave/payroll. Settings became a real engine; Finance gained COA/journal/trial-balance.
 
 ## 🎯 Next (high value — fourth pass candidates)
-1. **Server backend** — reimplement `core/state.js` + `core/database.js` + engine
+1. **Server backend** — reimplement `data/state.js` + `data/database.js` + engine
    persistence against a Laravel/REST API (see `docs/MIGRATION_ROADMAP.md`); enforce
    double-entry, serials, audit, maker-checker, per-company isolation server-side.
 2. **Air Ticketing further depth** — EMD/ancillary tab, TTL held-PNR deadline queue,
@@ -68,7 +68,7 @@ Each item is one `views/**` file following `docs/VIEWS-GUIDE.md`.
   Support desk (tickets/SLA/KB), Timesheets, Contracts.
 
 ## 🔌 Platform
-- **Real backend** — reimplement `core/state.js` + `core/database.js` against a REST/
+- **Real backend** — reimplement `data/state.js` + `data/database.js` against a REST/
   GraphQL API; enforce auth + permissions server-side. Nothing else changes.
 - **Automation engine** — rules/triggers UI writing to a rules store consumed by the bus.
 - **Reporting/export** — shared PDF/print report builder (extend the employee-report

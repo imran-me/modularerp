@@ -1,14 +1,16 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/search.js
+ * EPAL GROUP ERP  ·  assets/js/engines/search.js
  * ----------------------------------------------------------------------------
- * GLOBAL DATA SEARCH — EPAL.search.
+ * WHAT: GLOBAL DATA SEARCH (EPAL.search) — a pure query service over the live
+ *   data already in EPAL.store / EPAL.db. The Ctrl+K command palette in
+ *   core/app.js first lists matching MODULES (navigation), then appends the
+ *   DATA records this engine surfaces — so typing a customer name, a PNR, a
+ *   passport number, an invoice serial or a journal ref jumps you straight to
+ *   the record's owning module. Owns NO store; every lookup is lazy.
  *
- * This engine owns NO store of its own. It is a pure read-model over the live
- * data already sitting in EPAL.store / EPAL.db. The Ctrl+K command palette in
- * core/app.js first lists matching MODULES (navigation), then appends the DATA
- * records this engine surfaces — so typing a customer name, a PNR, a passport
- * number, an invoice serial or a journal ref jumps you straight to the record's
- * owning module.
+ * DATA IT OWNS (localStorage stores):
+ *   search_config — { id, cap:20, stores:[...] } — an idempotent config MARKER
+ *                   only. search persists nothing; it scans live stores.
  *
  * WHAT IT SCANS (store  ->  deep-link route):
  *   customers            -> group/crm/customers
@@ -24,20 +26,26 @@
  *   tv_contract_flights  -> travels/contract-flight/schedule
  *   sh_products          -> shop/inventory
  *
- * HOW IT RANKS: the query (lowercased) is tested against each record's most
- * identifying fields (name / title / id / pnr / passenger / applicant /
- * passport …). A hit's rank is the earliest index-of position across those
- * fields (an earlier match = a stronger match). Results are capped at 20 and
- * drawn ROUND-ROBIN across the categories, so one busy store can never crowd
- * out the rest. Every store scan is wrapped in try/catch, so a store that has
- * not been seeded yet simply contributes nothing.
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Ranking: the lowercased query is tested against each record's identifying
+ *     fields (name / title / id / pnr / passenger / applicant / passport …);
+ *     rank = the EARLIEST index-of position across those fields (earlier match =
+ *     stronger). Per-category hits sort ascending by that position.
+ *   - Results are capped at 20 and drawn ROUND-ROBIN across the categories, so
+ *     one busy store can never crowd the rest out of the 20 slots.
+ *   - Every store scan is wrapped in try/catch, so a store not yet seeded (or
+ *     malformed) simply contributes nothing and never breaks the search.
+ *   - Each result matches the command-palette render shape exactly:
+ *     { label, sub, icon(Bootstrap Icons name), route, accent(colour) }.
  *
- * Each result: { label, sub, icon, route, accent } — the exact shape the
- * command palette renders (icon = a Bootstrap Icons name, accent = a colour).
+ * PUBLIC API (window.EPAL.search.<x>):
+ *   all(query) -> [{label, sub, icon, route, accent}] — up to 20 deep-linked
+ *       results across all categories; [] for an empty query.
  *
- * It self-registers with core/engines.js. seed() only stamps an idempotent
- * config marker (there is no data store); boot() is a no-op — every lookup is
- * lazy and pulls live data at call time.
+ * ==> LARAVEL / PHP MAPPING: a Search Service / query object — e.g. a
+ *     SearchController@index that fans out across models (or a Scout / full-text
+ *     index) and returns a unified result DTO with a deep-link route per hit.
+ *     search_config is a config value, not a table.
  *
  * ES5 only (no arrow fns / let / const / template literals / classes). Never
  * write a literal star-slash inside this comment (it would close it).

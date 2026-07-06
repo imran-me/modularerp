@@ -1,34 +1,55 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/rules.js
+ * EPAL GROUP ERP  ·  assets/js/engines/rules.js
  * ----------------------------------------------------------------------------
- * THE AUTOMATION ENGINE + SCHEDULER  (EPAL.automation).
+ * WHAT: The AUTOMATION ENGINE + SCHEDULER (EPAL.automation) — "when X happens
+ *   in the live data, do Y." A set of declarative rules that each watch REAL
+ *   data (Shop reorder points, near-due / overdue payment schedules, idle
+ *   embassy files, overdue task boards, contract flights about to depart with
+ *   unsold seats, vendors/agents past their credit limit, month-end payroll)
+ *   and, when a rule matches, fire an ACTION: post a notification, spin up an
+ *   admin task, escalate to the MD (red-flag + alert), or mark a recurring
+ *   document ready. A background tick() re-runs due rules on an interval.
  *
- * "When X happens in the live data, do Y." This engine turns the group into a
- * self-watching organism: a set of declarative rules (stored in the existing
- * `automation_rules` store) that each watch REAL data — Shop reorder points,
- * overdue / near-due payment schedules, idle embassy files, overdue task
- * boards, contract flights about to depart with unsold seats, vendors past
- * their credit limit, and the month-end payroll cycle — and, when a rule
- * matches, fire an ACTION: post a notification, spin up an admin task, escalate
- * to the MD (red-flag + alert), or mark a recurring document ready.
+ * DATA IT OWNS (localStorage stores):
+ *   automation_rules — { id, name, trigger:enum, condition, action:enum,
+ *       active:bool, schedule:'realtime'|'daily', lastRun:ms|null, runs:int,
+ *       lastFired:'YYYY-MM-DD'|null, history:[{at,count,note}], created }
+ *       (seeds ~8 rules; this engine OWNS the seed).
+ *   automation_meta — { escalatedDay } — dedupe marker so the MD escalation
+ *       alert fires at most once per demo-day.
  *
- * OWNERSHIP: this engine OWNS the `automation_rules` seed (≈8 rules covering the
- * extended trigger set). The group/automation.js console reads these rows; it
- * must NOT re-seed (its own guard no-ops because this engine seeds first).
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - This engine OWNS the automation_rules seed; the group/automation.js
+ *     console only READS these rows and must NOT re-seed (its seedOnce no-ops
+ *     because this engine seeds first).
+ *   - Idempotent / deduped firing: isDue() lets each rule fire at most ONCE per
+ *     frozen demo-day (lastFired !== today), so a 60s tick never spams.
+ *   - Bookkeeping upsert is SILENT (no data:changed) to avoid audit spam every
+ *     60 seconds; history is capped at the 10 most recent runs.
+ *   - escalate() red-flags overdue tasks but pushes the admin alert only once
+ *     per demo-day (automation_meta.escalatedDay guard).
+ *   - Demo clock frozen at 2026-07-05 (new Date(2026,6,5)) so every date
+ *     comparison is deterministic across reloads.
  *
- * PUBLIC API (coded against by the Automation console view):
- *   EPAL.automation.triggers  → string[] of supported triggers
- *   EPAL.automation.actions   → string[] of supported actions
- *   EPAL.automation.evaluate(rule) → { count, matched:[{label,detail,route}] }
- *   EPAL.automation.runRule(rule)  → evaluates + performs the action, updates
- *                                    runs/lastRun/history/lastFired, audits.
- *   EPAL.automation.tick()         → runs every active + due rule (deduped).
- *   EPAL.automation.escalate()     → red-flags overdue tasks, alerts admin once.
+ * PUBLIC API (window.EPAL.automation.<x>):
+ *   triggers -> string[] — supported trigger names.
+ *   actions  -> string[] — supported action names.
+ *   evaluate(rule) -> { count, matched:[{label,detail,route}] } — query live
+ *       data for a rule's trigger (matched capped at 8); no side effects.
+ *   runRule(rule) -> evaluation — evaluate, perform action if count>0, then
+ *       update runs/lastRun/lastFired/history and audit.
+ *   tick() -> void — run every active + due rule (deduped by demo-day).
+ *   escalate() -> {overdue,flagged} — red-flag overdue tasks, alert admin once.
+ *
+ * ==> LARAVEL / PHP MAPPING: automation_rules -> Eloquent model + migration; the
+ *     scheduler is a scheduled Artisan command (Kernel schedule, ->everyMinute())
+ *     that dispatches per-rule QUEUED jobs; each action maps to a Notification /
+ *     job. tick()/escalate() -> the command's handle(). lastFired is the
+ *     withoutOverlapping / once-per-day guard.
  *
  * The demo clock is frozen at 2026-07-05 (new Date(2026,6,5)) so every date
  * comparison is deterministic across reloads. All reads/writes go through
  * EPAL.store / EPAL.db; seeds use seedOnce so they survive db.reset().
- *
  * boot(): tick() once (guarded), then setInterval(tick, 60000).
  * ==========================================================================*/
 

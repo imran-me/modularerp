@@ -1,30 +1,38 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/config.js
+ * EPAL GROUP ERP  ·  assets/js/kernel/config.js
  * ----------------------------------------------------------------------------
- * THE MODULE REGISTRY — the single source of truth for the whole system.
+ * WHAT: THE MODULE REGISTRY — the single source of truth for the whole system.
+ *   It declares the tree Group -> Companies (sister concerns) -> Modules ->
+ *   Sub-modules, entirely as plain data. The sidebar nav, the command palette,
+ *   the router's resolvable routes, and the admin Module Control screen are ALL
+ *   generated from this one object. Add a node here and its nav item + route are
+ *   live immediately (a placeholder view renders until you write a real one).
+ *   A route is always  #/<companyId>/<moduleId>[/<submoduleId>].
  *
- * Everything in this ERP is DATA-DRIVEN from this file:
- *   - The sidebar navigation is generated from here.
- *   - The router resolves routes declared here.
- *   - The admin "Module Manager" flips the `enabled` flags stored on top of
- *     this registry (persisted in localStorage) so companies / modules /
- *     sub-modules can be switched on and off live, with ZERO code changes.
+ * DATA IT OWNS (localStorage stores):
+ *   none directly. This file is the *default* registry held in memory. The
+ *   admin's on/off choices are persisted by state.js under the `module-overrides`
+ *   store and folded back onto this tree at boot (see EPAL.modules.applyOverrides).
  *
- * MENTAL MODEL
- *   Group  ──has many──▶  Companies (sister concerns)
- *   Company ──has many──▶ Modules (Dashboard, CRM, Visa Processing, ...)
- *   Module  ──has many──▶ Sub-modules (Visa Category, New Application, ...)
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Every node has `enabled` defaulting to TRUE unless the object says false —
+ *     the whole system ships "on", the admin switches things OFF, never on.
+ *   - Company/module/sub ids compose the route; they are the stable primary keys.
+ *   - `admin:true` marks owner/admin-only modules (auth.js enforces, not this file).
+ *   - This file is DECLARATIVE ONLY: no persistence, no gating logic lives here.
  *
- * A route looks like:  #/<companyId>/<moduleId>[/<submoduleId>]
- *   e.g. #/travels/visa-processing/new-application
+ * PUBLIC API (window.EPAL.config):
+ *   .group           -> group meta { name, currency 'BDT', fiscalYearStart:7 (July), ... }
+ *   .companies       -> array of company objects (id, accent, modules[])
+ *   .company(id)     -> one company object | null
+ *   .module(co,mod)  -> one module object within a company | null
+ *   .version/.codename, ._m(id,label,icon,opts), ._titleize(slug)  (registry helpers)
  *
- * HOW TO ADD SOMETHING NEW (future development):
- *   1. Add a company / module / submodule object below.
- *   2. (Optional) register a view renderer in assets/js/views/registry.js.
- *      If you don't, the generic placeholder scaffold renders automatically,
- *      so the nav item is live immediately.
- *   That's it. No wiring in three places like the old monolith.
- * ==========================================================================*/
+ * ==> LARAVEL / PHP MAPPING: a `config/modules.php` registry array PLUS `companies`
+ *     and `modules` DB tables (self-referencing parent_id for sub-modules, an
+ *     `enabled` boolean, `is_admin` flag). Nav/route generation becomes a service
+ *     that reads those tables; module ids map onto named route segments in web.php.
+ * ========================================================================*/
 
 (function (EPAL) {
   'use strict';

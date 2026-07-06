@@ -1,12 +1,55 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/seed-bd.js
+ * EPAL GROUP ERP  ·  assets/js/data/seed-bd.js
  * ----------------------------------------------------------------------------
- * DEEP DEMO SEED — Bangladesh-context operational data for EVERY company, so
- * the system feels like a live, running group (not a skeleton). Idempotent:
- * each store seeds only once (state.seedOnce). Called from database.js seed().
+ * WHAT: The DEEP demo seeder — Bangladesh-context operational data for EVERY
+ *   sister company, so the system feels like a live running group (not a
+ *   skeleton). Exposes ONE function, EPAL.seedBD(), called from db.seed() after
+ *   the core stores are seeded. It uses its OWN deterministic PRNG (independent
+ *   seed) and a `gen(store,count,factory)` helper that writes each store only
+ *   if it has never been written (idempotent). database.js owns the "core"
+ *   stores; this file owns the per-company operational stores below.
  *
- * ⚠ STORE SHAPES BELOW ARE THE CONTRACT for all module views. If you add a
- *   field, update docs/CONTRACT.md too.
+ * DATA IT OWNS (localStorage stores; each seeded only once):
+ *   GROUP / SHARED
+ *     banks          [{id, name, branch, account, companyId, balance, created}]
+ *     crm_activities [{id, type, lead, company, by, note, outcome, date, created}]
+ *     acc_entries    [{id, companyId, kind:enum(Income|Expense), category, desc, amount,
+ *                      method, date, created}]   monthly income/expense feed per company
+ *     acc_schedules  [{id, companyId, party, kind:enum(Payable|Receivable), amount, due,
+ *                      status:enum(Pending|Partial|Paid), ref, created}]
+ *     sales          [{id, companyId, date, amount, cost, profit, ref, desc, customer}]
+ *                      NOTE: same store db.postSale() appends to at runtime.
+ *   TRAVELS   tv_tickets, tv_contract_flights, tv_agents, tv_portals, tv_files, tv_passports
+ *   WOODART   wa_projects, wa_estimates, wa_materials, wa_production, wa_installs, wa_purchases
+ *   IT        it_projects, it_subscriptions, it_tickets, it_timesheets, it_contracts
+ *   SHOP      sh_products, sh_orders, sh_purchases, sh_suppliers
+ *   CONSTRUCTION  cn_projects, cn_tenders, cn_boq, cn_materials, cn_equipment,
+ *                 cn_subcontractors, cn_labor, cn_incidents
+ *   (per-row field shapes are declared inline at each gen(...) call below — those
+ *    shapes ARE the contract that module views read against.)
+ *
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Idempotent: gen() no-ops if the store key already exists, so this runs on
+ *     every boot without ever clobbering existing/edited data.
+ *   - Deterministic: a fixed-seed PRNG makes the demo identical across reloads.
+ *   - Referential integrity by construction: child rows reference parents via
+ *     built ids, e.g. cn_boq.project = seq('CNP', n) points at a real cn_project;
+ *     wa_production.project / it_timesheets.project follow the same convention.
+ *   - Seeded `sales` here are already inside the seeded `financials` totals (see
+ *     database.js) — do NOT re-roll them into financials.
+ *   - STORE SHAPES ARE THE CONTRACT for all module views: change a field here
+ *     and update docs/DATA_MODEL.md (and the reading view) too.
+ *
+ * PUBLIC API (window.EPAL.seedBD):
+ *   EPAL.seedBD() -> void — seed all deep per-company stores (idempotent).
+ *
+ * ==> LARAVEL / PHP MAPPING: This is a set of database Seeders (one per store /
+ *     module) wired into DatabaseSeeder, each using a deterministic Faker seed.
+ *     Every store => an Eloquent Model + migration with the inline column shapes;
+ *     the seq('CNP', n) parent references become real foreign keys. gen()'s
+ *     "skip if exists" guard maps to seeders that check `Model::count()` (or rely
+ *     on `migrate:fresh --seed`). This file has NO query/mutation API — it is
+ *     pure seed data, so at the backend it is Seeders only, not a Service.
  * ==========================================================================*/
 
 (function (EPAL) {

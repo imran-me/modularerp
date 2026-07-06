@@ -1,21 +1,41 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/router.js
+ * EPAL GROUP ERP  ·  assets/js/kernel/router.js
  * ----------------------------------------------------------------------------
- * HASH ROUTER — turns  #/<company>/<module>/<sub>  into a rendered view.
+ * WHAT: THE HASH ROUTER — turns the URL fragment #/<company>/<module>/<sub>[?params]
+ *   into a rendered view mounted in #view. It parses the hash, tears down the
+ *   previous view + its charts, enforces the enable/permission gates, resolves the
+ *   most specific registered view (falling back to a placeholder so EVERY nav item
+ *   is live from day one), themes the page to the company accent, and emits
+ *   route:changed. Dead ends are designed too (a premium 404, gate states).
  *
- * Resolution order for a route (first hit wins):
- *   1. views['<company>/<module>/<sub>']   ← most specific
- *   2. views['<company>/<module>']
- *   3. a wildcard "any-company" view (key: star + slash + module) — see resolve()
- *   4. the generic placeholder scaffold    ← so EVERY nav item is always live
+ * DATA IT OWNS (localStorage stores): none. Reads config, modules, auth, views.
  *
- * Before rendering it enforces two gates:
- *   - MODULE ENABLED?  (EPAL.modules.isEnabled) → else "module switched off".
- *   - PERMISSION?      (EPAL.auth.can)          → else "access restricted".
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - VIEW RESOLUTION ORDER, first hit wins: (1) 'co/mod/sub' exact, (2) 'co/mod',
+ *     (3) the "star-slash-mod" wildcard (a screen shared by every company), (4) the placeholder
+ *     scaffold. This is why any route always renders something real.
+ *   - TWO GATES run before render, in order: (1) enabled? company/module/sub via
+ *     EPAL.modules.isEnabled -> else a "switched off" state; (2) permitted? via
+ *     EPAL.auth.can -> else "access restricted". Never render a gated view.
+ *   - Unknown company -> redirect to group/dashboard; unknown module -> premium 404.
+ *   - Always teardown() the old view and destroyAll() charts first (no SPA leaks).
+ *   - A throwing view is caught and shown as an inline error, never a blank page.
  *
- * Views are objects: { title(ctx)?:string, render(ctx):void, teardown()?:void }
- * `ctx` = { mount, companyId, moduleId, subId, company, module, sub, params }
- * ==========================================================================*/
+ * PUBLIC API (window.EPAL.router):
+ *   .mount                         -> the DOM node views render into (set by app.js)
+ *   .parse()                       -> { companyId, moduleId, subId, params }
+ *   .navigate(route, params?)      -> set the hash (or re-render if unchanged)
+ *   .resolve(co, mod, sub)         -> the view object per the order above | null
+ *   .render()                      -> render the current hash (gates + teardown)
+ *   .start()                       -> attach hashchange + do the first render
+ *   view shape: { title(ctx)?, render(ctx), teardown()? };
+ *   ctx = { mount, companyId, moduleId, subId, company, module, sub, params, router }
+ *
+ * ==> LARAVEL / PHP MAPPING: web.php route `/{company}/{module}/{sub?}` -> a
+ *     controller that resolves a Blade view by the same specificity fallback. The
+ *     two gates become route middleware (a module-enabled check + an authorize()
+ *     policy call). 404 -> the framework's not-found handler.
+ * ========================================================================*/
 
 (function (EPAL) {
   'use strict';

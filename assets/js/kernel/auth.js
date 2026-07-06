@@ -1,27 +1,42 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/auth.js
+ * EPAL GROUP ERP  ·  assets/js/kernel/auth.js
  * ----------------------------------------------------------------------------
- * IDENTITY · ROLES · PERMISSIONS · "VIEW AS".
+ * WHAT: IDENTITY, ROLES, PERMISSIONS and "VIEW AS". Employees ARE the users of
+ *   this ERP; an employee record carries a role, a home company, and optional
+ *   fine-grained grants. This module answers the one question asked everywhere in
+ *   the app: "can THIS user open THIS company's THIS module?" It also drives the
+ *   demo role-impersonation switcher used to test the UI as any role live.
  *
- * Employees ARE the users of this ERP (the owner adds an employee, assigns a
- * company + designation + role, and grants module permissions). This module
- * answers one central question everywhere in the app:
+ * DATA IT OWNS (localStorage stores):
+ *   auth.currentUserId — string employee id (e.g. 'EPL-0001'); the logged-in/
+ *                        impersonated user. Defaults to the owner if unset. The
+ *                        employee RECORDS themselves live in db (store 'employees').
  *
- *      can this user open THIS company's THIS module?
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Role ladder: owner > admin > manager > accountant > hr > employee > agent.
+ *   - owner/admin bypass all gates (can() returns true immediately).
+ *   - EXPLICIT per-employee grants WIN over role defaults: a 'company/module' or
+ *     'company/*' entry in permissions[] grants access even if the role would deny.
+ *   - Non-admins are SCOPED to their homeCompany; they cannot open other companies'
+ *     modules. Everyone can see the 'group' shell but only its general modules
+ *     (dashboard/notifications) — GROUP_ADMIN_ONLY modules stay owner/admin-only.
+ *   - accessLevel 'general' hides confidential finance widgets; 'full' shows them.
+ *   - A plain employee is ESS: only their own dashboard + tasks (+ own profile).
+ *   - viewAs() is DEMO impersonation — it swaps the current user and stamps a role
+ *     without mutating the underlying employee record.
  *
- * ROLE MODEL (coarse defaults; per-employee `permissions[]` can override):
- *   owner       → everything, all companies (that's you).
- *   admin       → everything except owner-only settings.
- *   manager     → their own company only; no group admin modules.
- *   accountant  → finance/accounts/ledgers/reports in their company + group finance (read).
- *   hr          → workforce/hrm/attendance/payroll.
- *   employee    → General Dashboard + their own Tasks + own Profile (ESS).  ← self-service
- *   agent       → (Travels) CRM + visa/ticketing services + own tasks.
+ * PUBLIC API (window.EPAL.auth):
+ *   .current() -> user; .setUser(id) -> user (+emits auth:changed)
+ *   .role()/.isOwner()/.isAdmin()/.homeCompany()/.accessLevel()
+ *   .canCompany(companyId) -> bool  (visible in the company switcher?)
+ *   .can(companyId, moduleId) -> bool  (THE gate used by router + nav + palette)
+ *   .roles (list for the switcher); .viewAs(roleKey) -> user (demo impersonation)
  *
- * Fine-grained grants live on the employee record as:
- *   permissions: ['travels/visa-processing', 'group/dashboard', ...]
- *   accessLevel: 'full' | 'general'   (general = no confidential finance widgets)
- * ==========================================================================*/
+ * ==> LARAVEL / PHP MAPPING: Laravel Auth (guard/session) for current(); a Gate or
+ *     Policy for can()/canCompany() (the module gate becomes a `before` super-admin
+ *     hook + per-ability checks); route middleware enforces it. Grants map to a
+ *     spatie/laravel-permission style role+permission set on the User model.
+ * ========================================================================*/
 
 (function (EPAL) {
   'use strict';

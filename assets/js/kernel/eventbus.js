@@ -1,28 +1,37 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/eventbus.js
+ * EPAL GROUP ERP  ·  assets/js/kernel/eventbus.js
  * ----------------------------------------------------------------------------
- * THE NERVOUS SYSTEM — this is what makes the group "intelligently connected".
+ * WHAT: THE NERVOUS SYSTEM — a tiny in-memory publish/subscribe bus that makes
+ *   the group "intelligently connected" WITHOUT direct coupling. Every
+ *   meaningful change emits a named event; dashboards, analytics, the deep-core
+ *   engines (ledger/audit/approvals) and the notification centre subscribe. So a
+ *   Travels sale can move the Group revenue tile and auto-post a journal entry,
+ *   with neither module referencing the other. It also re-broadcasts the
+ *   browser `storage` event so two open tabs stay loosely in sync.
  *
- * Every meaningful change publishes an event here. Dashboards, analytics, the
- * notification centre and other companies SUBSCRIBE. So when Travels books a
- * sale, the Group Command Center's revenue tile and the CRM customer graph can
- * both react — without any direct coupling between those modules.
+ * DATA IT OWNS (localStorage stores): none. Purely runtime pub/sub.
  *
- * Canonical event names (keep this list current):
- *   data:changed        { store, action:'create|update|delete', record }
- *   sale:recorded       { companyId, amount, profit, customerId }
- *   customer:upserted   { customerId, companyId }
- *   task:updated        { empId, taskId, action }
- *   task:commented      { empId, taskId, byAdmin }
- *   modules:changed     { key, enabled }
- *   auth:changed        { user }
- *   theme:changed       { theme }
- *   company:switched     { companyId }
- *   notify              { level, title, text, ... }   (raise a notification)
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - A throwing handler is caught and logged, never allowed to break emit() —
+ *     one bad listener must not stop the others (fan-out must be resilient).
+ *   - A wildcard '*' subscriber receives EVERY event (used by audit/debug taps).
+ *   - Canonical events (keep current): data:changed {store,action,record},
+ *     sale:recorded {companyId,amount,profit,customerId}, customer:upserted,
+ *     task:updated, task:commented, modules:changed {key,enabled}, auth:changed,
+ *     theme:changed, company:switched, notify {level,title,text},
+ *     ledger:posted, approval:requested/approved/rejected, audit:logged,
+ *     route:changed, storage:external.
  *
- * Cross-tab: writes to localStorage also fire the browser `storage` event, so
- * two open tabs of the ERP stay loosely in sync (we re-broadcast those).
- * ==========================================================================*/
+ * PUBLIC API (window.EPAL.bus):
+ *   .on(event, fn)   -> disposer fn — subscribe (returns an off() you can call)
+ *   .off(event, fn)  -> void        — unsubscribe
+ *   .once(event, fn) -> disposer    — auto-unsubscribes after first fire
+ *   .emit(event, payload)           — fan out to subscribers + '*' wildcard taps
+ *
+ * ==> LARAVEL / PHP MAPPING: Laravel Events + Listeners (event dispatcher). Cross-
+ *     tab sync maps to broadcasting (Laravel Echo / websockets). `notify` maps to
+ *     the Notifications system.
+ * ========================================================================*/
 
 (function (EPAL) {
   'use strict';

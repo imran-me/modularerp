@@ -2,7 +2,7 @@
 
 > How "everything is modular" actually works. This is the heart of the ERP.
 
-## The registry (`assets/js/core/config.js`)
+## The registry (`assets/js/kernel/config.js`)
 
 The whole system is declared as one nested data structure:
 
@@ -22,7 +22,7 @@ Every node has `enabled` (default) and, for modules, optional `admin`, `badge`, 
 The **sidebar, rail, command palette, breadcrumbs, router and dashboards read from
 here** — nothing is hard-coded in HTML.
 
-## The override layer (`assets/js/core/state.js`)
+## The override layer (`assets/js/data/state.js`)
 
 Defaults live in the registry; the admin's changes live separately as **overrides**
 in `localStorage["epal.v1.module-overrides"]`:
@@ -77,7 +77,7 @@ A route renders only if **both** pass:
 1. **Enabled?** `EPAL.modules.isEnabled(...)` — the admin's on/off choice.
 2. **Permitted?** `EPAL.auth.can(companyId, moduleId)` — the user's role/grants.
 
-The router (`core/router.js`) checks enabled first, then permission, then renders the
+The router (`kernel/router.js`) checks enabled first, then permission, then renders the
 view (or the placeholder scaffold). Each failure has its own polished gate screen.
 
 ## Adding to the registry

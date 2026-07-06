@@ -1,24 +1,45 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/comments.js
+ * EPAL GROUP ERP  ·  assets/js/engines/comments.js
  * ----------------------------------------------------------------------------
- * COLLABORATION THREADS + @MENTIONS.
+ * WHAT: COLLABORATION THREADS + @MENTIONS (EPAL.comments) — a tiny, embeddable
+ *   discussion engine over a POLYMORPHIC comment model. Any detail drawer in
+ *   the group (a visa file, an air ticket, a task, a customer 360) drops in a
+ *   live thread with one call — widget(entityType, entityId) — rendering the
+ *   conversation (avatars, author, relative time, highlighted @mentions) plus a
+ *   compose box that appends new comments. "@Name" tokens are resolved against
+ *   the employee directory, stored as mentions:[empId], and each mentioned
+ *   person is pinged via EPAL.db.notify (the topbar glow).
  *
- * A tiny, embeddable discussion engine. Any detail drawer in the group (a visa
- * file, an air ticket, a task, a customer 360) can drop in a live comment
- * thread with one call — EPAL.comments.widget(entityType, entityId) — and get:
- *   - the existing conversation rendered with avatars, author, relative time,
- *     and @mentions highlighted,
- *   - a compose box (textarea + Post) that appends a new comment,
- *   - automatic @Name resolution: a token like "@Mohsin" is matched against the
- *     employee directory, stored as mentions:[empId], and each mentioned person
- *     is pinged through EPAL.db.notify (the topbar glow).
+ * DATA IT OWNS (localStorage stores):
+ *   comments — { id, entityType, entityId, at:ms, by:empId, byName,
+ *                text, mentions:[empId] }  (polymorphic: entityType+entityId is
+ *                the morph target; seeds ~8 idempotent sample threads.)
  *
- * Every write goes through EPAL.store + emits 'data:changed', so the audit
- * engine auto-logs it and any other open widget on the same entity refreshes.
- * Seeds are idempotent (seedOnce) so they survive db.reset().
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Polymorphic parent: a comment attaches to (entityType, entityId); the
+ *     same widget serves visaApps, airTickets, task, customer, etc.
+ *   - A mention is "@" + a SINGLE word — keeps parsing unambiguous so
+ *     "@Mohsin please review" tags only Mohsin, never the trailing words.
+ *   - @Name resolves by exact-name / first-name / name-prefix (case-insensitive)
+ *     against the employee directory; ids are de-duplicated.
+ *   - You never get pinged for mentioning YOURSELF (empId === author skipped).
+ *   - User text is rendered via textNodes + el(), NEVER innerHTML, so comment
+ *     bodies cannot inject HTML (XSS-safe).
+ *   - Every write emits 'data:changed', so the audit engine auto-logs it and
+ *     any other open widget on the same entity self-refreshes; the live-sync
+ *     listener auto-unsubscribes once its widget leaves the DOM.
  *
- * Comment row shape:
- *   { id, entityType, entityId, at, by, byName, text, mentions:[empId] }
+ * PUBLIC API (window.EPAL.comments.<x>):
+ *   thread(entityType, entityId) -> rows asc (oldest first).
+ *   add(entityType, entityId, text, {by,byName}?) -> row — parses mentions,
+ *       notifies them, emits data:changed.
+ *   widget(entityType, entityId) -> HTMLElement — embeddable thread + compose
+ *       box (Ctrl/Cmd+Enter also posts) with live self-refresh.
+ *
+ * ==> LARAVEL / PHP MAPPING: a polymorphic Comment Eloquent model
+ *     (morphTo commentable / entityType+entityId) + migration; add() -> a
+ *     controller store action that fires a Notification to mentioned users;
+ *     widget() -> a Blade/Livewire component. Mentions are a pivot or JSON col.
  * ==========================================================================*/
 
 (function (EPAL) {

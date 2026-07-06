@@ -1,28 +1,49 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/audit.js
+ * EPAL GROUP ERP  ·  assets/js/engines/audit.js
  * ----------------------------------------------------------------------------
- * THE AUDIT TRAIL — a structured, tamper-evident "who did what, when" log.
+ * WHAT: The append-only AUDIT TRAIL — a structured "who did what, when" log.
+ *   Every meaningful change in the group leaves a footprint here so the owner
+ *   and admins can answer: who created that visa file, who edited a salary,
+ *   when did the accountant post a refund, who logged in. It listens to the
+ *   'data:changed' firehose and auto-records create/update/delete for known
+ *   stores, plus explicit login/approve/export/config/permission events. It is
+ *   the compliance backbone that turns a demo into something enterprise-grade.
  *
- * Every meaningful change in the group leaves a footprint here so the owner and
- * admins can answer: which user created that visa file, who edited a salary,
- * when did the accountant post a refund, who logged in. It is the compliance
- * backbone that turns a demo into something that feels enterprise-grade.
+ * DATA IT OWNS (localStorage stores):
+ *   audit_log — { id:string, at:number(ms epoch), user:string(empId),
+ *                 userName:string, action:enum(create|update|delete|post|
+ *                   login|logout|approve|reject|export|config|permission|state),
+ *                 entity:string(storeName), entityId:string, entityLabel:string,
+ *                 companyId:string, changes:{field:{old,new}}|null,
+ *                 reason:string, ip:string, agent:string(userAgent) }
  *
- * HOW IT WORKS
- *   - record({action,entity,entityId,entityLabel,companyId,changes,reason})
- *     stamps id / time / user / ip / agent, upserts into the `audit_log` store,
- *     keeps that store capped (last 500 rows) so it never grows unbounded, and
- *     emits 'audit:logged' for any live listener.
- *   - boot() wires the engine into the nervous system: it records a 'login' for
- *     the current user, then listens on 'data:changed' and auto-records
- *     create / update / delete against known entity stores (noise stores are
- *     ignored), and listens on 'auth:changed' to record subsequent logins.
- *   - Money postings on the ledger self-audit inside core/ledger.js, so we do
- *     NOT subscribe to 'ledger:posted' (and skip the gl_entries store) to avoid
- *     double-logging.
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - APPEND-ONLY: rows are only ever added, never edited/deleted (tamper
+ *     evidence). The one exception is capping to the last 500 rows so the demo
+ *     store never grows unbounded — a real backend would keep all rows forever.
+ *   - SIGNAL over noise: only stores in LABELS are audited; high-frequency /
+ *     low-value stores (IGNORE: notifications, serials, ui.theme...) are skipped.
+ *   - NO DOUBLE-LOG: gl_entries/coa are skipped here because core/ledger.js
+ *     records its own audit row for every posting; mirroring would duplicate.
+ *   - create-vs-update: the FIRST write for an entity is 'create'; once a create
+ *     exists for that entityId, every later upsert is an 'update' (so same-day
+ *     voids/reissues/edits are never mislabeled as fresh creates).
+ *   - Transient __auditAction / __auditReason markers on a record let a mutating
+ *     flow (void/reissue) name its own verb; they are stripped after reading.
  *
- * All reads/writes go through EPAL.store; nothing here touches localStorage
- * directly. Seeds use seedOnce so they survive a db.reset().
+ * PUBLIC API (window.EPAL.audit):
+ *   record({action,entity,entityId,entityLabel,companyId,changes,reason}) -> row
+ *       — stamps id/at/user/ip/agent, upserts, caps store, emits 'audit:logged'.
+ *   log(filter{user,action,entity,companyId,from,to,q}) -> rows (newest first).
+ *   forEntity(entity, entityId) -> rows for one record (newest first).
+ *   diff(before, after) -> {field:{old,new}} — field-level change helper.
+ *
+ * ==> LARAVEL / PHP MAPPING: an append-only `audit_log` migration + read-only
+ *     Eloquent model (no update/delete), fed by a global Model Observer (or the
+ *     spatie/laravel-activitylog package) that fires on created/updated/deleted
+ *     and on Auth login/logout events. record() = the observer's writer; log()/
+ *     forEntity() = scoped query methods; diff() = Model::getChanges(). Cap logic
+ *     becomes a scheduled prune command (or drop it and retain everything).
  * ==========================================================================*/
 
 (function (EPAL) {

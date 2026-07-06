@@ -1,26 +1,47 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/permissions.js
+ * EPAL GROUP ERP  ·  assets/js/engines/permissions.js
  * ----------------------------------------------------------------------------
- * EPAL.perm — ACTION-LEVEL PERMISSIONS (layered on top of EPAL.auth).
+ * WHAT: EPAL.perm — ACTION-LEVEL PERMISSIONS layered on top of EPAL.auth.
+ *   auth.js answers the coarse question "may this user OPEN company/module?".
+ *   This engine refines it to "may this user perform THIS ACTION here?", where
+ *   an action is one of view / create / edit / delete / export / approve. Each
+ *   role has a grant map ("companyId/moduleId" -> allowed actions), and can()
+ *   is the single gate the view layer and destructive buttons consult.
  *
- * auth.js answers the coarse question "may this user OPEN company/module?".
- * This engine refines it to "may this user perform THIS ACTION here?" —
- * where an action is one of view · create · edit · delete · export · approve.
+ * DATA IT OWNS (localStorage stores):
+ *   role_templates — [{ id:string, role:string, label:string, desc:string,
+ *                       grants:{ "companyId/moduleId": ['view','create','edit',
+ *                         'delete','export','approve'] | '*' } }]
+ *     Grant keys support wildcards in BOTH slots — "company/module",
+ *     "company/*", "* /module", "* /*", "*" (spaced here to avoid star-slash).
  *
- * It is intentionally ADVISORY and NON-BREAKING for the demo: owner/admin can
- * do everything; anything a role can already SEE today stays visible (view
- * falls back to auth.can); only the genuinely destructive actions (delete /
- * approve) are hard-denied for a non-admin who has no explicit grant. When in
- * doubt it returns true so the "View As" demo never dead-ends. Settings UI and
- * destructive buttons consult EPAL.perm before acting.
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - ADVISORY / NON-BREAKING: this must never dead-end the "View As" demo, so
+ *     can() FAILS OPEN — any error, and any unknown/non-destructive action,
+ *     returns true.
+ *   - owner/admin BYPASS everything (auth.isAdmin() short-circuits).
+ *   - VIEW falls back to auth.can(): anything a role can SEE today stays visible
+ *     even without a fine-grained grant.
+ *   - ONLY destructive actions are truly enforced: delete/approve are hard-denied
+ *     for a non-admin with no covering grant. create/edit/export stay advisory.
+ *   - MOST-SPECIFIC KEY WINS: lookupGrant() tries exact company/module first,
+ *     then progressively broader wildcards.
+ *   - Seed templates are deterministic (fixed ids) and idempotent (seedOnce).
  *
- * Grants are stored per role in the `role_templates` store as a map of
- *   "companyId/moduleId"  ->  ['view','create',...]  |  '*'
- * with wildcards supported in BOTH positions, e.g.
- *   { 'group/finance':['view','export','approve'], 'travels/*':['view'],
- *     '* /accounts':[...], '* /*':[...] }   (star-slash spacing only in comment)
+ * PUBLIC API (window.EPAL.perm):
+ *   actions -> ['view','create','edit','delete','export','approve'] (the vocab).
+ *   can(companyId, moduleId, action) -> bool — the gate (never throws).
+ *   templates() -> all role templates.
+ *   template(role) -> one role's template (synthesised from defaults if absent).
+ *   setTemplate(role, grants) -> row — persist a role's grant map; emits change.
  *
- * Data is read/written ONLY through EPAL.store (seedOnce → survives db.reset).
+ * ==> LARAVEL / PHP MAPPING: Gates/Policies. Each action maps to an ability
+ *     (viewAny/create/update/delete/export/approve on a per-module Policy).
+ *     role_templates becomes a roles+permissions store (e.g. spatie/laravel-
+ *     permission) or a config-driven Gate::define. can() = Gate::allows(); the
+ *     "admin bypass" = Gate::before(); "view falls back to coarse auth" and
+ *     "fail open" become explicit before/after hooks. setTemplate() = an admin
+ *     controller writing the role's permission set.
  * ==========================================================================*/
 
 (function (EPAL) {

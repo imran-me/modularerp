@@ -1,30 +1,38 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/datatable.js
+ * EPAL GROUP ERP  ·  assets/js/kit/datatable.js
  * ----------------------------------------------------------------------------
- * THE DATA TABLE — one world-class table component used by every module.
+ * WHAT: The one reusable data table used by every module. Given a column spec
+ * and a rows array (or a rows() function), it renders a premium table with a
+ * toolbar (multi-key search + auto-derived dropdown filters + CSV export), a
+ * sortable header (click to toggle asc/desc), client-side pagination, per-row
+ * action buttons, row-click handling, an empty state and a live record count.
+ * All in-memory / client-side — this is a presentation component; it never
+ * touches storage. Call t.refresh() after the underlying data changes.
  *
- * Capabilities (all client-side, zero dependencies):
- *   search (multi-key) · sort (click header, asc/desc) · dropdown filters ·
- *   pagination · CSV export of the CURRENT filtered set · row click ·
- *   per-row action buttons · empty state · result count.
+ * DATA IT OWNS (localStorage stores): none. Pure UI toolkit.
  *
- * Usage:
- *   var t = EPAL.table({
- *     columns: [
- *       { key:'name', label:'Name', render:function(r){return '<b>'+r.name+'</b>';} },
- *       { key:'amount', label:'Amount', num:true, money:true },      // right-aligned ৳
- *       { key:'stage', label:'Stage', badge:{Won:'good',Lost:'bad'} }
- *     ],
- *     rows: array,                       // or rows:function(){return array;}
- *     searchKeys: ['name','phone'],      // default: all column keys
- *     filters: [{ key:'stage', label:'Stage' }],   // options auto-derived
- *     pageSize: 10,
- *     onRow: function(row){...},         // row click (adds pointer cursor)
- *     actions: [{ icon:'pencil', title:'Edit', onClick:function(row){...} }],
- *     exportName: 'leads.csv',           // false disables the export button
- *     empty: { icon:'inbox', title:'No leads yet', hint:'Create your first lead.' }
- *   });
- *   host.appendChild(t.el);   t.refresh();   // call refresh() after data changes
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Search / sort / filter / export operate on the SAME filtered() pipeline,
+ *     so CSV export always matches exactly what the user currently sees.
+ *   - Filter dropdown options are re-derived from the FULL dataset each draw
+ *     (not the filtered subset) so a selection never removes its own option.
+ *   - Column render()/money/date/badge are display-only; search & sort use the
+ *     raw row value (or c.sortVal) so formatting never breaks matching/ordering.
+ *
+ * PUBLIC API (window.EPAL.*):
+ *   EPAL.table(opts) -> { el, refresh(), state }
+ *     opts.columns: [{ key, label, num, money, date, badge:{val:tone},
+ *                      render(r), sort:false, sortVal(r), exportVal(r), width }]
+ *     opts.rows: array | function(){return array;}
+ *     opts.searchKeys (default all column keys) · opts.filters:[{key,label}]
+ *     opts.pageSize · opts.onRow(row) · opts.actions:[{icon,title,onClick(row)}]
+ *     opts.exportName (false disables export) · opts.empty:{icon,title,hint}
+ *
+ * ==> LARAVEL / PHP MAPPING: a reusable <x-data-table> Blade/Livewire component
+ *     (or a Laravel Datatables / Filament Table). Search/sort/filter/paginate
+ *     move server-side onto the Eloquent query (->where/->orderBy/->paginate);
+ *     column defs map to the component's column config; CSV export becomes a
+ *     download route streaming the same filtered query (Laravel Excel).
  * ==========================================================================*/
 
 (function (EPAL) {

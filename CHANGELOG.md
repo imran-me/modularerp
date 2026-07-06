@@ -44,7 +44,7 @@ an automation nervous-system, an intelligence advisor, and a trust/audit backbon
 so the system behaves like an enterprise ERP, not a beautiful shell. Built and hardened
 via multi-agent orchestration (scout → build → three-persona hostile inspection → fix).
 
-### Added — the 10 Deep Core engines (`assets/js/core/`)
+### Added — the 10 Deep Core engines (`assets/js/{kernel,data,engines,kit}/`)
 - **`ledger.js`** — true **double-entry** accounting. 22-account chart of accounts,
   balanced journal (`gl_entries`), `post()` that rejects imbalance, trial balance,
   running GL, party subledger, AR/AP ageing, P&L, balance sheet. Auto-posts every
@@ -88,7 +88,7 @@ via multi-agent orchestration (scout → build → three-persona hostile inspect
   **IT** projects + support desk (SLA) + subscriptions (MRR) + timesheets.
 - **HR:** leave apply→approve (via approvals), payroll run → branded salary slips + ledger
   posting, attendance punch.
-- **`core/forms.js`** — new **`items`** line-item repeater (multi-pax tickets, journal
+- **`kit/forms.js`** — new **`items`** line-item repeater (multi-pax tickets, journal
   lines, BOQ rows, quotation lines).
 
 ### Hardened — three-persona hostile inspection (owner / employee / auditor)
@@ -122,10 +122,10 @@ gap list found by auditing v0.1.0 against them, module by module.
 | # | Gap found in v0.1.0 (judged hostile) | Fix in v0.2.0 |
 |---|---|---|
 | 1 | ~80% of nav items landed on a scaffold, not a working module | Every module of every company is now a real screen: CRUD, validation, KPIs, analytics |
-| 2 | Tables were static HTML — no search/sort/filter/pagination/export | New `core/datatable.js` used everywhere: multi-key search, column sort, dropdown filters, pagination, CSV export of the filtered set |
-| 3 | Forms didn't validate; saves accepted garbage | New `core/forms.js` schema-driven forms: required/min/max/pattern/email/phone validation with inline error states |
+| 2 | Tables were static HTML — no search/sort/filter/pagination/export | New `kit/datatable.js` used everywhere: multi-key search, column sort, dropdown filters, pagination, CSV export of the filtered set |
+| 3 | Forms didn't validate; saves accepted garbage | New `kit/forms.js` schema-driven forms: required/min/max/pattern/email/phone validation with inline error states |
 | 4 | "Cross-company connection" was seed-deep only — a new sale changed nothing | New `db.postSale()` artery: every completed sale (POS checkout, air ticket, contract seats, project handover, go-live, CRM win, embassy file) rolls into that company's financials, the group sales ledger, and emits `sale:recorded` — Group Command Center reflects it instantly |
-| 5 | Demo data was thin and generic | New `core/seed-bd.js`: ~600 realistic Bangladesh-context records across 35+ stores — Biman/Emirates PNRs, Gulshan fit-outs, BSRM steel, Walton SKUs, bKash payments, LGED tenders |
+| 5 | Demo data was thin and generic | New `data/seed-bd.js`: ~600 realistic Bangladesh-context records across 35+ stores — Biman/Emirates PNRs, Gulshan fit-outs, BSRM steel, Walton SKUs, bKash payments, LGED tenders |
 | 6 | Owner dashboard had no forecasting, no drill-down, no signals | Command Center: every KPI drills to its detail, revenue projects forward (least-squares, dashed), Smart Signals digest (fastest riser, bleeder, best margin, top client, weakest performer — all computed live), health pills per company |
 | 7 | No per-module analytics | Every module now carries a KPI row + monthly trend + breakdown chart (auto-provided by the entity factory, custom on flagships) |
 | 8 | Employees had no in-company task route (RBAC dead-end) | "My Tasks" module added to all five companies; ESS employees reach their own board |
@@ -137,10 +137,10 @@ gap list found by auditing v0.1.0 against them, module by module.
 | 14 | Mobile: kanban and forms cramped | Deeper responsive pass (kanban swipe columns, single-column forms, full-width actions) |
 
 ### Added — core platform
-- `core/datatable.js` — the one world-class table component (search/sort/filter/paginate/export/actions/empty-states).
-- `core/forms.js` — schema-driven forms + `formModal` with validation gating.
-- `core/entity.js` — the entity module factory: declare a business object once, get a complete workspace (KPIs → table → validated CRUD → confirm-delete → auto analytics). This is how 70+ modules stay consistent.
-- `core/seed-bd.js` — deep, deterministic BD-context seed for all companies.
+- `kit/datatable.js` — the one world-class table component (search/sort/filter/paginate/export/actions/empty-states).
+- `kit/forms.js` — schema-driven forms + `formModal` with validation gating.
+- `kit/entity.js` — the entity module factory: declare a business object once, get a complete workspace (KPIs → table → validated CRUD → confirm-delete → auto analytics). This is how 70+ modules stay consistent.
+- `data/seed-bd.js` — deep, deterministic BD-context seed for all companies.
 - `db.col/save/remove` generic collection API; `db.postSale()` + `db.sales()` cross-company chain.
 - `EPAL.forecast()` least-squares projection; `ui.countUp()` animated numbers.
 - Premium 404 in the router; print stylesheet; POS layout; health pills; drill-down affordances (`elevation.css`).

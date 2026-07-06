@@ -1,27 +1,63 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/ledger.js
+ * EPAL GROUP ERP  ·  assets/js/engines/ledger.js   (EPAL.ledger)
  * ----------------------------------------------------------------------------
- * THE DOUBLE-ENTRY ACCOUNTING ENGINE — EPAL.ledger.
+ * WHAT: The double-entry accounting engine — the single financial source of
+ *   truth for the whole group. Every taka that moves is recorded as a balanced
+ *   journal entry (Sum of debits === Sum of credits). From this one journal it
+ *   derives the Trial Balance, P&L, Balance Sheet, AR/AP party subledgers,
+ *   aging buckets, and a CONSOLIDATED (multi-company) trial balance that
+ *   eliminates inter-company balances. It self-registers with engines.js:
+ *   seed() builds the COA and backfills history from seeded sales/banks/expenses;
+ *   boot() subscribes to `sale:recorded` so any new sale anywhere auto-posts.
  *
- * Every taka that moves anywhere in the group can be recorded here as a proper
- * balanced journal entry (Sum of debits === Sum of credits). This is the single
- * financial source of truth that powers Consolidated Finance, Trial Balance,
- * P&L, Balance Sheet and the AR/AP party subledgers + aging screens.
+ * DATA IT OWNS (localStorage stores; seeded idempotently via seedOnce):
+ *   coa        — { code:string, name:string,
+ *                  type:enum(asset|liability|equity|income|expense),
+ *                  normal:enum(debit|credit), group:string, intercompany?:bool }
+ *   gl_entries — { id:'JV-…'|'GL-…', date:'YYYY-MM-DD', companyId, ref, memo,
+ *                  source:enum(sale|manual|payroll|refund|opening|intercompany|…),
+ *                  party:string, lines:[{account:code, dr:number, cr:number}],
+ *                  posted:true, created:ms }
  *
- * Two stores (both seeded idempotently, both survive db.reset via seedOnce):
- *   coa          chart of accounts — {code,name,type,normal,group}
- *   gl_entries   the journal        — {id,date,companyId,ref,memo,source,party,
- *                                       lines:[{account,dr,cr}],posted,created}
+ * BUSINESS RULES (the "why" a developer MUST preserve):
+ *   - BALANCING INVARIANT: an entry may only post if |Sum(dr) - Sum(cr)| <= TOL
+ *     (0.5 float tolerance). post() THROWS on imbalance — never persist a
+ *     lopsided journal. This is the one rule the whole finance model rests on.
+ *   - normal side is derived from account type (asset/expense => debit, else
+ *     credit); a signed balance is measured on that normal side.
+ *   - CONSOLIDATION: accounts flagged intercompany (1300/2400) net to zero at
+ *     group level — their balance moves into an "elimination" column so the
+ *     group figures aren't double-counted when A invoices B inside the group.
+ *   - AUTO-POST ON SALE: one sale => DR 1200 AR / CR 4000 Revenue, plus (if
+ *     cost>0) DR 5000 COGS / CR 2000 AP. Guarded against double-posting by sale
+ *     ref / GL-S<id> so replaying `sale:recorded` cannot post twice (idempotent).
+ *   - AGING is FIFO: payments settle the OLDEST open invoice first, then the
+ *     remaining balance is bucketed current / 1-30 / 31-60 / 60+ by invoice age.
+ *   - SEED is idempotent and deterministic (survives db.reset): expenses are a
+ *     fixed fraction of each company's own revenue so the demo P&L is stable.
  *
- * The engine self-registers with core/engines.js:
- *   seed()  runs during db.seed()  — builds the COA + backfills historical
- *           journal entries from the seeded sales / banks / summarised expenses.
- *   boot()  runs after the router starts — subscribes to `sale:recorded` so any
- *           new sale anywhere auto-posts DR AR / CR Revenue (+ DR COGS / CR AP).
+ * PUBLIC API (window.EPAL.ledger):
+ *   accounts() / account(code) / ensureAccount(code,name,type)
+ *   post({date,companyId,ref,memo,source,party,lines}) -> entry  (validates + emits)
+ *   entries(filter{companyId,account,party,source,from,to}) -> rows asc
+ *   balance(code,{companyId,asOf}) -> signed number on normal side
+ *   trialBalance(companyId?) -> [{code,name,type,debit,credit}]
+ *   ledgerFor(code,{companyId}) / partyLedger(party,{companyId}) -> running rows
+ *   aging('AR'|'AP',{companyId}) -> [{party,current,d30,d60,d90,total}]
+ *   pnl(companyId?,{from,to}) -> {revenue,cogs,gross,expenses,net,lines}
+ *   balanceSheet(companyId?) -> {assets,liabilities,equity,totals{balanced}}
+ *   consolidatedTrialBalance() -> per-company + elimination + group columns
+ *   postIntercompany(fromCo,toCo,amount,opts) -> two mirrored balanced entries
  *
- * Public postings ALWAYS go through EPAL.ledger.post(); it validates the entry
- * balances, upserts through EPAL.store, and fans the change out on EPAL.bus
- * (`data:changed` + `ledger:posted`) and to the audit trail when present.
+ * ==> LARAVEL / PHP MAPPING: `coa` -> Account model (migration accounts) and
+ *   `gl_entries` -> JournalEntry hasMany JournalLine (entries + entry_lines).
+ *   post() becomes a LedgerService::post() that opens a DB::transaction, asserts
+ *   Sum(dr)===Sum(cr) (else throws / rolls back), and fires a LedgerPosted event.
+ *   The sale:recorded auto-post is a queued listener (PostSaleToLedger job) on a
+ *   SaleRecorded event — idempotent via a unique index on (source,ref). Trial
+ *   balance / P&L / balance sheet / aging are read-model query methods (or DB
+ *   views); consolidation is a scope that groups by company and zeroes the
+ *   intercompany accounts. Auditing rides on Laravel model events.
  *
  * NOTE: never write a literal star-slash inside this comment (it would close it).
  * ==========================================================================*/

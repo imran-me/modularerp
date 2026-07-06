@@ -1,25 +1,48 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/documents.js
+ * EPAL GROUP ERP  ·  assets/js/engines/documents.js   (EPAL.doc)
  * ----------------------------------------------------------------------------
- * THE BRANDED DOCUMENT ENGINE  ·  EPAL.doc
+ * WHAT: The branded document engine — one authority for every printable business
+ *   object in the group (invoice, receipt, voucher, work order, salary slip,
+ *   quotation, purchase order, visa cover letter, ticket). From a plain `spec`
+ *   object it renders a pixel-perfect navy (#1B2A4A) / gold (#C9A227) ".epal-doc"
+ *   DOM tree (styles in css/deepcore.css) so any module raises an on-brand
+ *   document with one call and never hand-builds HTML. It draws its serial from
+ *   EPAL.serial, converts amounts to words (BD lakh/crore), and can print,
+ *   download a self-contained .html, or file the doc to the Document Center.
  *
- * One authority for every printable business object in the group — invoices,
- * receipts, vouchers, work orders, salary slips, quotations, purchase orders,
- * visa cover letters, tickets. Each is rendered as a navy (#1B2A4A) / gold
- * (#C9A227) ".epal-doc" DOM tree (styles live in css/deepcore.css) from a plain
- * spec object, so any module can raise a pixel-perfect, on-brand document with
- * a single call and never hand-build HTML.
+ * DATA IT OWNS (localStorage store; seeded via seedOnce):
+ *   documents — Document Center metadata (NOT the rendered doc):
+ *     { id, serial, type:enum(invoice|receipt|voucher|workorder|salary|
+ *       quotation|po|visacover|ticket|document), title, companyId, party,
+ *       amount:number, at:ms, by:string }
  *
- *   var node = EPAL.doc.build(spec);          // spec -> HTMLElement.epal-doc
- *   EPAL.doc.open(spec);                       // xl modal: Print / Download / Save
- *   EPAL.doc.print(node);                      // opens a standalone print window
- *   EPAL.doc.download(node, 'INV-000042.html');// saves a self-contained .html
- *   EPAL.doc.numberFor('invoice');             // -> 'INV/2026/000042' (serial.next)
- *   EPAL.doc.amountInWords(42000);             // -> 'Taka Forty Two Thousand Only'
+ * BUSINESS RULES (the "why" a developer MUST preserve):
+ *   - Serial is drawn via EPAL.doc.numberFor(type) -> EPAL.serial.next(prefix)
+ *     using the contract-mandated PREFIX map; this keeps document numbering
+ *     gapless and traceable (see serial.js). Never invent a serial by hand.
+ *   - SAVE-ONCE: open()'s "Save to Center" is idempotent per modal — a second
+ *     click no-ops so one displayed document files exactly one metadata row.
+ *   - Saving goes through EPAL.db.save (writes store AND emits data:changed) so
+ *     audit auto-records it and the Document Center refreshes live.
+ *   - PRINT-SELF-CONTAINED: print/download inline the critical CSS with color
+ *     values resolved (no CSS custom properties, no external stylesheet) so a
+ *     document renders and prints correctly even from file:// on its own.
+ *   - amountInWords uses BD/Indian numbering (crore · lakh · thousand), not the
+ *     western million/billion grouping.
  *
- * Saved documents drop a metadata row into the `documents` store (the Document
- * Center reads it). Print/Download inline the critical CSS so a document is
- * self-contained and prints correctly even from file:// with no stylesheet.
+ * PUBLIC API (window.EPAL.doc):
+ *   build(spec) -> HTMLElement.epal-doc
+ *   open(spec)  -> xl modal with Print / Download / Save-to-Center
+ *   print(node) / download(node, filename)
+ *   numberFor(type) -> next serial for that doc type
+ *   amountInWords(n) -> 'Taka Forty Two Thousand Only'
+ *   prefixes -> the type->prefix map
+ *
+ * ==> LARAVEL / PHP MAPPING: `documents` -> Document model (migration documents).
+ *   build()/PRINT_CSS become a Blade template rendered to HTML, and print/
+ *   download map to a PDF response via a DocumentService (dompdf / Browsershot).
+ *   numberFor() calls the SerialService; open()'s Save-to-Center is a controller
+ *   store action. amountInWords is a small helper/Number-to-words utility.
  *
  * NOTE: never write a literal star-slash inside this comment block.
  * ==========================================================================*/

@@ -2,7 +2,7 @@
 
 ## Principles
 
-1. **Data-driven** — the app is generated from `core/config.js`, not hand-written HTML.
+1. **Data-driven** — the app is generated from `kernel/config.js`, not hand-written HTML.
 2. **One door per concern** — persistence (`state.js`), events (`eventbus.js`),
    formatting/DOM (`ui.js`), data (`database.js`). Swap the backend by rewriting
    `state.js` + `database.js` only.
@@ -11,7 +11,7 @@
 4. **Progressive depth** — unbuilt screens fall back to a live scaffold, so the app is
    always fully navigable and modules graduate one at a time.
 
-## Boot sequence (`core/app.js` → `App.init`)
+## Boot sequence (`kernel/app.js` → `App.init`)
 
 ```
 1. EPAL.db.seed()                 idempotent demo data
@@ -27,15 +27,15 @@
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Registry | `core/config.js` | companies → modules → subs; the source of truth |
-| Persistence | `core/state.js` | namespaced localStorage + module override engine |
-| Events | `core/eventbus.js` | pub/sub; cross-company sync + cross-tab rebroadcast |
-| UI kit | `core/ui.js` | `el()` hyperscript, formatting, toast/modal/confirm |
-| Charts | `core/charts.js` | theme-aware Chart.js factory (destroy-on-route) |
-| Data | `core/database.js` | seeded mock DB + aggregators (`groupSnapshot`, `series`, `riskScore`) |
-| Auth | `core/auth.js` | roles, `can()`, company scoping, View-As |
-| Router | `core/router.js` | `#/co/mod/sub` → gates → view resolution |
-| Shell | `core/app.js` | rail, sidebar, topbar, command palette, notifications |
+| Registry | `kernel/config.js` | companies → modules → subs; the source of truth |
+| Persistence | `data/state.js` | namespaced localStorage + module override engine |
+| Events | `kernel/eventbus.js` | pub/sub; cross-company sync + cross-tab rebroadcast |
+| UI kit | `kernel/ui.js` | `el()` hyperscript, formatting, toast/modal/confirm |
+| Charts | `kernel/charts.js` | theme-aware Chart.js factory (destroy-on-route) |
+| Data | `data/database.js` | seeded mock DB + aggregators (`groupSnapshot`, `series`, `riskScore`) |
+| Auth | `kernel/auth.js` | roles, `can()`, company scoping, View-As |
+| Router | `kernel/router.js` | `#/co/mod/sub` → gates → view resolution |
+| Shell | `kernel/app.js` | rail, sidebar, topbar, command palette, notifications |
 | Views | `views/**` | one screen per file, self-registered into `EPAL.views` |
 
 ## Data flow (why the group stays "connected")
@@ -74,5 +74,5 @@ data/auth/routing layers are framework-agnostic.
 
 This stage is a **client-side prototype**: all data and "permissions" live in the
 browser. Role gating here is UX, not security. When a backend is added, enforce
-auth /permissions server-side; `core/auth.js` then becomes the client mirror of the
+auth /permissions server-side; `kernel/auth.js` then becomes the client mirror of the
 server's policy.

@@ -4,8 +4,8 @@
 > multi-user, server-backed production system **without rewriting the app**.
 >
 > Read `CONTEXT.md` and `docs/ARCHITECTURE.md` first. This document is the plan
-> for roadmap item **§9.4** ("Real backend: reimplement `core/state.js` +
-> `core/database.js` against an API; everything else is untouched.").
+> for roadmap item **§9.4** ("Real backend: reimplement `data/state.js` +
+> `data/database.js` against an API; everything else is untouched.").
 
 ---
 
@@ -16,9 +16,9 @@ data through exactly **three doors**, and never touches `localStorage` directly:
 
 | Door | File | What it is today | What it becomes |
 |---|---|---|---|
-| `EPAL.store` | `core/state.js` | namespaced `localStorage` get/set/list/upsert/remove/seedOnce | thin async client over the REST/GraphQL API |
-| `EPAL.db` | `core/database.js` | seeded mock collections + aggregators + `postSale`/`saveX` mutators that emit on `EPAL.bus` | typed API calls that hit resource endpoints; aggregators move server-side |
-| the engines | `core/ledger.js`, `audit.js`, `approvals.js`, `serial.js`, `documents.js`, `permissions.js`, `rules.js`, `intel.js`, `comments.js`, `search.js` (all registered through `core/engines.js`) | compute-and-persist logic running **in the browser** over `EPAL.store` | thin clients; the *authoritative* logic (posting, numbering, approval decisions) runs on the server |
+| `EPAL.store` | `data/state.js` | namespaced `localStorage` get/set/list/upsert/remove/seedOnce | thin async client over the REST/GraphQL API |
+| `EPAL.db` | `data/database.js` | seeded mock collections + aggregators + `postSale`/`saveX` mutators that emit on `EPAL.bus` | typed API calls that hit resource endpoints; aggregators move server-side |
+| the engines | `engines/ledger.js`, `audit.js`, `approvals.js`, `serial.js`, `documents.js`, `permissions.js`, `rules.js`, `intel.js`, `comments.js`, `search.js` (all registered through `engines/engines.js`) | compute-and-persist logic running **in the browser** over `EPAL.store` | thin clients; the *authoritative* logic (posting, numbering, approval decisions) runs on the server |
 
 Everything else in the codebase is downstream of these three doors:
 
@@ -38,7 +38,7 @@ calling `EPAL.db.postSale(...)`; they neither know nor care whether that writes 
 
 ### 0.1 Precisely what "reimplement state.js + database.js" means
 
-`core/state.js` today is ~140 lines whose whole job is:
+`data/state.js` today is ~140 lines whose whole job is:
 
 ```js
 EPAL.store.get(key, fallback)      // read a JSON blob
@@ -133,7 +133,7 @@ is written to be portable across both.
 ### 2.1 Inventory of what exists today
 
 Every store is a namespaced key (`epal.v1.<key>`) holding a JSON array or object.
-From `core/database.js`, `core/state.js`, `core/seed-bd.js` and the engine files:
+From `data/database.js`, `data/state.js`, `data/seed-bd.js` and the engine files:
 
 **Operational (database.js + seed-bd.js):**
 `financials`, `employees`, `customers`, `leads`, `tasks.<empId>` (one array per
@@ -482,10 +482,10 @@ outright: "Role gating here is UX, not security." After migration:
   is company-scoped. A forged client that calls `POST /api/journal-entries`
   without the `approve`/`create` grant is rejected with `403`, regardless of what
   the browser UI allowed.
-- `core/auth.js` and `core/permissions.js` **stay in the browser as a mirror**
+- `kernel/auth.js` and `engines/permissions.js` **stay in the browser as a mirror**
   of the server policy (hydrated from `GET /api/me`) — they keep gating the nav,
   buttons, and routes for a good UX, but they are no longer the security boundary.
-  ARCHITECTURE.md already anticipates this: "core/auth.js then becomes the client
+  ARCHITECTURE.md already anticipates this: "kernel/auth.js then becomes the client
   mirror of the server's policy."
 
 ---

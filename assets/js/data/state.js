@@ -1,17 +1,52 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/state.js
+ * EPAL GROUP ERP  ·  assets/js/data/state.js
  * ----------------------------------------------------------------------------
- * PERSISTENCE + LIVE MODULE TOGGLES.
+ * WHAT: The persistence seam. A thin, namespaced wrapper around localStorage
+ *   that EVERY store in the system reads/writes through (never touch
+ *   localStorage raw). All keys are prefixed `epal.v1.` so the whole dataset
+ *   can be found, versioned, or wiped as a unit. It ALSO owns the "module
+ *   override" layer that makes the app modular: the admin Module Manager writes
+ *   on/off flags here and `applyOverrides()` folds them onto the in-memory
+ *   EPAL.config registry so the whole UI (nav, router, search) reacts instantly.
  *
- * This is the thin, namespaced wrapper around localStorage that every store in
- * the system uses. The old system scattered raw `localStorage['epal_tv_*']`
- * calls everywhere; here it all goes through one door so we can later swap the
- * backend for a real API by changing ONLY this file.
+ * DATA IT OWNS (localStorage stores):
+ *   module-overrides — { "<companyId>":bool,                     // whole company on/off
+ *                        "<companyId>/<moduleId>":bool,          // one module on/off
+ *                        "<companyId>/<moduleId>/<subId>":bool } // one sub-feature on/off
+ *     Absence of a key => "use the declared default (enabled) from config.js".
+ *   (All other stores are OWNED by their seeders — this file just persists them.)
  *
- * It also owns the "module override" layer: the admin Module Manager writes
- * enable/disable flags here, and `applyOverrides()` folds them back onto the
- * in-memory EPAL.config registry so the whole UI reacts instantly.
- * ==========================================================================*/
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - One door: every read/write is namespaced (NS = 'epal.v1.') so a real
+ *     backend can be swapped in by rewriting ONLY this file. NS also carries the
+ *     schema version — bump it to invalidate an incompatible old dataset.
+ *   - seedOnce is IDEMPOTENT: it writes only if the key has never existed, so
+ *     reseeding never clobbers user edits (boot calls it on every load).
+ *   - Overrides are the source of truth over config defaults: isEnabled checks
+ *     the override map first, then falls back to the node's `enabled !== false`.
+ *   - A missing config node resolves to DISABLED (safe default — never expose a
+ *     node the registry does not declare).
+ *
+ * PUBLIC API:
+ *   EPAL.store.get/set/patch/remove(key[,val])   — raw namespaced JSON I/O
+ *   EPAL.store.list/upsert/removeFrom(key[,rec]) — array-of-{id} collection helpers
+ *   EPAL.store.seedOnce(key,data) -> value       — idempotent first-write seed
+ *   EPAL.store.nuke()                            — wipe every epal.* key ("Reset demo data")
+ *   EPAL.store.namespace                         — the 'epal.v1.' prefix string
+ *   EPAL.modules.isEnabled(co[,mod[,sub]]) -> bool — the ONE truth-check (rail/router/search)
+ *   EPAL.modules.toggle(co,mod,sub[,val]) -> bool  — persist flag + emit 'modules:changed'
+ *   EPAL.modules.applyOverrides()                — fold overrides onto live config
+ *   EPAL.modules.overrides()/keyFor(...)         — raw map / key builder
+ *
+ * ==> LARAVEL / PHP MAPPING: This is the Repository / persistence seam — the
+ *     file you replace to go from localStorage to a real API. `EPAL.store`
+ *     becomes an HTTP client or an Eloquent-backed repository; `list/upsert/
+ *     removeFrom` map to index/store-update/destroy. `module-overrides` becomes
+ *     a `feature_toggles` (or `company_module_settings`) table keyed by the
+ *     dotted path, and `isEnabled` becomes a Gate / middleware that reads it.
+ *     `applyOverrides` is the equivalent of hydrating config from that table on
+ *     each request; `nuke` maps to a `migrate:fresh --seed` for the demo.
+ * ========================================================================*/
 
 (function (EPAL) {
   'use strict';

@@ -1,21 +1,46 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/serial.js
+ * EPAL GROUP ERP  ·  assets/js/engines/serial.js   (EPAL.serial)
  * ----------------------------------------------------------------------------
- * GAPLESS DOCUMENT NUMBERING — "no magic numbers, full traceability".
+ * WHAT: Gapless, sequential document numbering — "no magic numbers, full
+ *   traceability". Every branded business object (invoice, receipt, voucher,
+ *   journal, work order, salary slip, PO, visa cover, ticket…) draws a stable,
+ *   human-readable serial from ONE authority so numbers never collide, skip, or
+ *   repeat. Format is `PREFIX/FY/000NNN` (6-digit zero pad by default); the
+ *   stream is keyed per (prefix, fiscal-year) and optionally per company.
  *
- * Every branded business object (invoice, receipt, voucher, journal, work
- * order, salary slip, PO…) gets a stable, sequential, human-readable serial
- * from ONE authority so numbers never collide or repeat. Counters persist in
- * the `serials` store keyed by a template code.
+ * DATA IT OWNS (localStorage store):
+ *   serials — a plain map { 'INV:2026':42, 'travels:JV:2026':7, … }
+ *             key = keyFor(prefix,company) = "[company:]PREFIX:FY"; value = last
+ *             number issued on that stream (a monotonic integer counter).
  *
- *   EPAL.serial.next('INV')            → 'INV/2026/000042'   (advances + saves)
- *   EPAL.serial.peek('INV')            → 'INV/2026/000043'   (does not advance)
- *   EPAL.serial.next('JV', {company:'travels'})              → per-company stream
+ * BUSINESS RULES (the "why" a developer MUST preserve):
+ *   - GAPLESS + UNIQUE: next() atomically increments the counter and returns the
+ *     new serial; peek()/current() never consume. An auditor trusts this for
+ *     sequence integrity, so numbers must never be reused or skipped.
+ *   - RECONCILE-BEFORE-USE: on first read the counters are seeded ABOVE the
+ *     highest serial already printed on a SEEDED document (documents.js seeds
+ *     fixed serials like INV/2026/000001..2). Without this, the first next('INV')
+ *     would reissue a byte-for-byte duplicate of a seeded document.
+ *   - ORDER-INDEPENDENT / RESET-SAFE: serial.js loads before documents.js, so its
+ *     seed hook may run before documents exist — then it is a no-op and the lazy
+ *     reconcile() inside counters() establishes the store on first runtime read.
+ *     After db.reset() nukes `serials`, it is rebuilt from the fresh documents.
+ *   - Fiscal year is anchored to a fixed demo "now" (Jul 2026) so serials are
+ *     stable across sessions; FY label = the calendar year the FY started in.
  *
- * Format is `PREFIX/FY/000NNN` where FY is the fiscal year of the group config;
- * width is 6 by default. Pass {pad, sep, fy} to override. Counters reset per
- * (prefix, fiscal-year) automatically. This is the single source of truth an
- * auditor can trust for sequence integrity.
+ * PUBLIC API (window.EPAL.serial):
+ *   next(prefix,{company,pad,sep,fy}) -> 'INV/2026/000042'  (advances + saves)
+ *   peek(prefix,opts)    -> next serial WITHOUT consuming it
+ *   current(prefix,opts) -> highest number issued (0 if none)
+ *   format(prefix,n,opts)-> render a serial string
+ *   counters()           -> the raw counter map (reconciles first)
+ *   fiscalYear()         -> integer FY label
+ *
+ * ==> LARAVEL / PHP MAPPING: a SerialService backed by a `serial_counters` table
+ *   (prefix, company_id, fiscal_year, last_no) with a UNIQUE index on that tuple.
+ *   next() runs inside a DB transaction using SELECT … FOR UPDATE (or an atomic
+ *   increment) so concurrent requests can never draw the same number — the true
+ *   backend equivalent of this single-threaded JS counter's gapless guarantee.
  * ==========================================================================*/
 
 (function (EPAL) {

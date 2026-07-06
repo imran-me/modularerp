@@ -1,38 +1,56 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/approvals.js
+ * EPAL GROUP ERP  ·  assets/js/engines/approvals.js
  * ----------------------------------------------------------------------------
- * THE MAKER-CHECKER ENGINE — governance for money and sensitive actions.
+ * WHAT: The MAKER-CHECKER engine — governance for money and sensitive actions.
+ *   Enterprise ERPs never let one person both raise AND approve a payment; this
+ *   engine encodes that segregation of duties. A "maker" requests approval for a
+ *   document (vendor payment, refund, salary change, client deletion, credit-
+ *   limit override); one or more "checkers" approve or reject it level by level;
+ *   the maker can never approve their own request. On full approval an optional
+ *   registered executor runs the document's real-world action.
  *
- * Enterprise ERPs never let one person both raise AND approve a payment. This
- * engine encodes that segregation of duties. A "maker" requests approval for a
- * document (a vendor payment, a refund, a salary change, a client deletion, a
- * credit-limit override); one or more "checkers" then approve or reject it,
- * and — crucially — the maker can never approve their own request.
+ * DATA IT OWNS (localStorage stores):
+ *   approvals — { id:string, at:number(ms), docType:string, docId:string,
+ *                 companyId:string, title:string, amount:number,
+ *                 maker:string(empId), makerName:string,
+ *                 state:enum(pending|approved|rejected|recalled),
+ *                 level:number(1-based current step), levels:[role,...],
+ *                 steps:[{level, role, decidedBy, decidedByName,
+ *                         decision, at, comment}], created:number }
+ *   approval_matrix — [{ docType:string, minAmount:number, maxAmount:number,
+ *                        roles:[role,...] }]  (amount band -> required roles)
  *
- * HOW IT WORKS
- *   - An APPROVAL MATRIX (store `approval_matrix`) declares, per document type
- *     and amount band, which roles must sign off. Higher amounts add more
- *     levels (e.g. a payment over 5L needs Finance Manager AND the MD).
- *   - needsApproval(docType, amount) looks up the matrix and returns either
- *     false (no approval needed) or { levels:[role, role...] } — one level per
- *     required role, approved in order.
- *   - request(...) creates a pending record, notifies + audits, and emits
- *     'approval:requested'.
- *   - decide(id, decision, {by, comment}) enforces maker != checker, advances
- *     through the levels, sets the final state, notifies the maker, audits, and
- *     emits 'approval:approved' / 'approval:rejected'. A comment is mandatory
- *     when rejecting.
- *   - onApproved(docType, fn) lets any module register an executor so that when
- *     one of its documents is fully approved, its real-world action runs.
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - MAKER != CHECKER: decide() throws if the deciding user is the maker — the
+ *     core segregation-of-duties invariant. pending({forUser}) also hides a
+ *     user's own requests from their checker queue.
+ *   - AMOUNT BANDING: needsApproval() matches [minAmount, maxAmount) so higher
+ *     amounts pull in more approval levels (e.g. payment > 5L adds the MD).
+ *   - LEVELS ARE SEQUENTIAL: each approve advances one level; only the LAST
+ *     level's approval flips state to 'approved'. Any reject ends it immediately.
+ *   - REJECT NEEDS A REASON: decide() throws on reject with an empty comment.
+ *   - EXECUTOR ON APPROVAL: modules register onApproved(docType, fn); the fn
+ *     fires exactly once when a doc reaches 'approved' (wrapped in try/catch so a
+ *     failing executor never corrupts the approval record).
+ *   - MAX is a JSON-safe 'infinity' sentinel (real Infinity does not serialise).
  *
- * Records shape (store `approvals`):
- *   { id, at, docType, docId, companyId, title, amount, maker, makerName,
- *     state:'pending'|'approved'|'rejected'|'recalled', level, levels:[role...],
- *     steps:[{level, role, decidedBy, decidedByName, decision, at, comment}],
- *     created }
+ * PUBLIC API (window.EPAL.approvals):
+ *   matrix() / setMatrix(rules) -> the amount-band rule table.
+ *   needsApproval(docType, amount) -> false | { levels:[role,...] }.
+ *   request({docType,docId,companyId,title,amount,maker}) -> pending req
+ *       — notifies, audits, emits 'approval:requested'.
+ *   decide(id, decision, {by,comment}) -> req — enforces maker!=checker, advances
+ *       levels, audits, notifies maker, emits approved/rejected/advanced.
+ *   onApproved(docType, fn) -> this — register a "run on full approval" action.
+ *   pending({forUser}) / list(filter) / get(id) -> query helpers.
  *
- * All reads/writes go through EPAL.store / EPAL.db; seeds use seedOnce so they
- * survive db.reset(). ES5 only. Never write a literal star-slash in a comment.
+ * ==> LARAVEL / PHP MAPPING: an `approvals` model + `approval_matrix` config (or
+ *     table) driven by an ApprovalService. request()/decide() are service methods
+ *     wrapped in a DB transaction; the maker!=checker rule is a Gate/Policy check
+ *     (deny when auth()->id() === $req->maker) plus a validation rule. Level
+ *     advancement is a small state machine; onApproved() maps to a domain event
+ *     + listener per docType, or the Laravel Approval/Workflow pattern.
+ *     ES5 only. Never write a literal star-slash in a comment.
  * ==========================================================================*/
 
 (function (EPAL) {

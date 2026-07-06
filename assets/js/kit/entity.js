@@ -1,32 +1,46 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/entity.js
+ * EPAL GROUP ERP  ·  assets/js/kit/entity.js
  * ----------------------------------------------------------------------------
- * THE ENTITY MODULE FACTORY — declare a business object once, get a complete,
- * world-class module workspace: KPI row → filterable/sortable/paginated table
- * with CSV export → validated create/edit modal → delete with confirm →
- * per-module ANALYTICS (monthly trend + breakdown charts) — all wired to the
- * data layer so every mutation emits events and syncs the group.
+ * WHAT: The CRUD factory. One spec object describes a business object and this
+ * builds an entire working module screen and registers it as a view: page
+ * header (+ optional sub-route pills), a KPI tile row, a filterable/sortable/
+ * paginated table (via EPAL.table) with CSV export, a schema-driven create/edit
+ * modal (via EPAL.formModal), delete-with-confirm, and auto ANALYTICS (8-month
+ * trend + breakdown doughnut). Every save/delete goes through EPAL.db so it
+ * emits events and is written to the audit log — keeping the whole group in
+ * sync. This is how ~60 modules exist without 60 hand-written screens; flagship
+ * modules still get bespoke views, everything else is a spec.
  *
- * This is how the system fulfils "no empty pages, every button works" across
- * 60+ modules without 60 hand-written screens. Flagship modules still get
- * custom views; everything else is a spec like:
+ * DATA IT OWNS (localStorage stores): none of its own. It reads/writes the
+ *   caller-named collection `spec.store` through EPAL.db (db.col/save/remove).
+ *   New records get: id = (spec.idPrefix||'R')-<last6 of epoch>, created = today
+ *   (YYYY-MM-DD) — only if not already set.
  *
- *   EPAL.entity({
- *     route: 'woodart/projects',       // view key ("company/module")
- *     store: 'wa_projects',            // collection name in EPAL.db
- *     title: 'Projects', icon: 'easel2-fill', singular: 'Project',
- *     desc: '…',
- *     fields: [ …form spec (see forms.js)… ],
- *     columns: [ …table spec (see datatable.js)… ],
- *     filters: [{key:'stage',label:'Stage'}],
- *     searchKeys: ['name','client'],
- *     kpis: [ { label:'Active', icon:'play', compute:function(rows){…} } ],
- *     analytics: { moneyField:'value', groupBy:'stage', dateField:'created' },
- *     subs: { active: { label:'Active', filter:function(r){…} } },  // sub-routes
- *     hooks: { afterSave:function(rec,isNew){…}, beforeDelete:function(rec){…} },
- *     readonly: false,                 // true → no New/Edit/Delete
- *     detail: function(rec, refresh){…}// optional custom row-click drawer
- *   });
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - readonly:true suppresses New/Edit/Delete and the row-click editor.
+ *   - hooks.beforeDelete returning false ABORTS the delete (veto hook, e.g. a
+ *     record with dependants must not be removable).
+ *   - hooks.afterSave(record,isNew) runs post-persist for side effects (e.g.
+ *     post a sale to the ledger, generate a document).
+ *   - Every mutation writes an activity-log line (maker + human action text) so
+ *     the audit trail stays complete.
+ *   - subs let one store power several sub-routes via row filter predicates.
+ *
+ * PUBLIC API (window.EPAL.*):
+ *   EPAL.entity(spec) -> view — builds the screen and registers it with
+ *       EPAL.view(spec.route). Spec keys:
+ *     route, store, title, icon, singular, desc, fields[], columns[],
+ *     filters[], searchKeys[], kpis[], analytics{moneyField,groupBy,dateField},
+ *     subs{}, hooks{afterSave,beforeDelete}, actions[], scope(r), readonly,
+ *     detail(rec,refresh), defaults{}, idPrefix, pageSize.
+ *
+ * ==> LARAVEL / PHP MAPPING: this is the resource Controller + views pattern.
+ *     spec.store = an Eloquent model/table; fields[] = a FormRequest + Blade
+ *     form; columns[] = an index table/component; the New/Edit/Delete wiring =
+ *     a resourceful Controller (index/create/store/edit/update/destroy);
+ *     hooks.afterSave / beforeDelete = model observers or Controller hooks;
+ *     the activity-log line = an audit/observer (e.g. Laravel Auditing); KPIs +
+ *     analytics = query aggregates fed to the index view.
  * ==========================================================================*/
 
 (function (EPAL) {
@@ -136,10 +150,11 @@
             onSave: function (vals) {
               var record = Object.assign({}, rec || {}, vals);
               if (isNew) {
+                // Assign id + created only on first save; edits keep their originals.
                 record.id = record.id || (spec.idPrefix || 'R') + '-' + Date.now().toString().slice(-6);
                 record.created = record.created || new Date().toISOString().slice(0, 10);
               }
-              db.save(spec.store, record);
+              db.save(spec.store, record);   // persists + emits data:changed (group stays in sync)
               if (spec.hooks && spec.hooks.afterSave) spec.hooks.afterSave(record, isNew);
               db.log(EPAL.auth.current().name, (isNew ? 'Created ' : 'Updated ') + (spec.singular || 'record') + ' ' + (record.name || record.title || record.id), (spec.route || '').split('/')[0]);
               refresh();
@@ -152,6 +167,7 @@
             text: (rec.name || rec.title || rec.id) + ' will be permanently removed.', confirmLabel: 'Delete' })
             .then(function (ok) {
               if (!ok) return;
+              // beforeDelete may veto (return false) — e.g. record has dependants.
               if (spec.hooks && spec.hooks.beforeDelete && spec.hooks.beforeDelete(rec) === false) return;
               db.remove(spec.store, rec.id);
               refresh(); ui.toast('Deleted', 'success');

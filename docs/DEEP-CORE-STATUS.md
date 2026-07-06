@@ -4,7 +4,7 @@ The third-prompt "Deep Core Pass" (brain / nerves / backbone) is **done, hostile
 and verified**. This file was the live resume tracker; it is retained as a record.
 
 ## Delivered
-- **9 core engines** (`assets/js/core/`): `ledger` (double-entry), `audit`, `approvals`
+- **9 core engines** (`assets/js/{kernel,data,engines,kit}/`): `ledger` (double-entry), `audit`, `approvals`
   (maker-checker), `documents` + `serial` (branded, gapless), `intel` (MD briefing / RFM /
   anomalies), `permissions` (action-level), `rules` (automation scheduler), `comments`
   (@mentions), `search` (Ctrl+K data) — plus the `engines` self-registration backbone and

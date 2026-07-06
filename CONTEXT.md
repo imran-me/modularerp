@@ -51,24 +51,38 @@ The look must be **premium, luxurious, artistic, corporate, timeless** — expli
 ## 3. Architecture (how it actually works)
 
 **Stack:** vanilla HTML/CSS/JS + Bootstrap *Icons* + Chart.js. **No build step.**
-Persistence is `localStorage` behind one wrapper (`core/state.js`) so it can later be
+Persistence is `localStorage` behind one wrapper (`data/state.js`) so it can later be
 swapped for a real API by changing one file.
 
 ```
-index.html ─ loads design system + runtime, then core/app.js BOOTS everything
+index.html ─ loads design system + runtime, then kernel/app.js BOOTS everything
 │
 ├─ assets/css/   tokens → base → layout → components → animations   (the look)
 │
-├─ assets/js/core/
+├─ assets/js/   grouped into LAYERS that map 1:1 to a future Laravel backend
+│               (see docs/FOR-LARAVEL-DEVELOPERS.md):
+│
+│  kernel/   app bootstrap + shell           ⇒ routes, middleware, layout
 │    config.js     THE MODULE REGISTRY (companies→modules→subs). Single source of truth.
-│    state.js      localStorage wrapper + the module on/off "override" engine.
 │    eventbus.js   pub/sub — the nervous system that keeps the group in sync.
 │    ui.js         DOM builder (el/frag), formatting (money/date), toast/modal/confirm.
 │    charts.js     theme-aware Chart.js factory.
-│    database.js   seeded mock DB + cross-company aggregators (groupSnapshot, series…).
 │    auth.js       roles, permissions, "View As", company scoping.
 │    router.js     hash router (#/company/module/sub) + enable/permission gates.
 │    app.js        builds rail+sidebar+topbar from the registry, then starts router.
+│
+│  data/     persistence + seeded data        ⇒ Models + Migrations + Seeders
+│    state.js      localStorage wrapper + the module on/off "override" engine.
+│    database.js   seeded mock DB + cross-company aggregators (groupSnapshot, series…).
+│    seed-bd.js    deep Bangladesh-context seed for every company.
+│
+│  engines/  business-logic services          ⇒ app/Services (+ policies, jobs)
+│    ledger.js (double-entry) · audit.js · approvals.js · documents.js · serial.js
+│    intel.js · rules.js (automation) · comments.js · search.js · permissions.js
+│    engines.js  (the self-registration registry)
+│
+│  kit/      reusable UI building blocks       ⇒ Blade components / FormRequests
+│    forms.js (schema form + items repeater) · datatable.js (EPAL.table) · entity.js (CRUD factory)
 │
 └─ assets/js/views/   one file per screen; each self-registers into EPAL.views.
      registry.js            EPAL.view() + the generic placeholder SCAFFOLD.
@@ -142,17 +156,17 @@ Also live: the **group command layer** (CRM, Consolidated Finance, Analytics, Re
 Companies, Automation, Notifications, Settings) and **shared wildcard company views**
 (`*/dashboard`, `*/hrm`, `*/accounts`, `*/ledgers`, `*/reports`, `*/analytics`,
 `*/customers`, `*/crm`, `*/settings`) that give every sister concern real screens, plus
-the runtime kit `core/forms.js` · `core/datatable.js` (`EPAL.table`) · `core/entity.js`
-(CRUD factory) · `core/seed-bd.js` (deep all-company seed).
+the runtime kit `kit/forms.js` · `kit/datatable.js` (`EPAL.table`) · `kit/entity.js`
+(CRUD factory) · `data/seed-bd.js` (deep all-company seed).
 
-**Deep Core (v0.3.0) — the operating brain, all live:** double-entry **`core/ledger.js`**
+**Deep Core (v0.3.0) — the operating brain, all live:** double-entry **`engines/ledger.js`**
 (COA, journal, trial balance, AR/AP ageing, P&L, balance sheet; auto-posts every sale),
-**`core/audit.js`** (append-only trail → `group/activity-log`), **`core/approvals.js`**
-(maker-checker → `group/approvals`), **`core/documents.js`** + **`core/serial.js`**
-(branded navy/gold docs + gapless serials → `group/documents`), **`core/intel.js`**
-(MD briefing → `group/briefing`, RFM, anomalies), **`core/permissions.js`** (action-level
-RBAC), **`core/rules.js`** (automation scheduler + escalation), **`core/comments.js`**
-(@mention threads), **`core/search.js`** (Ctrl+K data search). Deep modules: Travels
+**`engines/audit.js`** (append-only trail → `group/activity-log`), **`engines/approvals.js`**
+(maker-checker → `group/approvals`), **`engines/documents.js`** + **`engines/serial.js`**
+(branded navy/gold docs + gapless serials → `group/documents`), **`engines/intel.js`**
+(MD briefing → `group/briefing`, RFM, anomalies), **`engines/permissions.js`** (action-level
+RBAC), **`engines/rules.js`** (automation scheduler + escalation), **`engines/comments.js`**
+(@mention threads), **`engines/search.js`** (Ctrl+K data search). Deep modules: Travels
 **Vendor & Agent** ledgers, **Contract Flight** seats, deepened **Air Ticketing** &
 **Visa**; **Shop POS**, **Construction** BOQ→billing→retention, **Woodart**, **IT**.
 Engine APIs are in `docs/DEEP-CORE-CONTRACT.md`; every store/field/relation in
@@ -175,7 +189,7 @@ workspace — ready to graduate one file at a time.
 2. Group CRM (unified customer 360) + Consolidated Finance (P&L, cash, AR/AP).
 3. Shop POS + Inventory; Construction Projects/BOQ; Woodart Projects/Estimates; IT
    Projects/Support.
-4. Real backend: reimplement `core/state.js` + `core/database.js` against an API;
+4. Real backend: reimplement `data/state.js` + `data/database.js` against an API;
    everything else is untouched.
 
 ## 10. Reference

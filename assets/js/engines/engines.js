@@ -1,27 +1,47 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/engines.js
+ * EPAL GROUP ERP  ·  assets/js/engines/engines.js
  * ----------------------------------------------------------------------------
- * THE ENGINE REGISTRY — Deep Core Pass backbone.
+ * WHAT: The engine REGISTRY (a service-provider pattern). The Deep Core Pass
+ *   adds several cross-cutting "engines" (double-entry ledger, audit trail,
+ *   approvals, documents, automation scheduler, intelligence, comments,
+ *   search). Each lives in its own file and must (a) seed its own store
+ *   idempotently and (b) optionally run boot logic AFTER the router is live.
+ *   Rather than wire each into database.js / app.js by hand (collision-prone),
+ *   every engine self-registers here, and this file drives two lifecycle
+ *   phases — seed, then boot — over all registered engines in order.
  *
- * The Deep Core Pass adds several cross-cutting "engines" (double-entry ledger,
- * audit trail, approvals, documents, automation scheduler, intelligence…). Each
- * lives in its own core/*.js file and must (a) seed its own store idempotently
- * and (b) optionally run boot logic AFTER the router is live. Rather than wire
- * each into database.js/app.js by hand (collision-prone), every engine
- * self-registers here:
+ * DATA IT OWNS (localStorage stores):
+ *   none — this is a pure registry / dispatcher. Individual engines own stores.
  *
- *   EPAL.registerEngine({
- *     name: 'ledger',
- *     seed: function () { EPAL.store.seedOnce('coa', COA); … },   // idempotent
- *     boot: function () { EPAL.bus.on('sale:recorded', …); }       // after start
- *   });
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Registration order IS execution order for both seed() and boot(). Load
+ *     order in index.html therefore matters (see note below).
+ *   - Each phase isolates errors per engine (try/catch) so one bad engine can
+ *     never block the rest from seeding/booting.
+ *   - An engine registered LATE (after the phases already ran, e.g. a lazily
+ *     loaded module) has its missed phases run immediately, so nothing is
+ *     skipped regardless of when it self-registers.
+ *   - seed() must be idempotent (engines use EPAL.store.seedOnce) so re-seeding
+ *     never duplicates rows. boot() runs after router.start().
+ *   - Load order in index.html: engines.js must come BEFORE any engine that
+ *     calls registerEngine, and after eventbus/state/ui.
  *
- * database.js  → calls EPAL.seedEngines()  at the end of db.seed()
- * app.js       → calls EPAL.bootEngines()  after router.start()
+ * PUBLIC API (window.EPAL.<x>):
+ *   registerEngine({name,seed?,boot?}) -> engine — self-register; runs missed
+ *       phases immediately if seed/boot already happened.
+ *   engines() -> array — snapshot copy of the registry.
+ *   seedEngines() -> void — run every engine's seed() in order (called at the
+ *       end of db.seed()).
+ *   bootEngines() -> void — run every engine's boot() in order (called after
+ *       router.start()).
+ *   onSeed(name, fn) -> engine — convenience to register a pure seed hook (a
+ *       view that needs a seeded store but has no runtime engine).
  *
- * Both are ordered by registration order and isolate errors so one bad engine
- * never blocks the rest. Load order in index.html: engines.js must come BEFORE
- * any engine that calls registerEngine, and after eventbus/state/ui.
+ * ==> LARAVEL / PHP MAPPING: this is a Service Provider registry. Each engine
+ *     maps to a Laravel ServiceProvider; seed() -> a database Seeder invoked
+ *     from DatabaseSeeder (idempotent updateOrCreate); boot() -> the provider's
+ *     boot() method (event listeners, scheduled tasks). seedEngines/bootEngines
+ *     are the framework running register()/boot() across all providers in order.
  * ==========================================================================*/
 
 (function (EPAL) {

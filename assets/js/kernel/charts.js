@@ -1,18 +1,35 @@
 /* ============================================================================
- * EPAL GROUP ERP  ·  core/charts.js
+ * EPAL GROUP ERP  ·  assets/js/kernel/charts.js
  * ----------------------------------------------------------------------------
- * CHART FACTORY — a thin, theme-aware wrapper over Chart.js (loaded via CDN).
+ * WHAT: THE CHART FACTORY — a thin, theme-aware wrapper over Chart.js (CDN) that
+ *   keeps all premium chart styling (fonts, grid, tooltips, gradients, the brand
+ *   palette) in ONE place. It reads live CSS custom properties so charts recolour
+ *   the instant the dark/light theme flips, and it tracks every instance so a view
+ *   can destroy them all before re-rendering.
  *
- * Why a wrapper?
- *   - Consistent premium styling (fonts, grid, tooltips) in ONE place.
- *   - Reads live CSS custom properties so charts recolour on dark/light flip.
- *   - Tracks every chart instance so a view can `EPAL.charts.destroyAll()`
- *     before re-rendering (prevents Chart.js canvas-reuse leaks in the SPA).
+ * DATA IT OWNS (localStorage stores): none. Holds only an in-memory `instances[]`
+ *   list of live Chart.js objects for cleanup.
  *
- * Usage:
- *   EPAL.charts.line(canvasEl, { labels, datasets:[{label,data,color}] })
- *   EPAL.charts.area(...)  EPAL.charts.bar(...)  EPAL.charts.doughnut(...)
- * ==========================================================================*/
+ * BUSINESS RULES (the "why" a developer must preserve):
+ *   - Every created chart is track()ed; the router calls destroyAll() on route
+ *     change. This is MANDATORY — Chart.js leaks/errors if a canvas is reused in
+ *     an SPA without destroying the previous chart bound to it.
+ *   - Colours come from CSS vars (cssVar) not hard-coded, so one theme swap
+ *     restyles every chart; it re-applies defaults on the `theme:changed` event.
+ *   - Money axes/tooltips format via EPAL.ui.compact (Lakh/Crore), matching the app.
+ *
+ * PUBLIC API (window.EPAL.charts):
+ *   .palette                        -> brand accent colour array
+ *   .line/.area(canvas,cfg)         -> Chart  (cfg: {labels, datasets:[{label,data,color}], money})
+ *   .bar(canvas,cfg)                -> Chart  (cfg supports horizontal, stacked)
+ *   .doughnut(canvas,cfg)           -> Chart  (cfg: {labels,data,colors,cutout})
+ *   .spark(canvas,data,color)       -> Chart  (axis-less KPI sparkline)
+ *   .destroyAll()                   -> void   (call before re-render)
+ *
+ * ==> LARAVEL / PHP MAPPING: presentation-only, has no backend model. Rebuild as a
+ *     front-end asset; the backend just supplies the series data via an API/JSON
+ *     endpoint (controller returning {labels, datasets}).
+ * ========================================================================*/
 
 (function (EPAL) {
   'use strict';
