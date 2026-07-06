@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<!-- ============================================================================
+     EPAL TRAVELS ERP  ·  travels/air-ticketing.html
+     A real second page (proves multi-page HTML). Tabs via Alpine; Direct Sale is
+     a real HTML <form>; Manage Sales is a real HTML table. Same shell as the
+     dashboard (in Laravel this shell is one Blade layout @extend'ed by both).
+     ⇒ Laravel: resources/views/travels/air-ticketing.blade.php + Controller.
+============================================================================= -->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Epal Travels · Air Ticketing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      colors: { navy:{900:'#070b14',800:'#0b1220',700:'#111a2e',600:'#1B2A4A'}, gold:'#C9A227', goldsoft:'#e8cf7a' },
+      fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['Sora','Inter','sans-serif'], mono:['JetBrains Mono','ui-monospace','monospace'] }
+    } } };
+  </script>
+  <link rel="stylesheet" href="assets/theme.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+
+<body x-data="{ sidebar:false }" class="text-slate-200">
+<div class="flex min-h-screen">
+
+  <!-- ===================== SIDEBAR (shared shell) ===================== -->
+  <aside class="fixed lg:static z-40 inset-y-0 left-0 w-64 shrink-0 glass border-r border-white/10 flex flex-col transition-transform duration-300"
+         :class="sidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
+    <div class="h-16 flex items-center gap-3 px-5 border-b border-white/10">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-gold to-yellow-700 grid place-items-center font-display font-extrabold text-navy-900">E</div>
+      <div><div class="font-display font-bold leading-tight">Epal Travels</div><div class="text-[11px] text-slate-400 -mt-0.5">Travel & Consultancy</div></div>
+    </div>
+    <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1 text-sm">
+      <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-1">Overview</div>
+      <a href="index.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-speedometer2 nav-ico text-slate-400"></i> Dashboard</a>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-people nav-ico text-slate-400"></i> CRM & Leads</a>
+      <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-1 mt-4">Operations</div>
+      <a href="air-ticketing.html" class="nav-link active relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-200"><i class="bi bi-airplane-fill nav-ico text-slate-400"></i> Air Ticketing</a>
+      <a href="visa-processing.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-passport-fill nav-ico text-slate-400"></i> Visa Processing</a>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-airplane-engines nav-ico text-slate-400"></i> Contract Flights</a>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-building nav-ico text-slate-400"></i> Hotels & Packages <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded badge-gold">soon</span></a>
+      <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-1 mt-4">Finance</div>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-people-fill nav-ico text-slate-400"></i> Vendor & Agent</a>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-cash-stack nav-ico text-slate-400"></i> Accounts & Ledger</a>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-file-earmark-bar-graph nav-ico text-slate-400"></i> Reports</a>
+    </nav>
+    <div class="p-3 border-t border-white/10">
+      <div class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5">
+        <div class="w-8 h-8 rounded-full bg-emerald-600 grid place-items-center text-xs font-bold">MI</div>
+        <div class="text-sm leading-tight"><div class="font-semibold">Mohsin</div><div class="text-[11px] text-slate-400">Owner</div></div>
+      </div>
+    </div>
+  </aside>
+  <div x-show="sidebar" @click="sidebar=false" x-transition.opacity class="fixed inset-0 bg-black/50 z-30 lg:hidden" style="display:none"></div>
+
+  <!-- ===================== MAIN ===================== -->
+  <div class="flex-1 min-w-0 flex flex-col" x-data="{ tab:'direct' }">
+    <header class="h-16 sticky top-0 z-20 glass border-b border-white/10 flex items-center gap-3 px-4 lg:px-6">
+      <button @click="sidebar=true" class="lg:hidden text-xl text-slate-300"><i class="bi bi-list"></i></button>
+      <div class="text-sm text-slate-400 flex items-center gap-2">
+        <a href="index.html" class="hover:text-slate-200">Travels</a><i class="bi bi-chevron-right text-[10px]"></i>
+        <span class="text-slate-200 font-display font-semibold">Air Ticketing</span>
+      </div>
+      <div class="flex-1"></div>
+      <button class="pill text-sm px-3 py-2 rounded-lg text-slate-300 hover:bg-white/5"><i class="bi bi-download"></i> Export</button>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+      <div class="flex flex-wrap items-end justify-between gap-3 fade-up">
+        <div><h1 class="text-2xl font-display font-bold">Air Ticketing</h1>
+          <p class="text-slate-400 text-sm mt-0.5">Issue, re-issue, refund and void tickets — with BSP/ADM reconciliation.</p></div>
+      </div>
+
+      <!-- tab strip (Alpine) -->
+      <div class="flex gap-1 p-1 glass rounded-xl w-fit fade-up-2">
+        <button @click="tab='direct'" :class="tab==='direct' ? 'bg-gold text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Direct Sale</button>
+        <button @click="tab='manage'" :class="tab==='manage' ? 'bg-gold text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Manage Sales</button>
+        <button @click="tab='bsp'" :class="tab==='bsp' ? 'bg-gold text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">BSP / ADM</button>
+      </div>
+
+      <!-- DIRECT SALE — a real HTML form -->
+      <form x-show="tab==='direct'" x-transition class="glass rounded-2xl p-6 space-y-6 fade-up-3" @submit.prevent>
+        <div>
+          <h3 class="font-display font-semibold mb-4 flex items-center gap-2"><i class="bi bi-person-badge text-gold"></i> Passenger & Itinerary</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <label class="block"><span class="text-xs text-slate-400">Passenger name</span>
+              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="Full name as on passport" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Passport no</span>
+              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="A01234567" /></label>
+            <label class="block"><span class="text-xs text-slate-400">From</span>
+              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>DAC · Dhaka</option><option>CGP · Chittagong</option></select></label>
+            <label class="block"><span class="text-xs text-slate-400">To</span>
+              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>DXB · Dubai</option><option>JED · Jeddah</option><option>SIN · Singapore</option></select></label>
+            <label class="block"><span class="text-xs text-slate-400">Airline</span>
+              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>EK · Emirates</option><option>SV · Saudia</option><option>BG · Biman</option></select></label>
+            <label class="block"><span class="text-xs text-slate-400">PNR</span>
+              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="HX42Q7" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Travel date</span>
+              <input type="date" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Trip type</span>
+              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>One-way</option><option>Round</option><option>Multi-city</option></select></label>
+          </div>
+        </div>
+
+        <!-- fare block with live profit (Alpine) -->
+        <div x-data="{ base:70000, tax:12000, markup:5000, commission:3500,
+                       get cost(){ return (+this.base)+(+this.tax) },
+                       get sale(){ return (+this.base)+(+this.tax)+(+this.markup) },
+                       get profit(){ return (+this.markup) - (+this.commission) } }">
+          <h3 class="font-display font-semibold mb-4 flex items-center gap-2"><i class="bi bi-calculator text-gold"></i> Fare & Profit</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <label class="block"><span class="text-xs text-slate-400">Base fare ৳</span>
+              <input x-model.number="base" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Taxes ৳</span>
+              <input x-model.number="tax" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Markup / service ৳</span>
+              <input x-model.number="markup" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Agent commission ৳</span>
+              <input x-model.number="commission" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-3 text-sm">
+            <div class="pill rounded-lg px-4 py-2">Total cost <b class="font-mono ml-1" x-text="'৳'+cost.toLocaleString('en-BD')"></b></div>
+            <div class="pill rounded-lg px-4 py-2">Sale price <b class="font-mono ml-1" x-text="'৳'+sale.toLocaleString('en-BD')"></b></div>
+            <div class="rounded-lg px-4 py-2 kpi-accent">Net profit <b class="font-mono ml-1 text-goldsoft" x-text="'৳'+profit.toLocaleString('en-BD')"></b></div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+          <button type="button" class="pill rounded-lg px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5">Save as draft</button>
+          <button type="submit" class="bg-gold text-navy-900 font-semibold rounded-lg px-5 py-2.5 text-sm hover:brightness-110"><i class="bi bi-check-lg"></i> Issue ticket</button>
+        </div>
+      </form>
+
+      <!-- MANAGE SALES — real HTML table -->
+      <div x-show="tab==='manage'" x-transition class="glass rounded-2xl overflow-hidden fade-up-3" style="display:none">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="text-slate-400 text-xs uppercase tracking-wider">
+              <tr class="border-b border-white/10">
+                <th class="text-left font-medium px-5 py-3">Ticket</th><th class="text-left font-medium px-5 py-3">Passenger</th>
+                <th class="text-left font-medium px-5 py-3">Route</th><th class="text-right font-medium px-5 py-3">Cost</th>
+                <th class="text-right font-medium px-5 py-3">Sale</th><th class="text-right font-medium px-5 py-3">Profit</th>
+                <th class="text-left font-medium px-5 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="tbl-row border-b border-white/5"><td class="px-5 py-3 font-mono text-gold">TK-7042</td><td class="px-5 py-3">Rahim Uddin</td><td class="px-5 py-3 font-mono text-slate-300">DAC → DXB</td><td class="px-5 py-3 text-right font-mono">৳78,000</td><td class="px-5 py-3 text-right font-mono">৳84,200</td><td class="px-5 py-3 text-right font-mono text-emerald-300">৳6,200</td><td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-emerald-300 bg-emerald-500/10">Issued</span></td></tr>
+              <tr class="tbl-row border-b border-white/5"><td class="px-5 py-3 font-mono text-gold">TK-7041</td><td class="px-5 py-3">Sadia Islam</td><td class="px-5 py-3 font-mono text-slate-300">DAC → JED</td><td class="px-5 py-3 text-right font-mono">৳56,000</td><td class="px-5 py-3 text-right font-mono">৳61,500</td><td class="px-5 py-3 text-right font-mono text-emerald-300">৳5,500</td><td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-emerald-300 bg-emerald-500/10">Issued</span></td></tr>
+              <tr class="tbl-row"><td class="px-5 py-3 font-mono text-gold">TK-7039</td><td class="px-5 py-3">Tanvir Hasan</td><td class="px-5 py-3 font-mono text-slate-300">DAC → SIN</td><td class="px-5 py-3 text-right font-mono">৳43,000</td><td class="px-5 py-3 text-right font-mono">৳47,200</td><td class="px-5 py-3 text-right font-mono text-emerald-300">৳4,200</td><td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-amber-300 bg-amber-500/10">Hold</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- BSP tab -->
+      <div x-show="tab==='bsp'" x-transition class="glass rounded-2xl p-6 fade-up-3" style="display:none">
+        <div class="flex items-center gap-3 text-sm text-slate-300"><i class="bi bi-shield-check text-emerald-400 text-lg"></i>
+          BSPlink connected · <span class="font-mono">bsplink.iata.org</span> · last sync 05 Jul 09:12 — <span class="text-emerald-300">6 matched</span>, <span class="text-amber-300">1 unmatched</span>, <span class="text-rose-300">1 ADM open</span>.</div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

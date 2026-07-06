@@ -1,0 +1,86 @@
+/* ============================================================================
+   EPAL TRAVELS ERP  ·  travels/assets/theme.css
+   ----------------------------------------------------------------------------
+   The premium theme LAYER that sits on top of Tailwind CSS (loaded via CDN).
+   Tailwind gives us the utility classes + the colour tokens (configured inline
+   in each page's <head>); this file adds the few bespoke pieces Tailwind
+   utilities can't express cleanly: the luxury background, glass cards, custom
+   scrollbars, fonts and a couple of component classes reused across pages.
+
+   Stack (all free, CDN, no build step, GitHub-Pages friendly):
+     Tailwind CSS (Play CDN)  ·  Alpine.js  ·  Chart.js  ·  Bootstrap Icons
+   ⇒ Laravel port: this becomes your compiled Tailwind theme + Blade layout.
+   ========================================================================== */
+
+:root {
+  --navy-900: #070b14;
+  --navy-800: #0b1220;
+  --navy-700: #111a2e;
+  --navy-600: #1B2A4A;   /* brand navy */
+  --line:     rgba(148, 163, 184, 0.14);
+  --gold:     #C9A227;
+  --gold-soft:#e8cf7a;
+}
+
+* { -webkit-font-smoothing: antialiased; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #e6ebf5;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(201,162,39,0.10), transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, rgba(47,107,255,0.10), transparent 55%),
+    linear-gradient(180deg, var(--navy-900), var(--navy-800));
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+h1, h2, h3, .font-display { font-family: 'Sora', 'Inter', sans-serif; }
+.num, .tabular { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+/* Glass / premium surfaces --------------------------------------------------*/
+.glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+.glass-hover { transition: transform .2s ease, border-color .2s ease, background .2s ease; }
+.glass-hover:hover { transform: translateY(-2px); border-color: rgba(201,162,39,0.35); }
+
+.gold-line { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+.text-gold { color: var(--gold); }
+.ring-gold { box-shadow: 0 0 0 1px rgba(201,162,39,0.4), 0 8px 30px rgba(0,0,0,0.35); }
+
+/* Sidebar active pill --------------------------------------------------------*/
+.nav-link { transition: color .15s ease, background .15s ease; }
+.nav-link:hover { background: rgba(255,255,255,0.05); color: #fff; }
+.nav-link.active { background: rgba(201,162,39,0.14); color: #fff; }
+.nav-link.active .nav-ico { color: var(--gold); }
+.nav-link.active::before {
+  content:''; position:absolute; left:0; top:8px; bottom:8px; width:3px;
+  border-radius:3px; background: var(--gold);
+}
+
+/* KPI + accents --------------------------------------------------------------*/
+.kpi-accent { background: linear-gradient(135deg, rgba(201,162,39,0.18), rgba(201,162,39,0.04)); }
+.pill { border: 1px solid var(--line); }
+.badge-up   { color:#34d399; background:rgba(52,211,153,0.12); }
+.badge-down { color:#f87171; background:rgba(248,113,113,0.12); }
+.badge-gold { color:var(--gold-soft); background:rgba(201,162,39,0.14); }
+
+/* Table -----------------------------------------------------------------------*/
+.tbl-row { transition: background .15s ease; }
+.tbl-row:hover { background: rgba(255,255,255,0.03); }
+
+/* Scrollbar ------------------------------------------------------------------*/
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.22); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.4); background-clip: padding-box; }
+
+/* Motion ---------------------------------------------------------------------*/
+@keyframes fadeUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
+.fade-up { animation: fadeUp .5s cubic-bezier(.2,.7,.2,1) both; }
+.fade-up-2 { animation: fadeUp .5s cubic-bezier(.2,.7,.2,1) .06s both; }
+.fade-up-3 { animation: fadeUp .5s cubic-bezier(.2,.7,.2,1) .12s both; }
+@media (prefers-reduced-motion: reduce) { .fade-up,.fade-up-2,.fade-up-3 { animation: none; } }
