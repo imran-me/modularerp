@@ -193,23 +193,14 @@
       this.highlightNav(EPAL.router.parse());
     },
 
-    /* ---- collapsible module nav (persisted accordion) --------------------
-     * Each module that has sub-features is an independently collapsible group.
-     * State persists per company under `ui.nav.open` = { "co/mod": true|false }.
-     * Default (no explicit preference): only the ACTIVE module is expanded, so
-     * the sidebar never piles up every visited section. Users can open/close
-     * any category freely and the choice is remembered. --------------------*/
-    navOpenPrefs: function () { return EPAL.store.get('ui.nav.open', {}) || {}; },
-    setNavOpen: function (companyId, moduleId, open) {
-      var s = this.navOpenPrefs(); s[companyId + '/' + moduleId] = !!open;
-      EPAL.store.set('ui.nav.open', s);
-    },
-    // Should this module's group render expanded right now?
-    isNavOpen: function (companyId, moduleId) {
-      var rt = EPAL.router.parse();
-      if (rt.companyId === companyId && rt.moduleId === moduleId) return true;   // active → open
-      var s = this.navOpenPrefs(); var key = companyId + '/' + moduleId;
-      return (key in s) ? !!s[key] : false;                                       // else user pref, default closed
+    /* ---- collapsible module nav (single-open accordion) ------------------
+     * Each module with sub-features is a collapsible group. Clicking anywhere on
+     * the row (or the caret) expands/collapses it. It is a SINGLE-OPEN accordion:
+     * opening one category collapses the others, so the sidebar stays tidy. On
+     * navigation the active module's group is the one shown open. No persisted
+     * state — nothing piles up. ------------------------------------------------*/
+    collapseOtherGroups: function (except) {
+      ui.$$('#nav .nav-group.open').forEach(function (g) { if (g !== except) g.classList.remove('open'); });
     },
 
     buildNavItem: function (co, mm) {
@@ -228,21 +219,27 @@
       if (!hasSubs) return row;
 
       var wrap = el('div.nav-group');
-      if (App.isNavOpen(co.id, mm.id)) wrap.classList.add('open');
+      var rt = EPAL.router.parse();
+      if (rt.companyId === co.id && rt.moduleId === mm.id) wrap.classList.add('open');   // active starts open
 
-      function toggle(e) {
+      // Toggle this group open/closed; opening collapses the others (single-open).
+      function toggleGroup() {
         var willOpen = !wrap.classList.contains('open');
+        if (willOpen) App.collapseOtherGroups(wrap);
         wrap.classList.toggle('open', willOpen);
-        App.setNavOpen(co.id, mm.id, willOpen);
-        if (e) e.preventDefault();     // pure expand/collapse — don't navigate away
-        if (e) e.stopPropagation();
+        return willOpen;
       }
-      // The caret is a dedicated expand/collapse control (never navigates).
+      // Whole row toggles. Expanding also navigates to the module overview;
+      // collapsing keeps you where you are.
+      row.addEventListener('click', function (e) {
+        var opened = toggleGroup();
+        if (!opened) e.preventDefault();
+      });
+      // Caret is a pure toggle — never navigates.
       var caret = row.querySelector('.nav-caret');
-      if (caret) caret.addEventListener('click', toggle);
-      // Clicking the row itself: navigate to the module overview AND ensure open.
-      row.addEventListener('click', function () {
-        if (!wrap.classList.contains('open')) { wrap.classList.add('open'); App.setNavOpen(co.id, mm.id, true); }
+      if (caret) caret.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        toggleGroup();
       });
 
       wrap.appendChild(row);
@@ -264,15 +261,11 @@
         var rt = a.getAttribute('data-route');
         a.classList.toggle('active', rt === active || (!r.subId && rt === moduleRoute));
       });
-      // Reconcile every group's open/closed state (no accumulation): the active
-      // module is always expanded; others follow the saved preference (default closed).
-      var prefs = App.navOpenPrefs();
+      // Single-open accordion: only the active module's group stays expanded.
       ui.$$('#nav .nav-group').forEach(function (g) {
         var head = g.querySelector('.nav-item');
         var gr = head && head.getAttribute('data-route');
-        if (!gr) return;
-        var open = (gr === moduleRoute) ? true : ((gr in prefs) ? !!prefs[gr] : false);
-        g.classList.toggle('open', open);
+        g.classList.toggle('open', gr === moduleRoute);
       });
     },
 
