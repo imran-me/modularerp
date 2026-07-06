@@ -92,7 +92,13 @@
 .nav-badge { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); text-transform: uppercase; letter-spacing: .03em; }
 .nav-lock { color: var(--text-mute); font-size: 11px; }
-.nav-caret { color: var(--text-mute); font-size: 11px; transition: transform var(--t) var(--e-out); }
+.nav-caret {
+  color: var(--text-mute); font-size: 11px; cursor: pointer; flex: none;
+  width: 22px; height: 22px; margin: -4px -4px -4px 0; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform var(--t) var(--e-out), background var(--t-fast), color var(--t-fast);
+}
+.nav-caret:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); }
 .nav-group.open > .nav-item .nav-caret { transform: rotate(90deg); }
 .nav-subs { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--t) var(--e-out); }
 .nav-group.open .nav-subs { grid-template-rows: 1fr; }

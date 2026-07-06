@@ -193,6 +193,25 @@
       this.highlightNav(EPAL.router.parse());
     },
 
+    /* ---- collapsible module nav (persisted accordion) --------------------
+     * Each module that has sub-features is an independently collapsible group.
+     * State persists per company under `ui.nav.open` = { "co/mod": true|false }.
+     * Default (no explicit preference): only the ACTIVE module is expanded, so
+     * the sidebar never piles up every visited section. Users can open/close
+     * any category freely and the choice is remembered. --------------------*/
+    navOpenPrefs: function () { return EPAL.store.get('ui.nav.open', {}) || {}; },
+    setNavOpen: function (companyId, moduleId, open) {
+      var s = this.navOpenPrefs(); s[companyId + '/' + moduleId] = !!open;
+      EPAL.store.set('ui.nav.open', s);
+    },
+    // Should this module's group render expanded right now?
+    isNavOpen: function (companyId, moduleId) {
+      var rt = EPAL.router.parse();
+      if (rt.companyId === companyId && rt.moduleId === moduleId) return true;   // active → open
+      var s = this.navOpenPrefs(); var key = companyId + '/' + moduleId;
+      return (key in s) ? !!s[key] : false;                                       // else user pref, default closed
+    },
+
     buildNavItem: function (co, mm) {
       var subs = (mm.subs || []).filter(function (s) { return EPAL.modules.isEnabled(co.id, mm.id, s.id); });
       var hasSubs = subs.length > 0;
@@ -201,17 +220,31 @@
         ui.frag('<span class="nav-ico"><i class="bi bi-' + mm.icon + '"></i></span>'),
         el('span.nav-label', { text: mm.label }),
         mm.badge ? el('span.nav-badge', { text: mm.badge }) : null,
-        hasSubs ? ui.frag('<span class="nav-caret"><i class="bi bi-chevron-right"></i></span>') : null
+        hasSubs ? el('span.nav-caret', { role:'button', 'aria-label':'Toggle ' + mm.label,
+          title:'Expand / collapse', html:'<i class="bi bi-chevron-right"></i>' }) : null
       ]);
       if (mm.admin) row.appendChild(ui.frag('<span class="nav-lock" title="Admin only"><i class="bi bi-shield-lock"></i></span>'));
 
       if (!hasSubs) return row;
 
       var wrap = el('div.nav-group');
-      row.addEventListener('click', function (e) {
-        // clicking the row toggles the group AND navigates to the module overview
-        wrap.classList.toggle('open');
+      if (App.isNavOpen(co.id, mm.id)) wrap.classList.add('open');
+
+      function toggle(e) {
+        var willOpen = !wrap.classList.contains('open');
+        wrap.classList.toggle('open', willOpen);
+        App.setNavOpen(co.id, mm.id, willOpen);
+        if (e) e.preventDefault();     // pure expand/collapse — don't navigate away
+        if (e) e.stopPropagation();
+      }
+      // The caret is a dedicated expand/collapse control (never navigates).
+      var caret = row.querySelector('.nav-caret');
+      if (caret) caret.addEventListener('click', toggle);
+      // Clicking the row itself: navigate to the module overview AND ensure open.
+      row.addEventListener('click', function () {
+        if (!wrap.classList.contains('open')) { wrap.classList.add('open'); App.setNavOpen(co.id, mm.id, true); }
       });
+
       wrap.appendChild(row);
       var subWrap = el('div.nav-subs');
       subs.forEach(function (s) {
@@ -231,10 +264,15 @@
         var rt = a.getAttribute('data-route');
         a.classList.toggle('active', rt === active || (!r.subId && rt === moduleRoute));
       });
-      // auto-open the group containing the active sub
+      // Reconcile every group's open/closed state (no accumulation): the active
+      // module is always expanded; others follow the saved preference (default closed).
+      var prefs = App.navOpenPrefs();
       ui.$$('#nav .nav-group').forEach(function (g) {
-        var has = g.querySelector('[data-route="' + active + '"]') || g.querySelector('[data-route="' + moduleRoute + '"]');
-        if (has) g.classList.add('open');
+        var head = g.querySelector('.nav-item');
+        var gr = head && head.getAttribute('data-route');
+        if (!gr) return;
+        var open = (gr === moduleRoute) ? true : ((gr in prefs) ? !!prefs[gr] : false);
+        g.classList.toggle('open', open);
       });
     },
 
