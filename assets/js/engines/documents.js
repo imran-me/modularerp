@@ -232,7 +232,7 @@
     '.epal-doc{background:#fff;color:#1a2233;width:100%;max-width:820px;margin:0 auto;box-shadow:0 10px 40px rgba(0,0,0,.18);border-radius:8px;overflow:hidden;position:relative;}',
     '.epal-doc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:26px 30px;background:' + NAVY + ';color:#fff;border-bottom:4px solid ' + GOLD + ';}',
     '.epal-doc-brand{display:flex;align-items:center;gap:14px;}',
-    '.epal-doc-logo{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,' + GOLD + ',#a5811a);color:' + NAVY + ';font-weight:800;font-size:26px;display:flex;align-items:center;justify-content:center;}',
+    '.epal-doc-logo{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,' + GOLD + ',#0A2472);color:' + NAVY + ';font-weight:800;font-size:26px;display:flex;align-items:center;justify-content:center;}',
     '.epal-doc-brand h2{margin:0;font-size:20px;font-weight:800;letter-spacing:.01em;}',
     '.epal-doc-brand .epal-doc-tag{font-size:12px;opacity:.82;}',
     '.epal-doc-meta{text-align:right;font-size:12.5px;line-height:1.7;}',

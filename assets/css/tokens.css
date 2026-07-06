@@ -61,16 +61,17 @@
 
 /* ============================ DARK (default) ============================= */
 :root, [data-theme="dark"] {
-  --bg:        #070b14;
-  --bg-2:      #0a0f1c;
-  --surface:   #0e1524;
-  --surface-2: #131b2d;
-  --surface-3: #1a2338;
-  --surface-hi:#212c45;
+  --bg:        #03071c;
+  --bg-2:      #060c26;
+  --surface:   #0a1330;
+  --surface-2: #0f1a3d;
+  --surface-3: #17234f;
+  --surface-hi:#1f2d5e;
 
-  --border:        rgba(255,255,255,.07);
-  --border-strong: rgba(255,255,255,.13);
-  --border-accent: color-mix(in srgb, var(--accent) 45%, transparent);
+  --border:        rgba(142,168,240,.12);
+  --border-strong: rgba(150,178,245,.22);
+  --border-accent: color-mix(in srgb, var(--accent) 55%, transparent);
+  --hairline:      rgba(200,218,255,.09);   /* beveled top-edge light on panels */
 
   --text:      #eaeefb;
   --text-dim:  #9aa6c2;
@@ -98,9 +99,10 @@
   --surface-3: #eef2f9;
   --surface-hi:#e5ebf6;
 
-  --border:        rgba(16,26,48,.09);
-  --border-strong: rgba(16,26,48,.16);
-  --border-accent: color-mix(in srgb, var(--accent) 40%, transparent);
+  --border:        rgba(26,67,191,.12);
+  --border-strong: rgba(26,67,191,.22);
+  --border-accent: color-mix(in srgb, var(--accent) 42%, transparent);
+  --hairline:      rgba(255,255,255,.7);    /* crisp top edge on white panels */
 
   --text:      #131a2c;
   --text-dim:  #56617c;

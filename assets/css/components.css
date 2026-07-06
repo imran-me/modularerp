@@ -18,9 +18,9 @@
 .card {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 20%, var(--surface)), var(--surface));
   border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm); position: relative; overflow: hidden; transition: border-color var(--t), box-shadow var(--t), transform var(--t);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--hairline); position: relative; overflow: hidden; transition: border-color var(--t), box-shadow var(--t), transform var(--t);
 }
-.card.hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow); transform: translateY(-2px); }
+.card.hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); transform: translateY(-2px); }
 .card-pad { padding: 20px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
 .card-head h3 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
@@ -37,7 +37,8 @@
 .kpi-card {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 34%, var(--surface)), var(--surface));
   border: 1px solid var(--border); border-radius: var(--r-lg);
-  padding: 20px; position: relative; overflow: hidden; box-shadow: var(--shadow-sm);
+  padding: 20px; position: relative; overflow: hidden;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--hairline);
   transition: transform var(--t) var(--e-out), box-shadow var(--t) var(--e-out), border-color var(--t);
 }
 /* a single fine luminous hairline along the top edge — the premium detail that
@@ -48,7 +49,7 @@
     color-mix(in srgb, var(--epal-soft, var(--accent)) 65%, transparent) 68%, transparent);
   transition: opacity var(--t);
 }
-.kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--border-strong); }
+.kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); border-color: var(--border-strong); }
 .kpi-card:hover::before { opacity: .95; }
 .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .kpi-label { font-size: 10.5px; color: var(--text-mute); font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
@@ -293,7 +294,7 @@
 #boot-splash.gone { opacity: 0; pointer-events: none; }
 .boot-logo { display: flex; flex-direction: column; align-items: center; gap: 18px; }
 .boot-mark { width: 66px; height: 66px; border-radius: 20px; display: grid; place-items: center; font-family: var(--font-display);
-  font-weight: 800; font-size: 30px; color: #1a1206; background: linear-gradient(135deg, var(--gold), #9c7b2e); box-shadow: 0 14px 40px -10px var(--gold);
+  font-weight: 800; font-size: 30px; color: #dbe4f8; background: linear-gradient(135deg, var(--gold), #0A2472); box-shadow: 0 14px 40px -10px var(--gold);
   animation: floatY 2.4s var(--e-inout) infinite; }
 .boot-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: .02em; }
 .boot-bar { width: 160px; height: 3px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
