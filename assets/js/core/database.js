@@ -365,6 +365,9 @@
       // Extended deep seed (all companies' operational data) lives in
       // core/seed-bd.js so this file stays readable. It is also idempotent.
       if (EPAL.seedBD) EPAL.seedBD();
+      // Deep Core engines (ledger, audit, approvals, documents…) self-seed via
+      // the engine registry — all idempotent (core/engines.js).
+      if (EPAL.seedEngines) EPAL.seedEngines();
     },
 
     /* --- raw collections --------------------------------------------------*/

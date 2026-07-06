@@ -32,6 +32,7 @@
       this.bindGlobal();                 // 5. keyboard, bus subscriptions
       EPAL.router.mount = $('#view');    // 6. tell router where to render
       EPAL.router.start();               // 7. go
+      if (EPAL.bootEngines) EPAL.bootEngines();  // 8. start Deep Core engines (scheduler, audit…)
       // reactive re-renders
       EPAL.bus.on('modules:changed', this.refreshNav.bind(this));
       EPAL.bus.on('auth:changed', function () { App.renderShell(); EPAL.router.render(); });
@@ -344,7 +345,13 @@
       }
       input.addEventListener('input', function () {
         var q = input.value.toLowerCase(); sel = 0;
-        filtered = items.filter(function (it) { return (it.label + ' ' + it.sub).toLowerCase().indexOf(q) >= 0; });
+        var mods = items.filter(function (it) { return (it.label + ' ' + it.sub).toLowerCase().indexOf(q) >= 0; });
+        // Deep Core: also search DATA records (customers, tickets, files, invoices…)
+        var data = [];
+        if (EPAL.search && q.length >= 2) {
+          try { data = EPAL.search.all(input.value).slice(0, 20); } catch (e) { data = []; }
+        }
+        filtered = mods.slice(0, 20).concat(data);
         draw();
       });
       input.addEventListener('keydown', function (e) {

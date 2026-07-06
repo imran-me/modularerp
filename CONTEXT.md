@@ -4,6 +4,14 @@
 > (human or AI) can resume work months later without losing the vision, the
 > architecture, or the conventions. Read this first, always.
 
+> ✅ **DEEP CORE PASS COMPLETE (v0.3.0, 2026-07-06).** The double-entry ledger, audit
+> trail, maker-checker approvals, branded document engine, intelligence layer (MD
+> briefing/RFM/anomalies), action-level permissions, automation scheduler, comment
+> threads, and global search are all built, hostile-inspected (17 defects found & fixed),
+> and verified (boot sweep 184/0; dynamic invariants 24/24). Engine APIs: `docs/DEEP-CORE-CONTRACT.md`.
+> Data model: `docs/DATA_MODEL.md`. Backend path: `docs/MIGRATION_ROADMAP.md`. See the
+> CHANGELOG v0.3.0 entry for the full list.
+
 ---
 
 ## 1. The Vision (the owner's words, distilled)
@@ -137,13 +145,28 @@ Companies, Automation, Notifications, Settings) and **shared wildcard company vi
 the runtime kit `core/forms.js` · `core/datatable.js` (`EPAL.table`) · `core/entity.js`
 (CRUD factory) · `core/seed-bd.js` (deep all-company seed).
 
-> ⚠️ **Every new file MUST be added as a `<script>` in `index.html`** (there is no
-> dynamic loader). A whole batch was once written and committed but left unwired, so it
-> silently fell back to the scaffold. A boot sweep (Chrome headless over all 180 routes)
-> is the fast regression check — every route must render real content with no console error.
+**Deep Core (v0.3.0) — the operating brain, all live:** double-entry **`core/ledger.js`**
+(COA, journal, trial balance, AR/AP ageing, P&L, balance sheet; auto-posts every sale),
+**`core/audit.js`** (append-only trail → `group/activity-log`), **`core/approvals.js`**
+(maker-checker → `group/approvals`), **`core/documents.js`** + **`core/serial.js`**
+(branded navy/gold docs + gapless serials → `group/documents`), **`core/intel.js`**
+(MD briefing → `group/briefing`, RFM, anomalies), **`core/permissions.js`** (action-level
+RBAC), **`core/rules.js`** (automation scheduler + escalation), **`core/comments.js`**
+(@mention threads), **`core/search.js`** (Ctrl+K data search). Deep modules: Travels
+**Vendor & Agent** ledgers, **Contract Flight** seats, deepened **Air Ticketing** &
+**Visa**; **Shop POS**, **Construction** BOQ→billing→retention, **Woodart**, **IT**.
+Engine APIs are in `docs/DEEP-CORE-CONTRACT.md`; every store/field/relation in
+`docs/DATA_MODEL.md`; backend path in `docs/MIGRATION_ROADMAP.md`.
 
-**Live-but-scaffolded:** the remaining per-concern modules still render a real navigable
-workspace via the placeholder — ready to graduate one file at a time.
+> ⚠️ **Every new file MUST be added as a `<script>` in `index.html`** (there is no
+> dynamic loader) — new core engines self-register via `EPAL.registerEngine` but still
+> need the script tag. A boot sweep (Chrome headless over all ~184 routes) is the fast
+> regression check — every route must render real content with no console error. There
+> is also a dynamic invariant harness (ledger balance, maker≠checker, serial uniqueness,
+> audit capture) used in the Deep Core hostile-inspection pass.
+
+**Live-but-scaffolded:** a few remaining sub-features still render the placeholder
+workspace — ready to graduate one file at a time.
 
 ## 9. Roadmap / next graduations (priority order)
 

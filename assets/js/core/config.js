@@ -62,6 +62,7 @@
    * ========================================================================*/
   var GROUP_MODULES = [
     m('dashboard',      'Command Center',       'grid-1x2-fill', { desc:'Consolidated group health, KPIs, intelligence.' }),
+    m('briefing',       'MD Briefing',          'sun-fill',      { badge:'AI', desc:'Your daily narrative digest — money, risks, exceptions.' }),
     m('companies',      'Sister Concerns',      'diagram-3-fill',{ desc:'All companies at a glance — revenue, margin, risk.' }),
     m('finance',        'Consolidated Finance', 'cash-coin',     { desc:'Group P&L, cash position, receivables, payables.',
         subs:[['pnl','Profit & Loss'],['cashflow','Cash Flow'],['balance-sheet','Balance Sheet'],
@@ -75,7 +76,10 @@
               ['performance','Performance'],['org-chart','Org Chart']] }),
     m('tasks',          'Task Oversight',       'kanban-fill',   { admin:true, desc:'Open any employee task board, assign & audit.' }),
     m('reports',        'Reports',              'file-earmark-bar-graph-fill',{ desc:'Downloadable, documentation-grade reports.' }),
+    m('documents',      'Document Center',      'file-earmark-richtext-fill',{ desc:'Every branded invoice, receipt & report — searchable.' }),
+    m('approvals',      'Approvals',            'patch-check-fill',{ desc:'Maker-checker inbox — authorise the big moves.' }),
     m('automation',     'Automation',           'robot',         { desc:'Rules, triggers & workflows across the group.' }),
+    m('activity-log',   'Activity Log',         'shield-lock-fill',{ admin:true, desc:'Full audit trail — who did what, when, from where.' }),
     m('notifications',  'Notifications',        'bell-fill',     { desc:'System-wide alerts, mentions & approvals.' }),
     m('module-manager', 'Module Control',       'toggles2',      { admin:true, desc:'Turn companies, modules & features on/off live.' }),
     m('settings',       'Settings',             'gear-fill',     { admin:true, desc:'Group profile, branding, security, backups.' })

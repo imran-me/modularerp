@@ -30,12 +30,32 @@ Each item is one `views/**` file following `docs/VIEWS-GUIDE.md`.
   (`EPAL.table`), `core/entity.js` (CRUD factory), `core/seed-bd.js` (deep all-company
   operational seed). All wired into `index.html` and boot-verified (180 routes, 0 errors).
 
-## 🎯 Next (high value)
-1. **Travels ▸ Air Ticketing depth** — repeatable multi-pax cards, EMD/ancillary tab,
-   payable/receivable schedules, branded invoice/PDF, TTL deadline queue.
-2. **Travels ▸ Vendor & Agent** — party ledgers, ageing buckets, credit limits, commission.
-3. **Contract Flight** — group/charter seat blocks (Umrah/Hajj/worker) off the airline master.
-4. Graduate the remaining scaffolded per-concern modules (Shop POS, Construction BOQ…).
+## ✅ Deep Core Pass (v0.3.0) — the operating brain (done + hostile-inspected)
+- **Double-entry accounting** (`core/ledger.js`): chart of accounts, balanced journal,
+  trial balance, GL, party subledger, AR/AP ageing, P&L, balance sheet; auto-posts sales.
+- **Trust backbone**: append-only audit trail (`core/audit.js` → Activity Log),
+  maker-checker approvals (`core/approvals.js` → Approvals inbox), action-level
+  permissions (`core/permissions.js`).
+- **Document engine** (`core/documents.js` + `core/serial.js`): branded navy/gold
+  invoices/receipts/vouchers/slips/statements, gapless serials, Document Center.
+- **Intelligence** (`core/intel.js`): MD Briefing, RFM/LTV, anomaly flags, risk register.
+- **Automation** (`core/rules.js`): reminder/escalation/recurring scheduler.
+- **Comms & search**: @mention threads (`core/comments.js`), Ctrl+K data search (`core/search.js`).
+- **Modules deepened/added**: Air Ticketing (multi-pax + commission + reissue/refund/void
+  + invoice), Visa (fee breakdown + posting), **Vendor & Agent** ledgers, **Contract
+  Flight** seats, **Shop POS**, **Construction** BOQ→billing→retention, **Woodart**, **IT**,
+  HR leave/payroll. Settings became a real engine; Finance gained COA/journal/trial-balance.
+
+## 🎯 Next (high value — fourth pass candidates)
+1. **Server backend** — reimplement `core/state.js` + `core/database.js` + engine
+   persistence against a Laravel/REST API (see `docs/MIGRATION_ROADMAP.md`); enforce
+   double-entry, serials, audit, maker-checker, per-company isolation server-side.
+2. **Air Ticketing further depth** — EMD/ancillary tab, TTL held-PNR deadline queue,
+   full BSP HOT-file import + reconciliation.
+3. **Consolidation** — inter-company eliminations, per-company columns on the group
+   trial balance, currency translation.
+4. **Deepen remaining sub-features** still on the scaffold (procurement GRN, warehouses/
+   transfers, QA/QC & HSE, KB, contracts).
 
 ## 🧱 Per-concern build-out
 - **Epal Shop** — POS terminal, Products (catalog/variants/barcodes), Inventory

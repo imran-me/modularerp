@@ -32,7 +32,7 @@
     { id:'Approved',      color:'#23c17e', icon:'patch-check' },
     { id:'Rejected',      color:'#f0506e', icon:'x-octagon' }
   ];
-  // Standard required documents per visa type (world-class agency checklist).
+  // Standard required documents per visa TYPE (generic fallback checklist).
   var DOC_REQS = {
     Tourist:  ['Passport (6m validity)','Passport-size photo','Bank statement (6m)','Hotel booking','Return air ticket','Travel insurance','NID / Birth certificate'],
     Business: ['Passport','Invitation letter','Company trade license','Bank statement','Board resolution','Photo','Cover letter'],
@@ -41,6 +41,84 @@
     Visit:    ['Passport','Sponsor invitation','Sponsor bank statement','Relationship proof','Photo','Cover letter'],
     Student:  ['Passport','Admission / I-20','Financial proof','Academic transcripts','Language test','Photo']
   };
+  // PER-COUNTRY (per-embassy) checklists — the realistic differences a world-class
+  // agency actually tracks. Keyed by destination country; falls back to DOC_REQS
+  // (by visa type) when the country is unknown. Every item marked here is REQUIRED.
+  var DOC_REQS_COUNTRY = {
+    'Schengen':     ['Passport (3m beyond return, 2 blank pages)','Signed Schengen application form','2 photos (35x45mm, white bg)','Travel medical insurance (€30,000)','Confirmed round-trip flight reservation','Hotel bookings (full stay)','Bank statement (6 months)','Salary certificate / employer NOC','Cover letter','Visa fee payment slip'],
+    'UAE':          ['Passport (6m validity)','Passport-size photo (white bg)','Confirmed return air ticket','Hotel booking / host details','Bank statement (3 months)','Employer NOC','Visa application form'],
+    'Saudi Arabia': ['Passport (6m validity, 2 blank pages)','2 photos (40x60mm, white bg)','Meningitis (ACWY) vaccination certificate','COVID vaccination card','Mahram proof (women under 45)','Umrah package voucher (hotel + transport)','Round-trip air ticket','National ID copy'],
+    'Canada':       ['Passport (valid)','Digital photo (IRCC spec)','Completed IMM 5257 form','Proof of funds / bank statements (4 months)','Employment letter & NOC','Invitation letter from host','Property / asset documents','Travel history','Biometrics appointment confirmation','Purpose of travel letter'],
+    'UK':           ['Passport','Photo','Online application (VAF) printout','Bank statements (6 months)','Employment / salary evidence','Sponsor documents (if sponsored)','Accommodation details','Travel itinerary','TB test certificate'],
+    'Malaysia':     ['Passport (6m validity)','Photo (white bg)','Confirmed return air ticket','Hotel booking','Bank statement (3 months)','NID copy'],
+    'Thailand':     ['Passport (6m validity)','Photo (4x6cm)','Confirmed return air ticket','Hotel booking','Bank statement (min ৳80,000)','Visa application form'],
+    'Singapore':    ['Passport','Photo','Form 14A','Local sponsor / company letter (LOI)','Business invitation','Bank statement','Trade license']
+  };
+
+  // Resolve the REQUIRED-document list for an application/category: prefer the
+  // destination country's embassy checklist, fall back to the visa-type list.
+  function docReqsFor(country, type) {
+    if (country && DOC_REQS_COUNTRY[country]) return DOC_REQS_COUNTRY[country];
+    return DOC_REQS[type] || DOC_REQS.Tourist;
+  }
+  // Materialise an app's docs array (backward-compat: derive from checklist if absent).
+  function docsFor(a) {
+    if (a.docs && a.docs.length) return a.docs;
+    return docReqsFor(a.country, a.visaType).map(function (d){ return { name:d, done:false }; });
+  }
+  // Count still-missing required documents.
+  function missingDocs(a) {
+    var n = 0;
+    docsFor(a).forEach(function (d){ if (!d.done) n++; });
+    return n;
+  }
+
+  /* ---- fee / service / profit breakdown (backward-compatible) --------------
+   * New apps carry embassyFee + vfsCharge + serviceFee -> customerTotal, with
+   * profit == serviceFee. Legacy seeded apps only have cost/sale, so we derive:
+   * embassyFee<-cost, vfsCharge<-0, serviceFee<-(sale-cost), total<-sale. -----*/
+  function fees(a) {
+    a = a || {};
+    var embassy = +a.embassyFee || 0, vfs = +a.vfsCharge || 0, service = +a.serviceFee || 0;
+    var total = +a.customerTotal || 0;
+    if (!embassy && !vfs && !service && !total) {         // legacy record
+      embassy = +a.cost || 0;
+      total = +a.sale || 0;
+      service = total - embassy; if (service < 0) service = 0;
+    } else if (!total) {
+      total = embassy + vfs + service;
+    }
+    var cost = embassy + vfs;
+    return { embassy:embassy, vfs:vfs, service:service, customerTotal:total, cost:cost, profit:total - cost };
+  }
+
+  // Stage helpers + advance-gate (block leaving Documents with an incomplete file).
+  var ADVANCE_BLOCK = ['Submitted','Under Process','Approved'];
+  function canAdvance(a, target) {
+    if (ADVANCE_BLOCK.indexOf(target) >= 0) {
+      var miss = missingDocs(a);
+      if (miss > 0) {
+        ui.toast(miss + ' required document' + (miss>1?'s':'') + ' still missing — complete the checklist before submitting', 'error');
+        return false;
+      }
+    }
+    return true;
+  }
+  // Post a visa sale to finance exactly once (guarded by app.posted).
+  function postVisaToFinance(a) {
+    if (a.posted) return;
+    var f = fees(a);
+    db.postSale('travels', {
+      amount: f.customerTotal || a.sale || 0,
+      cost: f.cost || a.cost || 0,
+      ref: a.id,
+      desc: 'Visa ' + (a.country || ''),
+      customer: a.applicant || ''
+    });
+    a.posted = true;
+    db.saveVisaApp(a);
+    db.notify({ level:'info', title:'Visa posted to finance', text:a.applicant+' · '+ui.money(f.customerTotal||a.sale||0), companyId:'travels', icon:'cash-coin' });
+  }
 
   function apps() { return S.list('visaApps'); }
   function cats() { return db.visaCats(); }
@@ -87,8 +165,8 @@
   /* ======================================================= OVERVIEW HUB */
   function overview(page) {
     var a = apps();
-    var revenue = a.reduce(function (s,x){ return s+(x.sale||0); }, 0);
-    var profit = a.reduce(function (s,x){ return s+((x.sale||0)-(x.cost||0)); }, 0);
+    var revenue = a.reduce(function (s,x){ return s+fees(x).customerTotal; }, 0);
+    var profit = a.reduce(function (s,x){ return s+fees(x).profit; }, 0);
     var approved = a.filter(function (x){ return x.stage==='Approved'; }).length;
     var rate = a.length ? Math.round(approved / a.length * 100) : 0;
     page.appendChild(el('div.kpi-grid.stagger', null, [
@@ -172,7 +250,11 @@
       sec('Visa'),
       selDyn('Destination / Category','catId', cl.map(function(c){return [c.id, c.flag+' '+c.country+' · '+c.type];})),
       inp('Travel date','travelDate','','','date'),
-      inp('Costing','cost',0,'','number'), inp('Sale price','sale',0,'','number'),
+
+      sec('Fee breakdown'),
+      inp('Embassy fee','embassyFee',0,'','number'),
+      inp('VFS / centre charge','vfsCharge',0,'','number'),
+      inp('Service fee (your margin)','serviceFee',0,'','number'),
       sel('Payment status','payStatus','Due',['Paid','Partial','Due']),
       selDyn('Assigned agent','agent', db.employees({companyId:'travels'}).map(function(e){return [e.id,e.name];})),
 
@@ -180,22 +262,27 @@
       txt('Notes','notes','','col-2')
     ]));
 
-    // profit readout + auto price from category
+    // fee/profit readout + auto price from category
     var profitBar = el('div.build-banner', { style:{ marginTop:'6px' } }, [ ui.frag(ui.icon('calculator')),
-      el('div', null, [ el('span',{id:'vp-readout',html:'Gross profit: <strong>—</strong>'}) ]) ]);
+      el('div', null, [ el('span',{id:'vp-readout',html:'Customer total: <strong>—</strong>'}) ]) ]);
     b.appendChild(profitBar);
 
     function recompute() {
-      var cost = +val('cost')||0, sale = +val('sale')||0;
-      var p = sale - cost; var m = sale ? Math.round(p/sale*100) : 0;
-      ui.$('#vp-readout').innerHTML = 'Gross profit: <strong class="'+(p>=0?'text-good':'text-bad')+'">'+ui.money(p)+'</strong> · margin '+m+'%';
+      var em = +val('embassyFee')||0, vf = +val('vfsCharge')||0, sf = +val('serviceFee')||0;
+      var total = em + vf + sf; var profit = sf;
+      ui.$('#vp-readout').innerHTML = 'Embassy '+ui.money(em)+' + VFS '+ui.money(vf)+' + Service '+ui.money(sf)+
+        ' = Customer total <strong>'+ui.money(total)+'</strong> · profit <strong class="text-good">'+ui.money(profit)+'</strong>';
+    }
+    function applyCat(c) {
+      if (!c) return;
+      setVal('embassyFee', c.cost); setVal('vfsCharge', 0); setVal('serviceFee', Math.max(0,(c.sale||0)-(c.cost||0))); recompute();
     }
     b.querySelector('#f-catId').addEventListener('change', function (e) {
-      var c = cl.filter(function(x){return x.id===e.target.value;})[0];
-      if (c) { setVal('cost', c.cost); setVal('sale', c.sale); recompute(); }
+      applyCat(cl.filter(function(x){return x.id===e.target.value;})[0]);
     });
-    b.querySelector('#f-cost').addEventListener('input', recompute);
-    b.querySelector('#f-sale').addEventListener('input', recompute);
+    b.querySelector('#f-embassyFee').addEventListener('input', recompute);
+    b.querySelector('#f-vfsCharge').addEventListener('input', recompute);
+    b.querySelector('#f-serviceFee').addEventListener('input', recompute);
 
     b.appendChild(el('div.flex.justify-between.mt-3', null, [
       el('a.btn.btn-ghost', { href:'#/travels/visa-processing/application-board', html: ui.icon('arrow-left')+' Cancel' }),
@@ -203,25 +290,30 @@
     ]));
     page.appendChild(form);
     // preselect first cat prices
-    if (cl[0]) { setVal('cost', cl[0].cost); setVal('sale', cl[0].sale); recompute(); }
+    if (cl[0]) applyCat(cl[0]);
 
     function val(id){ var n=ui.$('#f-'+id); return n?n.value:''; }
     function setVal(id,v){ var n=ui.$('#f-'+id); if(n) n.value=v; }
     function save() {
       if (!val('applicant').trim()) { ui.toast('Applicant name is required','error'); return; }
       var c = cl.filter(function(x){return x.id===val('catId');})[0] || {};
+      var em = +val('embassyFee')||0, vf = +val('vfsCharge')||0, sf = +val('serviceFee')||0;
+      var total = em + vf + sf;
       var app = {
         id:'VA-'+Date.now().toString().slice(-5),
         applicant:val('applicant').trim(), phone:val('phone'), email:val('email'),
         passport:val('passport'), nationality:val('nationality'), dob:val('dob'),
         catId:val('catId'), country:c.country||'—', flag:c.flag||'🌍', visaType:c.type||'Tourist',
-        travelDate:val('travelDate'), cost:+val('cost')||0, sale:+val('sale')||0,
-        payStatus:val('payStatus'), agent:val('agent'), notes:val('notes'),
+        travelDate:val('travelDate'),
+        embassyFee:em, vfsCharge:vf, serviceFee:sf, customerTotal:total,
+        cost: em + vf, sale: total,                 // backward-compat mirror
+        payStatus:val('payStatus'), agent:val('agent'), notes:val('notes'), posted:false,
         stage:'New', created:new Date().toISOString().slice(0,10),
-        docs: (DOC_REQS[c.type] || DOC_REQS.Tourist).map(function (d){ return { name:d, done:false }; }),
+        docs: docReqsFor(c.country, c.type).map(function (d){ return { name:d, done:false }; }),
         timeline: [{ at: Date.now(), text:'Application created' }]
       };
       db.saveVisaApp(app);
+      if (app.payStatus === 'Paid') postVisaToFinance(app);
       ui.toast('Visa application '+app.id+' created','success');
       EPAL.router.navigate('travels/visa-processing/application-board');
     }
@@ -247,9 +339,11 @@
         lst.addEventListener('dragleave', function(){ lst.parentNode.classList.remove('drag-over'); });
         lst.addEventListener('drop', function(e){ e.preventDefault(); lst.parentNode.classList.remove('drag-over');
           var id=e.dataTransfer.getData('text/plain'); var a=apps().filter(function(x){return x.id===id;})[0];
-          if(a && a.stage!==st.id){ a.stage=st.id; a.timeline=(a.timeline||[]).concat([{at:Date.now(),text:'Moved to '+st.id}]);
+          if(a && a.stage!==st.id){
+            if(!canAdvance(a, st.id)){ draw(); return; }
+            a.stage=st.id; a.timeline=(a.timeline||[]).concat([{at:Date.now(),text:'Moved to '+st.id}]);
             db.saveVisaApp(a);
-            if(st.id==='Approved') db.notify({level:'success',title:'Visa Approved',text:a.applicant+' · '+a.country,companyId:'travels',icon:'patch-check-fill'});
+            if(st.id==='Approved'){ db.notify({level:'success',title:'Visa Approved',text:a.applicant+' · '+a.country,companyId:'travels',icon:'patch-check-fill'}); postVisaToFinance(a); }
             draw(); }
         });
         kb.appendChild(el('div.kb-col', { style:{'--kb':st.color} }, [
@@ -264,15 +358,18 @@
     draw();
   }
   function appCard(a, refresh) {
-    var profit = (a.sale||0)-(a.cost||0);
+    var f = fees(a);
     var card = el('div.kb-card', { draggable:'true', 'data-id':a.id, onclick:function(){ appDetail(a, refresh); } });
     card.addEventListener('dragstart', function(e){ e.dataTransfer.setData('text/plain', a.id); card.classList.add('dragging'); });
     card.addEventListener('dragend', function(){ card.classList.remove('dragging'); });
     card.appendChild(el('div.flex.items-center.gap-1.mb-1', null, [ el('span',{style:{fontSize:'18px'},text:a.flag}),
       el('span.kb-card-title',{style:{margin:0},text:a.applicant}) ]));
     card.appendChild(el('div.text-mute.xs', { text: a.country+' · '+a.visaType+' · '+a.id }));
+    var miss = missingDocs(a);
+    if (miss > 0) card.appendChild(el('div.mt-1', null, [
+      el('span.badge.badge-bad', { html: ui.icon('exclamation-triangle-fill')+' '+miss+' document'+(miss>1?'s':'')+' missing' }) ]));
     card.appendChild(el('div.kb-card-foot', null, [
-      el('span',{html:'<span class="num strong">'+ui.money(a.sale)+'</span>'}),
+      el('span',{html:'<span class="num strong">'+ui.money(f.customerTotal)+'</span>'}),
       payBadge(a.payStatus)
     ]));
     return card;
@@ -282,21 +379,28 @@
     var m = ui.modal({ title:a.applicant+' · '+a.country, icon:'passport', size:'lg', body:body, footer:false });
     function redraw() {
       body.innerHTML='';
-      body.appendChild(el('div.flex.gap-1.flex-wrap.mb-3', null, [
-        stBadge(a.stage), el('span.badge',{text:a.visaType}), payBadge(a.payStatus),
-        el('span.badge',{text:a.id}) ]));
+      var f = fees(a);
+      var miss = missingDocs(a);
+      var badges = [ stBadge(a.stage), el('span.badge',{text:a.visaType}), payBadge(a.payStatus), el('span.badge',{text:a.id}) ];
+      if (miss > 0) badges.push(el('span.badge.badge-bad',{ html: ui.icon('exclamation-triangle-fill')+' '+miss+' document'+(miss>1?'s':'')+' missing' }));
+      body.appendChild(el('div.flex.gap-1.flex-wrap.mb-3', null, badges));
       body.appendChild(el('div.form-grid', null, [
         kv('Passport', a.passport||'—'), kv('Phone', a.phone||'—'),
         kv('Nationality', a.nationality||'—'), kv('Travel date', a.travelDate?ui.date(a.travelDate):'—'),
-        kv('Costing', ui.money(a.cost)), kv('Sale', ui.money(a.sale)),
-        kv('Profit', ui.money((a.sale||0)-(a.cost||0))), kv('Agent', (db.employee(a.agent)||{name:'—'}).name)
+        kv('Embassy fee', ui.money(f.embassy)), kv('VFS / centre charge', ui.money(f.vfs)),
+        kv('Service fee', ui.money(f.service)), kv('Customer total', ui.money(f.customerTotal)),
+        kv('Profit', ui.money(f.profit)), kv('Agent', (db.employee(a.agent)||{name:'—'}).name)
       ]));
-      // documents checklist
-      body.appendChild(el('div.section-label',{text:'Documents'}));
+      // documents checklist (per-country / per-embassy)
+      body.appendChild(el('div.flex.items-center.justify-between', null, [
+        el('div.section-label',{text:'Documents'}),
+        el('span.badge'+(miss>0?'.badge-bad':'.badge-good'),{text: miss>0 ? (miss+' missing') : 'Complete'}) ]));
       var dl = el('div');
-      (a.docs || (DOC_REQS[a.visaType]||[]).map(function(d){return {name:d,done:false};})).forEach(function (d, i) {
+      var docs = docsFor(a).slice();
+      a.docs = docs;                          // persist materialised checklist shape
+      docs.forEach(function (d, i) {
         dl.appendChild(el('label.data-row', { style:{cursor:'pointer'} }, [
-          check(d.done, function(v){ a.docs = a.docs||[]; a.docs[i]={name:d.name,done:v}; db.saveVisaApp(a); }),
+          check(d.done, function(v){ a.docs[i]={name:d.name,done:v}; db.saveVisaApp(a); redraw(); refresh(); }),
           el('span.flex-1.sm'+(d.done?'.text-mute':''),{text:d.name}) ]));
       });
       body.appendChild(dl);
@@ -306,42 +410,91 @@
         return el('div.tl-item', null, [ el('div.tl-time',{text:ui.ago(t.at)}), el('div.tl-text',{text:t.text}) ]); })));
       // controls
       body.appendChild(el('div.divider'));
-      var moveSel = el('select.select',{style:{width:'auto'},onchange:function(){ a.stage=moveSel.value; a.timeline=(a.timeline||[]).concat([{at:Date.now(),text:'Moved to '+a.stage}]); db.saveVisaApp(a); redraw(); refresh(); }});
+      var moveSel = el('select.select',{style:{width:'auto'},onchange:function(){
+        var target = moveSel.value;
+        if (target === a.stage) return;
+        if (!canAdvance(a, target)) { moveSel.value = a.stage; return; }
+        a.stage=target; a.timeline=(a.timeline||[]).concat([{at:Date.now(),text:'Moved to '+a.stage}]); db.saveVisaApp(a);
+        if (target === 'Approved') postVisaToFinance(a);
+        redraw(); refresh();
+      }});
       STAGES.forEach(function(s){var o=el('option',{value:s.id,text:'Stage → '+s.id});if(s.id===a.stage)o.selected=true;moveSel.appendChild(o);});
       body.appendChild(el('div.flex.gap-1.flex-wrap', null, [
         moveSel,
-        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(a.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ a.payStatus=a.payStatus==='Paid'?'Due':'Paid'; db.saveVisaApp(a); redraw(); refresh(); }}),
+        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(a.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ a.payStatus=a.payStatus==='Paid'?'Due':'Paid'; db.saveVisaApp(a); if(a.payStatus==='Paid') postVisaToFinance(a); redraw(); refresh(); }}),
+        el('button.btn.btn-sm.btn-ghost',{html:ui.icon('file-earmark-text')+' Cover Sheet',onclick:function(){ openCoverSheet(a); }}),
         el('button.btn.btn-sm.btn-danger',{html:ui.icon('trash')+' Delete',onclick:function(){ ui.confirm({title:'Delete application?',danger:true,confirmLabel:'Delete'}).then(function(ok){ if(ok){ S.removeFrom('visaApps',a.id); EPAL.bus.emit('data:changed',{store:'visaApps',action:'delete'}); m.close(); refresh(); ui.toast('Application deleted','success'); } }); }})
       ]));
+      // discussion thread (@mentions notify)
+      if (EPAL.comments && EPAL.comments.widget) {
+        body.appendChild(el('div.section-label',{text:'Discussion'}));
+        body.appendChild(EPAL.comments.widget('visaApps', a.id));
+      }
     }
     redraw();
+  }
+
+  /* -------- branded Visa File Cover Sheet (EPAL.doc) --------------------- */
+  function openCoverSheet(a) {
+    if (!EPAL.doc || !EPAL.doc.open) { ui.toast('Document engine unavailable','error'); return; }
+    var f = fees(a);
+    var docs = docsFor(a);
+    EPAL.doc.open({
+      type:'visacover',
+      title:'Visa File Cover Sheet',
+      serial: EPAL.doc.numberFor ? EPAL.doc.numberFor('visacover') : a.id,
+      watermark:'EPAL TRAVELS',
+      badge: a.stage,
+      parties:[
+        { label:'Applicant', lines:[ a.applicant||'—', a.passport?('Passport: '+a.passport):'', a.phone||'', a.nationality||'' ] },
+        { label:'Destination', lines:[ (a.flag||'')+' '+(a.country||'—'), (a.visaType||'')+' Visa', a.travelDate?('Travel: '+ui.date(a.travelDate)):'' ] }
+      ],
+      meta:[
+        { label:'File No', value:a.id },
+        { label:'Created', value: a.created?ui.date(a.created):'—' },
+        { label:'Stage', value:a.stage },
+        { label:'Agent', value:(db.employee(a.agent)||{name:'—'}).name },
+        { label:'Payment', value:a.payStatus }
+      ],
+      columns:[ { key:'name', label:'Required Document' }, { key:'status', label:'Status' } ],
+      rows: docs.map(function(d){ return { name:d.name, status: d.done ? 'Received' : 'Pending' }; }),
+      totals:[
+        { label:'Embassy Fee', value:ui.money(f.embassy) },
+        { label:'VFS / Centre Charge', value:ui.money(f.vfs) },
+        { label:'Service Fee', value:ui.money(f.service) },
+        { label:'Customer Total', value:ui.money(f.customerTotal), grand:true }
+      ],
+      words: EPAL.doc.amountInWords ? EPAL.doc.amountInWords(f.customerTotal) : '',
+      terms:'This cover sheet accompanies the applicant file. Verify every required document is received before embassy submission.',
+      sign:'Processing Officer'
+    });
   }
 
   /* ======================================================= MANAGE SALES */
   function manageSales(page) {
     page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost',{html:ui.icon('download')+' Export CSV',onclick:exportSales}));
     var a = apps();
-    var totalCost=0,totalSale=0,paid=0;
-    a.forEach(function(x){ totalCost+=x.cost||0; totalSale+=x.sale||0; if(x.payStatus==='Paid')paid+=x.sale||0; });
+    var totalCost=0,totalSale=0,totalProfit=0,paid=0;
+    a.forEach(function(x){ var f=fees(x); totalCost+=f.cost; totalSale+=f.customerTotal; totalProfit+=f.service; if(x.payStatus==='Paid')paid+=f.customerTotal; });
     page.appendChild(el('div.kpi-grid', null, [
-      kpi('Total Sales', ui.money(totalSale,{compact:true}), 'cash-coin'),
-      kpi('Total Cost', ui.money(totalCost,{compact:true}), 'wallet2'),
-      kpi('Gross Profit', ui.money(totalSale-totalCost,{compact:true}), 'graph-up-arrow'),
+      kpi('Customer Total', ui.money(totalSale,{compact:true}), 'cash-coin'),
+      kpi('Embassy + VFS Cost', ui.money(totalCost,{compact:true}), 'wallet2'),
+      kpi('Service Profit', ui.money(totalProfit,{compact:true}), 'graph-up-arrow'),
       kpi('Collected', ui.money(paid,{compact:true}), 'check2-circle')
     ]));
     var rows = a.map(function (x) {
-      var p=(x.sale||0)-(x.cost||0);
+      var f=fees(x);
       return el('tr', null, [
         td('<span class="strong">'+x.id+'</span>'), td(x.flag+' '+ui.escapeHtml(x.applicant)),
-        td(x.country+' · '+x.visaType), tdN(ui.money(x.cost)), tdN(ui.money(x.sale)),
-        td('<span class="num '+(p>=0?'text-good':'text-bad')+'">'+ui.money(p)+'</span>'),
+        td(x.country+' · '+x.visaType), tdN(ui.money(f.embassy)), tdN(ui.money(f.vfs)),
+        td('<span class="num text-good">'+ui.money(f.service)+'</span>'), tdN(ui.money(f.customerTotal)),
         td(payBadge(x.payStatus).outerHTML), td(stBadge(x.stage).outerHTML) ]);
     });
-    page.appendChild(tableCard('Sales Ledger', ['App','Applicant','Service','Cost','Sale','Profit','Payment','Stage'], rows, 'No sales yet.'));
+    page.appendChild(tableCard('Sales Ledger', ['App','Applicant','Service','Embassy','VFS','Service Fee','Customer Total','Payment','Stage'], rows, 'No sales yet.'));
   }
   function exportSales() {
-    var rows=[['App','Applicant','Country','Type','Cost','Sale','Profit','Payment','Stage']];
-    apps().forEach(function(x){ rows.push([x.id,x.applicant,x.country,x.visaType,x.cost,x.sale,(x.sale||0)-(x.cost||0),x.payStatus,x.stage]); });
+    var rows=[['App','Applicant','Country','Type','Embassy','VFS','ServiceFee','CustomerTotal','Payment','Stage']];
+    apps().forEach(function(x){ var f=fees(x); rows.push([x.id,x.applicant,x.country,x.visaType,f.embassy,f.vfs,f.service,f.customerTotal,x.payStatus,x.stage]); });
     var blob=new Blob([rows.map(function(r){return r.join(',');}).join('\n')],{type:'text/csv'});
     var link=el('a',{href:URL.createObjectURL(blob),download:'visa-sales.csv'}); document.body.appendChild(link); link.click(); link.remove();
     ui.toast('Sales exported','success');
@@ -392,7 +545,26 @@
   /* ======================================================= DOCUMENTS */
   function documents(page) {
     page.appendChild(el('div.build-banner', null, [ ui.frag(ui.icon('list-check')),
-      el('div',{html:'Standard document checklists applied automatically to every new application by visa type. Edit an application to tick items off.'}) ]));
+      el('div',{html:'Per-embassy checklists are attached automatically to every new application by <strong>destination country</strong> (falling back to the visa-type list when the country has no custom checklist). Edit an application to tick items off — missing items raise a red alert and block embassy submission.'}) ]));
+
+    // Per-country (per-embassy) checklists — the differentiators an agency lives by.
+    page.appendChild(el('div.section-label',{text:'By destination (embassy-specific)'}));
+    var cgrid = el('div.grid-auto.stagger');
+    var flags = {};
+    cats().forEach(function(c){ flags[c.country]=c.flag; });
+    Object.keys(DOC_REQS_COUNTRY).forEach(function (country) {
+      var list = DOC_REQS_COUNTRY[country];
+      cgrid.appendChild(el('div.card', null, [
+        el('div.card-head', null, [ el('h3',{html:(flags[country]?flags[country]+' ':ui.icon('geo-alt-fill')+' ')+ui.escapeHtml(country)}), el('span.card-sub',{text:list.length+' documents'}) ]),
+        el('div.card-body', null, [ el('div.data-list', null, list.map(function (d){
+          return el('div.data-row', null, [ ui.frag('<span class="notif-ico notif-info">'+ui.icon('file-earmark-text')+'</span>'),
+            el('div.flex-1.sm',{text:d}) ]); })) ])
+      ]));
+    });
+    page.appendChild(cgrid);
+
+    // Generic per-type fallback checklists.
+    page.appendChild(el('div.section-label',{text:'By visa type (fallback)'}));
     var grid = el('div.grid-auto.stagger');
     Object.keys(DOC_REQS).forEach(function (type) {
       grid.appendChild(el('div.card', null, [

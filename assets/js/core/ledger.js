@@ -1,0 +1,561 @@
+/* ============================================================================
+ * EPAL GROUP ERP  ·  core/ledger.js
+ * ----------------------------------------------------------------------------
+ * THE DOUBLE-ENTRY ACCOUNTING ENGINE — EPAL.ledger.
+ *
+ * Every taka that moves anywhere in the group can be recorded here as a proper
+ * balanced journal entry (Sum of debits === Sum of credits). This is the single
+ * financial source of truth that powers Consolidated Finance, Trial Balance,
+ * P&L, Balance Sheet and the AR/AP party subledgers + aging screens.
+ *
+ * Two stores (both seeded idempotently, both survive db.reset via seedOnce):
+ *   coa          chart of accounts — {code,name,type,normal,group}
+ *   gl_entries   the journal        — {id,date,companyId,ref,memo,source,party,
+ *                                       lines:[{account,dr,cr}],posted,created}
+ *
+ * The engine self-registers with core/engines.js:
+ *   seed()  runs during db.seed()  — builds the COA + backfills historical
+ *           journal entries from the seeded sales / banks / summarised expenses.
+ *   boot()  runs after the router starts — subscribes to `sale:recorded` so any
+ *           new sale anywhere auto-posts DR AR / CR Revenue (+ DR COGS / CR AP).
+ *
+ * Public postings ALWAYS go through EPAL.ledger.post(); it validates the entry
+ * balances, upserts through EPAL.store, and fans the change out on EPAL.bus
+ * (`data:changed` + `ledger:posted`) and to the audit trail when present.
+ *
+ * NOTE: never write a literal star-slash inside this comment (it would close it).
+ * ==========================================================================*/
+
+(function (EPAL) {
+  'use strict';
+
+  var S = EPAL.store, bus = EPAL.bus, ui = EPAL.ui;
+
+  var COA_KEY = 'coa';
+  var GL_KEY  = 'gl_entries';
+
+  var TOL = 0.5;                       // float tolerance for balance check
+  var TODAY = new Date(2026, 6, 5);    // demo "today" = 2026-07-05 (for aging)
+
+  var _seq = 0;                        // runtime entry-id counter
+
+  /* ==========================================================================
+   * STANDARD CHART OF ACCOUNTS
+   * ========================================================================*/
+  var STANDARD_COA = [
+    { code: '1000', name: 'Cash',                  type: 'asset',     group: 'Current Assets' },
+    { code: '1010', name: 'Bank',                  type: 'asset',     group: 'Current Assets' },
+    { code: '1150', name: 'Sub-Agent Receivable',  type: 'asset',     group: 'Current Assets' },
+    { code: '1200', name: 'Accounts Receivable',   type: 'asset',     group: 'Current Assets' },
+    { code: '1400', name: 'Inventory',             type: 'asset',     group: 'Current Assets' },
+    { code: '1500', name: 'Fixed Assets',          type: 'asset',     group: 'Non-current Assets' },
+    { code: '2000', name: 'Accounts Payable',      type: 'liability', group: 'Current Liabilities' },
+    { code: '2050', name: 'BSP Payable',           type: 'liability', group: 'Current Liabilities' },
+    { code: '2200', name: 'VAT Payable',           type: 'liability', group: 'Current Liabilities' },
+    { code: '2300', name: 'Customer Advances',     type: 'liability', group: 'Current Liabilities' },
+    { code: '3000', name: 'Owner Equity',          type: 'equity',    group: 'Equity' },
+    { code: '3100', name: 'Retained Earnings',     type: 'equity',    group: 'Equity' },
+    { code: '4000', name: 'Sales Revenue',         type: 'income',    group: 'Revenue' },
+    { code: '4100', name: 'Commission Income',     type: 'income',    group: 'Revenue' },
+    { code: '4900', name: 'Other Income',          type: 'income',    group: 'Revenue' },
+    { code: '5000', name: 'Cost of Sales',         type: 'expense',   group: 'Cost of Sales' },
+    { code: '5100', name: 'Salaries',              type: 'expense',   group: 'Operating Expenses' },
+    { code: '5200', name: 'Rent',                  type: 'expense',   group: 'Operating Expenses' },
+    { code: '5300', name: 'Utilities',             type: 'expense',   group: 'Operating Expenses' },
+    { code: '5400', name: 'Marketing',             type: 'expense',   group: 'Operating Expenses' },
+    { code: '5900', name: 'ADM & Penalties',       type: 'expense',   group: 'Operating Expenses' },
+    { code: '6000', name: 'Bank Charges',          type: 'expense',   group: 'Operating Expenses' }
+  ];
+
+  function normalFor(type) {
+    return (type === 'asset' || type === 'expense') ? 'debit' : 'credit';
+  }
+  function withNormal(row) {
+    return { code: row.code, name: row.name, type: row.type,
+             normal: row.normal || normalFor(row.type), group: row.group || '' };
+  }
+
+  /* ==========================================================================
+   * ACCOUNTS
+   * ========================================================================*/
+  function accounts() { return S.list(COA_KEY); }
+
+  function account(code) {
+    var list = accounts();
+    for (var i = 0; i < list.length; i++) if (list[i].code === String(code)) return list[i];
+    return null;
+  }
+
+  function ensureAccount(code, name, type) {
+    code = String(code);
+    var existing = account(code);
+    if (existing) return existing;
+    var row = withNormal({ code: code, name: name || code, type: type || 'asset', group: 'Other' });
+    S.upsert(COA_KEY, row);
+    return row;
+  }
+
+  /* ==========================================================================
+   * POSTING
+   * ========================================================================*/
+  function sumSide(lines, side) {
+    var t = 0;
+    for (var i = 0; i < lines.length; i++) t += (+lines[i][side] || 0);
+    return t;
+  }
+
+  function nextId() {
+    _seq += 1;
+    return 'JV-' + Date.now().toString(36).toUpperCase() + '-' + _seq;
+  }
+
+  function post(spec) {
+    spec = spec || {};
+    var lines = spec.lines || [];
+    if (!lines.length) throw new Error('ledger.post: entry has no lines');
+
+    // normalise lines to {account,dr,cr}
+    var clean = [];
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i] || {};
+      clean.push({ account: String(ln.account), dr: +ln.dr || 0, cr: +ln.cr || 0 });
+    }
+    var dr = sumSide(clean, 'dr'), cr = sumSide(clean, 'cr');
+    if (Math.abs(dr - cr) > TOL) {
+      throw new Error('ledger.post: entry does not balance (DR ' + dr + ' vs CR ' + cr + ')');
+    }
+
+    var entry = {
+      id: spec.id || nextId(),
+      date: spec.date || new Date().toISOString().slice(0, 10),
+      companyId: spec.companyId || 'group',
+      ref: spec.ref || '',
+      memo: spec.memo || '',
+      source: spec.source || 'manual',
+      party: spec.party || '',
+      lines: clean,
+      posted: true,
+      created: Date.now()
+    };
+
+    S.upsert(GL_KEY, entry);
+    bus.emit('data:changed', { store: GL_KEY, action: 'upsert', record: entry });
+    bus.emit('ledger:posted', entry);
+    if (EPAL.audit && EPAL.audit.record) {
+      try {
+        EPAL.audit.record({ action: 'post', entity: 'gl_entries', entityId: entry.id,
+          entityLabel: entry.ref || entry.memo || entry.id, companyId: entry.companyId });
+      } catch (e) { /* audit is best-effort */ }
+    }
+    return entry;
+  }
+
+  /* ==========================================================================
+   * QUERIES
+   * ========================================================================*/
+  function entryHasAccount(entry, code) {
+    for (var i = 0; i < entry.lines.length; i++) if (entry.lines[i].account === code) return true;
+    return false;
+  }
+
+  function entries(filter) {
+    filter = filter || {};
+    var rows = S.list(GL_KEY);
+    var code = filter.account != null ? String(filter.account) : null;
+    return rows.filter(function (e) {
+      if (filter.companyId && e.companyId !== filter.companyId) return false;
+      if (filter.source && e.source !== filter.source) return false;
+      if (filter.party && e.party !== filter.party) return false;
+      if (code && !entryHasAccount(e, code)) return false;
+      if (filter.from && e.date < filter.from) return false;
+      if (filter.to && e.date > filter.to) return false;
+      return true;
+    }).sort(byDate);
+  }
+
+  function byDate(a, b) {
+    if (a.date === b.date) return (a.created || 0) - (b.created || 0);
+    return a.date < b.date ? -1 : 1;
+  }
+
+  // net {dr,cr} for one account over a filtered set of entries
+  function accountTotals(code, opts) {
+    opts = opts || {};
+    code = String(code);
+    var rows = S.list(GL_KEY), dr = 0, cr = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var e = rows[i];
+      if (opts.companyId && e.companyId !== opts.companyId) continue;
+      if (opts.asOf && e.date > opts.asOf) continue;
+      if (opts.from && e.date < opts.from) continue;
+      if (opts.to && e.date > opts.to) continue;
+      for (var j = 0; j < e.lines.length; j++) {
+        if (e.lines[j].account === code) { dr += (+e.lines[j].dr || 0); cr += (+e.lines[j].cr || 0); }
+      }
+    }
+    return { dr: dr, cr: cr };
+  }
+
+  // signed balance by the account's normal side
+  function balance(code, opts) {
+    var t = accountTotals(code, opts || {});
+    var acc = account(code);
+    var normal = acc ? acc.normal : normalFor('asset');
+    return normal === 'debit' ? (t.dr - t.cr) : (t.cr - t.dr);
+  }
+
+  function trialBalance(companyId) {
+    var coa = accounts(), out = [];
+    for (var i = 0; i < coa.length; i++) {
+      var acc = coa[i];
+      var t = accountTotals(acc.code, { companyId: companyId });
+      var net = t.dr - t.cr;                 // + => net debit, - => net credit
+      if (Math.abs(net) < 0.5 && t.dr === 0 && t.cr === 0) continue; // untouched
+      out.push({ code: acc.code, name: acc.name, type: acc.type,
+        debit: net > 0 ? net : 0, credit: net < 0 ? -net : 0 });
+    }
+    return out;
+  }
+
+  function runningRows(matchFn, normal, companyId) {
+    var rows = S.list(GL_KEY).filter(function (e) {
+      return !companyId || e.companyId === companyId;
+    }).sort(byDate);
+    var out = [], bal = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var e = rows[i];
+      for (var j = 0; j < e.lines.length; j++) {
+        var ln = e.lines[j];
+        if (!matchFn(ln, e)) continue;
+        var d = +ln.dr || 0, c = +ln.cr || 0;
+        bal += normal === 'debit' ? (d - c) : (c - d);
+        out.push({ date: e.date, ref: e.ref, memo: e.memo, party: e.party,
+          debit: d, credit: c, balance: bal });
+      }
+    }
+    return out;
+  }
+
+  function ledgerFor(code, opts) {
+    opts = opts || {};
+    code = String(code);
+    var acc = account(code);
+    var normal = acc ? acc.normal : normalFor('asset');
+    return runningRows(function (ln) { return ln.account === code; }, normal, opts.companyId);
+  }
+
+  // AR/AP subledger accounts
+  var AR_ACCOUNTS = ['1200', '1150'];
+  var AP_ACCOUNTS = ['2000', '2050', '2300'];
+  function inList(code, arr) { return arr.indexOf(code) >= 0; }
+
+  // A party statement blends their receivable + payable movement; a positive
+  // running balance means the party owes us (net AR), negative means we owe.
+  function partyLedger(party, opts) {
+    opts = opts || {};
+    return runningRowsForParty(party, opts.companyId);
+  }
+
+  function runningRowsForParty(party, companyId) {
+    var rows = S.list(GL_KEY).filter(function (e) {
+      return e.party === party && (!companyId || e.companyId === companyId);
+    }).sort(byDate);
+    var out = [], bal = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var e = rows[i], d = 0, c = 0;
+      for (var j = 0; j < e.lines.length; j++) {
+        var ln = e.lines[j];
+        if (inList(ln.account, AR_ACCOUNTS)) { d += (+ln.dr || 0); c += (+ln.cr || 0); }
+        else if (inList(ln.account, AP_ACCOUNTS)) { c += (+ln.dr || 0); d += (+ln.cr || 0); }
+      }
+      if (d === 0 && c === 0) continue;
+      bal += (d - c);
+      out.push({ date: e.date, ref: e.ref, memo: e.memo, source: e.source,
+        debit: d, credit: c, balance: bal });
+    }
+    return out;
+  }
+
+  /* ==========================================================================
+   * AGING  (FIFO bucketing of open AR / AP invoices by invoice date)
+   * ========================================================================*/
+  function daysBetween(fromStr) {
+    var d = new Date(fromStr);
+    if (isNaN(d)) return 0;
+    return Math.floor((TODAY.getTime() - d.getTime()) / 86400000);
+  }
+
+  function aging(kind, opts) {
+    opts = opts || {};
+    var accs = kind === 'AP' ? AP_ACCOUNTS : AR_ACCOUNTS;
+    var rows = S.list(GL_KEY).filter(function (e) {
+      return !opts.companyId || e.companyId === opts.companyId;
+    }).sort(byDate);
+
+    // per party: collect invoices (opening amounts) + total payments
+    var byParty = {};
+    function bucket(p) {
+      if (!byParty[p]) byParty[p] = { invoices: [], payments: 0 };
+      return byParty[p];
+    }
+    for (var i = 0; i < rows.length; i++) {
+      var e = rows[i];
+      var party = e.party || '(unassigned)';
+      for (var j = 0; j < e.lines.length; j++) {
+        var ln = e.lines[j];
+        if (!inList(ln.account, accs)) continue;
+        var d = +ln.dr || 0, c = +ln.cr || 0;
+        // AR: debit raises the invoice, credit is a payment. AP: reversed.
+        var invAmt = kind === 'AP' ? c : d;
+        var payAmt = kind === 'AP' ? d : c;
+        var b = bucket(party);
+        if (invAmt > 0) b.invoices.push({ date: e.date, amt: invAmt });
+        if (payAmt > 0) b.payments += payAmt;
+      }
+    }
+
+    var out = [];
+    Object.keys(byParty).forEach(function (party) {
+      var b = byParty[party];
+      var pay = b.payments;
+      // FIFO: apply payments to oldest invoices first
+      b.invoices.sort(byDate);
+      var row = { party: party, current: 0, d30: 0, d60: 0, d90: 0, total: 0 };
+      for (var k = 0; k < b.invoices.length; k++) {
+        var inv = b.invoices[k], remain = inv.amt;
+        if (pay > 0) { var used = Math.min(pay, remain); remain -= used; pay -= used; }
+        if (remain <= 0.5) continue;
+        var age = daysBetween(inv.date);
+        if (age <= 0) row.current += remain;
+        else if (age <= 30) row.d30 += remain;
+        else if (age <= 60) row.d60 += remain;
+        else row.d90 += remain;
+        row.total += remain;
+      }
+      if (row.total > 0.5) out.push(row);
+    });
+    out.sort(function (a, b2) { return b2.total - a.total; });
+    return out;
+  }
+
+  /* ==========================================================================
+   * FINANCIAL STATEMENTS
+   * ========================================================================*/
+  function pnl(companyId, opts) {
+    opts = opts || {};
+    var q = { companyId: companyId, from: opts.from, to: opts.to };
+    var coa = accounts();
+    var revenue = 0, cogs = 0, expenses = 0, lines = [];
+    for (var i = 0; i < coa.length; i++) {
+      var a = coa[i];
+      if (a.type === 'income') {
+        var inc = valueOnNormal(a, q);
+        revenue += inc;
+        if (Math.abs(inc) > 0.5) lines.push({ code: a.code, name: a.name, amount: inc });
+      } else if (a.type === 'expense') {
+        var ex = valueOnNormal(a, q);
+        if (a.code === '5000') cogs += ex; else expenses += ex;
+        if (Math.abs(ex) > 0.5) lines.push({ code: a.code, name: a.name, amount: ex });
+      }
+    }
+    var gross = revenue - cogs;
+    return { revenue: revenue, cogs: cogs, gross: gross, expenses: expenses,
+      net: gross - expenses, lines: lines };
+  }
+
+  function valueOnNormal(acc, q) {
+    var t = accountTotals(acc.code, q);
+    return acc.normal === 'debit' ? (t.dr - t.cr) : (t.cr - t.dr);
+  }
+
+  function balanceSheet(companyId) {
+    var coa = accounts();
+    var assets = [], liabilities = [], equity = [];
+    var totAssets = 0, totLiab = 0, totEquity = 0;
+    var income = 0, expense = 0;
+    for (var i = 0; i < coa.length; i++) {
+      var a = coa[i];
+      var v = valueOnNormal(a, { companyId: companyId });
+      if (a.type === 'asset') {
+        if (Math.abs(v) > 0.5) assets.push({ code: a.code, name: a.name, amount: v });
+        totAssets += v;
+      } else if (a.type === 'liability') {
+        if (Math.abs(v) > 0.5) liabilities.push({ code: a.code, name: a.name, amount: v });
+        totLiab += v;
+      } else if (a.type === 'equity') {
+        if (Math.abs(v) > 0.5) equity.push({ code: a.code, name: a.name, amount: v });
+        totEquity += v;
+      } else if (a.type === 'income') { income += v; }
+      else if (a.type === 'expense') { expense += v; }
+    }
+    // Fold current-period earnings into equity so the sheet balances.
+    var earnings = income - expense;
+    if (Math.abs(earnings) > 0.5) {
+      equity.push({ code: '3200', name: 'Current Year Earnings', amount: earnings });
+      totEquity += earnings;
+    }
+    return {
+      assets: assets, liabilities: liabilities, equity: equity,
+      totals: { assets: totAssets, liabilities: totLiab, equity: totEquity,
+        balanced: Math.abs(totAssets - (totLiab + totEquity)) < 1 }
+    };
+  }
+
+  /* ==========================================================================
+   * PUBLIC API
+   * ========================================================================*/
+  EPAL.ledger = {
+    accounts: accounts,
+    account: account,
+    ensureAccount: ensureAccount,
+    post: post,
+    entries: entries,
+    balance: balance,
+    trialBalance: trialBalance,
+    ledgerFor: ledgerFor,
+    partyLedger: partyLedger,
+    aging: aging,
+    pnl: pnl,
+    balanceSheet: balanceSheet
+  };
+
+  /* ==========================================================================
+   * SEED  (idempotent — survives db.reset via seedOnce)
+   * ========================================================================*/
+  function saleEntry(sale, idx) {
+    var lines = [
+      { account: '1200', dr: sale.amount, cr: 0 },
+      { account: '4000', dr: 0, cr: sale.amount }
+    ];
+    if (sale.cost > 0) {
+      lines.push({ account: '5000', dr: sale.cost, cr: 0 });
+      lines.push({ account: '2000', dr: 0, cr: sale.cost });
+    }
+    return {
+      id: 'GL-S' + (sale.id || idx),
+      date: sale.date || '2026-06-01',
+      companyId: sale.companyId || 'group',
+      ref: sale.ref || '',
+      memo: sale.desc || 'Sale',
+      source: 'sale',
+      party: sale.customer || '',
+      lines: lines,
+      posted: true,
+      created: sale.created || Date.now()
+    };
+  }
+
+  // Monthly operating expenses are sized as a deterministic fraction of each
+  // company's own posted sales revenue, so the demo P&L reads as a healthy,
+  // profitable business regardless of how large the seeded sales sample is.
+  var EXP_MONTHS = ['2026-04-28', '2026-05-28', '2026-06-28'];
+  var EXP_NAMES = { '5100': 'Salaries', '5200': 'Rent', '5300': 'Utilities' };
+  // per-month share of a company's revenue, split across the three expense heads
+  var EXP_SPLIT = { '5100': 0.036, '5200': 0.015, '5300': 0.009 }; // ~6%/mo total
+
+  function buildGlSeed() {
+    var out = [];
+
+    // 1) backfill one balanced entry per seeded sale
+    var sales = (EPAL.db && EPAL.db.sales) ? EPAL.db.sales() : S.list('sales');
+    for (var i = 0; i < sales.length; i++) out.push(saleEntry(sales[i], i));
+
+    // 2) opening balances — DR Bank / CR Owner Equity from each bank position
+    var banks = S.list('banks');
+    for (var b = 0; b < banks.length; b++) {
+      var bk = banks[b];
+      var bal = +bk.balance || 0;
+      if (bal <= 0) continue;
+      out.push({
+        id: 'GL-OB-' + bk.id, date: '2025-07-01', companyId: bk.companyId || 'group',
+        ref: bk.account || bk.id, memo: 'Opening balance · ' + (bk.name || 'Bank'),
+        source: 'opening', party: '',
+        lines: [ { account: '1010', dr: bal, cr: 0 }, { account: '3000', dr: 0, cr: bal } ],
+        posted: true, created: Date.now()
+      });
+    }
+
+    // 3) summarised monthly operating expenses — DR Expense / CR Bank.
+    //    Sized off each company's own seeded sales revenue (deterministic).
+    var revByCompany = {};
+    for (var s = 0; s < sales.length; s++) {
+      var sl = sales[s];
+      revByCompany[sl.companyId] = (revByCompany[sl.companyId] || 0) + (+sl.amount || 0);
+    }
+    Object.keys(revByCompany).forEach(function (cid) {
+      var rev = revByCompany[cid];
+      if (rev <= 0) return;
+      for (var m = 0; m < EXP_MONTHS.length; m++) {
+        var dateStr = EXP_MONTHS[m];
+        Object.keys(EXP_SPLIT).forEach(function (code) {
+          var amt = Math.round(rev * EXP_SPLIT[code] / 1000) * 1000; // tidy to 000s
+          if (amt <= 0) return;
+          out.push({
+            id: 'GL-EX-' + cid + '-' + code + '-' + m,
+            date: dateStr, companyId: cid,
+            ref: EXP_NAMES[code] + ' ' + dateStr.slice(0, 7),
+            memo: EXP_NAMES[code] + ' — ' + cid, source: 'manual', party: '',
+            lines: [ { account: code, dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt } ],
+            posted: true, created: Date.now()
+          });
+        });
+      }
+    });
+
+    return out;
+  }
+
+  function seed() {
+    S.seedOnce(COA_KEY, STANDARD_COA.map(withNormal));
+    S.seedOnce(GL_KEY, buildGlSeed());
+  }
+
+  /* ==========================================================================
+   * BOOT  — auto-post every new sale to the ledger
+   * ========================================================================*/
+  function saleKey(rec) { return rec.ref || rec.id || ''; }
+
+  function alreadyPosted(rec) {
+    var key = saleKey(rec);
+    var rows = S.list(GL_KEY);
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].source === 'sale' && (rows[i].ref === rec.ref && rec.ref) ) return true;
+      if (rows[i].id === 'GL-S' + (rec.id || '')) return true;
+    }
+    return false;
+  }
+
+  function boot() {
+    var postedKeys = {};
+    // pre-load keys from any already-posted sale entries
+    var existing = S.list(GL_KEY);
+    for (var i = 0; i < existing.length; i++) {
+      if (existing[i].source === 'sale') postedKeys[existing[i].ref || existing[i].id] = true;
+    }
+
+    bus.on('sale:recorded', function (rec) {
+      if (!rec) return;
+      var key = saleKey(rec);
+      if (postedKeys[key]) return;                 // seen this run
+      if (alreadyPosted(rec)) { postedKeys[key] = true; return; } // seen in store
+      postedKeys[key] = true;
+
+      var amount = +rec.amount || 0, cost = +rec.cost || 0;
+      var lines = [
+        { account: '1200', dr: amount, cr: 0 },
+        { account: '4000', dr: 0, cr: amount }
+      ];
+      if (cost > 0) {
+        lines.push({ account: '5000', dr: cost, cr: 0 });
+        lines.push({ account: '2000', dr: 0, cr: cost });
+      }
+      try {
+        post({ id: 'GL-S' + (rec.id || key), date: rec.date, companyId: rec.companyId,
+          ref: rec.ref, memo: rec.desc || 'Sale', source: 'sale', party: rec.customer, lines: lines });
+      } catch (e) { console.error('[ledger] auto-post failed', e); }
+    });
+  }
+
+  EPAL.registerEngine({ name: 'ledger', seed: seed, boot: boot });
+
+})(window.EPAL = window.EPAL || {});

@@ -47,6 +47,28 @@
   }
   function today() { return new Date().toISOString().slice(0, 10); }
 
+  /* ---- Won-deal costing: a won deal is never pure profit. Estimate a cost of
+   * 70% of the deal value so db.postSale records a realistic margin (≈30%)
+   * instead of booking the whole amount as profit. -------------------------*/
+  function estCost(value) { return Math.round((+value || 0) * 0.7); }
+
+  /* ---- RFM segment styling (EPAL.intel.rfm segments) ---------------------*/
+  var SEG_COLOR = {
+    'Champions': '#23c17e', 'Loyal': '#2f6bff', 'Potential Loyalist': '#7b5cff',
+    'New': '#8b93a7', 'Need Attention': '#f4b740', 'At Risk': '#e2721b',
+    'Cant Lose': '#f0506e', 'Hibernating': '#8b93a7', 'Lost': '#f0506e'
+  };
+  function segColor(seg) { return SEG_COLOR[seg] || '#8b93a7'; }
+  function rfmSegBadge(x) {
+    var c = segColor(x.segment);
+    return el('span.badge.rfm-seg', {
+      style: { color: c, borderColor: c + '55' },
+      title: 'RFM ' + x.score + ' · R' + x.r + ' F' + x.f + ' M' + x.m,
+      text: x.segment
+    });
+  }
+  function fmOf(x) { return Math.round((x.f + x.m) / 2); }
+
   /* ---- tiny KPI tile ------------------------------------------------------*/
   function kpi(label, value, icon, drill, foot) {
     return el('div.kpi-card' + (drill ? '.drill' : ''),
@@ -176,9 +198,10 @@
               db().notify({ level: 'success', title: 'Deal won 🎉',
                 text: l.name + ' · ' + ui.money(l.value) + (co ? ' · ' + co.short : ''),
                 companyId: l.companyId, icon: 'trophy-fill' });
-              db().postSale(l.companyId, { amount: l.value || 0, cost: 0, ref: l.id,
+              db().postSale(l.companyId, { amount: l.value || 0, cost: estCost(l.value), ref: l.id,
                 desc: 'CRM deal: ' + l.name, customer: l.name });
-              ui.toast('Deal won — sale posted to ' + (co ? co.short : l.companyId), 'success');
+              ui.toast('Deal won — sale posted to ' + (co ? co.short : l.companyId) +
+                ' (cost est. ' + ui.money(estCost(l.value), { compact: true }) + ')', 'success');
             }
             EPAL.router.render();
           }
@@ -232,11 +255,19 @@
      * ======================================================================*/
     function drawCustomers() {
       body.innerHTML = '';
-      var state = { q: '', tier: '' };
+      var state = { q: '', tier: '', cell: null };
+
+      /* ---- intelligence read-model (keyed by sales.customer NAME) ---------*/
+      var rfmList = [];
+      try { rfmList = EPAL.intel.rfm() || []; } catch (e) { rfmList = []; }
+      var rfmByName = {};
+      rfmList.forEach(function (x) { rfmByName[x.name] = x; });
+      function ltvOf(name) { try { return EPAL.intel.ltv(name) || 0; } catch (e) { return 0; } }
 
       var grid = el('div.grid-auto.stagger');
       var countLbl = el('span.dt-count');
 
+      /* ---- filter bar -----------------------------------------------------*/
       var searchIn = el('input.input', { placeholder: 'Search customers…', style: { maxWidth: '240px' },
         oninput: ui.debounce(function () { state.q = searchIn.value.toLowerCase(); paint(); }, 120) });
       var tierSel = el('select.select', { onchange: function () { state.tier = tierSel.value; paint(); } });
@@ -246,19 +277,141 @@
       body.appendChild(el('div.flex.items-center.gap-2.mb-3', null, [
         searchIn, tierSel, el('div.spacer'), countLbl
       ]));
+
+      /* ---- RFM heatmap + intelligence lists -------------------------------*/
+      body.appendChild(buildIntel());
+
       body.appendChild(grid);
+
+      /* ---- RFM 5x5 heatmap card (.rfm-grid) — click a cell to filter ------*/
+      function buildIntel() {
+        var cellCount = {}, maxc = 0;
+        rfmList.forEach(function (x) {
+          var k = x.r + '-' + fmOf(x);
+          cellCount[k] = (cellCount[k] || 0) + 1;
+          if (cellCount[k] > maxc) maxc = cellCount[k];
+        });
+
+        var gridEl = el('div.rfm-grid', { style: {
+          display: 'grid', gridTemplateColumns: 'auto repeat(5, 1fr)', gap: '4px', alignItems: 'stretch'
+        } });
+        // corner + FM column headers
+        gridEl.appendChild(el('div.rfm-axis.xs.text-mute', { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }, text: 'R \\ FM' }));
+        [1, 2, 3, 4, 5].forEach(function (fm) {
+          gridEl.appendChild(el('div.rfm-axis.xs.text-mute', { style: { textAlign: 'center' }, text: 'FM' + fm }));
+        });
+        [5, 4, 3, 2, 1].forEach(function (r) {
+          gridEl.appendChild(el('div.rfm-axis.xs.text-mute', { style: { display: 'flex', alignItems: 'center' }, text: 'R' + r }));
+          [1, 2, 3, 4, 5].forEach(function (fm) {
+            var k = r + '-' + fm, count = cellCount[k] || 0;
+            var alpha = maxc ? (0.10 + 0.62 * count / maxc) : 0;
+            var active = state.cell && state.cell.r === r && state.cell.fm === fm;
+            var cell = el('div.rfm-cell', {
+              title: count + ' customer' + (count === 1 ? '' : 's') + ' · R' + r + ' / FM' + fm,
+              style: {
+                minHeight: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '7px', cursor: count ? 'pointer' : 'default', fontWeight: '700',
+                fontVariantNumeric: 'tabular-nums',
+                background: count ? 'rgba(200,162,74,' + alpha.toFixed(3) + ')' : 'rgba(139,147,167,0.08)',
+                border: active ? '2px solid #c8a24a' : '1px solid rgba(139,147,167,0.18)',
+                color: count ? '' : 'var(--text-muted, #8b93a7)'
+              },
+              onclick: function () {
+                if (!count) return;
+                if (state.cell && state.cell.r === r && state.cell.fm === fm) state.cell = null;
+                else state.cell = { r: r, fm: fm };
+                drawCustomers();   // rebuild so the heatmap highlight redraws too
+              }
+            }, [ el('span', { text: count ? String(count) : '·' }) ]);
+            gridEl.appendChild(cell);
+          });
+        });
+
+        var heat = el('div.card', null, [
+          el('div.card-head', null, [
+            el('h3', { html: ui.icon('grid-3x3-gap') + ' RFM Segmentation' }),
+            el('span.card-sub', { text: 'Recency × (Frequency+Monetary) · click a cell to filter' })
+          ]),
+          el('div.card-body', null, [
+            gridEl,
+            state.cell
+              ? el('div.mt-2', null, [ el('button.btn.btn-ghost.btn-sm', {
+                  html: ui.icon('x-circle') + ' Clear R' + state.cell.r + '/FM' + state.cell.fm + ' filter',
+                  onclick: function () { state.cell = null; drawCustomers(); } }) ])
+              : el('div.text-mute.xs.mt-2', { text: rfmList.length + ' customers scored from the group sales ledger.' })
+          ])
+        ]);
+
+        /* ---- best / sleeping / at-risk lists -------------------------------*/
+        function miniList(title, icon, rows, render, empty) {
+          var lst = el('div.data-list');
+          if (!rows.length) lst.appendChild(el('div.text-mute.xs', { text: empty }));
+          else rows.forEach(function (r) { lst.appendChild(render(r)); });
+          return el('div.card', null, [
+            el('div.card-head', null, [ el('h3', { html: ui.icon(icon) + ' ' + title }) ]),
+            el('div.card-body', null, [ lst ])
+          ]);
+        }
+        function nameRow(name, rightHtml, sub) {
+          return el('div.data-row', { style: { cursor: 'pointer' }, onclick: function () { openByName(name); } }, [
+            el('div', null, [
+              el('div.strong', { text: name }),
+              sub ? el('div.text-mute.xs', { text: sub }) : null
+            ]),
+            el('div', { style: { textAlign: 'right' }, html: rightHtml })
+          ]);
+        }
+        var best = [], sleeping = [], risk = [];
+        try { best = EPAL.intel.topCustomers(5) || []; } catch (e) {}
+        try { sleeping = (EPAL.intel.sleepingCustomers() || []).slice(0, 5); } catch (e) {}
+        try { risk = (EPAL.intel.atRisk() || []).slice(0, 5); } catch (e) {}
+
+        var lists = el('div', { style: {
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px'
+        } }, [
+          miniList('Best Customers', 'trophy', best, function (r) {
+            return nameRow(r.name,
+              '<span class="num strong">' + ui.escapeHtml(ui.money(r.ltv || r.monetary || 0, { compact: true })) + '</span>',
+              r.segment + ' · ' + r.frequency + ' orders');
+          }, 'No sales history yet.'),
+          miniList('Sleeping Customers', 'moon-stars', sleeping, function (r) {
+            return nameRow(r.name,
+              '<span class="text-mute xs">' + r.recencyDays + 'd ago</span>',
+              ui.money(r.monetary || 0, { compact: true }) + ' lifetime');
+          }, 'Everyone is active.'),
+          miniList('At-Risk Customers', 'exclamation-triangle', risk, function (r) {
+            var c = segColor(r.segment);
+            return nameRow(r.name,
+              '<span class="badge" style="color:' + c + ';border-color:' + c + '55">' + ui.escapeHtml(r.segment) + '</span>',
+              r.recencyDays + ' days since last order');
+          }, 'No customers flagged at-risk.')
+        ]);
+
+        return el('div.mb-3', null, [ heat, el('div.mt-3', null, [ lists ]) ]);
+      }
+
+      function openByName(name) {
+        var c = allCustomers().filter(function (x) { return x.name === name; })[0];
+        if (c) customerDetail(c);
+        else ui.toast(name + ' is a ledger customer — not yet in the shared customer graph.', 'info');
+      }
 
       function paint() {
         grid.innerHTML = '';
         var rows = allCustomers().filter(function (c) {
           if (state.tier && c.tier !== state.tier) return false;
+          if (state.cell) {
+            var x = rfmByName[c.name];
+            if (!x || x.r !== state.cell.r || fmOf(x) !== state.cell.fm) return false;
+          }
           if (state.q) {
             var hay = (c.name + ' ' + (c.contact || '') + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase();
             if (hay.indexOf(state.q) < 0) return false;
           }
           return true;
         });
-        countLbl.textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's');
+        countLbl.textContent = rows.length + ' customer' + (rows.length === 1 ? '' : 's') +
+          (state.cell ? ' · R' + state.cell.r + '/FM' + state.cell.fm : '');
         if (!rows.length) {
           grid.appendChild(el('div.card', null, [ el('div.card-pad.text-mute', { text: 'No customers match this filter.' }) ]));
           return;
@@ -266,6 +419,8 @@
         rows.forEach(function (c) {
           var tierCls = c.tier === 'Platinum' ? 'badge-accent' : c.tier === 'Gold' ? 'badge-warn' : c.tier === 'Silver' ? 'badge-info' : '';
           var known = (c.companyIds || []).map(function (id) { return coBadge(id); }).join(' ');
+          var rf = rfmByName[c.name];
+          var intelLtv = rf ? ltvOf(c.name) : 0;
           grid.appendChild(el('div.card.hover', { style: { cursor: 'pointer' }, onclick: function () { customerDetail(c); } }, [
             el('div.card-pad', null, [
               el('div.flex.items-center.gap-2', null, [
@@ -277,10 +432,17 @@
                 ]),
                 el('span.badge.' + (tierCls || 'badge'), { text: c.tier || 'Standard' })
               ]),
+              el('div.flex.items-center.gap-1.mt-1', null, [
+                rf ? rfmSegBadge(rf) : el('span.badge.badge-muted', { text: 'Unrated', title: 'No matching sales in the ledger' })
+              ]),
               el('div.stat-row.mt-2', null, [
                 el('div.stat', null, [
                   el('div.text-mute.xs', { text: 'Lifetime Value' }),
                   el('div.num.strong', { text: ui.money(c.value || 0, { compact: true }) })
+                ]),
+                el('div.stat', null, [
+                  el('div.text-mute.xs', { text: 'Predicted LTV' }),
+                  el('div.num.strong', { text: rf ? ui.money(intelLtv, { compact: true }) : '—' })
                 ]),
                 el('div.stat', null, [
                   el('div.text-mute.xs', { text: 'Known By' }),
@@ -296,22 +458,47 @@
 
     function customerDetail(c) {
       var known = (c.companyIds || []).map(function (id) { return coBadge(id); }).join(' ');
+
+      // intelligence for this customer (matched by name against the sales ledger)
+      var rf = null;
+      try {
+        (EPAL.intel.rfm() || []).forEach(function (x) { if (x.name === c.name) rf = x; });
+      } catch (e) { rf = null; }
+      var predLtv = 0; try { predLtv = EPAL.intel.ltv(c.name) || 0; } catch (e) {}
+
+      var detailRows = [
+        detailRow('Contact Person', c.contact || '—'),
+        detailRow('Phone', c.phone || '—'),
+        detailRow('Email', c.email || '—'),
+        detailRow('Tier', c.tier || 'Standard'),
+        detailRow('Lifetime Value', ui.money(c.value || 0)),
+        detailRow('Customer Since', c.since || '—'),
+        detailRow('Status', c.status || 'active')
+      ];
+      if (rf) {
+        detailRows.push(el('div.data-row', null, [
+          el('span.text-mute', { text: 'RFM Segment' }),
+          rfmSegBadge(rf)
+        ]));
+        detailRows.push(detailRow('RFM Score', rf.score + '  (R' + rf.r + ' F' + rf.f + ' M' + rf.m + ')'));
+        detailRows.push(detailRow('Predicted LTV', ui.money(predLtv)));
+      }
+
+      // discussion thread (comments engine) — embedded per contract
+      var cw = null;
+      try { cw = EPAL.comments.widget('customer', c.id); } catch (e) { cw = null; }
+
       var m = ui.modal({
         title: c.name, icon: 'person-hearts', size: 'sm',
         body: el('div', null, [
-          el('div.data-list', null, [
-            detailRow('Contact Person', c.contact || '—'),
-            detailRow('Phone', c.phone || '—'),
-            detailRow('Email', c.email || '—'),
-            detailRow('Tier', c.tier || 'Standard'),
-            detailRow('Lifetime Value', ui.money(c.value || 0)),
-            detailRow('Customer Since', c.since || '—'),
-            detailRow('Status', c.status || 'active')
-          ]),
+          el('div.data-list', null, detailRows),
           el('div.mt-2', null, [
             el('div.section-label', { text: 'Known By (shared graph)' }),
             el('div', { html: known || '<span class="text-mute">Not linked to a concern yet</span>' })
-          ])
+          ]),
+          cw ? el('div.mt-3', null, [
+            el('div.section-label', { text: 'Discussion' }), cw
+          ]) : null
         ]),
         actions: [
           { label: 'Close', variant: 'ghost', onClick: function () {} },
@@ -420,7 +607,9 @@
           { key: 'companyId', label: 'Concern', type: 'select', options: companyOptions(), required: true },
           { key: 'source', label: 'Source', type: 'select', options: SOURCES, required: true },
           { key: 'stage', label: 'Stage', type: 'select', options: STAGES.map(function (s) { return s.id; }), default: 'New' },
-          { key: 'value', label: 'Estimated Value (৳)', type: 'money', required: true, min: 1 }
+          { key: 'value', label: 'Estimated Value (৳)', type: 'money', required: true, min: 1 },
+          { key: 'cost', label: 'Estimated Cost (৳)', type: 'money', min: 0,
+            hint: 'Optional — leave blank to auto-estimate 70% of value when the deal is Won.' }
         ],
         onSave: function (vals) {
           var prevStage = l ? l.stage : null;
@@ -432,7 +621,8 @@
             db().notify({ level: 'success', title: 'Deal won 🎉',
               text: rec.name + ' · ' + ui.money(rec.value) + (co ? ' · ' + co.short : ''),
               companyId: rec.companyId, icon: 'trophy-fill' });
-            db().postSale(rec.companyId, { amount: rec.value || 0, cost: 0, ref: rec.id,
+            var wonCost = (rec.cost != null && rec.cost !== '') ? (+rec.cost || 0) : estCost(rec.value);
+            db().postSale(rec.companyId, { amount: rec.value || 0, cost: wonCost, ref: rec.id,
               desc: 'CRM deal: ' + rec.name, customer: rec.name });
           }
           ui.toast('Lead saved', 'success');

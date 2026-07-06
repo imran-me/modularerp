@@ -31,6 +31,14 @@
     fields.forEach(function (f) {
       if (f.type === 'section') { root.appendChild(el('div.form-section-title', { text: f.label })); return; }
 
+      // ---- Line-item repeater (multi-pax, journal lines, BOQ rows, …) -------
+      if (f.type === 'items') {
+        var im = buildItems(f, record[f.key]);
+        root.appendChild(im.wrap);
+        ctrls[f.key] = { input: im.wrap, spec: f, errEl: im.errEl, wrap: im.wrap, getVal: im.read, isItems: true };
+        return;
+      }
+
       var input;
       var val = record[f.key] != null ? record[f.key] : (f.default != null ? f.default : '');
 
@@ -71,11 +79,91 @@
       input.addEventListener('change', function () { clearErr(f.key); applyShowIf(); });
     });
 
+    /* ---- Line-item repeater builder --------------------------------------*/
+    function buildItems(f, initial) {
+      var cols = f.columns || [];
+      var rows = Array.isArray(initial) ? initial.map(function (r) { return r; }) : (Array.isArray(f.default) ? f.default.map(function (r) { return r; }) : []);
+      var minRows = f.min != null ? f.min : 0;
+      var errEl = el('div.field-error');
+      var body = el('div.items-rows');
+      var wrap = el('div.field.col-2.items-field', null, [
+        el('label', { html: ui.escapeHtml(f.label || f.key) + (f.required ? ' <span class="req">*</span>' : '') }),
+        body,
+        el('div.items-foot', null, [
+          el('button.btn.btn-sm.btn-ghost', { type: 'button', html: ui.icon('plus-lg') + ' ' + (f.addLabel || 'Add row'),
+            onclick: function () { rows.push({}); render(); } }),
+          f.footer ? el('div.items-total', { id: 'items-total-' + f.key }) : null
+        ]),
+        f.hint ? el('div.hint', { text: f.hint }) : null,
+        errEl
+      ]);
+
+      function readRow(rowEl) {
+        var o = {};
+        cols.forEach(function (c) {
+          var inp = rowEl.querySelector('[data-ik="' + c.key + '"]');
+          if (!inp) { o[c.key] = null; return; }
+          if (c.type === 'checkbox') o[c.key] = inp.checked;
+          else if (c.type === 'number' || c.type === 'money') o[c.key] = inp.value === '' ? null : +inp.value;
+          else o[c.key] = inp.value;
+        });
+        return o;
+      }
+      function read() {
+        return ui.$$('.items-row', body).map(function (r) { return readRow(r); });
+      }
+      function refreshFooter() {
+        if (!f.footer) return;
+        var t = wrap.querySelector('#items-total-' + f.key);
+        if (t) t.innerHTML = f.footer(read());
+      }
+      function render() {
+        body.innerHTML = '';
+        if (!rows.length) body.appendChild(el('div.items-empty.text-mute.sm', { text: f.emptyText || 'No rows yet — add one below.' }));
+        rows.forEach(function (row, idx) {
+          var cells = cols.map(function (c) {
+            var v = row[c.key] != null ? row[c.key] : (c.default != null ? c.default : '');
+            var inp;
+            if (c.type === 'select') {
+              inp = el('select.select.items-input', { 'data-ik': c.key });
+              (c.options || []).forEach(function (o) {
+                var ov = Array.isArray(o) ? o[0] : o, ol = Array.isArray(o) ? o[1] : o;
+                var op = el('option', { value: ov, text: ol }); if (String(ov) === String(v)) op.selected = true; inp.appendChild(op);
+              });
+            } else if (c.type === 'checkbox') {
+              inp = el('input.items-input', { type: 'checkbox', 'data-ik': c.key }); inp.checked = !!v;
+            } else {
+              var ht = { money: 'number', phone: 'tel' }[c.type] || c.type || 'text';
+              inp = el('input.input.items-input', { type: ht, 'data-ik': c.key, placeholder: c.label || '' });
+              inp.value = v; if (c.type === 'money' || c.type === 'number') inp.step = c.step || 'any';
+            }
+            inp.addEventListener('input', function () { rows[idx] = readRow(rowEl); refreshFooter(); if (f.onChange) f.onChange(read(), wrap); });
+            inp.addEventListener('change', function () { rows[idx] = readRow(rowEl); refreshFooter(); if (f.onChange) f.onChange(read(), wrap); });
+            return el('div.items-cell', { style: c.width ? { flex: '0 0 ' + c.width } : null }, [
+              el('span.items-cell-label', { text: c.label || c.key }), inp
+            ]);
+          });
+          var rowEl = el('div.items-row', null, cells.concat([
+            el('button.items-del', { type: 'button', title: 'Remove', html: ui.icon('x-lg'),
+              onclick: function () { rows.splice(idx, 1); render(); } })
+          ]));
+          body.appendChild(rowEl);
+        });
+        refreshFooter();
+        if (f.onChange) f.onChange(read(), wrap);
+      }
+      // seed minimum rows
+      while (rows.length < minRows) rows.push({});
+      render();
+      return { wrap: wrap, errEl: errEl, read: read };
+    }
+
     function values() {
       var out = {};
       Object.keys(ctrls).forEach(function (k) {
         var c = ctrls[k], t = c.spec.type;
-        if (t === 'checkbox') out[k] = c.input.checked;
+        if (c.isItems) out[k] = c.getVal();
+        else if (t === 'checkbox') out[k] = c.input.checked;
         else if (t === 'number' || t === 'money') out[k] = c.input.value === '' ? null : +c.input.value;
         else out[k] = c.input.value;
       });
@@ -84,11 +172,13 @@
 
     function setErr(key, msg) {
       var c = ctrls[key]; if (!c) return;
-      c.input.classList.add('invalid'); c.errEl.textContent = msg;
+      if (!c.isItems) c.input.classList.add('invalid');
+      c.errEl.textContent = msg;
     }
     function clearErr(key) {
       var c = ctrls[key]; if (!c) return;
-      c.input.classList.remove('invalid'); c.errEl.textContent = '';
+      if (!c.isItems) c.input.classList.remove('invalid');
+      c.errEl.textContent = '';
     }
 
     function validate() {
@@ -97,6 +187,11 @@
         var f = ctrls[k].spec, v = vals[k];
         clearErr(k);
         if (f.showIf && !f.showIf(vals)) return;               // hidden → skip
+        if (ctrls[k].isItems) {
+          var need = f.min != null ? f.min : (f.required ? 1 : 0);
+          if ((v ? v.length : 0) < need) { setErr(k, 'Add at least ' + need + ' ' + (need === 1 ? 'row' : 'rows')); ok = false; }
+          return;
+        }
         if (f.required && (v === '' || v == null || v === false && f.type !== 'checkbox')) {
           setErr(k, (f.label || k) + ' is required'); ok = false; return;
         }

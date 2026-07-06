@@ -41,6 +41,7 @@
   <link rel="stylesheet" href="assets/css/base.css" />
   <link rel="stylesheet" href="assets/css/layout.css" />
   <link rel="stylesheet" href="assets/css/components.css" />
+  <link rel="stylesheet" href="assets/css/deepcore.css" />
   <link rel="stylesheet" href="assets/css/animations.css" />
 </head>
 
@@ -67,14 +68,27 @@
   <script src="assets/js/core/eventbus.js"></script>
   <script src="assets/js/core/ui.js"></script>
   <script src="assets/js/core/charts.js"></script>
+  <!-- Deep Core engine registry (self-registration backbone) — before engines. -->
+  <script src="assets/js/core/engines.js"></script>
   <script src="assets/js/core/database.js"></script>
   <!-- deep operational seed for every company (idempotent; consumed by db.seed()) -->
   <script src="assets/js/core/seed-bd.js"></script>
+  <!-- ===== Deep Core engines (brain, nerves, backbone) — self-register ===== -->
+  <script src="assets/js/core/serial.js"></script>
+  <script src="assets/js/core/ledger.js"></script>
+  <script src="assets/js/core/audit.js"></script>
+  <script src="assets/js/core/approvals.js"></script>
+  <script src="assets/js/core/rules.js"></script>
+  <script src="assets/js/core/documents.js"></script>
+  <script src="assets/js/core/intel.js"></script>
+  <script src="assets/js/core/comments.js"></script>
+  <script src="assets/js/core/search.js"></script>
   <!-- shared UI building blocks used by the graduated views -->
   <script src="assets/js/core/forms.js"></script>
   <script src="assets/js/core/datatable.js"></script>
   <script src="assets/js/core/entity.js"></script>
   <script src="assets/js/core/auth.js"></script>
+  <script src="assets/js/core/permissions.js"></script>
   <script src="assets/js/core/router.js"></script>
 
   <!-- ===================== VIEWS (self-registering) ===================== -->
@@ -94,6 +108,11 @@
   <script src="assets/js/views/group/automation.js"></script>
   <script src="assets/js/views/group/notifications.js"></script>
   <script src="assets/js/views/group/settings.js"></script>
+  <!-- Deep Core group screens -->
+  <script src="assets/js/views/group/briefing.js"></script>
+  <script src="assets/js/views/group/documents.js"></script>
+  <script src="assets/js/views/group/approvals.js"></script>
+  <script src="assets/js/views/group/activity-log.js"></script>
   <!-- Admin + cross-company -->
   <script src="assets/js/views/admin/module-manager.js"></script>
   <script src="assets/js/views/tasks/board.js"></script>
@@ -102,6 +121,13 @@
   <script src="assets/js/views/travels/dashboard.js"></script>
   <script src="assets/js/views/travels/visa-processing.js"></script>
   <script src="assets/js/views/travels/air-ticketing.js"></script>
+  <script src="assets/js/views/travels/vendor-agent.js"></script>
+  <script src="assets/js/views/travels/contract-flight.js"></script>
+  <!-- Per-concern deep modules -->
+  <script src="assets/js/views/shop/pos.js"></script>
+  <script src="assets/js/views/construction/projects.js"></script>
+  <script src="assets/js/views/woodart/projects.js"></script>
+  <script src="assets/js/views/it/projects.js"></script>
 
   <!-- ===================== BOOT (must be LAST) ===================== -->
   <!-- app.js auto-initialises after all views have registered themselves. -->

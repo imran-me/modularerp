@@ -1,5 +1,80 @@
 # CHANGELOG — Epal Group ERP
 
+## v0.3.0 "Deep Core — Brain, Nerves & Backbone" · 06-Jul-2026
+
+The third major build. Where v0.1.0 built the body and v0.2.0 gave it a world-class
+face, v0.3.0 adds the **operating brain**: real business rules, double-entry accounting,
+an automation nervous-system, an intelligence advisor, and a trust/audit backbone —
+so the system behaves like an enterprise ERP, not a beautiful shell. Built and hardened
+via multi-agent orchestration (scout → build → three-persona hostile inspection → fix).
+
+### Added — the 10 Deep Core engines (`assets/js/core/`)
+- **`ledger.js`** — true **double-entry** accounting. 22-account chart of accounts,
+  balanced journal (`gl_entries`), `post()` that rejects imbalance, trial balance,
+  running GL, party subledger, AR/AP ageing, P&L, balance sheet. Auto-posts every
+  `sale:recorded` (DR AR / CR Revenue, DR COGS / CR AP). **The trial balance balances
+  and the balance sheet ties out — verified.**
+- **`audit.js`** — structured, append-only audit trail. Every create/edit/delete/login/
+  post/approve captured with who/what/when/before-after. Global filterable Activity Log.
+- **`approvals.js`** — maker-checker workflows. Amount-banded matrix, sequential levels,
+  **maker ≠ checker enforced** (throws), mandatory reject comment, pending inbox.
+- **`documents.js`** + **`serial.js`** — branded (navy `#1B2A4A` / gold `#C9A227`)
+  document engine: invoices, receipts, vouchers, work orders, salary slips, statements,
+  visa cover sheets — with **gapless serial numbering**, amount-in-words, print/PDF, and
+  a searchable Document Center.
+- **`intel.js`** — the advisor: **MD Briefing** narrative digest, RFM/LTV customer
+  ranking, employee productivity, per-company risk register, anomaly flags (expense
+  spike, negative-margin sale, over-credit-limit, margin drop).
+- **`permissions.js`** — action-level RBAC (view/create/edit/delete/export/approve) with
+  editable role templates, layered over the existing module gate.
+- **`rules.js`** — automation engine + 60s scheduler: reminders (idle visa file, payment
+  due, task overdue, flight deadline, credit-limit breach), 48h escalation, recurring
+  month-end generation. Powers the Automation Center.
+- **`comments.js`** — @mention comment threads embeddable on any entity.
+- **`search.js`** — global Ctrl+K search across data (customers, tickets, files,
+  invoices, GL, employees…), not just modules.
+- **`engines.js`** — the self-registration backbone (`registerEngine/seedEngines/bootEngines`).
+
+### Added — modules & deepenings (`assets/js/views/`)
+- **Group:** MD Briefing, Document Center, Approvals inbox, Activity Log; Finance gains
+  Chart-of-Accounts / Journal / Trial-Balance tabs; Settings becomes a real engine
+  (fiscal year, tax, dropdown managers, approval matrix, role templates, per-company
+  branding); Dashboard gains the briefing teaser + anomaly radar; CRM gains RFM/LTV.
+- **Travels:** **Vendor & Agent** party ledgers (ageing, credit limits, commission,
+  branded statements); **Contract Flight** block-seat inventory with unsold-seat
+  deadline warnings; **Air Ticketing** deepened to a full lifecycle (multi-passenger
+  fare model, base/tax/markup + agent commission, reissue/refund/void with reversing
+  ledger entries, per-airline/agent profit, branded IATA-style invoice); **Visa** gains
+  per-country checklists, missing-doc alerts, fee/service/profit breakdown, finance posting.
+- **Per concern:** **Shop POS** (cart, stock-guarded checkout, VAT, receipt) + Inventory
+  with low-stock & dues; **Construction** project → BOQ → work orders → milestone billing
+  → retention → per-project P&L; **Woodart** design→production→install→handover billing;
+  **IT** projects + support desk (SLA) + subscriptions (MRR) + timesheets.
+- **HR:** leave apply→approve (via approvals), payroll run → branded salary slips + ledger
+  posting, attendance punch.
+- **`core/forms.js`** — new **`items`** line-item repeater (multi-pax tickets, journal
+  lines, BOQ rows, quotation lines).
+
+### Hardened — three-persona hostile inspection (owner / employee / auditor)
+26 adversarial agents surfaced 20 candidate defects; **17 confirmed** (3 correctly
+refuted), all fixed and re-verified. Notable catches: a non-admin HR **privilege-escalation**
+via the role field (closed), ticket **refunds that never reversed booked revenue** (now
+post reversing entries), **duplicate document serials** on first runtime issue (counters
+now reconcile past seeded docs), agent **commission omitted from posted cost** (now
+reconciles module Net Profit with Group Finance), and anomaly deep-links to 404 routes (fixed).
+
+### Verified
+Every JS file passes `node --check`. Headless boot sweep: **184 routes, 0 errors, 0
+render failures, 0 blanks.** Dynamic invariant harness: **24/24** (ledger stays balanced
+through sales/refunds/rejected posts; `postSale` never double-posts; maker≠checker
+enforced; serials unique & monotonic; audit captures mutations; stock decrements persist).
+
+### Docs
+New `docs/DATA_MODEL.md` (every store, field, relation), `docs/MIGRATION_ROADMAP.md`
+(front-end → Laravel/API path), `docs/DEEP-CORE-CONTRACT.md` (engine APIs).
+
+---
+
 ## v0.2.0 "Aurora — World-Class Elevation Pass" · 02-Jul-2026
 
 The second major build: a full-system depth audit and elevation. The benchmark was

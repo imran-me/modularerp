@@ -26,13 +26,17 @@
   'use strict';
   var ui = EPAL.ui, el = ui.el;
   var db = function () { return EPAL.db; };
+  var LED = function () { return EPAL.ledger; };
+  function hasLedger() { return !!(EPAL.ledger && EPAL.ledger.accounts); }
+  function can(action) { return (EPAL.perm && EPAL.perm.can) ? EPAL.perm.can('group', 'finance', action) : true; }
 
   var GREEN = '#23c17e', RED = '#f0506e', AMBER = '#f4b740', ORANGE = '#e2721b', GOLD = '#c8a24a';
 
   var TABS = [
     [null, 'Overview'], ['pnl', 'P&L'], ['cashflow', 'Cash Flow'],
     ['balance-sheet', 'Balance Sheet'], ['receivables', 'Receivables'],
-    ['payables', 'Payables'], ['banks', 'Banks']
+    ['payables', 'Payables'], ['banks', 'Banks'],
+    ['coa', 'Chart of Accounts'], ['journal', 'Journal'], ['trial-balance', 'Trial Balance']
   ];
 
   /* ---- tiny shared helpers ------------------------------------------------*/
@@ -137,6 +141,9 @@
     else if (sub === 'receivables') renderAging(page, 'Receivable');
     else if (sub === 'payables') renderAging(page, 'Payable');
     else if (sub === 'banks') renderBanks(page);
+    else if (sub === 'coa') renderCoa(page);
+    else if (sub === 'journal') renderJournal(page);
+    else if (sub === 'trial-balance') renderTrialBalance(page);
     else renderOverview(page);
     ctx.mount.appendChild(page);
   } });
@@ -148,7 +155,18 @@
     var f = db().finance(null, 12);
     var snap = db().groupSnapshot();
     var cash = bankTotal();
-    var ar = outstandingOf('Receivable'), ap = outstandingOf('Payable');
+    // Source AR/AP from the same population the KPI cards drill into: when the
+    // Deep Core ledger is loaded the receivables/payables desks show ledger
+    // aging (renderAgingLedger), so mirror that total here so the cockpit and
+    // the desk reconcile; otherwise fall back to the acc_schedules figures.
+    var ar, ap;
+    if (EPAL.ledger && EPAL.ledger.aging) {
+      ar = LED().aging('AR', {}).reduce(function (a, r) { return a + (r.total || 0); }, 0);
+      ap = LED().aging('AP', {}).reduce(function (a, r) { return a + (r.total || 0); }, 0);
+    } else {
+      ar = outstandingOf('Receivable');
+      ap = outstandingOf('Payable');
+    }
 
     page.appendChild(head('Consolidated Finance', 'cash-coin',
       'Group-wide P&L, cash position, receivables and payables across ' + snap.companies.length + ' concerns · trailing 12 months.', [
@@ -157,6 +175,19 @@
         onclick: function () { EPAL.router.navigate('group/finance/banks'); } })
     ]));
     page.appendChild(pills(null));
+
+    if (hasLedger()) {
+      page.appendChild(el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' } }, [
+        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('diagram-2') + ' Chart of Accounts',
+          onclick: function () { EPAL.router.navigate('group/finance/coa'); } }),
+        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('journal-text') + ' Group Journal',
+          onclick: function () { EPAL.router.navigate('group/finance/journal'); } }),
+        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('list-columns-reverse') + ' Trial Balance',
+          onclick: function () { EPAL.router.navigate('group/finance/trial-balance'); } }),
+        el('button.btn.btn-sm.btn-primary', { html: ui.icon('journal-plus') + ' New Journal',
+          onclick: function () { newJournal(); } })
+      ]));
+    }
 
     page.appendChild(el('div.kpi-grid.stagger', null, [
       kpi('Revenue (12M)', ui.money(f.revenue, { compact: true }), 'graph-up-arrow', 'group/finance/pnl', 'all concerns'),
@@ -363,6 +394,7 @@
    * BALANCE SHEET — a clearly-labelled management view (derived, not audited)
    * ========================================================================*/
   function renderBalanceSheet(page) {
+    if (EPAL.ledger && EPAL.ledger.balanceSheet) { renderBalanceSheetLedger(page); return; }
     var banks = db().col('banks').slice().sort(function (a, b) { return (b.balance || 0) - (a.balance || 0); });
     var cash = bankTotal();
     var ar = outstandingOf('Receivable'), ap = outstandingOf('Payable');
@@ -463,6 +495,7 @@
    * RECEIVABLES / PAYABLES — aging buckets, settlement, aging chart
    * ========================================================================*/
   function renderAging(page, kind) {
+    if (EPAL.ledger && EPAL.ledger.aging) { renderAgingLedger(page, kind); return; }
     var isAR = kind === 'Receivable';
     var title = isAR ? 'Receivables — Collections Desk' : 'Payables — Settlement Desk';
     var icon = isAR ? 'arrow-down-left-circle' : 'arrow-up-right-circle';
@@ -707,6 +740,478 @@
         }
       });
     }
+  }
+
+  /* ==========================================================================
+   * LEDGER-DERIVED SUB-SCREENS  (powered by EPAL.ledger, the double-entry GL)
+   * ========================================================================*/
+  function ledgerMissing() {
+    return el('div.card', null, [ el('div.empty-state', null, [
+      ui.frag(ui.icon('plug')), el('h3', { text: 'Ledger engine unavailable' }),
+      el('p.text-muted', { text: 'The double-entry ledger (EPAL.ledger) is not loaded in this build.' })
+    ]) ]);
+  }
+  function metaRow(label, val) {
+    return el('div.data-row', null, [
+      el('span.text-mute', { text: label }),
+      el('span.strong', { text: String(val == null ? '—' : val) })
+    ]);
+  }
+  // a compact running-balance table (account ledger / party statement drawers)
+  function miniLedgerTable(rows) {
+    if (!rows.length) return el('div.empty-state', null, [ ui.frag(ui.icon('inbox')), el('h3', { text: 'No movement' }) ]);
+    var t = el('table.tbl');
+    t.appendChild(el('thead', null, [ el('tr', null, [
+      el('th', { text: 'Date' }), el('th', { text: 'Ref' }), el('th', { text: 'Memo' }),
+      el('th.num', { text: 'Debit' }), el('th.num', { text: 'Credit' }), el('th.num', { text: 'Balance' })
+    ]) ]));
+    var tb = el('tbody');
+    rows.forEach(function (r) {
+      tb.appendChild(el('tr', null, [
+        el('td', { text: ui.date(r.date) }),
+        el('td', { text: r.ref || '—' }),
+        el('td', { text: r.memo || '—' }),
+        el('td.num', { html: r.debit ? ui.money(r.debit) : '—' }),
+        el('td.num', { html: r.credit ? ui.money(r.credit) : '—' }),
+        el('td.num', { html: '<span class="num">' + ui.money(r.balance) + '</span>' })
+      ]));
+    });
+    t.appendChild(tb);
+    return el('div.table-wrap', null, [ t ]);
+  }
+
+  /* ---- Chart of Accounts --------------------------------------------------*/
+  var TYPE_META = [
+    ['asset', 'Assets', 'safe2'], ['liability', 'Liabilities', 'file-earmark-minus'],
+    ['equity', 'Equity', 'gem'], ['income', 'Income', 'graph-up-arrow'], ['expense', 'Expenses', 'wallet2']
+  ];
+  function renderCoa(page) {
+    var accts = hasLedger() ? LED().accounts() : [];
+    page.appendChild(head('Chart of Accounts', 'diagram-2',
+      'The group double-entry chart of accounts — ' + accts.length + ' ledger accounts in ' +
+      TYPE_META.length + ' classes. Live balances are computed from the general ledger.', [
+      el('button.btn.btn-primary', { html: ui.icon('journal-plus') + ' New Journal', onclick: function () { newJournal(); } })
+    ]));
+    page.appendChild(pills('coa'));
+    if (!hasLedger()) { page.appendChild(ledgerMissing()); return; }
+
+    var counts = {};
+    accts.forEach(function (a) { counts[a.type] = (counts[a.type] || 0) + 1; });
+    page.appendChild(el('div.kpi-grid', null, TYPE_META.map(function (t) {
+      return kpi(t[1], counts[t[0]] || 0, t[2], null, 'ledger accounts');
+    })));
+
+    TYPE_META.forEach(function (t) {
+      var list = accts.filter(function (a) { return a.type === t[0]; });
+      if (!list.length) return;
+      var rows = list.map(function (a) {
+        return { code: a.code, name: a.name, group: a.group || '—', normal: a.normal, balance: LED().balance(a.code, {}) };
+      });
+      page.appendChild(el('div.section-label', { html: ui.icon(t[2]) + ' ' + t[1] }));
+      var tbl = EPAL.table({
+        columns: [
+          { key: 'code', label: 'Code', render: function (r) { return '<span class="num strong">' + ui.escapeHtml(r.code) + '</span>'; } },
+          { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.name) + '</span>'; } },
+          { key: 'group', label: 'Group' },
+          { key: 'normal', label: 'Normal', badge: { debit: 'info', credit: 'accent' } },
+          { key: 'balance', label: 'Balance', num: true, render: function (r) {
+            return '<span class="num" style="color:' + (r.balance >= 0 ? GREEN : RED) + '">' + ui.money(r.balance) + '</span>'; },
+            exportVal: function (r) { return r.balance; } }
+        ],
+        rows: rows, pageSize: 25, searchKeys: ['code', 'name', 'group'],
+        exportName: 'coa-' + t[0] + '.csv',
+        onRow: function (r) { openAccountLedger(r.code, r.name); },
+        empty: { icon: 'diagram-2', title: 'No accounts' }
+      });
+      page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ tbl.el ]) ]));
+    });
+  }
+  function openAccountLedger(code, name) {
+    var rows = hasLedger() ? LED().ledgerFor(code, {}) : [];
+    var body = el('div', null, [
+      el('div.text-mute.mb-2', { text: 'Running general-ledger movement for account ' + code + '.' }),
+      miniLedgerTable(rows)
+    ]);
+    ui.modal({ title: code + ' · ' + name, icon: 'journal-text', size: 'xl', body: body,
+      actions: [{ label: 'Close', variant: 'ghost' }] });
+  }
+
+  /* ---- Group Journal ------------------------------------------------------*/
+  function entryDebit(e) { var d = 0; e.lines.forEach(function (l) { d += +l.dr || 0; }); return d; }
+  function renderJournal(page) {
+    var entries = hasLedger() ? LED().entries({}) : [];
+    page.appendChild(head('Group Journal', 'journal-text',
+      'Every double-entry journal across all concerns — ' + entries.length + ' posted entries. Filter by ' +
+      'company or source; open any entry to inspect its debit/credit lines.', [
+      el('button.btn.btn-primary', { html: ui.icon('journal-plus') + ' New Journal', onclick: function () { newJournal(); } })
+    ]));
+    page.appendChild(pills('journal'));
+    if (!hasLedger()) { page.appendChild(ledgerMissing()); return; }
+
+    var totalVal = 0, srcSet = {};
+    entries.forEach(function (e) { totalVal += entryDebit(e); srcSet[e.source] = 1; });
+
+    page.appendChild(el('div.kpi-grid', null, [
+      kpi('Posted Entries', entries.length, 'journals', null, 'across the group'),
+      kpi('Posted Value', ui.money(totalVal, { compact: true }), 'cash-stack', null, 'sum of debits'),
+      kpi('Sources', Object.keys(srcSet).length, 'tags', null, 'entry origins'),
+      kpi('Chart Accounts', LED().accounts().length, 'diagram-2', 'group/finance/coa', 'open CoA')
+    ]));
+
+    var rows = entries.map(function (e) {
+      return { id: e.id, date: e.date, companyId: e.companyId, source: e.source,
+        ref: e.ref || '—', memo: e.memo || '—', party: e.party || '—',
+        amount: entryDebit(e), count: e.lines.length, _e: e };
+    }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+
+    page.appendChild(el('div.section-label', { text: 'Journal Entries — newest first · click a row for its lines' }));
+    var table = EPAL.table({
+      columns: [
+        { key: 'date', label: 'Date', date: true },
+        { key: 'id', label: 'Entry', render: function (r) { return '<span class="num">' + ui.escapeHtml(r.id) + '</span>'; } },
+        { key: 'companyId', label: 'Company', render: function (r) { return coBadge(r.companyId); }, exportVal: function (r) { return r.companyId; } },
+        { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', payroll: 'accent', refund: 'warn', opening: 'info', adjustment: 'warn' } },
+        { key: 'ref', label: 'Ref' },
+        { key: 'memo', label: 'Memo', render: function (r) { return '<span class="text-mute">' + ui.escapeHtml(r.memo) + '</span>'; } },
+        { key: 'party', label: 'Party' },
+        { key: 'amount', label: 'Amount', num: true, money: true },
+        { key: 'count', label: 'Lines', num: true, render: function (r) { return '<span class="badge badge-info">' + r.count + '</span>'; }, exportVal: function (r) { return r.count; } }
+      ],
+      rows: rows,
+      filters: [{ key: 'companyId', label: 'Company' }, { key: 'source', label: 'Source' }],
+      searchKeys: ['id', 'ref', 'memo', 'party'], pageSize: 15,
+      exportName: 'group-journal.csv',
+      onRow: function (r) { openEntry(r._e); },
+      empty: { icon: 'journal-x', title: 'No journal entries', hint: 'Post the first entry with New Journal.' }
+    });
+    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ table.el ]) ]));
+  }
+  function openEntry(e) {
+    var dr = 0, cr = 0;
+    e.lines.forEach(function (l) { dr += +l.dr || 0; cr += +l.cr || 0; });
+    var co = EPAL.config.company(e.companyId);
+    var body = el('div');
+    body.appendChild(el('div.data-list.mb-3', null, [
+      metaRow('Entry', e.id), metaRow('Date', ui.date(e.date)),
+      metaRow('Company', co ? co.short : e.companyId), metaRow('Source', e.source),
+      e.ref ? metaRow('Reference', e.ref) : null,
+      e.party ? metaRow('Party', e.party) : null,
+      e.memo ? metaRow('Memo', e.memo) : null
+    ]));
+    var t = el('table.tbl');
+    t.appendChild(el('thead', null, [ el('tr', null, [
+      el('th', { text: 'Account' }), el('th.num', { text: 'Debit' }), el('th.num', { text: 'Credit' })
+    ]) ]));
+    var tb = el('tbody');
+    e.lines.forEach(function (l) {
+      var acc = hasLedger() ? LED().account(l.account) : null;
+      tb.appendChild(el('tr', null, [
+        el('td', { html: '<span class="num">' + ui.escapeHtml(String(l.account)) + '</span> ' + ui.escapeHtml(acc ? acc.name : '') }),
+        el('td.num', { html: l.dr ? ui.money(l.dr) : '—' }),
+        el('td.num', { html: l.cr ? ui.money(l.cr) : '—' })
+      ]));
+    });
+    tb.appendChild(el('tr', null, [
+      el('td', { html: '<span class="strong">Totals</span>' }),
+      el('td.num', { html: '<span class="strong">' + ui.money(dr) + '</span>' }),
+      el('td.num', { html: '<span class="strong">' + ui.money(cr) + '</span>' })
+    ]));
+    t.appendChild(tb);
+    body.appendChild(el('div.table-wrap', null, [ t ]));
+    if (EPAL.comments && EPAL.comments.widget) {
+      body.appendChild(el('div.section-label', { text: 'Discussion' }));
+      body.appendChild(EPAL.comments.widget('gl_entries', e.id));
+    }
+    ui.modal({ title: 'Journal ' + e.id, icon: 'journal-text', size: 'xl', body: body,
+      actions: [{ label: 'Close', variant: 'ghost' }] });
+  }
+  function newJournal() {
+    if (!hasLedger()) { ui.toast('Ledger engine not available', 'error'); return; }
+    if (!can('create')) { ui.toast('You do not have permission to post journals', 'error'); return; }
+    var accOpts = LED().accounts().map(function (a) { return [a.code, a.code + ' · ' + a.name]; });
+    function balNote(rowsArr) {
+      var dr = 0, cr = 0;
+      (rowsArr || []).forEach(function (l) { dr += +l.dr || 0; cr += +l.cr || 0; });
+      var diff = dr - cr, ok = Math.abs(diff) < 0.5;
+      return '<div class="flex justify-between" style="font-variant-numeric:tabular-nums">' +
+        '<span>Debits <b>' + ui.money(dr) + '</b> &nbsp; Credits <b>' + ui.money(cr) + '</b></span>' +
+        '<span style="color:' + (ok ? GREEN : RED) + '">' +
+        (ok ? '● Balanced' : '● Out by ' + ui.money(Math.abs(diff))) + '</span></div>';
+    }
+    EPAL.formModal({
+      title: 'New Journal Entry', icon: 'journal-plus', size: 'xl',
+      fields: [
+        { key: 'date', label: 'Date', type: 'date', required: true, default: new Date().toISOString().slice(0, 10), col2: true },
+        { key: 'companyId', label: 'Company', type: 'select', required: true,
+          options: EPAL.config.companies.map(function (c) { return [c.id, c.short]; }) },
+        { key: 'ref', label: 'Reference', type: 'text', placeholder: 'Voucher / doc no', col2: true },
+        { key: 'source', label: 'Source', type: 'select', default: 'manual',
+          options: ['manual', 'sale', 'payroll', 'refund', 'opening', 'adjustment'] },
+        { key: 'party', label: 'Party (optional)', type: 'text', placeholder: 'Customer / vendor name', col2: true },
+        { key: 'memo', label: 'Memo', type: 'text', placeholder: 'Narration' },
+        { key: 'lines', type: 'items', label: 'Journal Lines', required: true, min: 2, addLabel: 'Add line',
+          columns: [
+            { key: 'account', label: 'Account', type: 'select', options: accOpts, width: '2fr' },
+            { key: 'dr', label: 'Debit', type: 'money', width: '1fr' },
+            { key: 'cr', label: 'Credit', type: 'money', width: '1fr' }
+          ],
+          footer: function (rowsArr) { return balNote(rowsArr); } }
+      ],
+      onSave: function (vals) {
+        var lines = (vals.lines || []).filter(function (l) { return l.account && ((+l.dr) || (+l.cr)); })
+          .map(function (l) { return { account: l.account, dr: +l.dr || 0, cr: +l.cr || 0 }; });
+        if (lines.length < 2) { ui.toast('A journal needs at least two posting lines', 'error'); return false; }
+        try {
+          var entry = LED().post({ date: vals.date, companyId: vals.companyId, ref: vals.ref,
+            memo: vals.memo, source: vals.source || 'manual', party: vals.party, lines: lines });
+          ui.toast('Journal ' + entry.id + ' posted', 'success');
+          EPAL.router.render();
+        } catch (e) {
+          ui.toast(e && e.message ? e.message : 'Entry does not balance', 'error');
+          return false;
+        }
+      }
+    });
+  }
+
+  /* ---- Consolidated Trial Balance -----------------------------------------*/
+  function renderTrialBalance(page) {
+    var tb = hasLedger() ? LED().trialBalance() : [];
+    var totDr = 0, totCr = 0;
+    tb.forEach(function (r) { totDr += r.debit; totCr += r.credit; });
+    var balanced = Math.abs(totDr - totCr) < 1;
+
+    page.appendChild(head('Consolidated Trial Balance', 'list-columns-reverse',
+      'Every account with a live balance, consolidated across all concerns as at ' + ui.date(new Date(), 'long') + '.', [
+      el('button.btn.btn-ghost', { html: ui.icon('download') + ' Export (CSV)', onclick: function () { exportTrialBalance(tb); } })
+    ]));
+    page.appendChild(pills('trial-balance'));
+    if (!hasLedger()) { page.appendChild(ledgerMissing()); return; }
+
+    page.appendChild(el('div.kpi-grid', null, [
+      kpi('Total Debits', ui.money(totDr, { compact: true }), 'arrow-down-circle'),
+      kpi('Total Credits', ui.money(totCr, { compact: true }), 'arrow-up-circle'),
+      kpi('Difference', ui.money(Math.abs(totDr - totCr), { compact: true }),
+        balanced ? 'check-circle' : 'exclamation-triangle', null, balanced ? 'in balance' : 'OUT OF BALANCE'),
+      kpi('Accounts', tb.length, 'diagram-2', 'group/finance/coa', 'with movement')
+    ]));
+
+    page.appendChild(el('div.card', null, [ el('div', {
+      style: { padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'center',
+        borderLeft: '4px solid ' + (balanced ? GREEN : RED) },
+      html: ui.icon(balanced ? 'check-circle-fill' : 'exclamation-octagon-fill') +
+        ' <span class="strong">' + (balanced ? 'The consolidated ledger is in balance' : 'The ledger does NOT balance') +
+        '</span> <span class="text-mute">· Debits ' + ui.money(totDr) + ' vs Credits ' + ui.money(totCr) + '</span>'
+    }) ]));
+
+    page.appendChild(el('div.section-label', { text: 'Trial Balance — all accounts with movement' }));
+    var mainT = EPAL.table({
+      columns: [
+        { key: 'code', label: 'Code', render: function (r) { return '<span class="num strong">' + ui.escapeHtml(r.code) + '</span>'; } },
+        { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.name) + '</span>'; } },
+        { key: 'type', label: 'Class', badge: { asset: 'info', liability: 'warn', equity: 'accent', income: 'good', expense: 'bad' } },
+        { key: 'debit', label: 'Debit', num: true, render: function (r) {
+          return r.debit ? '<span class="num">' + ui.money(r.debit) + '</span>' : '<span class="text-mute">—</span>'; }, exportVal: function (r) { return r.debit; } },
+        { key: 'credit', label: 'Credit', num: true, render: function (r) {
+          return r.credit ? '<span class="num">' + ui.money(r.credit) + '</span>' : '<span class="text-mute">—</span>'; }, exportVal: function (r) { return r.credit; } }
+      ],
+      rows: tb, pageSize: 30, searchKeys: ['code', 'name'],
+      filters: [{ key: 'type', label: 'Class' }],
+      exportName: 'group-trial-balance.csv',
+      onRow: function (r) { openAccountLedger(r.code, r.name); },
+      empty: { icon: 'list-columns', title: 'No ledger movement yet' }
+    });
+    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ mainT.el ]) ]));
+
+    // per-company net-balance comparison
+    var comps = activeCompanies();
+    if (comps.length) {
+      var perCo = {};
+      comps.forEach(function (c) {
+        var m = {};
+        LED().trialBalance(c.id).forEach(function (r) { m[r.code] = r.debit - r.credit; });
+        perCo[c.id] = m;
+      });
+      var cmpRows = tb.map(function (r) {
+        var o = { code: r.code, name: r.name, grp: (r.debit - r.credit) };
+        comps.forEach(function (c) { o[c.id] = perCo[c.id][r.code] || 0; });
+        return o;
+      });
+      var cmpCols = [
+        { key: 'code', label: 'Code', render: function (r) { return '<span class="num">' + ui.escapeHtml(r.code) + '</span>'; } },
+        { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.name) + '</span>'; } }
+      ];
+      comps.forEach(function (c) {
+        cmpCols.push({ key: c.id, label: c.short, num: true, render: function (r) {
+          var v = r[c.id];
+          if (!v) return '<span class="text-mute">—</span>';
+          return '<span class="num" style="color:' + (v >= 0 ? GREEN : RED) + '">' + ui.money(v, { compact: true }) + '</span>'; },
+          exportVal: function (r) { return r[c.id]; } });
+      });
+      cmpCols.push({ key: 'grp', label: 'Group', num: true, render: function (r) {
+        return '<span class="num strong" style="color:' + (r.grp >= 0 ? GREEN : RED) + '">' + ui.money(r.grp, { compact: true }) + '</span>'; },
+        exportVal: function (r) { return r.grp; } });
+      page.appendChild(el('div.section-label', { text: 'Per-Company Comparison — net balance (debit positive · credit negative)' }));
+      var cmpT = EPAL.table({
+        columns: cmpCols, rows: cmpRows, pageSize: 30, searchKeys: ['code', 'name'],
+        exportName: 'trial-balance-by-company.csv',
+        empty: { icon: 'grid-3x3', title: 'No comparison data' }
+      });
+      page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ cmpT.el ]) ]));
+    }
+  }
+  function exportTrialBalance(tb) {
+    var lines = [['Code', 'Account', 'Class', 'Debit', 'Credit']];
+    var dr = 0, cr = 0;
+    tb.forEach(function (r) { lines.push([r.code, r.name, r.type, r.debit, r.credit]); dr += r.debit; cr += r.credit; });
+    lines.push(['', 'TOTAL', '', dr, cr]);
+    dl('group-trial-balance.csv', lines.map(function (l) { return l.join(','); }).join('\n'));
+  }
+
+  /* ---- Balance Sheet (ledger-derived) -------------------------------------*/
+  function renderBalanceSheetLedger(page) {
+    var bs = LED().balanceSheet();
+    var totA = bs.totals.assets, totL = bs.totals.liabilities, totE = bs.totals.equity;
+    var balanced = bs.totals.balanced;
+
+    page.appendChild(head('Balance Sheet — Group', 'clipboard-data',
+      'Consolidated statement of financial position as at ' + ui.date(new Date(), 'long') +
+      ', derived live from the double-entry ledger.', [
+      el('button.btn.btn-ghost', { html: ui.icon('download') + ' Export (CSV)', onclick: function () {
+        var lines = [['Section', 'Account', 'Amount']];
+        bs.assets.forEach(function (a) { lines.push(['Assets', a.name, a.amount]); });
+        lines.push(['Assets', 'TOTAL ASSETS', totA]);
+        bs.liabilities.forEach(function (a) { lines.push(['Liabilities', a.name, a.amount]); });
+        lines.push(['Liabilities', 'TOTAL LIABILITIES', totL]);
+        bs.equity.forEach(function (a) { lines.push(['Equity', a.name, a.amount]); });
+        lines.push(['Equity', 'TOTAL EQUITY', totE]);
+        lines.push(['Total', 'LIABILITIES + EQUITY', totL + totE]);
+        dl('group-balance-sheet.csv', lines.map(function (l) { return l.join(','); }).join('\n'));
+      } })
+    ]));
+    page.appendChild(pills('balance-sheet'));
+
+    page.appendChild(el('div.kpi-grid', null, [
+      kpi('Total Assets', ui.money(totA, { compact: true }), 'safe2', null, bs.assets.length + ' accounts'),
+      kpi('Total Liabilities', ui.money(totL, { compact: true }), 'file-earmark-minus', 'group/finance/payables', bs.liabilities.length + ' accounts'),
+      kpi('Total Equity', ui.money(totE, { compact: true }), 'gem', null, bs.equity.length + ' accounts'),
+      kpi('Balance Check', balanced ? 'Balanced' : 'Off by ' + ui.money(Math.abs(totA - (totL + totE)), { compact: true }),
+        balanced ? 'check-circle' : 'exclamation-triangle', null, 'Assets = Liabilities + Equity')
+    ]));
+
+    function lineRow(a) {
+      return el('div.flex.justify-between.items-center', {
+        style: { padding: '9px 2px', borderBottom: '1px solid rgba(128,128,128,.14)' }
+      }, [
+        el('span.text-mute', { html: '<span class="num">' + ui.escapeHtml(String(a.code)) + '</span> ' + ui.escapeHtml(a.name) }),
+        el('span.num', { text: ui.money(a.amount) })
+      ]);
+    }
+    function totalRow(label, amt, color) {
+      return el('div.flex.justify-between.items-center', {
+        style: { padding: '10px 2px', borderTop: '2px solid rgba(128,128,128,.25)' }
+      }, [
+        el('span.strong', { text: label }),
+        el('span.num.strong', { text: ui.money(amt), style: color ? { color: color } : null })
+      ]);
+    }
+
+    var left = el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('safe2') + ' Assets' }),
+        el('span.card-sub', { text: 'what the group owns' }) ]),
+      el('div.card-body', null, (bs.assets.length ? bs.assets.map(lineRow) : [ el('div.text-mute', { text: 'No asset balances.' }) ])
+        .concat([ totalRow('TOTAL ASSETS', totA, GREEN) ]))
+    ]);
+    var right = el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('file-earmark-minus') + ' Liabilities & Equity' }),
+        el('span.card-sub', { text: 'what it owes + owner value' }) ]),
+      el('div.card-body', null, [ el('div.section-label', { style: { marginTop: '0' }, text: 'Liabilities' }) ]
+        .concat(bs.liabilities.length ? bs.liabilities.map(lineRow) : [ el('div.text-mute', { text: 'No liabilities.' }) ])
+        .concat([ totalRow('Subtotal — Liabilities', totL, RED), el('div.section-label', { text: 'Equity' }) ])
+        .concat(bs.equity.length ? bs.equity.map(lineRow) : [ el('div.text-mute', { text: 'No equity balances.' }) ])
+        .concat([ totalRow('Subtotal — Equity', totE), totalRow('TOTAL LIABILITIES + EQUITY', totL + totE, GOLD) ]))
+    ]);
+    var cols = el('div.two-col'); cols.appendChild(left); cols.appendChild(right);
+    page.appendChild(cols);
+
+    var mixId = ui.uid('bsLedMix');
+    page.appendChild(chartCard('Asset Composition', 'pie-chart', mixId, 'by ledger account', 280));
+    requestAnimationFrame(function () {
+      var c = document.getElementById(mixId);
+      if (c && bs.assets.length) EPAL.charts.doughnut(c, {
+        labels: bs.assets.map(function (a) { return a.name; }),
+        data: bs.assets.map(function (a) { return Math.abs(a.amount); }),
+        legend: 'bottom'
+      });
+    });
+  }
+
+  /* ---- Receivables / Payables aging (ledger-derived subledger) ------------*/
+  function renderAgingLedger(page, kind) {
+    var isAR = kind === 'Receivable';
+    var lk = isAR ? 'AR' : 'AP';
+    var subKey = isAR ? 'receivables' : 'payables';
+    var icon = isAR ? 'arrow-down-left-circle' : 'arrow-up-right-circle';
+    var title = isAR ? 'Receivables — Aging' : 'Payables — Aging';
+    var rows = LED().aging(lk, {});
+    var BUCKETS = [['current', 'Current'], ['d30', '1–30d'], ['d60', '31–60d'], ['d90', '60+d']];
+    var BUCKET_COLORS = [GREEN, AMBER, ORANGE, RED];
+    function bucketSum(key) { return rows.reduce(function (a, r) { return a + (r[key] || 0); }, 0); }
+    var total = rows.reduce(function (a, r) { return a + (r.total || 0); }, 0);
+
+    page.appendChild(head(title, icon,
+      (isAR ? 'Who owes the group money and how overdue it is, ' : 'Who the group owes and how overdue it is, ') +
+      'aged from the double-entry ' + (isAR ? 'receivable' : 'payable') + ' subledger.', [
+      el('button.btn.btn-primary', { html: ui.icon('journal-plus') + ' Post ' + (isAR ? 'Receipt / Invoice' : 'Payment / Bill'),
+        onclick: function () { newJournal(); } })
+    ]));
+    page.appendChild(pills(subKey));
+
+    page.appendChild(el('div.kpi-grid', null, BUCKETS.map(function (b, i) {
+      var host = kpi(b[1] === 'Current' ? 'Current (not due)' : b[1] + ' overdue',
+        ui.money(bucketSum(b[0]), { compact: true }),
+        ['check2-circle', 'hourglass-split', 'exclamation-triangle', 'exclamation-octagon'][i]);
+      host.style.borderTop = '3px solid ' + BUCKET_COLORS[i];
+      return host;
+    })));
+
+    var agingId = ui.uid('ledAging');
+    page.appendChild(chartCard('Aging Distribution', 'bar-chart', agingId,
+      'outstanding ' + (isAR ? 'receivable' : 'payable') + ' value per bucket', 240));
+
+    page.appendChild(el('div.section-label', { text: 'By Party — total outstanding ' + ui.money(total, { compact: true }) + ' · click a party for its statement' }));
+    var table = EPAL.table({
+      columns: [
+        { key: 'party', label: 'Party', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.party) + '</span>'; } },
+        { key: 'current', label: 'Current', num: true, money: true },
+        { key: 'd30', label: '1–30d', num: true, money: true },
+        { key: 'd60', label: '31–60d', num: true, money: true },
+        { key: 'd90', label: '60+d', num: true, render: function (r) {
+          return '<span class="num" style="color:' + (r.d90 ? RED : 'inherit') + '">' + ui.money(r.d90) + '</span>'; }, exportVal: function (r) { return r.d90; } },
+        { key: 'total', label: 'Total', num: true, render: function (r) {
+          return '<span class="num strong">' + ui.money(r.total) + '</span>'; }, exportVal: function (r) { return r.total; } }
+      ],
+      rows: rows, pageSize: 15, searchKeys: ['party'],
+      exportName: 'group-' + subKey + '-aging.csv',
+      onRow: function (r) { openPartyLedger(r.party); },
+      empty: { icon: 'calendar2-week', title: 'No open ' + subKey, hint: 'Nothing outstanding in the ledger subledger.' }
+    });
+    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ table.el ]) ]));
+
+    requestAnimationFrame(function () {
+      var c = document.getElementById(agingId);
+      if (c) EPAL.charts.bar(c, { labels: ['Current', '1–30 days', '31–60 days', '60+ days'], money: true,
+        datasets: [{ label: 'Outstanding', data: BUCKETS.map(function (b) { return bucketSum(b[0]); }), colors: BUCKET_COLORS }] });
+    });
+  }
+  function openPartyLedger(party) {
+    var rows = hasLedger() ? LED().partyLedger(party, {}) : [];
+    var body = el('div', null, [
+      el('div.text-mute.mb-2', { text: 'Running AR / AP subledger statement for ' + party + '.' }),
+      miniLedgerTable(rows)
+    ]);
+    ui.modal({ title: party + ' · Statement', icon: 'person-lines-fill', size: 'xl', body: body,
+      actions: [{ label: 'Close', variant: 'ghost' }] });
   }
 
 })(window.EPAL = window.EPAL || {});
