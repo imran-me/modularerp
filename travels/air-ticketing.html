@@ -23,6 +23,7 @@
     } } };
   </script>
   <link rel="stylesheet" href="assets/theme.css" />
+  <script defer src="assets/core.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
 </head>
 
@@ -60,7 +61,10 @@
   <div x-show="sidebar" @click="sidebar=false" x-transition.opacity class="fixed inset-0 bg-black/50 z-30 lg:hidden" style="display:none"></div>
 
   <!-- ===================== MAIN ===================== -->
-  <div class="flex-1 min-w-0 flex flex-col" x-data="{ tab:'direct' }">
+  <!-- bookings load LIVE from the shared store (core.js) — a flight booked on
+       flight-search.html appears here automatically. That data flow is what makes
+       this an ERP rather than a set of static pages. -->
+  <div class="flex-1 min-w-0 flex flex-col" x-data="{ tab:'manage', bookings: (window.TV ? TV.bookings() : []) }">
     <header class="h-16 sticky top-0 z-20 glass border-b border-white/10 flex items-center gap-3 px-4 lg:px-6">
       <button @click="sidebar=true" class="lg:hidden text-xl text-slate-300"><i class="bi bi-list"></i></button>
       <div class="text-sm text-slate-400 flex items-center gap-2">
@@ -150,9 +154,19 @@
               </tr>
             </thead>
             <tbody>
-              <tr class="tbl-row border-b border-white/5"><td class="px-5 py-3 font-mono text-gold">TK-7042</td><td class="px-5 py-3">Rahim Uddin</td><td class="px-5 py-3 font-mono text-slate-300">DAC → DXB</td><td class="px-5 py-3 text-right font-mono">৳78,000</td><td class="px-5 py-3 text-right font-mono">৳84,200</td><td class="px-5 py-3 text-right font-mono text-emerald-300">৳6,200</td><td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-emerald-300 bg-emerald-500/10">Issued</span></td></tr>
-              <tr class="tbl-row border-b border-white/5"><td class="px-5 py-3 font-mono text-gold">TK-7041</td><td class="px-5 py-3">Sadia Islam</td><td class="px-5 py-3 font-mono text-slate-300">DAC → JED</td><td class="px-5 py-3 text-right font-mono">৳56,000</td><td class="px-5 py-3 text-right font-mono">৳61,500</td><td class="px-5 py-3 text-right font-mono text-emerald-300">৳5,500</td><td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-emerald-300 bg-emerald-500/10">Issued</span></td></tr>
-              <tr class="tbl-row"><td class="px-5 py-3 font-mono text-gold">TK-7039</td><td class="px-5 py-3">Tanvir Hasan</td><td class="px-5 py-3 font-mono text-slate-300">DAC → SIN</td><td class="px-5 py-3 text-right font-mono">৳43,000</td><td class="px-5 py-3 text-right font-mono">৳47,200</td><td class="px-5 py-3 text-right font-mono text-emerald-300">৳4,200</td><td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-amber-300 bg-amber-500/10">Hold</span></td></tr>
+              <!-- real rows from the store; booking a flight adds to this list -->
+              <template x-for="b in bookings" :key="b.id">
+                <tr class="tbl-row border-b border-white/5">
+                  <td class="px-5 py-3 font-mono text-gold" x-text="b.id"></td>
+                  <td class="px-5 py-3" x-text="b.pax"></td>
+                  <td class="px-5 py-3 font-mono text-slate-300" x-text="b.route"></td>
+                  <td class="px-5 py-3 text-right font-mono" x-text="TV.money(b.cost)"></td>
+                  <td class="px-5 py-3 text-right font-mono" x-text="TV.money(b.sale)"></td>
+                  <td class="px-5 py-3 text-right font-mono text-emerald-300" x-text="TV.money(b.profit)"></td>
+                  <td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full" :class="TV.statusClass(b.status)" x-text="b.status"></span></td>
+                </tr>
+              </template>
+              <tr x-show="bookings.length===0"><td colspan="7" class="px-5 py-10 text-center text-slate-500 text-sm">No tickets yet — issue one from Flight Search.</td></tr>
             </tbody>
           </table>
         </div>

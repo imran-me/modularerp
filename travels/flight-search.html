@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<!-- ============================================================================
+     EPAL TRAVELS ERP  ·  travels/flight-search.html
+     The #1 sellable feature: a FUNCTIONAL flight search & booking flow. Search a
+     route → compare fares → book a passenger → take payment → the booking + payment
+     are SAVED (localStorage via core.js) and show up in Manage Sales + Dashboard.
+     Real ERP transaction, not a static page. The search() call is the seam where a
+     live GDS/NDC API (Amadeus/Sabre/Travelport/Duffel/TBO) plugs in later.
+     ⇒ Laravel: FlightSearchController + BookingService + PaymentService.
+============================================================================= -->
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Epal Travels · Flight Search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{colors:{navy:{900:'#070b14',800:'#0b1220',700:'#111a2e',600:'#1B2A4A'},gold:'#C9A227',goldsoft:'#e8cf7a'},fontFamily:{sans:['Inter','system-ui','sans-serif'],display:['Sora','Inter','sans-serif'],mono:['JetBrains Mono','ui-monospace','monospace']}}}};</script>
+  <link rel="stylesheet" href="assets/theme.css" />
+  <script defer src="assets/core.js"></script>
+  <script defer src="assets/flight-search.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body x-data="{ sidebar:false }" class="text-slate-200">
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <aside class="fixed lg:static z-40 inset-y-0 left-0 w-64 shrink-0 glass border-r border-white/10 flex flex-col transition-transform duration-300" :class="sidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
+    <div class="h-16 flex items-center gap-3 px-5 border-b border-white/10">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-gold to-yellow-700 grid place-items-center font-display font-extrabold text-navy-900">E</div>
+      <div><div class="font-display font-bold leading-tight">Epal Travels</div><div class="text-[11px] text-slate-400 -mt-0.5">Travel & Consultancy</div></div>
+    </div>
+    <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1 text-sm">
+      <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-1">Overview</div>
+      <a href="index.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-speedometer2 nav-ico text-slate-400"></i> Dashboard</a>
+      <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-1 mt-4">Operations</div>
+      <a href="flight-search.html" class="nav-link active relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-200"><i class="bi bi-search nav-ico text-slate-400"></i> Flight Search <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded badge-gold">live</span></a>
+      <a href="air-ticketing.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-airplane-fill nav-ico text-slate-400"></i> Air Ticketing</a>
+      <a href="visa-processing.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-passport-fill nav-ico text-slate-400"></i> Visa Processing</a>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-building nav-ico text-slate-400"></i> Hotels & Packages <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded badge-gold">soon</span></a>
+      <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-1 mt-4">Finance</div>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-people-fill nav-ico text-slate-400"></i> Vendor & Agent</a>
+      <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-cash-stack nav-ico text-slate-400"></i> Accounts & Ledger</a>
+    </nav>
+    <div class="p-3 border-t border-white/10"><div class="flex items-center gap-3 px-2 py-2 rounded-lg"><div class="w-8 h-8 rounded-full bg-emerald-600 grid place-items-center text-xs font-bold">MI</div><div class="text-sm leading-tight"><div class="font-semibold">Mohsin</div><div class="text-[11px] text-slate-400">Owner</div></div></div></div>
+  </aside>
+  <div x-show="sidebar" @click="sidebar=false" x-transition.opacity class="fixed inset-0 bg-black/50 z-30 lg:hidden" style="display:none"></div>
+
+  <!-- MAIN -->
+  <div class="flex-1 min-w-0 flex flex-col" x-data="flightApp()">
+    <header class="h-16 sticky top-0 z-20 glass border-b border-white/10 flex items-center gap-3 px-4 lg:px-6">
+      <button @click="sidebar=true" class="lg:hidden text-xl text-slate-300"><i class="bi bi-list"></i></button>
+      <div class="text-sm text-slate-400 flex items-center gap-2"><a href="index.html" class="hover:text-slate-200">Travels</a><i class="bi bi-chevron-right text-[10px]"></i><span class="text-slate-200 font-display font-semibold">Flight Search & Booking</span></div>
+      <div class="flex-1"></div>
+      <a href="air-ticketing.html" class="pill text-sm px-3 py-2 rounded-lg text-slate-300 hover:bg-white/5"><i class="bi bi-list-ul"></i> Manage Sales</a>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+
+      <!-- stepper -->
+      <div class="flex items-center gap-2 text-xs fade-up">
+        <template x-for="(s,i) in ['Search','Passenger','Payment','Done']" :key="i">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full grid place-items-center font-mono"
+                  :class="step> (i+1) ? 'bg-emerald-500/20 text-emerald-300' : (step===(i+1) ? 'bg-gold text-navy-900' : 'bg-white/5 text-slate-500')"
+                  x-text="step>(i+1) ? '✓' : (i+1)"></span>
+            <span :class="step===(i+1)?'text-slate-100 font-semibold':'text-slate-500'" x-text="s"></span>
+            <i class="bi bi-chevron-right text-slate-600" x-show="i<3"></i>
+          </div>
+        </template>
+      </div>
+
+      <!-- STEP 1 · SEARCH -->
+      <div x-show="step===1" class="space-y-5 fade-up-2">
+        <div class="glass rounded-2xl p-5">
+          <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+            <label class="block"><span class="text-xs text-slate-400">From</span>
+              <select x-model="form.from" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50">
+                <template x-for="a in airports" :key="a.code"><option :value="a.code" x-text="a.code + ' · ' + a.city"></option></template></select></label>
+            <label class="block"><span class="text-xs text-slate-400">To</span>
+              <select x-model="form.to" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50">
+                <template x-for="a in airports" :key="a.code"><option :value="a.code" x-text="a.code + ' · ' + a.city"></option></template></select></label>
+            <label class="block"><span class="text-xs text-slate-400">Departure</span>
+              <input type="date" x-model="form.date" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Cabin</span>
+              <select x-model="form.cabin" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>Economy</option><option>Premium Economy</option><option>Business</option><option>First</option></select></label>
+            <button @click="search()" class="bg-gold text-navy-900 font-semibold rounded-lg px-4 py-2.5 text-sm hover:brightness-110"><i class="bi bi-search"></i> Search flights</button>
+          </div>
+        </div>
+
+        <!-- searching -->
+        <div x-show="searching" class="glass rounded-2xl p-10 text-center text-slate-400"><i class="bi bi-arrow-repeat text-2xl animate-spin"></i><div class="mt-2 text-sm">Searching live fares…</div></div>
+
+        <!-- results -->
+        <div x-show="searched && !searching" class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm text-slate-400"><span x-text="results.length"></span> fares · <span class="text-slate-200 font-medium" x-text="routeLabel()"></span></div>
+            <label class="text-xs text-slate-400 flex items-center gap-2">Sort
+              <select x-model="sort" @change="applySort()" class="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-xs"><option value="price">Cheapest</option><option value="dep">Departure</option><option value="duration">Duration</option></select></label>
+          </div>
+          <template x-for="f in results" :key="f.airlineCode + f.flightNo">
+            <div class="glass glass-hover rounded-2xl p-4 flex flex-wrap items-center gap-4">
+              <div class="flex items-center gap-3 w-40">
+                <span class="w-10 h-10 rounded-lg bg-white/5 grid place-items-center text-gold font-mono font-bold" x-text="f.airlineCode"></span>
+                <div><div class="text-sm font-medium" x-text="f.airlineName"></div><div class="text-[11px] text-slate-400" x-text="f.flightNo + ' · ' + f.cabin"></div></div>
+              </div>
+              <div class="flex items-center gap-3 text-center">
+                <div><div class="text-lg font-mono" x-text="f.dep"></div><div class="text-[11px] text-slate-400" x-text="form.from"></div></div>
+                <div class="text-slate-500 text-xs w-24"><div x-text="f.duration"></div><div class="h-px bg-white/10 my-1"></div><div x-text="f.stops===0 ? 'Non-stop' : f.stops+' stop'"></div></div>
+                <div><div class="text-lg font-mono" x-text="f.arr"></div><div class="text-[11px] text-slate-400" x-text="form.to"></div></div>
+              </div>
+              <div class="flex-1"></div>
+              <div class="text-right">
+                <div class="text-xs text-slate-400">from</div>
+                <div class="text-xl font-mono font-semibold text-gold" x-text="fmt(f.price)"></div>
+                <div class="text-[11px] text-slate-500" x-text="f.seats + ' seats left'"></div>
+              </div>
+              <button @click="pick(f)" class="bg-gold text-navy-900 font-semibold rounded-lg px-4 py-2.5 text-sm hover:brightness-110">Select</button>
+            </div>
+          </template>
+        </div>
+
+        <div x-show="!searched && !searching" class="glass rounded-2xl p-10 text-center text-slate-500">
+          <i class="bi bi-airplane text-3xl text-slate-600"></i><div class="mt-2 text-sm">Search a route to see live fares, then book in a few clicks.</div></div>
+      </div>
+
+      <!-- STEP 2 · PASSENGER -->
+      <div x-show="step===2" class="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-up" style="display:none">
+        <div class="glass rounded-2xl p-6 lg:col-span-2 space-y-4">
+          <h3 class="font-display font-semibold flex items-center gap-2"><i class="bi bi-person-badge text-gold"></i> Passenger details</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <label class="block sm:col-span-2"><span class="text-xs text-slate-400">Full name (as on passport)</span>
+              <input x-model="booking.pax" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="e.g. Rahim Uddin" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Passport no</span>
+              <input x-model="booking.passport" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="A01234567" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Phone</span>
+              <input x-model="booking.phone" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="+8801…" /></label>
+            <label class="block"><span class="text-xs text-slate-400">Your markup / service ৳</span>
+              <input x-model.number="booking.markup" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+          </div>
+          <div class="flex justify-between pt-2 border-t border-white/10">
+            <button @click="step=1" class="pill rounded-lg px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5"><i class="bi bi-arrow-left"></i> Back to results</button>
+            <button @click="toPay()" class="bg-gold text-navy-900 font-semibold rounded-lg px-5 py-2.5 text-sm hover:brightness-110">Continue to payment <i class="bi bi-arrow-right"></i></button>
+          </div>
+        </div>
+        <!-- fare summary -->
+        <div class="glass rounded-2xl p-6 h-fit" x-show="selected">
+          <h3 class="font-display font-semibold mb-3">Fare summary</h3>
+          <div class="text-sm space-y-2">
+            <div class="flex justify-between"><span class="text-slate-400" x-text="(selected?selected.airlineName:'') + ' · ' + routeLabel()"></span></div>
+            <div class="flex justify-between"><span class="text-slate-400">Base fare</span><span class="font-mono" x-text="fmt(selected?selected.base:0)"></span></div>
+            <div class="flex justify-between"><span class="text-slate-400">Taxes & surcharges</span><span class="font-mono" x-text="fmt(selected?selected.tax:0)"></span></div>
+            <div class="flex justify-between"><span class="text-slate-400">Markup / service</span><span class="font-mono" x-text="fmt(booking.markup)"></span></div>
+            <div class="h-px bg-white/10 my-2"></div>
+            <div class="flex justify-between text-base"><span class="font-semibold">Total to collect</span><span class="font-mono font-semibold text-gold" x-text="fmt(total)"></span></div>
+            <div class="flex justify-between text-xs"><span class="text-slate-400">Your profit</span><span class="font-mono text-emerald-300" x-text="fmt(profit)"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3 · PAYMENT -->
+      <div x-show="step===3" class="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-up" style="display:none">
+        <div class="glass rounded-2xl p-6 lg:col-span-2 space-y-4">
+          <h3 class="font-display font-semibold flex items-center gap-2"><i class="bi bi-credit-card-2-front text-gold"></i> Take payment · <span class="font-mono text-gold" x-text="fmt(total)"></span></h3>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <template x-for="m in ['bKash','Nagad','Card','Bank','Agent Credit']" :key="m">
+              <button @click="pay.method=m" :class="pay.method===m ? 'ring-gold border-gold/60' : 'border-white/10'" class="pill rounded-xl p-3 text-sm text-left hover:bg-white/5 border">
+                <i class="bi text-lg" :class="{'bi-phone':m==='bKash'||m==='Nagad','bi-credit-card':m==='Card','bi-bank':m==='Bank','bi-people':m==='Agent Credit'}"></i>
+                <div class="mt-1" x-text="m"></div></button>
+            </template>
+          </div>
+          <label class="block" x-show="pay.method==='Agent Credit'"><span class="text-xs text-slate-400">Charge to agent</span>
+            <select x-model="pay.agentId" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm">
+              <option value="">Select agent…</option>
+              <template x-for="a in agents" :key="a.id"><option :value="a.id" x-text="a.name + ' · avail ' + fmt(a.balance)"></option></template></select></label>
+          <label class="block" x-show="pay.method!=='Agent Credit'"><span class="text-xs text-slate-400">Payment reference (trx id / cheque no)</span>
+            <input x-model="pay.ref" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="optional" /></label>
+          <div class="flex justify-between pt-2 border-t border-white/10">
+            <button @click="step=2" class="pill rounded-lg px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5"><i class="bi bi-arrow-left"></i> Back</button>
+            <button @click="confirm()" class="bg-emerald-500 text-navy-900 font-semibold rounded-lg px-5 py-2.5 text-sm hover:brightness-110"><i class="bi bi-check-lg"></i> Confirm & issue ticket</button>
+          </div>
+        </div>
+        <div class="glass rounded-2xl p-6 h-fit">
+          <h3 class="font-display font-semibold mb-3">Summary</h3>
+          <div class="text-sm space-y-2">
+            <div class="flex justify-between"><span class="text-slate-400">Passenger</span><span x-text="booking.pax"></span></div>
+            <div class="flex justify-between"><span class="text-slate-400">Route</span><span class="font-mono" x-text="routeLabel()"></span></div>
+            <div class="flex justify-between"><span class="text-slate-400">Airline</span><span x-text="selected?selected.airlineName:''"></span></div>
+            <div class="h-px bg-white/10 my-2"></div>
+            <div class="flex justify-between text-base"><span class="font-semibold">Total</span><span class="font-mono font-semibold text-gold" x-text="fmt(total)"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4 · CONFIRMED -->
+      <div x-show="step===4" class="fade-up" style="display:none">
+        <div class="glass rounded-2xl p-10 text-center max-w-xl mx-auto ring-gold">
+          <div class="w-16 h-16 rounded-full bg-emerald-500/15 text-emerald-300 grid place-items-center text-3xl mx-auto"><i class="bi bi-check-lg"></i></div>
+          <h2 class="font-display font-bold text-xl mt-4">Ticket issued & paid</h2>
+          <p class="text-slate-400 text-sm mt-1">Booking <span class="font-mono text-gold" x-text="lastRef"></span> is saved — it now appears in Manage Sales and on the Dashboard, and the payment is recorded.</p>
+          <div class="flex gap-3 justify-center mt-6">
+            <a href="air-ticketing.html" class="pill rounded-lg px-4 py-2.5 text-sm text-slate-200 hover:bg-white/5"><i class="bi bi-list-ul"></i> View in Manage Sales</a>
+            <button @click="reset()" class="bg-gold text-navy-900 font-semibold rounded-lg px-4 py-2.5 text-sm hover:brightness-110"><i class="bi bi-plus-lg"></i> Book another</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+</body>
+</html>
