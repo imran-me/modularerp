@@ -1,25 +1,27 @@
 /* ============================================================================
    EPAL TRAVELS ERP  ·  travels/assets/theme.css
    ----------------------------------------------------------------------------
-   The premium theme LAYER that sits on top of Tailwind CSS (loaded via CDN).
-   Tailwind gives us the utility classes + the colour tokens (configured inline
-   in each page's <head>); this file adds the few bespoke pieces Tailwind
-   utilities can't express cleanly: the luxury background, glass cards, custom
-   scrollbars, fonts and a couple of component classes reused across pages.
+   Premium theme LAYER on top of Tailwind CSS — matched to the EPAL GROUP logo:
+   a blue identity (sky blue -> ocean blue -> deep royal/indigo) on a deep-ocean
+   navy canvas. The brand accent gradient mirrors the logo "e" (bright sky at the
+   top, deep royal-navy at the bottom).
 
-   Stack (all free, CDN, no build step, GitHub-Pages friendly):
-     Tailwind CSS (Play CDN)  ·  Alpine.js  ·  Chart.js  ·  Bootstrap Icons
+   Brand palette (from the logo):
+     sky   #38BDF8   ocean  #2591D9 / #1E88E5   royal #1E40AF   deep #152A6B
+   The Tailwind colour key "brand" = ocean blue #2591D9 (the primary accent).
+
+   Stack (all free, CDN, no build): Tailwind CSS · Alpine.js · Chart.js · Bootstrap Icons
    ⇒ Laravel port: this becomes your compiled Tailwind theme + Blade layout.
    ========================================================================== */
 
 :root {
-  --navy-900: #070b14;
-  --navy-800: #0b1220;
-  --navy-700: #111a2e;
-  --navy-600: #1B2A4A;   /* brand navy */
-  --line:     rgba(148, 163, 184, 0.14);
-  --gold:     #C9A227;
-  --gold-soft:#e8cf7a;
+  --sky:   #38BDF8;
+  --ocean: #2591D9;   /* brand accent */
+  --royal: #1E4F9C;
+  --deep:  #152A6B;
+  --brand: #2591D9;
+  --brandsoft: #8FD0F7;
+  --line:  rgba(96, 165, 250, 0.16);
 }
 
 * { -webkit-font-smoothing: antialiased; }
@@ -27,11 +29,11 @@ html { scroll-behavior: smooth; }
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  color: #e6ebf5;
+  color: #e6eefb;
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(201,162,39,0.10), transparent 60%),
-    radial-gradient(900px 500px at -10% 10%, rgba(47,107,255,0.10), transparent 55%),
-    linear-gradient(180deg, var(--navy-900), var(--navy-800));
+    radial-gradient(1200px 600px at 82% -12%, rgba(56,189,248,0.14), transparent 60%),   /* sky glow */
+    radial-gradient(1000px 560px at -12% 8%, rgba(30,79,156,0.20), transparent 55%),      /* royal glow */
+    linear-gradient(180deg, #081337, #0a1a47);                                            /* deep ocean navy */
   background-attachment: fixed;
   min-height: 100vh;
 }
@@ -41,42 +43,42 @@ h1, h2, h3, .font-display { font-family: 'Sora', 'Inter', sans-serif; }
 
 /* Glass / premium surfaces --------------------------------------------------*/
 .glass {
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
   border: 1px solid var(--line);
   backdrop-filter: blur(10px);
 }
 .glass-hover { transition: transform .2s ease, border-color .2s ease, background .2s ease; }
-.glass-hover:hover { transform: translateY(-2px); border-color: rgba(201,162,39,0.35); }
+.glass-hover:hover { transform: translateY(-2px); border-color: rgba(56,189,248,0.45); }
 
-.gold-line { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
-.text-gold { color: var(--gold); }
-.ring-gold { box-shadow: 0 0 0 1px rgba(201,162,39,0.4), 0 8px 30px rgba(0,0,0,0.35); }
+.brand-line { background: linear-gradient(90deg, transparent, var(--brand), transparent); }
+.text-brand { color: var(--brand); }
+.ring-brand { box-shadow: 0 0 0 1px rgba(56,189,248,0.45), 0 8px 30px rgba(4,16,48,0.5); }
 
 /* Sidebar active pill --------------------------------------------------------*/
 .nav-link { transition: color .15s ease, background .15s ease; }
-.nav-link:hover { background: rgba(255,255,255,0.05); color: #fff; }
-.nav-link.active { background: rgba(201,162,39,0.14); color: #fff; }
-.nav-link.active .nav-ico { color: var(--gold); }
+.nav-link:hover { background: rgba(56,189,248,0.08); color: #fff; }
+.nav-link.active { background: rgba(37,145,217,0.18); color: #fff; }
+.nav-link.active .nav-ico { color: var(--sky); }
 .nav-link.active::before {
   content:''; position:absolute; left:0; top:8px; bottom:8px; width:3px;
-  border-radius:3px; background: var(--gold);
+  border-radius:3px; background: linear-gradient(180deg, var(--sky), var(--royal));
 }
 
 /* KPI + accents --------------------------------------------------------------*/
-.kpi-accent { background: linear-gradient(135deg, rgba(201,162,39,0.18), rgba(201,162,39,0.04)); }
+.kpi-accent { background: linear-gradient(135deg, rgba(56,189,248,0.20), rgba(30,79,156,0.06)); }
 .pill { border: 1px solid var(--line); }
-.badge-up   { color:#34d399; background:rgba(52,211,153,0.12); }
-.badge-down { color:#f87171; background:rgba(248,113,113,0.12); }
-.badge-gold { color:var(--gold-soft); background:rgba(201,162,39,0.14); }
+.badge-up   { color:#34d399; background:rgba(52,211,153,0.12); }   /* semantic: profit up */
+.badge-down { color:#f87171; background:rgba(248,113,113,0.12); }  /* semantic: down */
+.badge-brand { color:var(--brandsoft); background:rgba(56,189,248,0.16); }
 
 /* Table -----------------------------------------------------------------------*/
 .tbl-row { transition: background .15s ease; }
-.tbl-row:hover { background: rgba(255,255,255,0.03); }
+.tbl-row:hover { background: rgba(56,189,248,0.05); }
 
 /* Scrollbar ------------------------------------------------------------------*/
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.22); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.4); background-clip: padding-box; }
+::-webkit-scrollbar-thumb { background: rgba(96,165,250,0.28); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(96,165,250,0.5); background-clip: padding-box; }
 
 /* Motion ---------------------------------------------------------------------*/
 @keyframes fadeUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }

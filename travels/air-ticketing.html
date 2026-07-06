@@ -18,7 +18,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { theme: { extend: {
-      colors: { navy:{900:'#070b14',800:'#0b1220',700:'#111a2e',600:'#1B2A4A'}, gold:'#C9A227', goldsoft:'#e8cf7a' },
+      colors: { navy:{900:'#070b14',800:'#0b1220',700:'#111a2e',600:'#1B2A4A'}, brand:'#2591D9', brandsoft:'#8FD0F7' },
       fontFamily: { sans:['Inter','system-ui','sans-serif'], display:['Sora','Inter','sans-serif'], mono:['JetBrains Mono','ui-monospace','monospace'] }
     } } };
   </script>
@@ -34,7 +34,7 @@
   <aside class="fixed lg:static z-40 inset-y-0 left-0 w-64 shrink-0 glass border-r border-white/10 flex flex-col transition-transform duration-300"
          :class="sidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
     <div class="h-16 flex items-center gap-3 px-5 border-b border-white/10">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-gold to-yellow-700 grid place-items-center font-display font-extrabold text-navy-900">E</div>
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand to-blue-900 grid place-items-center font-display font-extrabold text-navy-900">E</div>
       <div><div class="font-display font-bold leading-tight">Epal Travels</div><div class="text-[11px] text-slate-400 -mt-0.5">Travel & Consultancy</div></div>
     </div>
     <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1 text-sm">
@@ -42,7 +42,7 @@
       <a href="index.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-speedometer2 nav-ico text-slate-400"></i> Dashboard</a>
       <a href="#" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-people nav-ico text-slate-400"></i> CRM & Leads</a>
       <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-1 mt-4">Operations</div>
-      <a href="flight-search.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-search nav-ico text-slate-400"></i> Flight Search <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded badge-gold">live</span></a>
+      <a href="flight-search.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-search nav-ico text-slate-400"></i> Flight Search <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded badge-brand">live</span></a>
       <a href="air-ticketing.html" class="nav-link active relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-200"><i class="bi bi-airplane-fill nav-ico text-slate-400"></i> Air Ticketing</a>
       <a href="visa-processing.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-passport-fill nav-ico text-slate-400"></i> Visa Processing</a>
       <a href="packages.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300"><i class="bi bi-box-seam nav-ico text-slate-400"></i> Packages</a>
@@ -84,32 +84,32 @@
 
       <!-- tab strip (Alpine) -->
       <div class="flex gap-1 p-1 glass rounded-xl w-fit fade-up-2">
-        <button @click="tab='direct'" :class="tab==='direct' ? 'bg-gold text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Direct Sale</button>
-        <button @click="tab='manage'" :class="tab==='manage' ? 'bg-gold text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Manage Sales</button>
-        <button @click="tab='bsp'" :class="tab==='bsp' ? 'bg-gold text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">BSP / ADM</button>
+        <button @click="tab='direct'" :class="tab==='direct' ? 'bg-brand text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Direct Sale</button>
+        <button @click="tab='manage'" :class="tab==='manage' ? 'bg-brand text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">Manage Sales</button>
+        <button @click="tab='bsp'" :class="tab==='bsp' ? 'bg-brand text-navy-900' : 'text-slate-300 hover:bg-white/5'" class="px-4 py-2 rounded-lg text-sm font-medium transition">BSP / ADM</button>
       </div>
 
       <!-- DIRECT SALE — a real HTML form -->
       <form x-show="tab==='direct'" x-transition class="glass rounded-2xl p-6 space-y-6 fade-up-3" @submit.prevent>
         <div>
-          <h3 class="font-display font-semibold mb-4 flex items-center gap-2"><i class="bi bi-person-badge text-gold"></i> Passenger & Itinerary</h3>
+          <h3 class="font-display font-semibold mb-4 flex items-center gap-2"><i class="bi bi-person-badge text-brand"></i> Passenger & Itinerary</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <label class="block"><span class="text-xs text-slate-400">Passenger name</span>
-              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="Full name as on passport" /></label>
+              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand/50" placeholder="Full name as on passport" /></label>
             <label class="block"><span class="text-xs text-slate-400">Passport no</span>
-              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="A01234567" /></label>
+              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand/50" placeholder="A01234567" /></label>
             <label class="block"><span class="text-xs text-slate-400">From</span>
-              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>DAC · Dhaka</option><option>CGP · Chittagong</option></select></label>
+              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand/50"><option>DAC · Dhaka</option><option>CGP · Chittagong</option></select></label>
             <label class="block"><span class="text-xs text-slate-400">To</span>
-              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>DXB · Dubai</option><option>JED · Jeddah</option><option>SIN · Singapore</option></select></label>
+              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand/50"><option>DXB · Dubai</option><option>JED · Jeddah</option><option>SIN · Singapore</option></select></label>
             <label class="block"><span class="text-xs text-slate-400">Airline</span>
-              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>EK · Emirates</option><option>SV · Saudia</option><option>BG · Biman</option></select></label>
+              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand/50"><option>EK · Emirates</option><option>SV · Saudia</option><option>BG · Biman</option></select></label>
             <label class="block"><span class="text-xs text-slate-400">PNR</span>
-              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" placeholder="HX42Q7" /></label>
+              <input class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand/50" placeholder="HX42Q7" /></label>
             <label class="block"><span class="text-xs text-slate-400">Travel date</span>
-              <input type="date" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+              <input type="date" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand/50" /></label>
             <label class="block"><span class="text-xs text-slate-400">Trip type</span>
-              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50"><option>One-way</option><option>Round</option><option>Multi-city</option></select></label>
+              <select class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand/50"><option>One-way</option><option>Round</option><option>Multi-city</option></select></label>
           </div>
         </div>
 
@@ -118,27 +118,27 @@
                        get cost(){ return (+this.base)+(+this.tax) },
                        get sale(){ return (+this.base)+(+this.tax)+(+this.markup) },
                        get profit(){ return (+this.markup) - (+this.commission) } }">
-          <h3 class="font-display font-semibold mb-4 flex items-center gap-2"><i class="bi bi-calculator text-gold"></i> Fare & Profit</h3>
+          <h3 class="font-display font-semibold mb-4 flex items-center gap-2"><i class="bi bi-calculator text-brand"></i> Fare & Profit</h3>
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <label class="block"><span class="text-xs text-slate-400">Base fare ৳</span>
-              <input x-model.number="base" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+              <input x-model.number="base" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand/50" /></label>
             <label class="block"><span class="text-xs text-slate-400">Taxes ৳</span>
-              <input x-model.number="tax" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+              <input x-model.number="tax" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand/50" /></label>
             <label class="block"><span class="text-xs text-slate-400">Markup / service ৳</span>
-              <input x-model.number="markup" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+              <input x-model.number="markup" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand/50" /></label>
             <label class="block"><span class="text-xs text-slate-400">Agent commission ৳</span>
-              <input x-model.number="commission" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-gold/50" /></label>
+              <input x-model.number="commission" type="number" class="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-brand/50" /></label>
           </div>
           <div class="mt-4 flex flex-wrap gap-3 text-sm">
             <div class="pill rounded-lg px-4 py-2">Total cost <b class="font-mono ml-1" x-text="'৳'+cost.toLocaleString('en-BD')"></b></div>
             <div class="pill rounded-lg px-4 py-2">Sale price <b class="font-mono ml-1" x-text="'৳'+sale.toLocaleString('en-BD')"></b></div>
-            <div class="rounded-lg px-4 py-2 kpi-accent">Net profit <b class="font-mono ml-1 text-goldsoft" x-text="'৳'+profit.toLocaleString('en-BD')"></b></div>
+            <div class="rounded-lg px-4 py-2 kpi-accent">Net profit <b class="font-mono ml-1 text-brandsoft" x-text="'৳'+profit.toLocaleString('en-BD')"></b></div>
           </div>
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
           <button type="button" class="pill rounded-lg px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5">Save as draft</button>
-          <button type="submit" class="bg-gold text-navy-900 font-semibold rounded-lg px-5 py-2.5 text-sm hover:brightness-110"><i class="bi bi-check-lg"></i> Issue ticket</button>
+          <button type="submit" class="bg-brand text-navy-900 font-semibold rounded-lg px-5 py-2.5 text-sm hover:brightness-110"><i class="bi bi-check-lg"></i> Issue ticket</button>
         </div>
       </form>
 
@@ -158,7 +158,7 @@
               <!-- real rows from the store; booking a flight adds to this list -->
               <template x-for="b in bookings" :key="b.id">
                 <tr class="tbl-row border-b border-white/5">
-                  <td class="px-5 py-3 font-mono text-gold" x-text="b.id"></td>
+                  <td class="px-5 py-3 font-mono text-brand" x-text="b.id"></td>
                   <td class="px-5 py-3" x-text="b.pax"></td>
                   <td class="px-5 py-3 font-mono text-slate-300" x-text="b.route"></td>
                   <td class="px-5 py-3 text-right font-mono" x-text="TV.money(b.cost)"></td>

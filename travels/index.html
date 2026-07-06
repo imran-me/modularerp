@@ -28,7 +28,7 @@
       theme: { extend: {
         colors: {
           navy: { 900:'#070b14', 800:'#0b1220', 700:'#111a2e', 600:'#1B2A4A' },
-          gold: '#C9A227', goldsoft: '#e8cf7a'
+          brand: '#2591D9', brandsoft: '#8FD0F7'
         },
         fontFamily: {
           sans: ['Inter','system-ui','sans-serif'],
@@ -54,7 +54,7 @@
          :class="sidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
     <!-- brand -->
     <div class="h-16 flex items-center gap-3 px-5 border-b border-white/10">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-gold to-yellow-700 grid place-items-center font-display font-extrabold text-navy-900">E</div>
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand to-blue-900 grid place-items-center font-display font-extrabold text-navy-900">E</div>
       <div>
         <div class="font-display font-bold leading-tight">Epal Travels</div>
         <div class="text-[11px] text-slate-400 -mt-0.5">Travel & Consultancy</div>
@@ -71,7 +71,7 @@
       <div class="px-3 text-[11px] uppercase tracking-wider text-slate-500 mb-1 mt-4">Operations</div>
       <a href="flight-search.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300">
         <i class="bi bi-search nav-ico text-slate-400"></i> Flight Search
-        <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded badge-gold">live</span></a>
+        <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded badge-brand">live</span></a>
       <a href="air-ticketing.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300">
         <i class="bi bi-airplane-fill nav-ico text-slate-400"></i> Air Ticketing</a>
       <a href="visa-processing.html" class="nav-link relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-300">
@@ -113,13 +113,13 @@
       <div class="flex-1"></div>
       <div class="relative hidden md:block">
         <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
-        <input placeholder="Search PNR, passenger, invoice…" class="w-72 bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gold/50 placeholder:text-slate-500" />
+        <input placeholder="Search PNR, passenger, invoice…" class="w-72 bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand/50 placeholder:text-slate-500" />
       </div>
       <!-- notifications -->
       <div class="relative" x-data="{ open:false }">
         <button @click="open=!open" class="relative w-10 h-10 grid place-items-center rounded-lg hover:bg-white/5 text-slate-300">
           <i class="bi bi-bell text-lg"></i>
-          <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-gold"></span>
+          <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-brand"></span>
         </button>
         <div x-show="open" @click.outside="open=false" x-transition style="display:none"
              class="absolute right-0 mt-2 w-80 glass rounded-xl border border-white/10 shadow-2xl p-2">
@@ -132,7 +132,7 @@
             <span class="text-sm"><b>Visa approved</b> — Malaysia tourist ×3<div class="text-[11px] text-slate-400">2 hours ago</div></span></a>
         </div>
       </div>
-      <a href="air-ticketing.html" class="hidden sm:inline-flex items-center gap-2 bg-gold text-navy-900 font-semibold text-sm px-4 py-2 rounded-lg hover:brightness-110 transition">
+      <a href="air-ticketing.html" class="hidden sm:inline-flex items-center gap-2 bg-brand text-navy-900 font-semibold text-sm px-4 py-2 rounded-lg hover:brightness-110 transition">
         <i class="bi bi-plus-lg"></i> New Booking</a>
     </header>
 
@@ -157,7 +157,7 @@
         <div class="glass glass-hover rounded-2xl p-5">
           <div class="flex items-center justify-between">
             <span class="text-sm text-slate-400">Sales (MTD)</span>
-            <span class="w-9 h-9 rounded-xl kpi-accent grid place-items-center text-gold"><i class="bi bi-cash-coin"></i></span>
+            <span class="w-9 h-9 rounded-xl kpi-accent grid place-items-center text-brand"><i class="bi bi-cash-coin"></i></span>
           </div>
           <div class="mt-3 text-2xl font-mono font-semibold">৳48.2L</div>
           <div class="mt-1 text-xs"><span class="px-1.5 py-0.5 rounded badge-up">▲ 12.4%</span> <span class="text-slate-500">vs last week</span></div>
@@ -166,7 +166,7 @@
         <div class="glass glass-hover rounded-2xl p-5">
           <div class="flex items-center justify-between">
             <span class="text-sm text-slate-400">Tickets Issued</span>
-            <span class="w-9 h-9 rounded-xl kpi-accent grid place-items-center text-gold"><i class="bi bi-ticket-perforated"></i></span>
+            <span class="w-9 h-9 rounded-xl kpi-accent grid place-items-center text-brand"><i class="bi bi-ticket-perforated"></i></span>
           </div>
           <div class="mt-3 text-2xl font-mono font-semibold">386</div>
           <div class="mt-1 text-xs"><span class="px-1.5 py-0.5 rounded badge-up">▲ 8.1%</span> <span class="text-slate-500">this month</span></div>
@@ -175,7 +175,7 @@
         <div class="glass glass-hover rounded-2xl p-5">
           <div class="flex items-center justify-between">
             <span class="text-sm text-slate-400">Gross Profit</span>
-            <span class="w-9 h-9 rounded-xl kpi-accent grid place-items-center text-gold"><i class="bi bi-graph-up-arrow"></i></span>
+            <span class="w-9 h-9 rounded-xl kpi-accent grid place-items-center text-brand"><i class="bi bi-graph-up-arrow"></i></span>
           </div>
           <div class="mt-3 text-2xl font-mono font-semibold">৳6.12L</div>
           <div class="mt-1 text-xs"><span class="px-1.5 py-0.5 rounded badge-up">▲ 5.6%</span> <span class="text-slate-500">margin 12.7%</span></div>
@@ -184,7 +184,7 @@
         <div class="glass glass-hover rounded-2xl p-5">
           <div class="flex items-center justify-between">
             <span class="text-sm text-slate-400">Cash Collected</span>
-            <span class="w-9 h-9 rounded-xl kpi-accent grid place-items-center text-gold"><i class="bi bi-wallet2"></i></span>
+            <span class="w-9 h-9 rounded-xl kpi-accent grid place-items-center text-brand"><i class="bi bi-wallet2"></i></span>
           </div>
           <div class="mt-3 text-2xl font-mono font-semibold">৳39.1L</div>
           <div class="mt-1 text-xs"><span class="px-1.5 py-0.5 rounded badge-down">▼ 3.2%</span> <span class="text-slate-500">AR ৳9.1L pending</span></div>
@@ -212,7 +212,7 @@
         <div class="glass rounded-2xl overflow-hidden xl:col-span-2">
           <div class="flex items-center justify-between px-5 py-4 border-b border-white/10">
             <h3 class="font-display font-semibold">Recent Bookings</h3>
-            <a href="air-ticketing.html" class="text-xs text-gold hover:underline">View all</a>
+            <a href="air-ticketing.html" class="text-xs text-brand hover:underline">View all</a>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -228,31 +228,31 @@
               </thead>
               <tbody>
                 <tr class="tbl-row border-b border-white/5">
-                  <td class="px-5 py-3 font-mono text-gold">TK-7042</td><td class="px-5 py-3">Rahim Uddin</td>
+                  <td class="px-5 py-3 font-mono text-brand">TK-7042</td><td class="px-5 py-3">Rahim Uddin</td>
                   <td class="px-5 py-3 font-mono text-slate-300">DAC → DXB</td><td class="px-5 py-3 font-mono">HX42Q7</td>
                   <td class="px-5 py-3 text-right font-mono">৳84,200</td>
                   <td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-emerald-300 bg-emerald-500/10">Issued</span></td>
                 </tr>
                 <tr class="tbl-row border-b border-white/5">
-                  <td class="px-5 py-3 font-mono text-gold">VA-5031</td><td class="px-5 py-3">Nusrat Jahan</td>
+                  <td class="px-5 py-3 font-mono text-brand">VA-5031</td><td class="px-5 py-3">Nusrat Jahan</td>
                   <td class="px-5 py-3 text-slate-300">Malaysia Tourist</td><td class="px-5 py-3 font-mono">MY-2231</td>
                   <td class="px-5 py-3 text-right font-mono">৳26,000</td>
                   <td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-amber-300 bg-amber-500/10">Under Process</span></td>
                 </tr>
                 <tr class="tbl-row border-b border-white/5">
-                  <td class="px-5 py-3 font-mono text-gold">TK-7041</td><td class="px-5 py-3">Sadia Islam</td>
+                  <td class="px-5 py-3 font-mono text-brand">TK-7041</td><td class="px-5 py-3">Sadia Islam</td>
                   <td class="px-5 py-3 font-mono text-slate-300">DAC → JED</td><td class="px-5 py-3 font-mono">KK81TZ</td>
                   <td class="px-5 py-3 text-right font-mono">৳61,500</td>
                   <td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-emerald-300 bg-emerald-500/10">Issued</span></td>
                 </tr>
                 <tr class="tbl-row border-b border-white/5">
-                  <td class="px-5 py-3 font-mono text-gold">CF-318</td><td class="px-5 py-3">Group · 12 pax</td>
+                  <td class="px-5 py-3 font-mono text-brand">CF-318</td><td class="px-5 py-3">Group · 12 pax</td>
                   <td class="px-5 py-3 text-slate-300">DAC → JED (Umrah)</td><td class="px-5 py-3 font-mono">BLOCK-12</td>
                   <td class="px-5 py-3 text-right font-mono">৳7,20,000</td>
                   <td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-sky-300 bg-sky-500/10">Confirmed</span></td>
                 </tr>
                 <tr class="tbl-row">
-                  <td class="px-5 py-3 font-mono text-gold">TK-7039</td><td class="px-5 py-3">Tanvir Hasan</td>
+                  <td class="px-5 py-3 font-mono text-brand">TK-7039</td><td class="px-5 py-3">Tanvir Hasan</td>
                   <td class="px-5 py-3 font-mono text-slate-300">DAC → SIN</td><td class="px-5 py-3 font-mono">Q2M4PL</td>
                   <td class="px-5 py-3 text-right font-mono">৳47,200</td>
                   <td class="px-5 py-3"><span class="text-xs px-2 py-1 rounded-full text-amber-300 bg-amber-500/10">Hold</span></td>
@@ -282,7 +282,7 @@
               <span class="text-xs font-mono text-slate-300">44h</span>
             </div>
           </div>
-          <div class="gold-line h-px my-4 opacity-40"></div>
+          <div class="brand-line h-px my-4 opacity-40"></div>
           <div class="text-xs text-slate-400 mb-2">Quick actions</div>
           <div class="grid grid-cols-2 gap-2">
             <a href="air-ticketing.html" class="text-sm text-center pill rounded-lg py-2 hover:bg-white/5"><i class="bi bi-airplane"></i> Issue ticket</a>
