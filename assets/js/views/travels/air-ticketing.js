@@ -42,6 +42,82 @@
   ];
   var REFUND_STAGES = ['Requested','Filed','Received','Paid','Rejected'];
 
+  // Ancillary service catalogue (EMD) — label + icon + a typical BDT cost band.
+  var EMD_SERVICES = [
+    { id:'Excess Baggage',   icon:'bag-fill',           color:'#2f6bff' },
+    { id:'Seat Upgrade',     icon:'star-fill',          color:'#7b5cff' },
+    { id:'Meal',             icon:'cup-hot-fill',       color:'#23c17e' },
+    { id:'Airport Tax',      icon:'building',           color:'#f4b740' },
+    { id:'Visa Fee',         icon:'passport-fill',      color:'#00b8d9' },
+    { id:'Travel Insurance', icon:'shield-fill-check',  color:'#f0506e' },
+    { id:'Lounge Access',    icon:'door-open-fill',     color:'#c9a227' },
+    { id:'Other',            icon:'three-dots',         color:'#8b93a7' }
+  ];
+  var TTL_STATUSES = ['Hold','Ticketed','Expired'];
+
+  /* ==========================================================================
+   * SEED — air_emd (ancillary EMDs) + air_ttl (ticketing-deadline queue).
+   * Idempotent; runs during db.seed + on db.reset. Deterministic PRNG so the
+   * demo reads the same every load.
+   * ========================================================================*/
+  EPAL.registerEngine({ name: 'air-ticketing-seed', seed: function () {
+    S.seedOnce('air_emd', seedEmd());
+    S.seedOnce('air_ttl', seedTtl());
+  }});
+
+  function prng(seed) { var s = seed; return function (n) { s = (s * 1103515245 + 12345) & 0x7fffffff; return s % n; }; }
+
+  function seedEmd() {
+    var rr = prng(70021);
+    var pax = ['Rahim Uddin','Nasreen Akter','Kamal Hossain','Farhana Yasmin','Tanvir Ahmed',
+      'Shirin Sultana','Jahangir Alam','Mitu Rahman','Sabbir Khan','Rokeya Begum'];
+    var refs = ['BG7421','EK5093','QR8810','SQ2274','TK6650','BS4417','MH3391','KU7120','GF5582','WY9043'];
+    var vendors = ['Biman Bangladesh','Emirates GSA','Qatar Airways','Singapore Airlines','Turkish Airlines',
+      'US-Bangla','Malaysia Airlines','Kuwait Airways','Gulf Air','Oman Air'];
+    var svc = [ ['Excess Baggage',4500,6500],['Seat Upgrade',3500,5000],['Meal',900,1500],
+      ['Airport Tax',1200,2200],['Visa Fee',6000,8500],['Travel Insurance',1800,3200],
+      ['Lounge Access',2500,4000],['Excess Baggage',5000,7500],['Seat Upgrade',4000,6000],['Other',1500,3000] ];
+    var dates = ['2026-06-18','2026-06-22','2026-06-27','2026-06-30','2026-07-01','2026-07-02','2026-07-03','2026-07-04'];
+    var out = [], n = 130450090001;
+    for (var i = 0; i < 10; i++) {
+      var s = svc[i], cost = s[1] + rr(s[2] - s[1]);
+      var margin = 500 + rr(1600);
+      out.push({
+        id:'EMD-' + (7001 + i), emdNo: String(n + i), date: dates[i % dates.length],
+        passenger: pax[i], ticketRef: refs[i], serviceType: s[0], vendor: vendors[i],
+        description: emdDesc(s[0]), cost: cost, sale: cost + margin,
+        payStatus: (i % 3 === 0 ? 'Due' : 'Paid'), agent: '', created: Date.now() - (i * 3600000)
+      });
+    }
+    return out;
+  }
+  function emdDesc(t) {
+    return ({ 'Excess Baggage':'+10kg checked baggage', 'Seat Upgrade':'Preferred / extra-legroom seat',
+      'Meal':'Special hot meal', 'Airport Tax':'Embarkation / security tax', 'Visa Fee':'Visa processing fee',
+      'Travel Insurance':'Single-trip cover', 'Lounge Access':'Departure lounge pass',
+      'Other':'Miscellaneous ancillary' }[t]) || 'Ancillary service';
+  }
+
+  function seedTtl() {
+    // ttl dates spread around demo-today 2026-07-05: overdue, imminent, comfortable.
+    var rows = [
+      { pnr:'RKPQ21', passenger:'Rahim Uddin',    airline:'Emirates',            route:'DAC → DXB', ttl:'2026-07-03T18:00', status:'Hold', amount:  86500 },
+      { pnr:'MHTZ88', passenger:'Nasreen Akter',  airline:'Qatar Airways',       route:'DAC → DOH', ttl:'2026-07-04T12:00', status:'Hold', amount: 112000 },
+      { pnr:'BSVL07', passenger:'Kamal Hossain',  airline:'US-Bangla',           route:'DAC → CXB', ttl:'2026-07-05T20:00', status:'Hold', amount:  14500 },
+      { pnr:'SQWX24', passenger:'Farhana Yasmin', airline:'Singapore Airlines',  route:'DAC → SIN', ttl:'2026-07-06T09:00', status:'Hold', amount: 138000 },
+      { pnr:'TKMN65', passenger:'Tanvir Ahmed',   airline:'Turkish Airlines',    route:'DAC → IST', ttl:'2026-07-07T15:00', status:'Hold', amount: 154500 },
+      { pnr:'BGAA74', passenger:'Shirin Sultana', airline:'Biman Bangladesh',    route:'DAC → JED', ttl:'2026-07-10T10:00', status:'Hold', amount:  92000 },
+      { pnr:'KUZZ12', passenger:'Jahangir Alam',  airline:'Kuwait Airways',      route:'DAC → KWI', ttl:'2026-07-12T23:59', status:'Hold', amount:  78500 },
+      { pnr:'GFOM58', passenger:'Mitu Rahman',    airline:'Gulf Air',            route:'DAC → BAH', ttl:'2026-07-02T14:00', status:'Expired', amount: 69000 }
+    ];
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i]; r.id = 'TTL-' + (5001 + i); r.created = Date.now() - (i * 5400000);
+      out.push(r);
+    }
+    return out;
+  }
+
   function tickets()  { return db.airTickets(); }
   function airlines() { return db.airlines(); }
   function airports() { return db.airports(); }
@@ -62,6 +138,7 @@
       var page = el('div.page');
       var map = {
         overview:'Air Ticketing', ticketing:'Direct Sale', 'manage-sales':'Manage Sales',
+        emd:'EMD & Ancillary', ttl:'Ticketing Deadlines',
         airlines:'Airlines', airports:'Airports', bsp:'BSP / ADM Recon', refunds:'Refund Tracker'
       };
       page.appendChild(EPAL.pageHead({
@@ -75,6 +152,7 @@
       }));
 
       ({ overview:overview, ticketing:directSale, 'manage-sales':manageSales,
+         emd:emdView, ttl:ttlView,
          airlines:airlinesView, airports:airportsView, bsp:bspView, refunds:refundsView }[sub] || overview)(page, ctx);
 
       ctx.mount.appendChild(page);
@@ -85,9 +163,11 @@
     return ({ overview:'Issue, re-issue, refund and void air tickets — with BSP/ADM reconciliation.',
       ticketing:'Multi-passenger fare model with markup, agent commission, live profit and a branded invoice.',
       'manage-sales':'Costing, sale, commission and net profit for every ticket — plus per-airline/agent reports.',
+      emd:'Sell ancillary services (baggage, seats, meals, insurance, lounge) as EMDs with a branded receipt.',
+      ttl:'Held-PNR ticketing-deadline queue — countdowns by urgency, ticket-now and extend actions.',
       airlines:'Airline master — carriers, IATA designators and status.',
       airports:'Airport master — stations, IATA codes and cities.',
-      bsp:'Reconcile agency sales against the BSP billing file; track ADMs with a dispute-deadline countdown.',
+      bsp:'Import the BSP billing file, auto-match against issued tickets and clear reconciliation exceptions; track ADMs with a dispute-deadline countdown.',
       refunds:'Every refund request from filing to payout, with airline-penalty math.' }[sub]) || '';
   }
 
@@ -633,6 +713,9 @@
 
   /* ======================================================= BSP / ADM RECON */
   function bspView(page) {
+    page.querySelector('.page-actions').prepend(el('button.btn.btn-primary',{
+      html:ui.icon('upload')+' Import BSP file', onclick:function(){ importBspModal(); } }));
+
     var bsp = db.airBsp();
     var api = bsp.api || {};
     var matched = (bsp.txns||[]).filter(function(x){ return x.status==='Matched'; }).length;
@@ -651,6 +734,9 @@
       kpi('ADM Exposure', ui.money(admTotal,{compact:true}), 'cash-stack'),
       kpi('Unused Value', ui.money(unusedVal,{compact:true}), 'recycle')
     ]));
+
+    // BSP FILE IMPORT + RECONCILIATION
+    renderBspRecon(page, bsp);
 
     // reconciliation table
     var txRows = (bsp.txns||[]).map(function (x) {
@@ -679,6 +765,183 @@
     row.appendChild(el('div', null, [ el('div.section-label',{text:'Unused Tickets (recoverable)'}),
       tableCard(null, ['Passenger','Airline','Value','Expiry'], unRows, 'No unused tickets.') ]));
     page.appendChild(row);
+  }
+
+  /* ---- BSP file import + reconciliation ---------------------------------*/
+  function persistBsp(bsp) { S.set('airBsp', bsp); }
+
+  function importBspModal() {
+    var body = el('div');
+    body.appendChild(el('p.text-muted',{ text:'Paste the BSP billing file below (CSV: ticketNo,gross,commission,net) or generate a mock statement from issued tickets. Rows auto-match against the ERP by ticket number / PNR.' }));
+    var ta = el('textarea.input', { rows:9, style:{ width:'100%', fontFamily:'monospace', whiteSpace:'pre' },
+      placeholder:'ticketNo,gross,commission,net\n0577421,86500,6055,80445\n...' });
+    body.appendChild(ta);
+    body.appendChild(el('div.flex.gap-1.mt-2', null, [
+      el('button.btn.btn-sm.btn-outline',{ html:ui.icon('magic')+' Generate mock statement',
+        onclick:function(){ ta.value = mockBspCsv(); ui.toast('Mock BSP statement generated','success'); } }) ]));
+    ui.modal({ title:'Import BSP File', icon:'upload', size:'lg', body:body,
+      actions:[{ label:'Cancel', variant:'ghost' }, { label:'Import & Reconcile', variant:'primary', onClick:function(){
+        var importRows = parseBspCsv(ta.value);
+        if (!importRows.length) { ui.toast('No valid rows found — paste CSV or generate a mock statement','error'); return false; }
+        var recon = reconcileBsp(importRows);
+        var bsp = db.airBsp(); bsp.recon = recon; persistBsp(bsp);
+        db.notify({ level:'info', title:'BSP File Imported', text:importRows.length+' rows · '+recon.exceptions.length+' exception(s)',
+          companyId:'travels', icon:'upload' });
+        ui.toast('Imported '+importRows.length+' rows · '+recon.exceptions.length+' exception(s)','success');
+        EPAL.router.render();
+      }}] });
+  }
+
+  function mockBspCsv() {
+    var t = tickets().filter(function(x){ return x.status==='Issued' || x.status==='Re-issued'; });
+    var lines = ['ticketNo,gross,commission,net'];
+    // Drop the last ticket (→ in-ERP-not-in-BSP), nudge one amount (→ mismatch).
+    var use = t.slice(0, Math.max(0, t.length-1));
+    for (var i=0;i<use.length;i++){
+      var x = use[i];
+      var key = (x.ticketNo||'').trim() || x.pnr;
+      var base = x.baseFare!=null ? x.baseFare : (x.cost||0);
+      var gross = (x.sale||0) + (i===1 ? 750 : 0);   // deliberate discrepancy on row 2
+      var comm = Math.round(base * 0.07);
+      lines.push(key+','+gross+','+comm+','+(gross-comm));
+    }
+    // one extra BSP-only row not present in the ERP
+    lines.push('TKT-BSP-9001,42000,2940,39060');
+    return lines.join('\n');
+  }
+
+  function parseBspCsv(text) {
+    var out = [];
+    String(text||'').split(/\r?\n/).forEach(function(ln){
+      ln = ln.trim(); if (!ln) return;
+      var parts = ln.split(',');
+      var key = (parts[0]||'').trim();
+      if (!key || /ticket\s*no/i.test(key)) return;   // skip header
+      out.push({ ticketNo:key, gross:+parts[1]||0, commission:+parts[2]||0, net:+parts[3]||0 });
+    });
+    return out;
+  }
+
+  function reconcileBsp(importRows) {
+    var t = tickets();
+    var matchedIds = {}, exceptions = [], matched = 0;
+    importRows.forEach(function(row){
+      var hit = null;
+      for (var i=0;i<t.length;i++){
+        var x = t[i];
+        if ((x.ticketNo && x.ticketNo===row.ticketNo) || x.pnr===row.ticketNo) { hit = x; break; }
+      }
+      if (hit) {
+        matchedIds[hit.id] = true;
+        var diff = row.gross - (hit.sale||0);
+        if (Math.abs(diff) > 1) exceptions.push({ type:'mismatch', key:row.ticketNo, passenger:hit.passenger,
+          erpAmt:hit.sale||0, bspAmt:row.gross, diff:diff, waived:false, note:'' });
+        else matched++;
+      } else {
+        exceptions.push({ type:'bsp-only', key:row.ticketNo, passenger:'—', erpAmt:0, bspAmt:row.gross, diff:row.gross, waived:false, note:'' });
+      }
+    });
+    t.forEach(function(x){
+      if (x.status!=='Issued' && x.status!=='Re-issued') return;
+      if (matchedIds[x.id]) return;
+      exceptions.push({ type:'erp-only', key:(x.ticketNo||'').trim()||x.pnr, passenger:x.passenger,
+        erpAmt:x.sale||0, bspAmt:0, diff:-(x.sale||0), waived:false, note:'' });
+    });
+    return { period: bspPeriodLabel(), importedAt: today(), count: importRows.length,
+      matched: matched, exceptions: exceptions, reconciled: false };
+  }
+
+  function bspPeriodLabel() {
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[NOW.getMonth()] + ' ' + NOW.getFullYear();
+  }
+
+  function renderBspRecon(page, bsp) {
+    page.appendChild(el('div.section-label',{ text:'BSP File Reconciliation' }));
+    var recon = bsp.recon;
+    if (!recon) {
+      page.appendChild(el('div.card', null, [ el('div.empty-state', null, [
+        ui.frag(ui.icon('file-earmark-arrow-up')), el('h3',{text:'No BSP file imported'}),
+        el('p.text-muted',{text:'Click "Import BSP file" to paste or generate a billing statement and auto-reconcile it against issued tickets.'}) ]) ]));
+      return;
+    }
+
+    var open = recon.exceptions.filter(function(e){ return !e.waived; }).length;
+    var discrepancies = recon.exceptions.filter(function(e){ return e.type==='mismatch' && !e.waived; }).length;
+    var unmatched = recon.exceptions.filter(function(e){ return (e.type==='bsp-only'||e.type==='erp-only') && !e.waived; }).length;
+
+    page.appendChild(el('div.kpi-grid', null, [
+      kpi('Imported Rows', recon.count, 'file-earmark-spreadsheet'),
+      kpi('Matched', recon.matched, 'check2-circle'),
+      kpi('Unmatched', unmatched, 'question-octagon'),
+      kpi('Discrepancies', discrepancies, 'exclamation-diamond')
+    ]));
+
+    // status banner
+    if (recon.reconciled) {
+      page.appendChild(el('div.build-banner', { style:{ borderLeft:'3px solid #23c17e' } }, [
+        ui.frag(ui.icon('check2-circle')),
+        el('div',{ html:'<strong>Period '+ui.escapeHtml(recon.period)+' reconciled</strong> · imported '+ui.escapeHtml(recon.importedAt)+' · '+recon.matched+' matched, all exceptions cleared or waived.' }) ]));
+    } else {
+      var barColor = open>0 ? '#f4b740' : '#23c17e';
+      page.appendChild(el('div.build-banner', { style:{ borderLeft:'3px solid '+barColor } }, [
+        ui.frag(ui.icon(open>0?'exclamation-triangle':'check2-circle')),
+        el('div',{ html:'<strong>'+ui.escapeHtml(recon.period)+'</strong> · '+open+' open exception'+(open===1?'':'s')+' remaining. '+(open===0?'Ready to mark reconciled.':'Resolve or waive exceptions to reconcile.') }),
+        el('button.btn.btn-sm'+(open===0?'.btn-primary':'.btn-outline'), { style:{ marginLeft:'auto' },
+          html:ui.icon('shield-check')+' Mark Reconciled',
+          onclick:function(){
+            if (open>0) { ui.toast('Clear or waive all exceptions first','error'); return; }
+            var b = db.airBsp(); if (b.recon) { b.recon.reconciled = true; persistBsp(b); }
+            db.notify({ level:'success', title:'BSP Reconciled', text:'Period '+recon.period+' marked reconciled', companyId:'travels', icon:'shield-check' });
+            ui.toast('Period marked reconciled','success'); EPAL.router.render();
+          } }) ]));
+    }
+
+    // exceptions table
+    if (recon.exceptions.length) {
+      var exRows = recon.exceptions.map(function(e, idx){
+        var typeLbl = e.type==='mismatch' ? 'Amount mismatch' : e.type==='bsp-only' ? 'In BSP, not in ERP' : 'In ERP, not in BSP';
+        var typeCls = e.type==='mismatch' ? 'badge-warn' : 'badge-bad';
+        var actTd = el('td');
+        if (e.waived) {
+          actTd.appendChild(el('span.badge.badge-good',{ text:'Waived', title:e.note||'' }));
+        } else {
+          var btnLabel = e.type==='mismatch' ? 'Accept BSP figure' : 'Waive';
+          actTd.appendChild(el('button.btn.btn-sm.btn-outline',{ html:ui.icon('check2')+' '+btnLabel,
+            onclick:(function(i){ return function(){ waiveException(i); }; })(idx) }));
+        }
+        return el('tr'+(e.waived?'':'') , null, [
+          td('<span class="badge '+typeCls+'">'+typeLbl+'</span>'),
+          td('<span class="mono strong">'+ui.escapeHtml(e.key)+'</span>'),
+          td(ui.escapeHtml(e.passenger||'—')),
+          tdN(e.erpAmt?ui.money(e.erpAmt):'—'),
+          tdN(e.bspAmt?ui.money(e.bspAmt):'—'),
+          td('<span class="num '+(e.diff===0?'text-mute':'text-bad')+'">'+(e.diff?ui.money(e.diff):'—')+'</span>'),
+          actTd
+        ]);
+      });
+      page.appendChild(tableCard('Reconciliation Exceptions',
+        ['Type','Ticket / PNR','Passenger','ERP','BSP','Diff',''], exRows, 'No exceptions — fully matched.'));
+    } else {
+      page.appendChild(el('div.card', null, [ el('div.empty-state', null, [
+        ui.frag(ui.icon('check2-circle')), el('h3',{text:'Fully matched'}),
+        el('p.text-muted',{text:'Every imported row matched an issued ticket with no discrepancy.'}) ]) ]));
+    }
+  }
+
+  function waiveException(idx) {
+    var bsp = db.airBsp();
+    if (!bsp.recon || !bsp.recon.exceptions[idx]) return;
+    var e = bsp.recon.exceptions[idx];
+    e.waived = true;
+    e.note = e.type==='mismatch'
+      ? 'Accepted BSP figure '+ui.money(e.bspAmt)+' (ERP '+ui.money(e.erpAmt)+', diff '+ui.money(e.diff)+') — adjustment recorded '+today()
+      : (e.type==='bsp-only' ? 'BSP-only row waived — logged for follow-up '+today()
+                             : 'ERP-only ticket waived — not yet in BSP file '+today());
+    persistBsp(bsp);
+    db.notify({ level:'info', title:'Exception Waived', text:e.key+' · '+e.note, companyId:'travels', icon:'check2' });
+    ui.toast(e.type==='mismatch'?'BSP figure accepted · adjustment noted':'Exception waived','success');
+    EPAL.router.render();
   }
 
   // ADM dispute-deadline countdown (raised date + 30 days), coloured by risk.
@@ -783,6 +1046,344 @@
         done&&done(); ui.toast('Refund saved','success');
       }}] });
   }
+
+  /* ======================================================= EMD & ANCILLARY */
+  function emdView(page) {
+    page.querySelector('.page-actions').prepend(el('button.btn.btn-primary',{
+      html:ui.icon('plus-lg')+' New EMD', onclick:function(){ newEmd(function(){ EPAL.router.render(); }); } }));
+
+    var rows = db.col('air_emd');
+    var revenue = rows.reduce(function(s,x){ return s+(x.sale||0); }, 0);
+    var cost    = rows.reduce(function(s,x){ return s+(x.cost||0); }, 0);
+    page.appendChild(el('div.kpi-grid.stagger', null, [
+      kpi('EMDs Issued', rows.length, 'receipt'),
+      kpi('Ancillary Revenue', ui.money(revenue,{compact:true}), 'cash-coin'),
+      kpi('Ancillary Profit', ui.money(revenue-cost,{compact:true}), 'graph-up-arrow'),
+      kpi('Avg. Margin', rows.length ? ui.money(Math.round((revenue-cost)/rows.length)) : ui.money(0), 'percent')
+    ]));
+
+    // mix by service type — small doughnut
+    var byType = {}; EMD_SERVICES.forEach(function(s){ byType[s.id]=0; });
+    rows.forEach(function(x){ byType[x.serviceType] = (byType[x.serviceType]||0) + (x.sale||0); });
+    var mixKeys = EMD_SERVICES.map(function(s){ return s.id; }).filter(function(k){ return byType[k]>0; });
+    if (mixKeys.length) {
+      var cid = ui.uid('c');
+      page.appendChild(el('div.card', { style:{ marginBottom:'14px' } }, [
+        el('div.card-head', null, [ el('h3',{ html: ui.icon('pie-chart')+' Revenue by Service Type' }) ]),
+        el('div.card-body', null, [ el('div',{ style:{ height:'240px', position:'relative' } }, [ el('canvas',{ id:cid }) ]) ])
+      ]));
+      requestAnimationFrame(function(){
+        var c = ui.$('#'+cid); if(!c || !EPAL.charts) return;
+        EPAL.charts.doughnut(c, { labels:mixKeys, data:mixKeys.map(function(k){ return byType[k]; }),
+          colors:mixKeys.map(function(k){ return svcColor(k); }), money:true });
+      });
+    }
+
+    var tbl = EPAL.table({
+      columns:[
+        { key:'emdNo', label:'EMD No', render:function(r){ return '<span class="mono">'+ui.escapeHtml(r.emdNo)+'</span>'; } },
+        { key:'passenger', label:'Passenger', render:function(r){ return '<span class="strong">'+ui.escapeHtml(r.passenger)+'</span>'; } },
+        { key:'serviceType', label:'Service', render:function(r){ return svcChip(r.serviceType); }, sortVal:function(r){ return r.serviceType; } },
+        { key:'ticketRef', label:'Ticket / PNR', render:function(r){ return '<span class="mono">'+ui.escapeHtml(r.ticketRef||'—')+'</span>'; } },
+        { key:'vendor', label:'Vendor', render:function(r){ return ui.escapeHtml(r.vendor||'—'); } },
+        { key:'cost', label:'Cost', num:true, money:true },
+        { key:'sale', label:'Sale', num:true, money:true },
+        { key:'profit', label:'Profit', num:true, render:function(r){ var p=(r.sale||0)-(r.cost||0);
+            return '<span class="num '+(p>=0?'text-good':'text-bad')+'">'+ui.money(p)+'</span>'; }, sortVal:function(r){ return (r.sale||0)-(r.cost||0); } },
+        { key:'payStatus', label:'Payment', render:function(r){ return payBadge(r.payStatus).outerHTML; }, sortVal:function(r){ return r.payStatus; } }
+      ],
+      rows: rows,
+      searchKeys:['emdNo','passenger','serviceType','ticketRef','vendor'],
+      filters:[{ key:'serviceType', label:'Service' }, { key:'payStatus', label:'Payment' }],
+      pageSize:10, exportName:'emd-ancillary.csv',
+      onRow:function(r){ emdDetail(r); },
+      empty:{ icon:'receipt', title:'No EMDs yet', hint:'Sell an ancillary service to raise your first EMD.' }
+    });
+    var card = el('div.card', null, [ el('div.card-body') ]);
+    card.querySelector('.card-body').appendChild(tbl.el);
+    page.appendChild(el('div.section-label',{text:'EMD Register'}));
+    page.appendChild(card);
+  }
+
+  function emdDetail(r) {
+    var body = el('div');
+    body.appendChild(el('div.flex.gap-1.flex-wrap.mb-3', null, [
+      svcBadgeEl(r.serviceType), payBadge(r.payStatus), el('span.badge',{text:r.emdNo}) ]));
+    body.appendChild(el('div.form-grid', null, [
+      kv('Passenger', r.passenger||'—'), kv('Ticket / PNR', r.ticketRef||'—'),
+      kv('Service', r.serviceType), kv('Description', r.description||'—'),
+      kv('Vendor', r.vendor||'—'), kv('Date', r.date?ui.date(r.date):'—'),
+      kv('Cost', ui.money(r.cost||0)), kv('Sale', ui.money(r.sale||0)),
+      kv('Profit', ui.money((r.sale||0)-(r.cost||0)))
+    ]));
+    var m = ui.modal({ title:'EMD '+r.emdNo, icon:'receipt', size:'lg', body:body,
+      actions:[
+        { label:'Close', variant:'ghost' },
+        { label: (r.payStatus==='Paid'?'Mark Due':'Mark Paid'), variant:'outline', onClick:function(){
+            r.payStatus = r.payStatus==='Paid' ? 'Due' : 'Paid'; db.save('air_emd', r);
+            ui.toast('Payment status updated','success'); EPAL.router.render(); } },
+        { label:'Print Receipt', variant:'primary', onClick:function(){ emdReceipt([r], r.emdNo, r.passenger, r.sale||0, r.cost||0); return true; } }
+      ] });
+    return m;
+  }
+
+  function newEmd(after) {
+    var vendors = db.vendors();
+    var vendorPairs = [['Direct Airline','Direct Airline']].concat(vendors.map(function(v){ return [v.name, v.name]; }));
+    var svcPairs = EMD_SERVICES.map(function(s){ return [s.id, s.id]; });
+
+    EPAL.formModal({
+      title:'New EMD — Ancillary Services', icon:'receipt', size:'lg', saveLabel:'Issue EMD',
+      fields:[
+        { type:'section', label:'Booking' },
+        { key:'passenger', label:'Passenger', type:'text', required:true },
+        { key:'ticketRef', label:'Ticket No / PNR', type:'text' },
+        { key:'vendor', label:'Vendor', type:'select', options:vendorPairs, default:'Direct Airline' },
+        { key:'date', label:'Date', type:'date', default:today() },
+        { key:'payStatus', label:'Payment', type:'select', options:['Paid','Due'], default:'Due' },
+        { type:'section', label:'Ancillary Lines' },
+        { key:'lines', type:'items', label:'Services (one EMD each)', required:true, min:1, addLabel:'Add service',
+          columns:[
+            { key:'serviceType', label:'Service', type:'select', options:svcPairs, width:'1.6fr' },
+            { key:'description', label:'Description', type:'text', width:'2fr' },
+            { key:'cost', label:'Cost', type:'money' },
+            { key:'sale', label:'Sale', type:'money' }
+          ],
+          footer:function(rows){
+            var c=0,s=0; rows.forEach(function(r){ c+=(+r.cost||0); s+=(+r.sale||0); });
+            return 'Cost: <strong>'+ui.money(c)+'</strong> · Sale: <strong>'+ui.money(s)+'</strong> · Profit: <strong>'+ui.money(s-c)+'</strong>';
+          }
+        }
+      ],
+      onSave:function(v){
+        var lines = (v.lines||[]).filter(function(l){ return l.serviceType && (+l.sale||0) > 0; });
+        if (!lines.length) { ui.toast('Add at least one ancillary line with a sale amount','error'); return false; }
+        if (!(v.passenger||'').trim()) { ui.toast('Passenger required','error'); return false; }
+
+        var totalSale=0, totalCost=0, docRows=[], firstNo='';
+        lines.forEach(function(l){
+          var emdNo = EPAL.serial ? EPAL.serial.next('EMD') : String(Date.now());
+          if (!firstNo) firstNo = emdNo;
+          var cost = +l.cost||0, sale = +l.sale||0;
+          var rec = {
+            id: ui.uid('EMD'), emdNo:emdNo, date: v.date||today(),
+            passenger:(v.passenger||'').trim(), ticketRef:(v.ticketRef||'').trim(),
+            serviceType:l.serviceType, vendor:v.vendor||'Direct Airline',
+            description:(l.description||'').trim() || emdDesc(l.serviceType),
+            cost:cost, sale:sale, payStatus:v.payStatus||'Due', agent:'', created:Date.now()
+          };
+          db.save('air_emd', rec);
+          totalSale += sale; totalCost += cost;
+          docRows.push({ serviceType:l.serviceType, description:rec.description, cost:cost, sale:sale });
+        });
+
+        // one cross-company sale for the EMD total (Travels + Group finance + ledger)
+        db.postSale('travels', { amount:totalSale, cost:totalCost, ref:firstNo,
+          desc:'EMD ancillary · '+(v.passenger||'').trim(), customer:(v.passenger||'').trim() });
+
+        db.notify({ level:'success', title:'EMD Issued', text:lines.length+' service'+(lines.length>1?'s':'')+' · '+ui.money(totalSale),
+          companyId:'travels', icon:'receipt' });
+        ui.toast('EMD issued · '+lines.length+' line'+(lines.length>1?'s':'')+' · profit '+ui.money(totalSale-totalCost),'success');
+
+        emdReceipt(docRows, firstNo, (v.passenger||'').trim(), totalSale, totalCost);
+        after && after();
+        return true;
+      }
+    });
+  }
+
+  function emdReceipt(rows, emdNo, passenger, totalSale, totalCost) {
+    if (!(EPAL.doc && EPAL.doc.open)) return;
+    EPAL.doc.open({
+      type:'receipt', title:'EMD — Ancillary Services Receipt', serial: emdNo,
+      badge:'EMD', watermark:'ANCILLARY',
+      parties:[
+        { label:'Issuing Agent', lines:['Epal Travels & Consultancy','IATA Accredited Agent','Dhaka, Bangladesh'] },
+        { label:'Passenger', lines:[ passenger, 'EMD '+emdNo ] }
+      ],
+      meta:[
+        { label:'EMD No', value:emdNo }, { label:'Passenger', value:passenger },
+        { label:'Issued', value: ui.date(today()) }
+      ],
+      columns:[
+        { key:'serviceType', label:'Service' }, { key:'description', label:'Description' },
+        { key:'cost', label:'Cost', money:true }, { key:'sale', label:'Amount', money:true }
+      ],
+      rows:rows,
+      totals:[
+        { label:'Total Cost', value:totalCost }, { label:'Grand Total', value:totalSale, grand:true }
+      ],
+      words: EPAL.doc.amountInWords ? EPAL.doc.amountInWords(totalSale) : '',
+      terms:'Ancillary EMD services are subject to airline rules and are generally non-refundable once utilised.',
+      sign:'For Epal Travels & Consultancy'
+    });
+  }
+
+  /* ======================================================= TICKETING DEADLINES */
+  function ttlView(page) {
+    var rows = db.col('air_ttl');
+
+    // KPIs
+    var held = rows.filter(function(r){ return r.status==='Hold'; });
+    var expiring24 = held.filter(function(r){ var h=hoursLeft(r.ttl); return h>=0 && h<24; }).length;
+    var expired = rows.filter(function(r){ return r.status==='Expired' || (r.status==='Hold' && hoursLeft(r.ttl)<0); }).length;
+    var heldValue = held.reduce(function(s,r){ return s+(r.amount||0); }, 0);
+    page.appendChild(el('div.kpi-grid.stagger', null, [
+      kpi('Held PNRs', held.length, 'hourglass-split'),
+      kpi('Expiring < 24h', expiring24, 'alarm'),
+      kpi('Expired', expired, 'x-octagon'),
+      kpi('Held Value', ui.money(heldValue,{compact:true}), 'cash-stack')
+    ]));
+
+    // urgency buckets (Hold rows only)
+    var red=0, amber=0, green=0;
+    held.forEach(function(r){ var b=urgencyBucket(r); if(b==='red') red++; else if(b==='amber') amber++; else green++; });
+
+    // queue-health banner
+    var healthColor = red>0 ? '#f0506e' : amber>0 ? '#f4b740' : '#23c17e';
+    var healthText = red>0 ? (red+' PNR'+(red>1?'s':'')+' need immediate ticketing (overdue or < 24h)')
+      : amber>0 ? (amber+' PNR'+(amber>1?'s':'')+' due within 72 hours — plan ticketing')
+      : 'Queue healthy — no imminent deadlines';
+    page.appendChild(el('div.build-banner', { style:{ borderLeft:'3px solid '+healthColor } }, [
+      ui.frag(ui.icon(red>0?'exclamation-triangle-fill':amber>0?'clock-history':'check2-circle')),
+      el('div',{ html:'<strong>Queue health:</strong> '+healthText }) ]));
+
+    // urgency doughnut
+    if (held.length) {
+      var cid = ui.uid('c');
+      var row = el('div.two-col');
+      row.appendChild(el('div', null, [
+        el('div.card', null, [
+          el('div.card-head', null, [ el('h3',{ html: ui.icon('pie-chart')+' Deadlines by Urgency' }) ]),
+          el('div.card-body', null, [ el('div',{ style:{ height:'220px', position:'relative' } }, [ el('canvas',{ id:cid }) ]) ])
+        ]) ]));
+      row.appendChild(el('div', null, [
+        el('div.card', null, [
+          el('div.card-head', null, [ el('h3',{ html: ui.icon('list-check')+' Bucket Summary' }) ]),
+          el('div.card-body', null, [ el('div.form-grid', null, [
+            kv('Overdue / < 24h', red+' PNR'),
+            kv('Due within 72h', amber+' PNR'),
+            kv('Comfortable', green+' PNR'),
+            kv('Total held value', ui.money(heldValue))
+          ]) ]) ]) ]));
+      page.appendChild(row);
+      requestAnimationFrame(function(){
+        var c = ui.$('#'+cid); if(!c || !EPAL.charts) return;
+        EPAL.charts.doughnut(c, { labels:['Overdue / <24h','< 72h','Comfortable'],
+          data:[red,amber,green], colors:['#f0506e','#f4b740','#23c17e'] });
+      });
+    }
+
+    // sorted deadline board
+    var order = { red:0, amber:1, green:2, done:3 };
+    var sorted = rows.slice().sort(function(a,b){
+      var ba=urgencyBucket(a), bb=urgencyBucket(b);
+      if (order[ba]!==order[bb]) return order[ba]-order[bb];
+      return hoursLeft(a.ttl) - hoursLeft(b.ttl);
+    });
+
+    var trs = sorted.map(function(r){
+      var bucket = urgencyBucket(r);
+      var cd = countdownLabel(r);
+      var acts = el('div.flex.gap-1');
+      if (r.status==='Hold') {
+        acts.appendChild(el('button.btn.btn-sm.btn-primary',{ html:ui.icon('ticket-perforated')+' Ticket now',
+          onclick:(function(rec){ return function(e){ e.stopPropagation(); ticketNow(rec); }; })(r) }));
+        acts.appendChild(el('button.btn.btn-sm.btn-outline',{ html:ui.icon('clock')+' Extend',
+          onclick:(function(rec){ return function(e){ e.stopPropagation(); extendTtl(rec); }; })(r) }));
+      } else {
+        acts.appendChild(el('span.text-mute',{ text:r.status }));
+      }
+      var actTd = el('td'); actTd.appendChild(acts);
+      return el('tr', null, [
+        td('<span class="mono strong">'+ui.escapeHtml(r.pnr)+'</span>'),
+        td(ui.escapeHtml(r.passenger)),
+        td(ui.escapeHtml(r.airline||'—')),
+        td('<span class="mono">'+ui.escapeHtml(r.route||'—')+'</span>'),
+        td('<span class="mono">'+ttlLabel(r.ttl)+'</span>'),
+        td('<span class="mono" style="color:'+bucketColor(bucket)+'">'+cd+'</span>'),
+        tdN(ui.money(r.amount||0)),
+        td(ttlBadge(r.status).outerHTML),
+        actTd
+      ]);
+    });
+    page.appendChild(el('div.section-label',{text:'Deadline Queue — sorted by urgency'}));
+    page.appendChild(tableCard(null,
+      ['PNR','Passenger','Airline','Route','Deadline','Countdown','Value','Status',''], trs, 'No held PNRs in the queue.'));
+  }
+
+  function hoursLeft(ttl) {
+    if (!ttl) return 1e9;
+    var s = String(ttl);
+    var d = new Date(s.indexOf('T') >= 0 ? s : s + 'T00:00:00');
+    return (d - NOW) / 3600000;
+  }
+  function urgencyBucket(r) {
+    if (r.status==='Ticketed') return 'done';
+    if (r.status==='Expired') return 'red';
+    var h = hoursLeft(r.ttl);
+    if (h < 24) return 'red';
+    if (h < 72) return 'amber';
+    return 'green';
+  }
+  function bucketColor(b) { return b==='red' ? '#f0506e' : b==='amber' ? '#f4b740' : b==='done' ? '#8b93a7' : '#23c17e'; }
+  function countdownLabel(r) {
+    if (r.status==='Ticketed') return 'Ticketed';
+    if (r.status==='Expired') return 'Expired';
+    var h = hoursLeft(r.ttl);
+    if (h < 0) { var od = Math.round(-h); return od < 48 ? 'Overdue '+od+'h' : 'Overdue '+Math.round(od/24)+'d'; }
+    if (h < 48) return Math.round(h)+'h left';
+    return Math.round(h/24)+'d left';
+  }
+  function ttlLabel(ttl) {
+    var s = String(ttl||'');
+    if (s.indexOf('T') >= 0) { var p = s.split('T'); return ui.date(p[0]) + ' ' + p[1]; }
+    return ui.date(s);
+  }
+  function ttlBadge(s) { return el('span.badge'+(s==='Ticketed'?'.badge-good':s==='Expired'?'.badge-bad':'.badge-warn'),{text:s}); }
+
+  function ticketNow(r) {
+    ui.confirm({ title:'Ticket PNR '+r.pnr+'?', body:'Issue the held booking for '+r.passenger+' ('+ui.money(r.amount||0)+') and record the sale.',
+      confirmLabel:'Ticket now' }).then(function(ok){
+      if (!ok) return;
+      r.status = 'Ticketed'; db.save('air_ttl', r);
+      var cost = Math.round((r.amount||0) * 0.92);   // typical net fare vs. sold price
+      db.postSale('travels', { amount:r.amount||0, cost:cost, ref:r.pnr,
+        desc:'Ticketed held PNR '+r.pnr+' · '+(r.route||''), customer:r.passenger });
+      db.notify({ level:'success', title:'PNR Ticketed', text:r.pnr+' · '+ui.money(r.amount||0), companyId:'travels', icon:'ticket-perforated-fill' });
+      ui.toast('PNR '+r.pnr+' ticketed','success');
+      EPAL.router.render();
+    });
+  }
+  function extendTtl(r) {
+    var body = el('div.form-grid', null, [
+      sec('Extend ticketing deadline'),
+      inp('New deadline','newTtl', (String(r.ttl||'').indexOf('T')>=0 ? String(r.ttl) : String(r.ttl||'')+'T00:00'), 'col-2', 'datetime-local')
+    ]);
+    var note = el('div.build-banner',{style:{marginTop:'6px'}},[ ui.frag(ui.icon('info-circle')),
+      el('div',{ html:'Current deadline: <strong>'+ttlLabel(r.ttl)+'</strong> · '+countdownLabel(r) }) ]);
+    body.appendChild(note);
+    ui.modal({ title:'Extend '+r.pnr, icon:'clock', body:body,
+      actions:[{ label:'Cancel', variant:'ghost' }, { label:'Extend', variant:'primary', onClick:function(box){
+        var val = (box.querySelector('#f-newTtl')||{}).value;
+        if (!val) { ui.toast('Pick a new deadline','error'); return false; }
+        if (new Date(val) <= NOW) { ui.toast('New deadline must be in the future','error'); return false; }
+        r.ttl = val;   // datetime-local 'YYYY-MM-DDTHH:MM'
+        if (r.status==='Expired') r.status='Hold';
+        db.save('air_ttl', r);
+        db.notify({ level:'info', title:'Deadline Extended', text:r.pnr+' → '+ttlLabel(r.ttl), companyId:'travels', icon:'clock-history' });
+        ui.toast('Deadline extended','success'); EPAL.router.render();
+      }}] });
+  }
+
+  // EMD service helpers
+  function svcMeta(t) { for (var i=0;i<EMD_SERVICES.length;i++){ if(EMD_SERVICES[i].id===t) return EMD_SERVICES[i]; } return { id:t, icon:'three-dots', color:'#8b93a7' }; }
+  function svcColor(t) { return svcMeta(t).color; }
+  function svcChip(t) {
+    var m = svcMeta(t);
+    return '<span class="badge" style="color:'+m.color+';background:'+m.color+'22"><i class="bi bi-'+m.icon+'"></i> '+ui.escapeHtml(t)+'</span>';
+  }
+  function svcBadgeEl(t) { var s=el('span'); s.innerHTML = svcChip(t); return s.firstChild; }
 
   /* ---------------------------------------------------- shared helpers */
   function kpi(label, value, icon) {

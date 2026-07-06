@@ -36,7 +36,8 @@
     [null, 'Overview'], ['pnl', 'P&L'], ['cashflow', 'Cash Flow'],
     ['balance-sheet', 'Balance Sheet'], ['receivables', 'Receivables'],
     ['payables', 'Payables'], ['banks', 'Banks'],
-    ['coa', 'Chart of Accounts'], ['journal', 'Journal'], ['trial-balance', 'Trial Balance']
+    ['coa', 'Chart of Accounts'], ['journal', 'Journal'], ['trial-balance', 'Trial Balance'],
+    ['consolidation', 'Consolidation']
   ];
 
   /* ---- tiny shared helpers ------------------------------------------------*/
@@ -144,6 +145,7 @@
     else if (sub === 'coa') renderCoa(page);
     else if (sub === 'journal') renderJournal(page);
     else if (sub === 'trial-balance') renderTrialBalance(page);
+    else if (sub === 'consolidation') renderConsolidation(page);
     else renderOverview(page);
     ctx.mount.appendChild(page);
   } });
@@ -1066,6 +1068,215 @@
     tb.forEach(function (r) { lines.push([r.code, r.name, r.type, r.debit, r.credit]); dr += r.debit; cr += r.credit; });
     lines.push(['', 'TOTAL', '', dr, cr]);
     dl('group-trial-balance.csv', lines.map(function (l) { return l.join(','); }).join('\n'));
+  }
+
+  /* ---- CONSOLIDATION — group trial balance with inter-company eliminations */
+  // Render one net figure the way a trial balance reads: a positive net is a
+  // debit shown plainly; a negative net is a credit shown in muted parentheses.
+  function consCell(v) {
+    if (!v || Math.abs(v) < 0.5) return '<span class="text-mute">—</span>';
+    if (v > 0) return '<span class="num">' + ui.money(v) + '</span>';
+    return '<span class="num text-mute" style="opacity:.75">(' + ui.money(-v) + ')</span>';
+  }
+
+  function renderConsolidation(page) {
+    if (!hasLedger()) {
+      page.appendChild(head('Consolidation', 'diagram-3',
+        'Group trial balance with inter-company eliminations.', []));
+      page.appendChild(pills('consolidation'));
+      page.appendChild(ledgerMissing());
+      return;
+    }
+
+    var data = LED().consolidatedTrialBalance();
+    var comps = data.companies;
+
+    // KPI inputs -----------------------------------------------------------
+    var elimGross = 0, icRowCount = 0, groupAssets = 0;
+    data.rows.forEach(function (r) {
+      elimGross += Math.abs(r.elimination || 0);
+      if (r.intercompany) icRowCount++;
+      if (r.type === 'asset') groupAssets += (r.group || 0);
+    });
+    elimGross = elimGross / 2;                 // each pair is counted on both legs
+    // distinct inter-company transactions = distinct refs on IC source entries
+    var icRefs = {}, icEntries = LED().entries({ source: 'intercompany' });
+    icEntries.forEach(function (e) { if (e.ref) icRefs[e.ref] = 1; });
+    var icCount = Object.keys(icRefs).length;
+
+    page.appendChild(head('Consolidation — Group Trial Balance', 'diagram-3',
+      'Every account netted across ' + comps.length + ' operating concerns, with inter-company balances ' +
+      'eliminated so the group figure reflects only third-party positions. As at ' + ui.date(new Date(), 'long') + '.', [
+      el('button.btn.btn-ghost', { html: ui.icon('download') + ' Export (CSV)',
+        onclick: function () { exportConsolidated(data); } }),
+      el('button.btn.btn-ghost', { html: ui.icon('file-earmark-text') + ' Consolidated Statement',
+        onclick: function () { openConsolidatedDoc(data); } }),
+      can('create') ? el('button.btn.btn-primary', { html: ui.icon('arrow-left-right') + ' Post Inter-company',
+        onclick: function () { postIC(comps); } }) : null
+    ]));
+    page.appendChild(pills('consolidation'));
+
+    page.appendChild(el('div.kpi-grid', null, [
+      kpi('Companies Consolidated', comps.length, 'diagram-3', null, 'operating concerns'),
+      kpi('Eliminations', ui.money(elimGross, { compact: true }), 'x-circle', null, 'netted on consolidation'),
+      kpi('Consolidated Assets', ui.money(groupAssets, { compact: true }), 'safe2', null, 'group, post-elimination'),
+      kpi('IC Transactions', icCount, 'arrow-left-right', null, icRowCount + ' control accounts')
+    ]));
+
+    // MAIN TABLE — Account | per-company nets | Elimination | Group ---------
+    page.appendChild(el('div.section-label', {
+      text: 'Consolidated Trial Balance — debit shown plainly · credit in (parentheses) · inter-company rows eliminated'
+    }));
+
+    var t = el('table.tbl');
+    var headCells = [ el('th', { text: 'Account' }) ];
+    comps.forEach(function (c) { headCells.push(el('th.num', { title: c.name, text: c.short })); });
+    headCells.push(el('th.num', { text: 'Elimination' }));
+    headCells.push(el('th.num', { text: 'Group' }));
+    t.appendChild(el('thead', null, [ el('tr', null, headCells) ]));
+
+    var tb = el('tbody');
+    data.rows.forEach(function (r) {
+      var acctHtml = '<span class="num strong">' + ui.escapeHtml(r.code) + '</span> ' + ui.escapeHtml(r.name) +
+        (r.intercompany ? ' <span class="badge badge-accent" title="Nets to zero on consolidation">eliminated</span>' : '');
+      var cells = [ el('td', { html: acctHtml }) ];
+      comps.forEach(function (c) { cells.push(el('td.num', { html: consCell(r.per[c.id] || 0) })); });
+      cells.push(el('td.num', { html: r.elimination ? consCell(r.elimination) : '<span class="text-mute">—</span>' }));
+      cells.push(el('td.num', { html: r.intercompany ? '<span class="text-mute">0</span>' : consCell(r.group) }));
+      tb.appendChild(el('tr', r.intercompany ? { style: { background: 'rgba(226,114,27,.07)' } } : null, cells));
+    });
+
+    // totals footer — each concern's books balance, so we show the balanced total
+    var footCells = [ el('td', { html: '<span class="strong">Totals · Dr = Cr</span>' }) ];
+    comps.forEach(function (c) {
+      footCells.push(el('td.num', { html: '<span class="num strong">' + ui.money(data.totals.per[c.id].debit) + '</span>' }));
+    });
+    footCells.push(el('td.num', { html: '<span class="text-mute">—</span>' }));
+    footCells.push(el('td.num', { html: '<span class="num strong" style="color:' + GOLD + '">' + ui.money(data.totals.group.debit) + '</span>' }));
+    tb.appendChild(el('tr', { style: { borderTop: '2px solid rgba(128,128,128,.3)' } }, footCells));
+    t.appendChild(tb);
+    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ el('div.table-wrap', null, [ t ]) ]) ]));
+
+    // explainer + per-company revenue bar ----------------------------------
+    var row = el('div.two-col');
+    row.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('info-circle') + ' How consolidation works' }),
+        el('span.card-sub', { text: 'why the group column differs from the sum of concerns' }) ]),
+      el('div.card-body', null, [
+        el('p.text-mute', { style: { fontSize: '13px', lineHeight: '1.7', marginTop: '0' },
+          html: 'When one concern sells to another, the seller books <b>1300 Inter-company Receivable</b> and the ' +
+            'buyer books <b>2400 Inter-company Payable</b> for the same amount. Across the group these are the same ' +
+            'money owed to itself, so on consolidation they are moved into the <b>Elimination</b> column and their ' +
+            '<b>Group</b> figure nets to zero — the group only reports what it is owed by, and owes to, outside parties.' }),
+        el('div.mt-2', {
+          style: { display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '12px',
+            borderRadius: '10px', border: '1px dashed rgba(200,162,74,.45)', fontSize: '12.5px' },
+          html: ui.icon('x-circle') + ' <span class="text-mute"><b>' + ui.money(elimGross) + '</b> of inter-company ' +
+            'balances eliminated across <b>' + icCount + '</b> transaction' + (icCount === 1 ? '' : 's') +
+            ', on the <b>1300</b> / <b>2400</b> control accounts.</span>'
+        })
+      ])
+    ]));
+    var revBarId = ui.uid('consRev');
+    row.appendChild(chartCard('Revenue by Concern', 'bar-chart', revBarId, 'trailing 12 months · per operating company', 280));
+    page.appendChild(row);
+
+    requestAnimationFrame(function () {
+      var snap = db().groupSnapshot();
+      var c = document.getElementById(revBarId);
+      if (c && snap.companies.length) EPAL.charts.bar(c, {
+        labels: snap.companies.map(function (co) { return co.short; }), money: true,
+        datasets: [{ label: 'Revenue', data: snap.companies.map(function (co) { return co.revenue; }),
+          colors: snap.companies.map(function (co) { return co.accent; }) }]
+      });
+    });
+  }
+
+  function postIC(comps) {
+    if (!can('create')) { ui.toast('You do not have permission to post inter-company entries', 'error'); return; }
+    var opts = comps.map(function (c) { return [c.id, c.short]; });
+    EPAL.formModal({
+      title: 'Post Inter-company Transaction', icon: 'arrow-left-right',
+      fields: [
+        { key: 'from', label: 'From (Seller — books receivable + revenue)', type: 'select', required: true, col2: true, options: opts },
+        { key: 'to', label: 'To (Buyer — books expense + payable)', type: 'select', required: true, options: opts },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+        { key: 'memo', label: 'Memo', type: 'text', placeholder: 'e.g. Shared services / inter-company supply' }
+      ],
+      onSave: function (vals) {
+        if (vals.from === vals.to) { ui.toast('Seller and buyer must be different concerns', 'error'); return false; }
+        try {
+          var r = LED().postIntercompany(vals.from, vals.to, +vals.amount, { memo: vals.memo });
+          db().log(EPAL.auth.current ? (EPAL.auth.current() || {}).name || 'Finance' : 'Finance',
+            'Inter-company ' + vals.from + ' → ' + vals.to + ' · ' + ui.money(+vals.amount) + ' (' + r.ref + ')', vals.from);
+          ui.toast('Inter-company transaction posted · ' + r.ref, 'success');
+          EPAL.router.render();
+        } catch (e) {
+          ui.toast(e && e.message ? e.message : 'Could not post inter-company entry', 'error');
+          return false;
+        }
+      }
+    });
+  }
+
+  function exportConsolidated(data) {
+    var header = ['Code', 'Account', 'Type']
+      .concat(data.companies.map(function (c) { return c.short; }))
+      .concat(['Elimination', 'Group']);
+    var lines = [header];
+    data.rows.forEach(function (r) {
+      var line = [r.code, r.name, r.type];
+      data.companies.forEach(function (c) { line.push(r.per[c.id] || 0); });
+      line.push(r.elimination || 0);
+      line.push(r.group || 0);
+      lines.push(line);
+    });
+    var totalLine = ['', 'TOTAL (Dr=Cr)', ''];
+    data.companies.forEach(function (c) { totalLine.push(data.totals.per[c.id].debit); });
+    totalLine.push(0);
+    totalLine.push(data.totals.group.debit);
+    lines.push(totalLine);
+    dl('group-consolidated-tb.csv', lines.map(function (l) { return l.join(','); }).join('\n'));
+  }
+
+  function openConsolidatedDoc(data) {
+    // A clean group-level statement: only the consolidated (post-elimination)
+    // figures per account, presented as a branded trial balance.
+    var rows = [];
+    data.rows.forEach(function (r) {
+      if (r.intercompany) return;              // netted to zero on the group
+      var g = r.group || 0;
+      if (Math.abs(g) < 0.5) return;
+      rows.push({ code: r.code, name: r.name, debit: g > 0 ? g : 0, credit: g < 0 ? -g : 0 });
+    });
+    EPAL.doc.open({
+      type: 'voucher', title: 'Consolidated Trial Balance', watermark: 'GROUP',
+      companyId: 'group', amount: data.totals.group.debit,
+      parties: [{ label: 'Reporting Entity', name: 'Epal Group (Consolidated)',
+        lines: [comLine(data.companies) ] }],
+      meta: [
+        { label: 'As at', value: ui.date(new Date(), 'long') },
+        { label: 'Concerns', value: data.companies.length },
+        { label: 'Basis', value: 'Inter-company eliminated' }
+      ],
+      columns: [
+        { key: 'code', label: 'Code' },
+        { key: 'name', label: 'Account' },
+        { key: 'debit', label: 'Debit', num: true, money: true },
+        { key: 'credit', label: 'Credit', num: true, money: true }
+      ],
+      rows: rows,
+      totals: [
+        { label: 'Group Debits', value: data.totals.group.debit },
+        { label: 'Group Credits', value: data.totals.group.credit, grand: true }
+      ],
+      terms: 'Consolidated management trial balance. Inter-company receivables (1300) and payables (2400) ' +
+        'are eliminated on consolidation. Derived live from the group double-entry ledger. E&OE.',
+      sign: 'Group Chief Financial Officer'
+    });
+  }
+  function comLine(comps) {
+    return comps.map(function (c) { return c.short; }).join(' · ');
   }
 
   /* ---- Balance Sheet (ledger-derived) -------------------------------------*/

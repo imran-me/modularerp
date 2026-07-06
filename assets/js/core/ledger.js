@@ -47,11 +47,13 @@
     { code: '1010', name: 'Bank',                  type: 'asset',     group: 'Current Assets' },
     { code: '1150', name: 'Sub-Agent Receivable',  type: 'asset',     group: 'Current Assets' },
     { code: '1200', name: 'Accounts Receivable',   type: 'asset',     group: 'Current Assets' },
+    { code: '1300', name: 'Inter-company Receivable', type: 'asset',  group: 'Current Assets', intercompany: true },
     { code: '1400', name: 'Inventory',             type: 'asset',     group: 'Current Assets' },
     { code: '1500', name: 'Fixed Assets',          type: 'asset',     group: 'Non-current Assets' },
     { code: '2000', name: 'Accounts Payable',      type: 'liability', group: 'Current Liabilities' },
     { code: '2050', name: 'BSP Payable',           type: 'liability', group: 'Current Liabilities' },
     { code: '2200', name: 'VAT Payable',           type: 'liability', group: 'Current Liabilities' },
+    { code: '2400', name: 'Inter-company Payable',  type: 'liability', group: 'Current Liabilities', intercompany: true },
     { code: '2300', name: 'Customer Advances',     type: 'liability', group: 'Current Liabilities' },
     { code: '3000', name: 'Owner Equity',          type: 'equity',    group: 'Equity' },
     { code: '3100', name: 'Retained Earnings',     type: 'equity',    group: 'Equity' },
@@ -72,7 +74,8 @@
   }
   function withNormal(row) {
     return { code: row.code, name: row.name, type: row.type,
-             normal: row.normal || normalFor(row.type), group: row.group || '' };
+             normal: row.normal || normalFor(row.type), group: row.group || '',
+             intercompany: !!row.intercompany };
   }
 
   /* ==========================================================================
@@ -215,6 +218,70 @@
         debit: net > 0 ? net : 0, credit: net < 0 ? -net : 0 });
     }
     return out;
+  }
+
+  /* CONSOLIDATED trial balance across all operating companies, with an
+   * inter-company elimination column. Returns per-company net columns, an
+   * elimination column (inter-company accounts net out), and the group total.
+   *   { companies:[{id,name}], rows:[{code,name,type,intercompany,per:{co:net},
+   *     elimination, group}], totals:{per:{co:{debit,credit}}, group:{debit,credit}} } */
+  function consolidatedTrialBalance() {
+    var comps = (EPAL.config.companies || []).filter(function (c) {
+      return c.type === 'company' && c.enabled !== false;
+    }).map(function (c) { return { id: c.id, name: c.name, short: c.short }; });
+    var coa = accounts(), rows = [];
+    comps.forEach(function (c) { c._dr = 0; c._cr = 0; });
+    var groupDr = 0, groupCr = 0;
+    for (var i = 0; i < coa.length; i++) {
+      var acc = coa[i];
+      var per = {}, touched = false, elim = 0;
+      for (var k = 0; k < comps.length; k++) {
+        var t = accountTotals(acc.code, { companyId: comps[k].id });
+        var net = t.dr - t.cr;                 // + net debit, - net credit
+        per[comps[k].id] = net;
+        if (Math.abs(net) >= 0.5) touched = true;
+        comps[k]._dr += net > 0 ? net : 0;
+        comps[k]._cr += net < 0 ? -net : 0;
+      }
+      if (!touched) continue;
+      // inter-company accounts are eliminated on consolidation: their summed
+      // balance moves into the elimination column and is dropped from the group.
+      var summed = 0; for (var p in per) if (per.hasOwnProperty(p)) summed += per[p];
+      var groupNet;
+      if (acc.intercompany) { elim = -summed; groupNet = 0; }
+      else { elim = 0; groupNet = summed; }
+      groupDr += groupNet > 0 ? groupNet : 0;
+      groupCr += groupNet < 0 ? -groupNet : 0;
+      rows.push({ code: acc.code, name: acc.name, type: acc.type,
+        intercompany: !!acc.intercompany, per: per, elimination: elim, group: groupNet });
+    }
+    var totals = { per: {}, group: { debit: groupDr, credit: groupCr } };
+    comps.forEach(function (c) { totals.per[c.id] = { debit: c._dr, credit: c._cr }; delete c._dr; delete c._cr; });
+    return { companies: comps, rows: rows, totals: totals };
+  }
+
+  /* Post an inter-company transaction (company A invoices company B). Creates
+   * two balanced, mirrored journal entries linked by an ic pair ref, using the
+   * inter-company control accounts (1300 / 2400) so they eliminate on
+   * consolidation. amount is the invoiced value.
+   *   opts: { date, memo, revenueAccount(seller, default 4000),
+   *           expenseAccount(buyer, default 5000) } */
+  function postIntercompany(fromCo, toCo, amount, opts) {
+    opts = opts || {};
+    var amt = +amount || 0;
+    var d = opts.date || new Date().toISOString().slice(0, 10);
+    var pair = 'IC-' + (opts.ref || (fromCo + '-' + toCo + '-' + Math.round(amt)));
+    var memo = opts.memo || ('Inter-company: ' + fromCo + ' → ' + toCo);
+    // Seller (fromCo): DR Inter-company Receivable / CR Revenue
+    var sell = post({ date: d, companyId: fromCo, ref: pair, memo: memo, source: 'intercompany',
+      party: toCo, lines: [ { account: '1300', dr: amt, cr: 0 },
+                            { account: opts.revenueAccount || '4000', dr: 0, cr: amt } ] });
+    // Buyer (toCo): DR Expense / CR Inter-company Payable
+    var buy = post({ date: d, companyId: toCo, ref: pair, memo: memo, source: 'intercompany',
+      party: fromCo, lines: [ { account: opts.expenseAccount || '5000', dr: amt, cr: 0 },
+                              { account: '2400', dr: 0, cr: amt } ] });
+    EPAL.bus.emit('intercompany:posted', { from: fromCo, to: toCo, amount: amt, ref: pair });
+    return { seller: sell, buyer: buy, ref: pair };
   }
 
   function runningRows(matchFn, normal, companyId) {
@@ -416,7 +483,9 @@
     partyLedger: partyLedger,
     aging: aging,
     pnl: pnl,
-    balanceSheet: balanceSheet
+    balanceSheet: balanceSheet,
+    consolidatedTrialBalance: consolidatedTrialBalance,
+    postIntercompany: postIntercompany
   };
 
   /* ==========================================================================
@@ -501,6 +570,24 @@
         });
       }
     });
+
+    // 4) inter-company transactions (eliminate on consolidation). Seller DR 1300
+    //    Inter-co Receivable / CR Revenue; Buyer DR Expense / CR 2400 Inter-co Payable.
+    var IC = [
+      { from:'it',      to:'travels',      amt: 850000,  memo:'ERP & IT support (annual)' },
+      { from:'woodart', to:'construction', amt: 1250000, memo:'Interior fit-out — site office' },
+      { from:'shop',    to:'construction', amt: 180000,  memo:'Site canteen supplies' },
+      { from:'it',      to:'shop',         amt: 320000,  memo:'POS software & maintenance' }
+    ];
+    for (var ic = 0; ic < IC.length; ic++) {
+      var x = IC[ic], ref = 'IC-' + (2001 + ic), dt = '2026-06-' + String(10 + ic).padStart(2, '0');
+      out.push({ id:'GL-ICS-' + ic, date: dt, companyId: x.from, ref: ref, memo: x.memo,
+        source:'intercompany', party: x.to, posted: true, created: Date.now(),
+        lines:[ { account:'1300', dr: x.amt, cr: 0 }, { account:'4000', dr: 0, cr: x.amt } ] });
+      out.push({ id:'GL-ICB-' + ic, date: dt, companyId: x.to, ref: ref, memo: x.memo,
+        source:'intercompany', party: x.from, posted: true, created: Date.now(),
+        lines:[ { account:'5000', dr: x.amt, cr: 0 }, { account:'2400', dr: 0, cr: x.amt } ] });
+    }
 
     return out;
   }

@@ -1,5 +1,41 @@
 # CHANGELOG — Epal Group ERP
 
+## v0.3.1 "Deep Core — Fourth Pass" · 06-Jul-2026
+
+Depth additions on top of the Deep Core, plus platform fixes.
+
+### Added
+- **Consolidation accounting** (`group/finance/consolidation`): a consolidated
+  trial balance with one column per company, an **inter-company elimination**
+  column, and the group total. New ledger primitives `EPAL.ledger.consolidatedTrialBalance()`
+  and `EPAL.ledger.postIntercompany()`, two inter-company control accounts
+  (1300 Inter-company Receivable / 2400 Inter-company Payable) that net to zero
+  on consolidation, and seeded inter-company transactions (IT→Travels, Woodart→
+  Construction, Shop→Construction, IT→Shop). Post-IC button, CSV, branded statement.
+- **Air Ticketing to the metal**: **EMD & Ancillary** module (multi-line ancillary
+  sales — baggage/seat/meal/insurance… — with serials + branded EMD receipt),
+  **Ticketing Deadlines (TTL)** held-PNR queue with urgency countdown, and a
+  **BSP file import + reconciliation** (import/parse a billing file, auto-match to
+  tickets, exception list of mismatches/missing, accept/waive, mark reconciled).
+- **Live comms channel** (`travels/marketing`): omni-channel **campaigns**
+  (WhatsApp/SMS/Email) with real-audience send simulation + delivery/open stats,
+  a **template** manager with placeholder preview, and an interactive **WhatsApp
+  Booking Bot** that answers fare/package/visa queries from real data and drafts bookings.
+- **Collapsible sidebar** — every company's module nav is now a persisted accordion
+  (default: only the active module expanded); fixes the pile-up where every visited
+  section stayed open.
+
+### Fixed
+- **GitHub Pages deploy** was failing on the large Deep Core commit (build OK, deploy
+  step failing) — added `.nojekyll` so this vanilla no-build site deploys as-is.
+
+### Verified
+Boot sweep **191 routes / 0 errors / 0 blanks**; dynamic ledger invariants **24/24**
+(including the new inter-company entries — trial balance and balance sheet still tie out;
+consolidation eliminates to a balanced group column).
+
+---
+
 ## v0.3.0 "Deep Core — Brain, Nerves & Backbone" · 06-Jul-2026
 
 The third major build. Where v0.1.0 built the body and v0.2.0 gave it a world-class
