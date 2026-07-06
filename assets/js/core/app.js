@@ -243,13 +243,17 @@
       });
 
       wrap.appendChild(row);
+      // The sub-links live in a SINGLE inner container so the CSS grid
+      // collapse (0fr -> 1fr) works — the trick only animates one grid child.
       var subWrap = el('div.nav-subs');
+      var subInner = el('div.nav-subs-inner');
       subs.forEach(function (s) {
         var sroute = route + '/' + s.id;
-        subWrap.appendChild(el('a.nav-sub', { href:'#/' + sroute, 'data-route': sroute }, [
+        subInner.appendChild(el('a.nav-sub', { href:'#/' + sroute, 'data-route': sroute }, [
           el('span.nav-sub-dot'), el('span', { text: s.label })
         ]));
       });
+      subWrap.appendChild(subInner);
       wrap.appendChild(subWrap);
       return wrap;
     },
