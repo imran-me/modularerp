@@ -90,7 +90,18 @@
     { id: 'HTL-03', name: 'Rove Downtown', city: 'Dubai', country: 'UAE', star: 4, board: 'Room Only', nightlyFrom: 12500 },
     { id: 'HTL-04', name: 'Sunway Putra', city: 'Kuala Lumpur', country: 'Malaysia', star: 4, board: 'Breakfast', nightlyFrom: 8500 }
   ];
+  // A "package" is a booking that BUNDLES any mix of services (flight, hotel,
+  // visa, transfer, insurance…) as line items — e.g. an Umrah package. Its
+  // cost/sale/profit are the sum of its lines. It flows into Manage Sales like
+  // any other booking. This is the multi-service model most travel sales use.
+  var SERVICE_TYPES = ['Flight Ticket', 'Hotel', 'Visa', 'Transfer', 'Tour / Activity', 'Insurance', 'Umrah / Hajj', 'Other'];
   var BOOKINGS = [
+    { id: 'PKG-9001', type: 'package', pax: 'Kamal Ahmed (Family of 4)', customer: 'Kamal Ahmed', title: 'Umrah Package · 14 nights', route: 'Umrah Package · 4 services', status: 'Confirmed', agentId: '', paid: true, created: '2026-07-02',
+      lines: [ { type: 'Flight Ticket', desc: 'DAC → JED → DAC ×4 (Saudia)', cost: 224000, sale: 248000 },
+               { type: 'Hotel', desc: 'Makkah 5★ · 7 nights', cost: 154000, sale: 178000 },
+               { type: 'Hotel', desc: 'Madinah 5★ · 5 nights', cost: 90000, sale: 108000 },
+               { type: 'Visa', desc: 'Umrah visa ×4', cost: 128000, sale: 152000 } ],
+      cost: 596000, sale: 686000, profit: 90000 },
     { id: 'TK-7042', type: 'flight', pax: 'Rahim Uddin', route: 'DAC → DXB', airlineCode: 'EK', pnr: 'HX42Q7', travelDate: '2026-07-18', base: 66000, tax: 12000, markup: 6200, commission: 0, cost: 78000, sale: 84200, profit: 6200, status: 'Issued', agentId: '', paid: true, created: '2026-07-04' },
     { id: 'TK-7041', type: 'flight', pax: 'Sadia Islam', route: 'DAC → JED', airlineCode: 'SV', pnr: 'KK81TZ', travelDate: '2026-07-22', base: 48000, tax: 8000, markup: 5500, commission: 0, cost: 56000, sale: 61500, profit: 5500, status: 'Issued', agentId: '', paid: true, created: '2026-07-03' },
     { id: 'TK-7039', type: 'flight', pax: 'Tanvir Hasan', route: 'DAC → SIN', airlineCode: 'SQ', pnr: 'Q2M4PL', travelDate: '2026-07-30', base: 37000, tax: 6000, markup: 4200, commission: 0, cost: 43000, sale: 47200, profit: 4200, status: 'Hold', agentId: '', paid: false, created: '2026-07-05' }
@@ -134,6 +145,26 @@
       b.paid = !!b.paid;
       b.created = b.created || todayISO();
       return store.save('tv.bookings', b);
+    },
+
+    serviceTypes: function () { return SERVICE_TYPES.slice(); },
+
+    /* Create a PACKAGE booking — a bundle of any-service line items. Totals are
+       summed from the lines so every figure traces to a line. Stored in the same
+       bookings list (type:'package') so it shows in Manage Sales & Dashboard. */
+    bookPackage: function (p) {
+      p.id = p.id || uid('PKG');
+      p.type = 'package';
+      var lines = p.lines || [];
+      p.cost = lines.reduce(function (s, l) { return s + (+l.cost || 0); }, 0);
+      p.sale = lines.reduce(function (s, l) { return s + (+l.sale || 0); }, 0);
+      p.profit = p.sale - p.cost;
+      p.route = (p.title || 'Package') + ' · ' + lines.length + ' service' + (lines.length === 1 ? '' : 's');
+      p.pax = p.customer || p.pax || '';
+      p.status = p.status || 'Confirmed';
+      p.paid = !!p.paid;
+      p.created = p.created || todayISO();
+      return store.save('tv.bookings', p);
     },
 
     /* Record a payment against a booking and mark it paid. If paid on agent
