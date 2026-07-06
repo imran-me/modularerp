@@ -16,7 +16,8 @@
 
 /* --------------------------------------------------------------- Cards */
 .card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 20%, var(--surface)), var(--surface));
+  border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm); position: relative; overflow: hidden; transition: border-color var(--t), box-shadow var(--t), transform var(--t);
 }
 .card.hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow); transform: translateY(-2px); }
@@ -34,17 +35,36 @@
 .grid-auto { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .kpi-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px; }
 .kpi-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
-  padding: 18px 20px; position: relative; overflow: hidden; transition: all var(--t) var(--e-out);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 34%, var(--surface)), var(--surface));
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 20px; position: relative; overflow: hidden; box-shadow: var(--shadow-sm);
+  transition: transform var(--t) var(--e-out), box-shadow var(--t) var(--e-out), border-color var(--t);
 }
-.kpi-card:hover { border-color: var(--border-accent); transform: translateY(-2px); box-shadow: var(--shadow); }
-.kpi-card::after { content:''; position: absolute; right: -30px; top: -30px; width: 120px; height: 120px; border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%); pointer-events: none; }
-.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.kpi-label { font-size: 12px; color: var(--text-dim); font-weight: 600; letter-spacing: .01em; }
-.kpi-ico { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-size: 17px;
-  background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
-.kpi-value { font-size: 27px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+/* a single fine luminous hairline along the top edge — the premium detail that
+   replaces the old cheap corner "glow". */
+.kpi-card::before {
+  content:''; position: absolute; inset: 0 0 auto 0; height: 1px; opacity: .5;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 55%, transparent) 32%,
+    color-mix(in srgb, var(--epal-soft, var(--accent)) 65%, transparent) 68%, transparent);
+  transition: opacity var(--t);
+}
+.kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--border-strong); }
+.kpi-card:hover::before { opacity: .95; }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.kpi-label { font-size: 10.5px; color: var(--text-mute); font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
+/* Jewel chip: deep royal→abyss gradient with a light "ink" icon, an inset top
+   highlight and a soft coloured cast — reads as enamel/metal, not a flat pastel. */
+.kpi-ico {
+  width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
+  font-size: 18px; color: #dbe4f8; flex: none;
+  background: linear-gradient(155deg, var(--epal-accent, var(--accent)) 0%, var(--epal-deep, var(--accent)) 60%, var(--epal-navy, var(--accent)) 100%);
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.30),
+    inset 0 -10px 16px -10px rgba(0,0,0,.55),
+    0 8px 18px -8px color-mix(in srgb, var(--epal-royal, var(--accent)) 70%, transparent);
+}
+.kpi-value { font-size: 29px; font-weight: 800; letter-spacing: -.025em; line-height: 1; font-variant-numeric: tabular-nums; }
 .kpi-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; }
 .kpi-trend { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
 .kpi-trend.up { color: var(--good); background: var(--good-soft); }

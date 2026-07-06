@@ -21,6 +21,14 @@
   /* Brand accents (also declared in config.js per company) ---------------*/
   --gold: #1A43BF;
   --gold-soft: #7E9AE8;
+  /* EPAL dark-blue palette (the owner's swatches) — used for the luxurious,
+     jewel-like surfaces (deep gradient chips, ink accents). */
+  --epal-abyss: #00072D;
+  --epal-navy:  #051650;
+  --epal-deep:  #0A2472;
+  --epal-royal: #123499;
+  --epal-accent:#1A43BF;
+  --epal-soft:  #7E9AE8;
   --brand-travels: #2f6bff;
   --brand-woodart: #6f9c1c;
   --brand-it: #7b5cff;
@@ -68,9 +76,9 @@
   --text-dim:  #9aa6c2;
   --text-mute: #5c6884;
 
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-  --shadow:    0 8px 30px rgba(0,0,0,.35);
-  --shadow-lg: 0 24px 70px rgba(0,0,0,.55);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.45);
+  --shadow:    0 1px 1px rgba(0,0,0,.4), 0 16px 36px -14px rgba(0,4,20,.66);
+  --shadow-lg: 0 2px 6px rgba(0,0,0,.5), 0 44px 84px -28px rgba(0,4,24,.78);
   --glow:      0 0 0 1px var(--border-accent), 0 10px 40px -12px color-mix(in srgb, var(--accent) 55%, transparent);
 
   --glass:      color-mix(in srgb, var(--surface) 72%, transparent);
@@ -98,9 +106,9 @@
   --text-dim:  #56617c;
   --text-mute: #8a93a9;
 
-  --shadow-sm: 0 1px 2px rgba(20,30,60,.06);
-  --shadow:    0 10px 30px rgba(20,30,60,.10);
-  --shadow-lg: 0 26px 70px rgba(20,30,60,.18);
+  --shadow-sm: 0 1px 2px rgba(5,22,80,.07);
+  --shadow:    0 2px 4px rgba(5,22,80,.05), 0 20px 42px -18px rgba(5,22,80,.18);
+  --shadow-lg: 0 4px 10px rgba(5,22,80,.07), 0 44px 84px -30px rgba(5,22,80,.24);
   --glow:      0 0 0 1px var(--border-accent), 0 12px 40px -14px color-mix(in srgb, var(--accent) 50%, transparent);
 
   --glass:      color-mix(in srgb, #ffffff 78%, transparent);
