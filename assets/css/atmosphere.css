@@ -41,14 +41,14 @@
   content: ''; position: absolute; z-index: 0; pointer-events: none;
   top: 0; right: 0;                               /* stays inside the scroll box */
   width: 540px; height: 316px; max-width: 60%;
-  opacity: .09;                                   /* felt, not seen (light) */
+  opacity: .12;                                   /* felt, not seen (light) */
   background: color-mix(in srgb, var(--accent) 55%, var(--text));
   /* mask nudged up/right so the motif bleeds toward the corner WITHOUT the box
      leaving the container (which would force a horizontal scrollbar). */
   -webkit-mask: var(--atmos, none) no-repeat right -30px top -26px / 116%;
           mask: var(--atmos, none) no-repeat right -30px top -26px / 116%;
 }
-[data-theme="dark"] #view::before { opacity: .14; }   /* a touch more on navy */
+[data-theme="dark"] #view::before { opacity: .18; }   /* a touch more on navy */
 /* keep the app content above the watermark */
 #view > * { position: relative; z-index: 1; }
 
