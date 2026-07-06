@@ -7,15 +7,29 @@
      loads the design system + the JS runtime, then core/app.js boots and builds
      everything (rail, sidebar, topbar, views) from the config registry.
 
-     ARCHITECTURE AT A GLANCE
-       assets/css/*        → the bespoke premium design system (no Bootstrap
-                             component conflicts; Bootstrap *Icons* only, since
-                             the brief explicitly asked for a NON-generic look).
-       assets/js/core/*    → runtime: config, state, eventbus, ui, charts,
-                             database, auth, router, app (boot).
-       assets/js/views/*   → one file per screen; each self-registers into
-                             EPAL.views. Unbuilt screens fall back to a live
-                             scaffold, so the entire navigation works today.
+     ARCHITECTURE AT A GLANCE — the JS is grouped into layers that map 1:1 onto a
+     future Laravel/PHP backend, so a developer can read this front-end as a spec:
+
+       assets/css/*         → the bespoke premium design system (navy/platinum/gold;
+                              Bootstrap *Icons* only). ⇢ Laravel: Blade layout + theme.
+       assets/js/kernel/*   → app bootstrap + shell: config (module registry),
+                              eventbus, ui (DOM kit), charts, auth, router, app (boot).
+                              ⇢ Laravel: routing, middleware, service container, layout.
+       assets/js/data/*     → persistence + seeded domain data: state (localStorage
+                              wrapper — the swap seam), database, seed-bd.
+                              ⇢ Laravel: Eloquent Models + Migrations + Seeders.
+       assets/js/engines/*  → business logic services: ledger (double-entry), audit,
+                              approvals (maker-checker), documents, serial, intel,
+                              rules (automation), comments, search, permissions,
+                              engines (registry). ⇢ Laravel: Services / Domain classes.
+       assets/js/kit/*      → reusable UI building blocks: forms, datatable, entity
+                              (CRUD factory). ⇢ Laravel: Blade components / form requests.
+       assets/js/views/*    → one file per screen; each self-registers into EPAL.views.
+                              Unbuilt screens fall back to a live scaffold, so the whole
+                              navigation works today. ⇢ Laravel: Blade views + Controllers.
+
+     LOAD ORDER MATTERS (no build step, everything hangs off a global window.EPAL):
+     config first, then the layers in dependency order, views next, app.js LAST.
 
      No build step. Open index.html through a local web server (recommended) or
      directly — everything is vanilla + CDN.
@@ -63,33 +77,33 @@
 
   <!-- ===================== CORE RUNTIME ===================== -->
   <!-- config MUST load first (ui/db/auth read from it at load time). -->
-  <script src="assets/js/core/config.js"></script>
-  <script src="assets/js/core/state.js"></script>
-  <script src="assets/js/core/eventbus.js"></script>
-  <script src="assets/js/core/ui.js"></script>
-  <script src="assets/js/core/charts.js"></script>
+  <script src="assets/js/kernel/config.js"></script>
+  <script src="assets/js/data/state.js"></script>
+  <script src="assets/js/kernel/eventbus.js"></script>
+  <script src="assets/js/kernel/ui.js"></script>
+  <script src="assets/js/kernel/charts.js"></script>
   <!-- Deep Core engine registry (self-registration backbone) — before engines. -->
-  <script src="assets/js/core/engines.js"></script>
-  <script src="assets/js/core/database.js"></script>
+  <script src="assets/js/engines/engines.js"></script>
+  <script src="assets/js/data/database.js"></script>
   <!-- deep operational seed for every company (idempotent; consumed by db.seed()) -->
-  <script src="assets/js/core/seed-bd.js"></script>
+  <script src="assets/js/data/seed-bd.js"></script>
   <!-- ===== Deep Core engines (brain, nerves, backbone) — self-register ===== -->
-  <script src="assets/js/core/serial.js"></script>
-  <script src="assets/js/core/ledger.js"></script>
-  <script src="assets/js/core/audit.js"></script>
-  <script src="assets/js/core/approvals.js"></script>
-  <script src="assets/js/core/rules.js"></script>
-  <script src="assets/js/core/documents.js"></script>
-  <script src="assets/js/core/intel.js"></script>
-  <script src="assets/js/core/comments.js"></script>
-  <script src="assets/js/core/search.js"></script>
+  <script src="assets/js/engines/serial.js"></script>
+  <script src="assets/js/engines/ledger.js"></script>
+  <script src="assets/js/engines/audit.js"></script>
+  <script src="assets/js/engines/approvals.js"></script>
+  <script src="assets/js/engines/rules.js"></script>
+  <script src="assets/js/engines/documents.js"></script>
+  <script src="assets/js/engines/intel.js"></script>
+  <script src="assets/js/engines/comments.js"></script>
+  <script src="assets/js/engines/search.js"></script>
   <!-- shared UI building blocks used by the graduated views -->
-  <script src="assets/js/core/forms.js"></script>
-  <script src="assets/js/core/datatable.js"></script>
-  <script src="assets/js/core/entity.js"></script>
-  <script src="assets/js/core/auth.js"></script>
-  <script src="assets/js/core/permissions.js"></script>
-  <script src="assets/js/core/router.js"></script>
+  <script src="assets/js/kit/forms.js"></script>
+  <script src="assets/js/kit/datatable.js"></script>
+  <script src="assets/js/kit/entity.js"></script>
+  <script src="assets/js/kernel/auth.js"></script>
+  <script src="assets/js/engines/permissions.js"></script>
+  <script src="assets/js/kernel/router.js"></script>
 
   <!-- ===================== VIEWS (self-registering) ===================== -->
   <!-- registry first (defines EPAL.view + the placeholder scaffold). -->
@@ -132,6 +146,6 @@
 
   <!-- ===================== BOOT (must be LAST) ===================== -->
   <!-- app.js auto-initialises after all views have registered themselves. -->
-  <script src="assets/js/core/app.js"></script>
+  <script src="assets/js/kernel/app.js"></script>
 </body>
 </html>
