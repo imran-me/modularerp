@@ -1,0 +1,98 @@
+/* ============================================================================
+ * EPAL GROUP ERP  ·  assets/css/atmosphere.css
+ * ----------------------------------------------------------------------------
+ * BESPOKE VERTICAL ATMOSPHERE — a whisper-subtle, hand-drawn line-art emblem set
+ * behind each page header, unique to the vertical you are standing in (think
+ * embossed letterhead, not wallpaper):
+ *
+ *   group        → a constellation: a hub with orbiting company nodes
+ *   travels      → a globe with a great-circle flight arc + a paper plane
+ *   travels/visa → concentric passport-stamp seals with an "approved" tick
+ *   construction → a lattice tower crane over a faint site plan
+ *   woodart      → topographic wood-grain contour lines around a knot
+ *   it           → a chip with orthogonal circuit traces and solder nodes
+ *   shop         → a retail bag with a barcode
+ *
+ * DESIGN LAW (why it looks expensive and not "new money"):
+ *   1. ONE colour. The whole system stays the single brand blue; a vertical's
+ *      identity comes from its MOTIF, never a second accent hue. No rainbow.
+ *   2. Near-invisible. Opacity is kept so low the emblem is *felt*, not *seen* —
+ *      it reads as craft, not decoration. Restraint is the point.
+ *   3. Line only. Fine single-weight strokes, engraved — no fills, no glow.
+ *
+ * HOW IT BINDS: app.js `onRoute` stamps  data-atmos="{companyId}"  and
+ *   data-module="{moduleId}"  onto the #view mount; the emblem is a mask on
+ *   `.page-head::after`, tinted with the live --accent, so it recolours with the
+ *   theme automatically. Encoded as inline SVG data-URIs — zero network cost,
+ *   GitHub-Pages friendly.
+ *
+ * ==> LARAVEL / PHP MAPPING: pure presentation. In Blade, set data-atmos /
+ *     data-module on the content wrapper (@yield('content') container) from the
+ *     active company + module; ship this stylesheet unchanged.
+ * ========================================================================== */
+
+/* The emblem is a large, faint architectural watermark bleeding off the content's
+   TOP-RIGHT corner — the page reads as if it were set on branded drafting paper.
+   It lives on the scroll container (#view) behind everything, so real content
+   always paints crisply on top and the motif only breathes through the header
+   whitespace. It scrolls up with the page (atmosphere, not a fixed sticker). */
+#view { position: relative; }
+#view::before {
+  content: ''; position: absolute; z-index: 0; pointer-events: none;
+  top: 0; right: 0;                               /* stays inside the scroll box */
+  width: 540px; height: 316px; max-width: 60%;
+  opacity: .09;                                   /* felt, not seen (light) */
+  background: color-mix(in srgb, var(--accent) 55%, var(--text));
+  /* mask nudged up/right so the motif bleeds toward the corner WITHOUT the box
+     leaving the container (which would force a horizontal scrollbar). */
+  -webkit-mask: var(--atmos, none) no-repeat right -30px top -26px / 116%;
+          mask: var(--atmos, none) no-repeat right -30px top -26px / 116%;
+}
+[data-theme="dark"] #view::before { opacity: .14; }   /* a touch more on navy */
+/* keep the app content above the watermark */
+#view > * { position: relative; z-index: 1; }
+
+/* No emblem until a vertical claims one — the var(--atmos, none) fallback above
+   keeps `.page-head::after` blank until one of the rules below sets --atmos.
+   (Deliberately NOT reset on #view: an #id rule would out-specify these
+   attribute rules and suppress every emblem.) */
+
+/* ---------------------------------------------------------------- GROUP */
+[data-atmos="group"] {
+  --atmos: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 240' fill='none' stroke='white' stroke-width='1.6'><circle cx='300' cy='120' r='34'/><circle cx='300' cy='120' r='84' stroke-dasharray='1 7'/><circle cx='300' cy='120' r='132' stroke-dasharray='1 7' stroke-opacity='.55'/><g stroke-opacity='.7'><path d='M300 120 l-84 0 M300 120 l70 -46 M300 120 l54 66 M300 120 l-38 78 M300 120 l14 -82'/></g><g fill='white' stroke='none'><circle cx='216' cy='120' r='5'/><circle cx='370' cy='74' r='5'/><circle cx='354' cy='186' r='5'/><circle cx='262' cy='198' r='4'/><circle cx='314' cy='38' r='4'/><circle cx='300' cy='120' r='7'/></g></svg>");
+}
+
+/* -------------------------------------------------------------- TRAVELS */
+[data-atmos="travels"] {
+  --atmos: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 240' fill='none' stroke='white' stroke-width='1.6'><circle cx='300' cy='128' r='104'/><ellipse cx='300' cy='128' rx='104' ry='40'/><ellipse cx='300' cy='128' rx='40' ry='104'/><ellipse cx='300' cy='128' rx='72' ry='104' stroke-opacity='.55'/><path d='M60 196 Q 200 44 372 104' stroke-width='1.7' stroke-dasharray='2 7'/><circle cx='60' cy='196' r='4' fill='white' stroke='none'/><circle cx='372' cy='104' r='4' fill='white' stroke='none'/><path d='M214 96 l16 -6 l-4 8 l11 3 l-12 4 l-3 9 l-4 -8 l-14 1 z' fill='white' stroke='none'/></svg>");
+}
+
+/* ---------------------------------------------- TRAVELS · VISA (module) */
+[data-atmos="travels"][data-module="visa-processing"] {
+  --atmos: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 240' fill='none' stroke='white' stroke-width='1.6'><circle cx='296' cy='120' r='80'/><circle cx='296' cy='120' r='66' stroke-dasharray='2 6'/><path d='M244 100 h104 M244 140 h104'/><path d='M276 120 l12 13 l26 -30' stroke-width='1.6'/><g stroke-width='1'><path d='M296 40 v10 M296 190 v10 M216 120 h10 M366 120 h10 M239 63 l7 7 M346 63 l-7 7 M239 177 l7 -7 M346 177 l-7 -7'/></g><circle cx='150' cy='150' r='50' stroke-opacity='.5'/><circle cx='150' cy='150' r='40' stroke-dasharray='2 6' stroke-opacity='.5'/></svg>");
+}
+
+/* --------------------------------------------------------- CONSTRUCTION */
+[data-atmos="construction"] {
+  --atmos: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 240' fill='none' stroke='white' stroke-width='1.6'><path d='M292 220 v-152 M304 220 v-152'/><path d='M292 200 l12 -10 M304 190 l-12 -10 M292 180 l12 -10 M304 170 l-12 -10 M292 150 l12 -10 M304 140 l-12 -10 M292 120 l12 -10 M304 110 l-12 -10 M292 90 l12 -10'/><path d='M298 68 h116 M298 68 h-44'/><path d='M298 80 l110 -10 M298 80 l-38 -10'/><path d='M298 68 l16 12 l16 -12 l16 12 l16 -12 l16 12 l16 -12'/><path d='M402 70 v18'/><g stroke-opacity='.5'><path d='M74 214 l150 0 M100 200 l150 0 M74 214 l30 -16 M124 214 l30 -16 M174 214 l30 -16'/></g></svg>");
+}
+
+/* ------------------------------------------------- WOODART · INTERIORS */
+[data-atmos="woodart"] {
+  --atmos: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 240' fill='none' stroke='white' stroke-width='1.6'><path d='M-10 40 Q 140 6 300 44 T 430 40'/><path d='M-10 74 Q 140 40 300 78 T 430 74'/><path d='M-10 150 Q 150 118 300 156 T 430 150'/><path d='M-10 186 Q 150 154 300 192 T 430 186'/><path d='M-10 222 Q 150 190 300 228 T 430 222'/><path d='M-10 108 Q 150 80 250 104 T 430 108' stroke-opacity='.55'/><g transform='translate(300 120)'><ellipse rx='26' ry='15'/><ellipse rx='16' ry='9'/><ellipse rx='7' ry='4'/></g></svg>");
+}
+
+/* ------------------------------------------------------------------- IT */
+[data-atmos="it"] {
+  --atmos: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 240' fill='none' stroke='white' stroke-width='1.6'><rect x='262' y='92' width='72' height='72' rx='7'/><rect x='284' y='114' width='28' height='28' rx='3' stroke-opacity='.55'/><g stroke-width='1.2'><path d='M262 108 h-18 M262 128 h-30 v34 M262 148 h-18 M334 108 h20 M334 128 h34 M334 148 h20 v-40 h24'/><path d='M298 92 v-22 M280 92 v-14 M316 92 v-14 M298 164 v26 M280 164 v14 M316 164 v14'/></g><g fill='white' stroke='none'><circle cx='226' cy='128' r='3'/><circle cx='368' cy='128' r='3'/><circle cx='244' cy='108' r='2.5'/><circle cx='390' cy='108' r='2.5'/><circle cx='298' cy='70' r='3'/><circle cx='378' cy='188' r='3'/></g></svg>");
+}
+
+/* ----------------------------------------------------------------- SHOP */
+[data-atmos="shop"] {
+  --atmos: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 240' fill='none' stroke='white' stroke-width='1.6'><path d='M252 100 h92 l12 108 h-116 z' stroke-linejoin='round'/><path d='M276 100 a22 22 0 0 1 44 0'/><g stroke-width='1.7' stroke-opacity='.6'><path d='M96 150 v44 M104 150 v44 M113 150 v44 M126 150 v44 M133 150 v44 M144 150 v44 M156 150 v44 M164 150 v44 M176 150 v44 M184 150 v44'/></g></svg>");
+}
+
+/* Reduced-motion users: the emblem is static anyway, but keep the fade instant. */
+@media (prefers-reduced-motion: reduce) {
+  .page-head::after { transition: none; }
+}

@@ -10,7 +10,7 @@
   grid-template-columns: var(--rail-w) var(--sidebar-w) 1fr;
   height: 100vh;
   background:
-    radial-gradient(1100px 560px at 84% -14%, color-mix(in srgb, var(--epal-royal, var(--accent)) 24%, transparent), transparent 56%),
+    radial-gradient(1100px 560px at 84% -14%, color-mix(in srgb, var(--epal-royal, var(--accent)) 13%, transparent), transparent 56%),
     radial-gradient(820px 480px at -8% 8%, color-mix(in srgb, var(--epal-accent, var(--accent)) 15%, transparent), transparent 52%),
     radial-gradient(900px 900px at 50% 130%, color-mix(in srgb, var(--epal-deep, var(--bg-2)) 40%, transparent), transparent 60%),
     var(--bg);

@@ -243,13 +243,19 @@
         trend.val ? el('span.kpi-trend.' + trend.dir, { html: ui.icon(trend.dir === 'up' ? 'arrow-up-right' : trend.dir === 'down' ? 'arrow-down-right' : 'dash') + ' ' + trend.val }) : null,
         el('span.text-muted', { text: foot })
       ]),
-      spark ? el('canvas.kpi-spark', { id: id }) : null
+      spark ? el('div.kpi-spark', null, [ el('canvas', { id: id }) ]) : null
     ]);
     // money values count up softly; preformatted strings render instantly
     if (typeof value === 'number') ui.countUp(valueEl, value, function (v) { return ui.money(v, { compact: true }); });
     else valueEl.textContent = value;
     host.appendChild(tile);
-    if (spark) requestAnimationFrame(function () { var c = document.getElementById(id); if (c) EPAL.charts.spark(c, spark, trend.dir === 'down' ? '#f0506e' : '#23c17e'); });
+    // one monochrome brand-accent line per tile (inherited --accent, company-tinted);
+    // sentiment is carried by the trend chip, not the sparkline colour.
+    if (spark) requestAnimationFrame(function () {
+      var c = document.getElementById(id); if (!c) return;
+      var col = getComputedStyle(c).getPropertyValue('--accent').trim() || '#1A43BF';
+      EPAL.charts.spark(c, spark, col);
+    });
   }
 
   /* MD Briefing teaser — the daily narrative from EPAL.intel, with a jump into

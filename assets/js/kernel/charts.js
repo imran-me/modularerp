@@ -161,17 +161,34 @@
     },
 
     // tiny inline sparkline (no axes) for KPI cards
+    // Axis-less KPI sparkline. Premium treatment: ONE monochrome brand line (the
+    // caller passes the tile's accent — never sentiment green/red, which reads
+    // cheap), a whisper of area fill (~20%→0%), and a single dot on the last point.
+    // Lives in its own bottom band (see .kpi-spark) so it never crosses the value.
     spark: function (canvas, data, color) {
       applyDefaults();
       var ctx = canvas.getContext('2d');
       color = color || this.palette[1];
+      var g = ctx.createLinearGradient(0, 0, 0, 52);
+      g.addColorStop(0, hexA(color, 0.20));
+      g.addColorStop(1, hexA(color, 0.0));
+      var last = data.length - 1;
       return track(new Chart(ctx, {
         type: 'line',
         data: { labels: data.map(function (_, i) { return i; }),
-          datasets: [{ data: data, borderColor: color, borderWidth: 2, pointRadius: 0,
-            tension: 0.45, fill: true, backgroundColor: gradient(ctx, color, 60) }] },
-        options: { plugins: { legend: { display: false }, tooltip: { enabled: false } },
-          scales: { x: { display: false }, y: { display: false } } }
+          datasets: [{ data: data, borderColor: color, borderWidth: 1.75, tension: 0.38,
+            fill: true, backgroundColor: g,
+            pointRadius: data.map(function (_, i) { return i === last ? 2.6 : 0; }),
+            pointBackgroundColor: color, pointBorderColor: color, pointHoverRadius: 0,
+            capBezierPoints: true }] },
+        options: {
+          animation: { duration: 750, easing: 'easeOutQuart' },
+          layout: { padding: { top: 6, bottom: 2, left: 1, right: 3 } },
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          // grace pads the domain so the curve floats inside the band, off the edges
+          scales: { x: { display: false }, y: { display: false, grace: '20%' } },
+          elements: { line: { capStyle: 'round', joinStyle: 'round' } }
+        }
       }));
     }
   };

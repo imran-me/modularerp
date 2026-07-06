@@ -80,6 +80,10 @@
   --shadow-sm: 0 1px 2px rgba(0,0,0,.45);
   --shadow:    0 1px 1px rgba(0,0,0,.4), 0 16px 36px -14px rgba(0,4,20,.66);
   --shadow-lg: 0 2px 6px rgba(0,0,0,.5), 0 44px 84px -28px rgba(0,4,24,.78);
+  /* Layered "resting" shadow for cards — several faint navy-tinted layers stacked
+     (contact + ambient), never one hard black drop. THE premium depth cue. */
+  --shadow-card: 0 1px 2px rgba(0,2,14,.5), 0 6px 16px -6px rgba(0,4,24,.5),
+                 0 20px 44px -18px rgba(0,4,24,.62);
   --glow:      0 0 0 1px var(--border-accent), 0 10px 40px -12px color-mix(in srgb, var(--accent) 55%, transparent);
 
   --glass:      color-mix(in srgb, var(--surface) 72%, transparent);
@@ -92,8 +96,8 @@
 
 /* =============================== LIGHT =================================== */
 [data-theme="light"] {
-  --bg:        #eef1f8;
-  --bg-2:      #e7ebf4;
+  --bg:        #e8edf6;   /* cool pearl, never pure white — lets white cards lift */
+  --bg-2:      #dde5f1;
   --surface:   #ffffff;
   --surface-2: #f6f8fd;
   --surface-3: #eef2f9;
@@ -111,6 +115,9 @@
   --shadow-sm: 0 1px 2px rgba(5,22,80,.07);
   --shadow:    0 2px 4px rgba(5,22,80,.05), 0 20px 42px -18px rgba(5,22,80,.18);
   --shadow-lg: 0 4px 10px rgba(5,22,80,.07), 0 44px 84px -30px rgba(5,22,80,.24);
+  /* Layered "resting" shadow — faint navy-tinted contact + ambient layers. */
+  --shadow-card: 0 1px 2px rgba(5,22,80,.05), 0 5px 14px -4px rgba(5,22,80,.08),
+                 0 20px 40px -16px rgba(5,22,80,.14);
   --glow:      0 0 0 1px var(--border-accent), 0 12px 40px -14px color-mix(in srgb, var(--accent) 50%, transparent);
 
   --glass:      color-mix(in srgb, #ffffff 78%, transparent);

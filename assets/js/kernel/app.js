@@ -190,6 +190,12 @@
       }
       this.highlightNav(ctx);
       this.renderBreadcrumb(ctx);
+      // Stamp the vertical + module onto the content mount so atmosphere.css can
+      // paint the right bespoke line-art emblem behind the page header.
+      if (EPAL.router.mount) {
+        EPAL.router.mount.setAttribute('data-atmos', ctx.companyId || '');
+        EPAL.router.mount.setAttribute('data-module', ctx.moduleId || '');
+      }
       // rail active state
       ui.$$('.rail-co').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-co') === ctx.companyId); });
       this.toggleSidebar(false);

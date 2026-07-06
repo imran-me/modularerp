@@ -18,7 +18,7 @@
 .card {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 20%, var(--surface)), var(--surface));
   border: 1px solid var(--border); border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--hairline); position: relative; overflow: hidden; transition: border-color var(--t), box-shadow var(--t), transform var(--t);
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--hairline); position: relative; overflow: hidden; transition: border-color var(--t), box-shadow var(--t), transform var(--t);
 }
 .card.hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); transform: translateY(-2px); }
 .card-pad { padding: 20px; }
@@ -35,10 +35,15 @@
 .grid-auto { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .kpi-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px; }
 .kpi-card {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 34%, var(--surface)), var(--surface));
+  display: flex; flex-direction: column;
+  /* a whisper of accent light off the top-right (behind the jewel icon) over a
+     faint top-lit surface gradient — the surface reads as lit, not painted. */
+  background:
+    radial-gradient(130% 90% at 90% -30%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 55%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 30%, var(--surface)), var(--surface));
   border: 1px solid var(--border); border-radius: var(--r-lg);
-  padding: 20px; position: relative; overflow: hidden;
-  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--hairline);
+  padding: 22px; min-height: 170px; position: relative; overflow: hidden;
+  box-shadow: var(--shadow-card), inset 0 1px 0 var(--hairline);
   transition: transform var(--t) var(--e-out), box-shadow var(--t) var(--e-out), border-color var(--t);
 }
 /* a single fine luminous hairline along the top edge — the premium detail that
@@ -65,13 +70,23 @@
     inset 0 -10px 16px -10px rgba(0,0,0,.55),
     0 8px 18px -8px color-mix(in srgb, var(--epal-royal, var(--accent)) 70%, transparent);
 }
-.kpi-value { font-size: 29px; font-weight: 800; letter-spacing: -.025em; line-height: 1; font-variant-numeric: tabular-nums; }
-.kpi-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; }
+/* The hero number: near-foreground (NEVER brand-coloured), semibold not black,
+   tight optical tracking, tabular figures — reads as a considered financial value,
+   its confidence from size + contrast + tracking rather than heavy weight. */
+.kpi-value { font-size: 32px; font-weight: 700; letter-spacing: -.03em; line-height: 1.02;
+  color: var(--text); font-variant-numeric: tabular-nums; }
+.kpi-foot { display: flex; align-items: center; gap: 8px; margin-top: 11px; font-size: 12px; }
 .kpi-trend { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
 .kpi-trend.up { color: var(--good); background: var(--good-soft); }
 .kpi-trend.down { color: var(--bad); background: var(--bad-soft); }
 .kpi-trend.flat { color: var(--text-dim); background: var(--surface-3); }
-.kpi-spark { position: absolute; right: 14px; bottom: 12px; width: 84px; height: 34px; opacity: .9; }
+/* Trend sparkline lives in its OWN full-width band, bled to the card's bottom edge,
+   pushed down by margin-top:auto. It NEVER crosses the number. The line is
+   monochrome brand (see charts.js); semantics live only in the trend chip above. */
+.kpi-spark { position: relative; height: 52px; margin: 16px -22px -22px; margin-top: auto; }
+.kpi-spark::before { content:''; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border) 14%, var(--border) 86%, transparent); }
+.kpi-spark canvas { display: block; }
 
 /* Small stat rows (inside cards) */
 .stat-row { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); background: var(--border); border-radius: var(--r-md); overflow: hidden; }
