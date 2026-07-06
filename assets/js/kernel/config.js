@@ -234,7 +234,7 @@
    * ========================================================================*/
   var COMPANIES = [
     { id:'group', name:'Epal Group', short:'Group', type:'group', enabled:true,
-      icon:'hexagon-fill', accent:'#c8a24a', /* platinum-gold */ tagline:'Command Layer',
+      icon:'hexagon-fill', accent:'#2591D9', /* platinum-gold */ tagline:'Command Layer',
       modules: GROUP_MODULES },
 
     { id:'travels', name:'Epal Travels & Consultancy', short:'Travels', type:'company', enabled:true,

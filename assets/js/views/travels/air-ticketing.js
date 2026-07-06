@@ -50,7 +50,7 @@
     { id:'Airport Tax',      icon:'building',           color:'#f4b740' },
     { id:'Visa Fee',         icon:'passport-fill',      color:'#00b8d9' },
     { id:'Travel Insurance', icon:'shield-fill-check',  color:'#f0506e' },
-    { id:'Lounge Access',    icon:'door-open-fill',     color:'#c9a227' },
+    { id:'Lounge Access',    icon:'door-open-fill',     color:'#2591D9' },
     { id:'Other',            icon:'three-dots',         color:'#8b93a7' }
   ];
   var TTL_STATUSES = ['Hold','Ticketed','Expired'];

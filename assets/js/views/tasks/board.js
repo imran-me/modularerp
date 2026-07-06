@@ -83,7 +83,7 @@
         // live 1s ticker updates any running phase display on cards
         self._ticker = setInterval(function () {
           ui.$$('[data-live-phase]').forEach(function (n) {
-            var t = getRunningElapsed(n); if (t != null) n.textContent = ui.dur(t);
+            var t = getRunningElapsed(n); if (t != null) n.textContent = longDur(t);
           });
         }, 1000);
       },
@@ -230,11 +230,13 @@
 
       if (t.desc) body.appendChild(el('p.text-muted.mb-3', { text: t.desc }));
 
-      // overall progress
+      // overall progress — fluid fill: render at 0, then animate to pct.
+      var pbar = el('div.progress-bar.fluid', { style: { width: '0%' } });
       body.appendChild(el('div.flex.items-center.gap-2.mb-2', null, [
-        el('div.flex-1', null, [ el('div.progress', null, [ el('div.progress-bar', { style:{ width: pct + '%' } }) ]) ]),
+        el('div.flex-1', null, [ el('div.progress.progress-lg', null, [ pbar ]) ]),
         el('strong', { text: pct + '%' })
       ]));
+      requestAnimationFrame(function () { requestAnimationFrame(function () { pbar.style.width = pct + '%'; }); });
 
       // phases
       body.appendChild(el('div.section-label', { style:{ marginTop:'14px' }, text:'Phases · time tracking' }));
@@ -322,51 +324,70 @@
     redraw();
   }
 
+  var PRIORITIES = ['high', 'medium', 'low'];
+
   function phaseRow(emp, t, p, redraw, refresh) {
     var elapsed = phaseElapsed(p);
+    var team = db.employees({ companyId: emp.companyId });
+
+    // ---- left: name + live elapsed + the start→end date-time range ----------
+    var timeLine = el('div.phase-time' + (p.running ? '.running' : ''), null, [
+      p.running ? ui.frag('<span class="rec-dot"></span> ') : null,
+      el('span', p.running ? { 'data-live-phase': JSON.stringify({ accumMs: p.accumMs, startedAt: p.startedAt }) } : {},
+         p.firstStart || elapsed ? longDur(elapsed) : 'not started')
+    ]);
+    // e.g. "10.00pm:07/07/2026 → 01.00pm:08/07/2026" (or "→ in progress")
+    var rangeLine = p.firstStart
+      ? el('div.phase-range' + (p.done ? '.complete' : ''), { text: fmtDT(p.firstStart) + '  →  ' + (p.completedAt ? fmtDT(p.completedAt) : 'in progress') })
+      : null;
+
+    // ---- middle: assignee + priority (replaces the old progress bar) --------
+    var asgn = el('select.select.phase-assignee', { title: 'Assign this phase',
+      onchange: function () { p.assignee = asgn.value; db.saveTask(emp.id, t); redraw(); refresh(); } });
+    asgn.appendChild(el('option', { value: '', text: 'Unassigned' }));
+    team.forEach(function (e) { var o = el('option', { value: e.id, text: e.name }); if (e.id === p.assignee) o.selected = true; asgn.appendChild(o); });
+
+    var pri = p.priority || 'medium';
+    var priSel = el('select.select.phase-priority.pri-' + pri, { title: 'Phase priority',
+      onchange: function () { p.priority = priSel.value; db.saveTask(emp.id, t); redraw(); refresh(); } });
+    PRIORITIES.forEach(function (x) { var o = el('option', { value: x, text: x.charAt(0).toUpperCase() + x.slice(1) }); if (x === pri) o.selected = true; priSel.appendChild(o); });
+
     var row = el('div.phase' + (p.done ? '.done' : ''), null, [
-      el('div.phase-main', null, [
-        el('div.phase-name', { text: p.name }),
-        el('div.phase-time' + (p.running ? '.running' : ''), null, [
-          p.running ? ui.frag('<span class="rec-dot"></span> ') : null,
-          el('span', p.running ? { 'data-live-phase': JSON.stringify({ accumMs: p.accumMs, startedAt: p.startedAt }) } : {}, ui.dur(elapsed))
-        ])
-      ]),
-      el('div.flex.items-center.gap-2', null, [
-        el('div.progress', { style:{ width:'70px' } }, [ el('div.progress-bar', { style:{ width: p.pct + '%' } }) ]),
-        el('small.mono', { text: p.pct + '%' })
+      el('div.phase-main', null, [ el('div.phase-name', { text: p.name }), timeLine, rangeLine ]),
+      el('div.phase-meta', null, [
+        el('label.phase-field', null, [ ui.frag(ui.icon('person')), asgn ]),
+        el('label.phase-field', null, [ ui.frag(ui.icon('flag')), priSel ])
       ]),
       el('div.phase-controls')
     ]);
+
+    // ---- right: start / pause / done (records first-start & completed-at) ---
     var ctr = row.querySelector('.phase-controls');
     if (!p.done) {
       if (!p.running) {
-        ctr.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('play-fill'), title:'Start', onclick: function () {
-          // auto-pause other running phases (one timer at a time)
+        ctr.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('play-fill'), title: 'Start', onclick: function () {
           (t.phases || []).forEach(function (o) { if (o.running) { o.accumMs += Date.now() - o.startedAt; o.running = false; } });
+          if (!p.firstStart) p.firstStart = Date.now();     // record the very first start time
           p.running = true; p.startedAt = Date.now(); if (t.status === 'todo') t.status = 'inprogress';
           db.saveTask(emp.id, t); redraw(); refresh();
         } }));
       } else {
-        ctr.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('pause-fill'), title:'Pause', onclick: function () {
+        ctr.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('pause-fill'), title: 'Pause', onclick: function () {
           p.accumMs += Date.now() - p.startedAt; p.running = false; db.saveTask(emp.id, t); redraw(); refresh();
         } }));
       }
-      ctr.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('check-lg'), title:'Mark phase done', onclick: function () {
+      ctr.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('check-lg'), title: 'Mark phase done', onclick: function () {
         if (p.running) { p.accumMs += Date.now() - p.startedAt; p.running = false; }
-        p.done = true; p.pct = 100;
+        if (!p.firstStart) p.firstStart = Date.now();
+        p.done = true; p.pct = 100; p.completedAt = Date.now();   // record the completion time
         db.saveTask(emp.id, t);
-        // if all phases done → move task to Completed
         if ((t.phases || []).every(function (x) { return x.done; })) { t.status = 'done'; db.saveTask(emp.id, t); ui.toast('All phases done — task completed!', 'success'); }
         redraw(); refresh();
       } }));
     } else {
       ctr.appendChild(el('span.badge.badge-good', { html: ui.icon('check') + ' Done' }));
     }
-    // quick % setter
-    var pctInput = el('input', { type:'range', min:'0', max:'100', step:'25', value: String(p.pct),
-      oninput: function () { p.pct = +pctInput.value; p.done = p.pct >= 100; db.saveTask(emp.id, t); redraw(); refresh(); } });
-    return el('div', null, [ row ]);
+    return row;
   }
 
   function toggleBtn(active, icon, label, onClick) {
@@ -443,9 +464,25 @@
   /* ---- time math --------------------------------------------------------*/
   function phaseElapsed(p) { return (p.accumMs || 0) + (p.running && p.startedAt ? Date.now() - p.startedAt : 0); }
   function taskTotalMs(t) { return (t.phases || []).reduce(function (a, p) { return a + phaseElapsed(p); }, 0); }
+  // Overall progress = share of phases marked Done (phases no longer carry a % bar).
   function taskProgress(t) {
     var ph = t.phases || []; if (!ph.length) return t.status === 'done' ? 100 : 0;
-    return Math.round(ph.reduce(function (a, p) { return a + (p.pct || 0); }, 0) / ph.length);
+    var done = ph.filter(function (p) { return p.done; }).length;
+    return Math.round(done / ph.length * 100);
+  }
+  // "1 Hour 35 min" style elapsed (long form the owner asked for).
+  function longDur(ms) {
+    ms = ms || 0; var s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    if (h > 0) return h + ' Hour' + (h > 1 ? 's' : '') + ' ' + m + ' min';
+    if (m > 0) return m + ' min';
+    return s + ' sec';
+  }
+  // "10.00pm:07/07/2026" style timestamp.
+  function fmtDT(ms) {
+    if (!ms) return '';
+    var d = new Date(ms), hh = d.getHours(), ap = hh >= 12 ? 'pm' : 'am', h12 = hh % 12 || 12;
+    var mm = ('0' + d.getMinutes()).slice(-2), DD = ('0' + d.getDate()).slice(-2), MO = ('0' + (d.getMonth() + 1)).slice(-2);
+    return h12 + '.' + mm + ap + ':' + DD + '/' + MO + '/' + d.getFullYear();
   }
   function getRunningElapsed(node) {
     try { var d = JSON.parse(node.getAttribute('data-live-phase')); return (d.accumMs || 0) + (Date.now() - d.startedAt); }

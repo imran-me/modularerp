@@ -37,7 +37,7 @@
   var SLABS = [
     { tier: 'Bronze',   range: 'Below ৳5,00,000',   rate: '2%', color: '#b08d57' },
     { tier: 'Silver',   range: '৳5L – ৳20L',        rate: '4%', color: '#9aa4b2' },
-    { tier: 'Gold',     range: '৳20L – ৳50L',       rate: '6%', color: '#c8a24a' },
+    { tier: 'Gold',     range: '৳20L – ৳50L',       rate: '6%', color: '#2591D9' },
     { tier: 'Platinum', range: 'Above ৳50,00,000',  rate: '7%', color: '#7b5cff' }
   ];
 

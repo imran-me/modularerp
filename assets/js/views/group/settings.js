@@ -704,7 +704,7 @@
       EPAL.charts.bar(c, {
         labels: top.map(function (s) { return s.key; }),
         datasets: [{ label: 'KB', data: top.map(function (s) { return +(s.bytes / 1024).toFixed(1); }),
-          colors: top.map(function () { return '#c8a24a'; }) }],
+          colors: top.map(function () { return '#2591D9'; }) }],
         horizontal: true
       });
     });

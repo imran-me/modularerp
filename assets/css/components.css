@@ -122,6 +122,32 @@
 .phase-controls .btn { padding: 5px 10px; }
 .phase.done .phase-name { color: var(--text-mute); text-decoration: line-through; }
 
+/* ---- Task board: phase assignee + priority + start→end date-time range ----*/
+.phase { flex-wrap: wrap; }
+.phase-range { font-size: 11px; color: var(--text-mute); font-family: var(--font-mono); margin-top: 3px; letter-spacing: -0.01em; }
+.phase-range.complete { color: var(--good); }
+.phase-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.phase-field { display: inline-flex; align-items: center; gap: 5px; color: var(--text-mute); font-size: 12px; }
+.phase-field .bi { font-size: 12px; }
+.phase-assignee, .phase-priority {
+  padding: 5px 8px; font-size: 12px; border-radius: 8px; max-width: 150px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+}
+.phase-priority.pri-high   { color: var(--bad, #f0506e); border-color: color-mix(in srgb, var(--bad, #f0506e) 45%, var(--border)); }
+.phase-priority.pri-medium { color: #f4b740; border-color: color-mix(in srgb, #f4b740 45%, var(--border)); }
+.phase-priority.pri-low    { color: var(--good, #23c17e); border-color: color-mix(in srgb, var(--good, #23c17e) 45%, var(--border)); }
+
+/* ---- Fluid main progress fill (task detail) ------------------------------*/
+.progress.progress-lg { height: 12px; }
+.progress-bar.fluid { position: relative; overflow: hidden; transition: width 1.1s cubic-bezier(.22,.61,.36,1); }
+.progress-bar.fluid::after {
+  content:''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+  transform: translateX(-100%); animation: progShimmer 2.2s ease-in-out infinite;
+}
+@keyframes progShimmer { 0% { transform: translateX(-100%); } 60%, 100% { transform: translateX(220%); } }
+@media (prefers-reduced-motion: reduce) { .progress-bar.fluid { transition: none; } .progress-bar.fluid::after { animation: none; } }
+
 /* --------------------------------------------------------- Avatar stack */
 .avatar-stack { display: flex; }
 .avatar-stack .avatar { width: 28px; height: 28px; border-radius: 8px; font-size: 10.5px; margin-left: -8px; border: 2px solid var(--surface); }

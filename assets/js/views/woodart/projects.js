@@ -37,7 +37,7 @@
   var STAGES = ['Design', 'Production', 'Installation', 'Handover', 'Completed'];
   var STAGE_COLOR = {
     Design:'#7b5cff', Production:'#2f6bff', Installation:'#f4b740',
-    Handover:'#c8a24a', Completed:'#23c17e'
+    Handover:'#2591D9', Completed:'#23c17e'
   };
   var TYPE_COLOR = {
     Residential:'#6f9c1c', Office:'#2f6bff', Retail:'#e0356e', Restaurant:'#e2721b'

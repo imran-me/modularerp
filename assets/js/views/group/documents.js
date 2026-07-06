@@ -30,7 +30,7 @@
   var TYPES = {
     invoice:   { label:'Invoice',        icon:'receipt',            tone:'good',  color:'#2f6bff', badge:'INVOICE' },
     receipt:   { label:'Receipt',        icon:'cash-coin',          tone:'good',  color:'#23c17e', badge:'RECEIPT' },
-    voucher:   { label:'Journal Voucher',icon:'journal-text',       tone:'',      color:'#c8a24a', badge:'VOUCHER' },
+    voucher:   { label:'Journal Voucher',icon:'journal-text',       tone:'',      color:'#2591D9', badge:'VOUCHER' },
     quotation: { label:'Quotation',      icon:'file-earmark-text',  tone:'warn',  color:'#7b5cff', badge:'QUOTATION' },
     workorder: { label:'Work Order',     icon:'clipboard-check',    tone:'',      color:'#e2721b', badge:'WORK ORDER' },
     po:        { label:'Purchase Order',  icon:'bag-check',         tone:'',      color:'#12b3a6', badge:'PURCHASE ORDER' },

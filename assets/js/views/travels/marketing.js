@@ -344,7 +344,7 @@
       body.appendChild(el('div', null, [
         funnelRow('Recipients', c.recipients, 100, '#2f6bff'),
         funnelRow('Delivered', c.delivered, c.recipients ? Math.round(c.delivered / c.recipients * 100) : 0, '#23c17e'),
-        funnelRow('Opened', c.opened, c.recipients ? Math.round(c.opened / c.recipients * 100) : 0, '#c9a227')
+        funnelRow('Opened', c.opened, c.recipients ? Math.round(c.opened / c.recipients * 100) : 0, '#2591D9')
       ]));
       body.appendChild(el('div.flex.gap-3.mt-2', null, [
         el('div.text-mute.sm', { html: 'Delivery rate <strong class="text-good">' + deliv + '%</strong>' }),

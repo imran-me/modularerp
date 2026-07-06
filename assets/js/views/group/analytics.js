@@ -26,7 +26,7 @@
   var ui = EPAL.ui, el = ui.el;
   var db = function () { return EPAL.db; };
 
-  var GOLD = '#c8a24a', GREEN = '#23c17e', RED = '#f0506e', AMBER = '#f4b740';
+  var GOLD = '#2591D9', GREEN = '#23c17e', RED = '#f0506e', AMBER = '#f4b740';
 
   var TABS = [
     [null, 'Trends'], ['forecast', 'Forecast'],
