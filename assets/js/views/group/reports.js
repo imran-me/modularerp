@@ -56,12 +56,12 @@
   function htmlDoc(title, bodyHtml) {
     return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>' +
       'body{font-family:Inter,Arial,sans-serif;color:#111;max-width:960px;margin:36px auto;padding:0 20px}' +
-      'h1{margin:0;font-size:24px}h2{border-bottom:2px solid #2591D9;padding-bottom:6px;margin-top:26px;font-size:15px}' +
+      'h1{margin:0;font-size:24px}h2{border-bottom:2px solid #3B6FA8;padding-bottom:6px;margin-top:26px;font-size:15px}' +
       'table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid #ddd;padding:7px 9px;text-align:left;font-size:12.5px}' +
       'th{background:#f6f6f6}.num{text-align:right;font-variant-numeric:tabular-nums}.strong{font-weight:700}' +
       'tr.total td{font-weight:700;background:#faf6ec}' +
-      '.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #2591D9;padding-bottom:12px}' +
-      '.muted{color:#666;font-size:12.5px}.brand{font-weight:800;color:#2591D9;font-size:14px}</style></head><body>' +
+      '.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #3B6FA8;padding-bottom:12px}' +
+      '.muted{color:#666;font-size:12.5px}.brand{font-weight:800;color:#3B6FA8;font-size:14px}</style></head><body>' +
       '<div class="head"><div><h1>' + esc(title) + '</h1><div class="muted">' + esc(EPAL.config.group.legalName) +
       ' · generated ' + ui.date(new Date(), 'full') + '</div></div>' +
       '<div class="brand">EPAL GROUP</div></div>' + bodyHtml +
@@ -156,7 +156,7 @@
         labels: ['Sales Ledger', 'Employees', 'Payment Schedules', 'Financial Rows', 'Customers'],
         datasets: [{ label: 'Records',
           data: [sales.length, employees.length, schedules.length, fins.length, customers.length],
-          colors: ['#2f6bff', '#7b5cff', '#f4b740', '#2591D9', '#23c17e'] }],
+          colors: ['#2f6bff', '#7b5cff', '#f4b740', '#3B6FA8', '#23c17e'] }],
         horizontal: true
       });
     });

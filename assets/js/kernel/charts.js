@@ -84,7 +84,7 @@
   var money = function (v) { return EPAL.ui.compact(v); };
 
   var Charts = {
-    palette: ['#2591D9', '#2f6bff', '#6f9c1c', '#7b5cff', '#e0356e', '#e2721b', '#12b3a6', '#f4b740'],
+    palette: ['#3B6FA8', '#2f6bff', '#6f9c1c', '#7b5cff', '#e0356e', '#e2721b', '#12b3a6', '#f4b740'],
 
     destroyAll: function () { instances.forEach(function (c) { try { c.destroy(); } catch (e) {} }); instances = []; },
 

@@ -7,20 +7,20 @@
    top, deep royal-navy at the bottom).
 
    Brand palette (from the logo):
-     sky   #38BDF8   ocean  #2591D9 / #1E88E5   royal #1E40AF   deep #152A6B
-   The Tailwind colour key "brand" = ocean blue #2591D9 (the primary accent).
+     sky   #6E9AC6   ocean  #3B6FA8 / #34659B   royal #1E40AF   deep #1B3358
+   The Tailwind colour key "brand" = ocean blue #3B6FA8 (the primary accent).
 
    Stack (all free, CDN, no build): Tailwind CSS · Alpine.js · Chart.js · Bootstrap Icons
    ⇒ Laravel port: this becomes your compiled Tailwind theme + Blade layout.
    ========================================================================== */
 
 :root {
-  --sky:   #38BDF8;
-  --ocean: #2591D9;   /* brand accent */
-  --royal: #1E4F9C;
-  --deep:  #152A6B;
-  --brand: #2591D9;
-  --brandsoft: #8FD0F7;
+  --sky:   #6E9AC6;
+  --ocean: #3B6FA8;   /* brand accent */
+  --royal: #2C5486;
+  --deep:  #1B3358;
+  --brand: #3B6FA8;
+  --brandsoft: #9BBBD8;
   --line:  rgba(96, 165, 250, 0.16);
 }
 
@@ -31,8 +31,8 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   color: #e6eefb;
   background:
-    radial-gradient(1200px 600px at 82% -12%, rgba(56,189,248,0.14), transparent 60%),   /* sky glow */
-    radial-gradient(1000px 560px at -12% 8%, rgba(30,79,156,0.20), transparent 55%),      /* royal glow */
+    radial-gradient(1200px 600px at 82% -12%, rgba(110,154,198,0.14), transparent 60%),   /* sky glow */
+    radial-gradient(1000px 560px at -12% 8%, rgba(44,84,134,0.20), transparent 55%),      /* royal glow */
     linear-gradient(180deg, #081337, #0a1a47);                                            /* deep ocean navy */
   background-attachment: fixed;
   min-height: 100vh;
@@ -48,16 +48,16 @@ h1, h2, h3, .font-display { font-family: 'Sora', 'Inter', sans-serif; }
   backdrop-filter: blur(10px);
 }
 .glass-hover { transition: transform .2s ease, border-color .2s ease, background .2s ease; }
-.glass-hover:hover { transform: translateY(-2px); border-color: rgba(56,189,248,0.45); }
+.glass-hover:hover { transform: translateY(-2px); border-color: rgba(110,154,198,0.45); }
 
 .brand-line { background: linear-gradient(90deg, transparent, var(--brand), transparent); }
 .text-brand { color: var(--brand); }
-.ring-brand { box-shadow: 0 0 0 1px rgba(56,189,248,0.45), 0 8px 30px rgba(4,16,48,0.5); }
+.ring-brand { box-shadow: 0 0 0 1px rgba(110,154,198,0.45), 0 8px 30px rgba(4,16,48,0.5); }
 
 /* Sidebar active pill --------------------------------------------------------*/
 .nav-link { transition: color .15s ease, background .15s ease; }
-.nav-link:hover { background: rgba(56,189,248,0.08); color: #fff; }
-.nav-link.active { background: rgba(37,145,217,0.18); color: #fff; }
+.nav-link:hover { background: rgba(110,154,198,0.08); color: #fff; }
+.nav-link.active { background: rgba(59,111,168,0.18); color: #fff; }
 .nav-link.active .nav-ico { color: var(--sky); }
 .nav-link.active::before {
   content:''; position:absolute; left:0; top:8px; bottom:8px; width:3px;
@@ -65,15 +65,15 @@ h1, h2, h3, .font-display { font-family: 'Sora', 'Inter', sans-serif; }
 }
 
 /* KPI + accents --------------------------------------------------------------*/
-.kpi-accent { background: linear-gradient(135deg, rgba(56,189,248,0.20), rgba(30,79,156,0.06)); }
+.kpi-accent { background: linear-gradient(135deg, rgba(110,154,198,0.20), rgba(44,84,134,0.06)); }
 .pill { border: 1px solid var(--line); }
 .badge-up   { color:#34d399; background:rgba(52,211,153,0.12); }   /* semantic: profit up */
 .badge-down { color:#f87171; background:rgba(248,113,113,0.12); }  /* semantic: down */
-.badge-brand { color:var(--brandsoft); background:rgba(56,189,248,0.16); }
+.badge-brand { color:var(--brandsoft); background:rgba(110,154,198,0.16); }
 
 /* Table -----------------------------------------------------------------------*/
 .tbl-row { transition: background .15s ease; }
-.tbl-row:hover { background: rgba(56,189,248,0.05); }
+.tbl-row:hover { background: rgba(110,154,198,0.05); }
 
 /* Scrollbar ------------------------------------------------------------------*/
 ::-webkit-scrollbar { width: 10px; height: 10px; }

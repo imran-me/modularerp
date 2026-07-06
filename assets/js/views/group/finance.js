@@ -30,7 +30,7 @@
   function hasLedger() { return !!(EPAL.ledger && EPAL.ledger.accounts); }
   function can(action) { return (EPAL.perm && EPAL.perm.can) ? EPAL.perm.can('group', 'finance', action) : true; }
 
-  var GREEN = '#23c17e', RED = '#f0506e', AMBER = '#f4b740', ORANGE = '#e2721b', GOLD = '#2591D9';
+  var GREEN = '#23c17e', RED = '#f0506e', AMBER = '#f4b740', ORANGE = '#e2721b', GOLD = '#3B6FA8';
 
   var TABS = [
     [null, 'Overview'], ['pnl', 'P&L'], ['cashflow', 'Cash Flow'],

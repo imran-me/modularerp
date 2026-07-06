@@ -313,7 +313,7 @@
                 borderRadius: '7px', cursor: count ? 'pointer' : 'default', fontWeight: '700',
                 fontVariantNumeric: 'tabular-nums',
                 background: count ? 'rgba(200,162,74,' + alpha.toFixed(3) + ')' : 'rgba(139,147,167,0.08)',
-                border: active ? '2px solid #2591D9' : '1px solid rgba(139,147,167,0.18)',
+                border: active ? '2px solid #3B6FA8' : '1px solid rgba(139,147,167,0.18)',
                 color: count ? '' : 'var(--text-muted, #8b93a7)'
               },
               onclick: function () {
