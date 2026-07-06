@@ -749,10 +749,10 @@
     var att = e.attendance || {}; var tasks = db.tasksFor(e.id);
     var html = '<!doctype html><html><head><meta charset="utf-8"><title>' + e.name + ' — Profile</title>' +
       '<style>body{font-family:Inter,Arial,sans-serif;color:#111;max-width:760px;margin:40px auto;padding:0 20px}' +
-      'h1{margin:0}h2{border-bottom:2px solid #3B6FA8;padding-bottom:6px;margin-top:28px;font-size:16px}' +
+      'h1{margin:0}h2{border-bottom:2px solid #1A43BF;padding-bottom:6px;margin-top:28px;font-size:16px}' +
       'table{width:100%;border-collapse:collapse;margin-top:10px}td,th{border:1px solid #ddd;padding:8px;text-align:left;font-size:13px}' +
-      '.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #3B6FA8;padding-bottom:14px}' +
-      '.muted{color:#666;font-size:13px}.brand{font-weight:800;color:#3B6FA8}</style></head><body>' +
+      '.head{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1A43BF;padding-bottom:14px}' +
+      '.muted{color:#666;font-size:13px}.brand{font-weight:800;color:#1A43BF}</style></head><body>' +
       '<div class="head"><div><h1>' + e.name + '</h1><div class="muted">' + e.designation + ' · ' + e.dept + ' · ' + co.name + '</div></div>' +
       '<div class="brand">EPAL GROUP</div></div>' +
       '<h2>Personal & Employment</h2><table>' +

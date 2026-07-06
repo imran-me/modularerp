@@ -4,7 +4,7 @@
  * WHAT: The branded document engine — one authority for every printable business
  *   object in the group (invoice, receipt, voucher, work order, salary slip,
  *   quotation, purchase order, visa cover letter, ticket). From a plain `spec`
- *   object it renders a pixel-perfect navy (#1B2A4A) / gold (#3B6FA8) ".epal-doc"
+ *   object it renders a pixel-perfect navy (#1B2A4A) / gold (#1A43BF) ".epal-doc"
  *   DOM tree (styles in css/deepcore.css) so any module raises an on-brand
  *   document with one call and never hand-builds HTML. It draws its serial from
  *   EPAL.serial, converts amounts to words (BD lakh/crore), and can print,
@@ -54,7 +54,7 @@
   var ui = EPAL.ui;
 
   var NAVY = '#1B2A4A';
-  var GOLD = '#3B6FA8';
+  var GOLD = '#1A43BF';
 
   /* type -> serial prefix (contract-mandated map) --------------------------*/
   var PREFIX = {

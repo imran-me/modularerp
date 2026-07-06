@@ -222,7 +222,7 @@
   });
 
   /* ---- helpers ------------------------------------------------------------*/
-  function getAccent(id) { var c = EPAL.config.company(id); return c ? c.accent : '#3B6FA8'; }
+  function getAccent(id) { var c = EPAL.config.company(id); return c ? c.accent : '#1A43BF'; }
 
   function trendFrom(seriesArr) {
     var n = seriesArr.length;

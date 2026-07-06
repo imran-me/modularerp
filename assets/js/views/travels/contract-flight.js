@@ -30,7 +30,7 @@
   var RISK_WINDOW = 15;               // days-left threshold for the red alert
   var CATEGORIES = ['Umrah', 'Hajj', 'Tourist', 'Worker', 'Medical', 'Business', 'Student'];
   var CAT_COLOR = {
-    Umrah:'#23c17e', Hajj:'#3B6FA8', Tourist:'#2f6bff', Worker:'#e2721b',
+    Umrah:'#23c17e', Hajj:'#1A43BF', Tourist:'#2f6bff', Worker:'#e2721b',
     Medical:'#f0506e', Business:'#7b5cff', Student:'#18a0a0'
   };
 
@@ -159,7 +159,7 @@
               return '<span class="num ' + (u === 0 ? 'text-good' : atRisk(r) ? 'text-bad' : '') + '">' + u + '</span>'; } },
           { key:'fill', label:'Sell-through', sort:false, render:function (r) {
               var pct = r.seats ? Math.round((+r.sold || 0) / r.seats * 100) : 0;
-              var col = pct >= 90 ? '#23c17e' : pct >= 50 ? '#3B6FA8' : '#f0506e';
+              var col = pct >= 90 ? '#23c17e' : pct >= 50 ? '#1A43BF' : '#f0506e';
               return '<div style="display:flex;align-items:center;gap:8px">' +
                 '<div style="flex:1;height:7px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden">' +
                 '<div style="width:' + pct + '%;height:100%;background:' + col + '"></div></div>' +

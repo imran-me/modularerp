@@ -25,7 +25,7 @@
   'use strict';
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
 
-  var RED = '#f0506e', GREEN = '#23c17e', GOLD = '#3B6FA8';
+  var RED = '#f0506e', GREEN = '#23c17e', GOLD = '#1A43BF';
 
   EPAL.view('group/briefing', {
     render: function (ctx) {

@@ -56,7 +56,7 @@
 
   var S = EPAL.store;
 
-  var GROUP_GOLD = '#3B6FA8';
+  var GROUP_GOLD = '#1A43BF';
   var CAP = 20;
 
   /* --- little helpers -----------------------------------------------------*/

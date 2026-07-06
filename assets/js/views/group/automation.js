@@ -290,7 +290,7 @@
       EPAL.charts.bar(c, {
         labels: top.map(function (r) { return r.name.length > 34 ? r.name.slice(0, 32) + '…' : r.name; }),
         datasets: [{ label: 'Runs', data: top.map(function (r) { return r.runs || 0; }),
-          colors: top.map(function (r) { return r.active ? '#3B6FA8' : '#8b93a7'; }) }],
+          colors: top.map(function (r) { return r.active ? '#1A43BF' : '#8b93a7'; }) }],
         horizontal: true
       });
     });

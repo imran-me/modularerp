@@ -122,10 +122,17 @@
 .phase-controls .btn { padding: 5px 10px; }
 .phase.done .phase-name { color: var(--text-mute); text-decoration: line-through; }
 
-/* ---- Task board: phase assignee + priority + start→end date-time range ----*/
-.phase { flex-wrap: wrap; }
-.phase-range { font-size: 11px; color: var(--text-mute); font-family: var(--font-mono); margin-top: 3px; letter-spacing: -0.01em; }
-.phase-range.complete { color: var(--good); }
+/* ---- Task board: phase assignee + priority + time/timeline chips ----------*/
+.phase { flex-wrap: wrap; border-radius: 10px; padding: 11px 10px; margin: 0 -10px; }
+.phase.running { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* time counting + timeline sit BESIDE each other as chips */
+.phase-timerow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+.phase-time { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 11.5px; font-family: var(--font-mono); color: var(--text-mute); }
+.phase-time.running { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.phase-range { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; letter-spacing: -0.01em;
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 11px; font-family: var(--font-mono); color: var(--text-mute); }
+.phase-range.complete { color: var(--good); border-color: color-mix(in srgb, var(--good) 35%, var(--border)); background: color-mix(in srgb, var(--good) 9%, transparent); }
 .phase-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .phase-field { display: inline-flex; align-items: center; gap: 5px; color: var(--text-mute); font-size: 12px; }
 .phase-field .bi { font-size: 12px; }

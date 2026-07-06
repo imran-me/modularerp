@@ -305,6 +305,8 @@
         COLUMNS.forEach(function (c) { var o = el('option', { value:c.id, text:'Move → ' + c.title }); if (c.id === t.status) o.selected = true; moveSel.appendChild(o); });
         controls.appendChild(moveSel);
       }
+      controls.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print report',
+        onclick: function () { printTaskReport(emp, t); } }));
       controls.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('pencil') + ' Edit',
         onclick: function () { m.close(); openEditor(emp, t, isAdmin, refresh); } }));
 
@@ -352,8 +354,12 @@
       onchange: function () { p.priority = priSel.value; db.saveTask(emp.id, t); redraw(); refresh(); } });
     PRIORITIES.forEach(function (x) { var o = el('option', { value: x, text: x.charAt(0).toUpperCase() + x.slice(1) }); if (x === pri) o.selected = true; priSel.appendChild(o); });
 
-    var row = el('div.phase' + (p.done ? '.done' : ''), null, [
-      el('div.phase-main', null, [ el('div.phase-name', { text: p.name }), timeLine, rangeLine ]),
+    var row = el('div.phase' + (p.done ? '.done' : '') + (p.running ? '.running' : ''), null, [
+      el('div.phase-main', null, [
+        el('div.phase-name', { text: p.name }),
+        // time counting + the start→end timeline BESIDE it (same line)
+        el('div.phase-timerow', null, [ timeLine, rangeLine ])
+      ]),
       el('div.phase-meta', null, [
         el('label.phase-field', null, [ ui.frag(ui.icon('person')), asgn ]),
         el('label.phase-field', null, [ ui.frag(ui.icon('flag')), priSel ])
@@ -483,6 +489,125 @@
     var d = new Date(ms), hh = d.getHours(), ap = hh >= 12 ? 'pm' : 'am', h12 = hh % 12 || 12;
     var mm = ('0' + d.getMinutes()).slice(-2), DD = ('0' + d.getDate()).slice(-2), MO = ('0' + (d.getMonth() + 1)).slice(-2);
     return h12 + '.' + mm + ap + ':' + DD + '/' + MO + '/' + d.getFullYear();
+  }
+
+  function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  /* ---- Branded, print-ready TASK REPORT ---------------------------------
+   * A full one-page document of the task + every phase (assignee, priority,
+   * time spent, start→end timeline), a mini Gantt, totals and comments — in the
+   * EPAL navy/blue identity. Opens a print window and calls print().        */
+  function printTaskReport(emp, t) {
+    var phases = t.phases || [];
+    var pct = taskProgress(t);
+    var totalMs = taskTotalMs(t);
+    var statusTitle = (COLUMNS.filter(function (c) { return c.id === t.status; })[0] || { title: t.status }).title;
+    var priColor = { high: '#c0455a', medium: '#b7841c', low: '#2b8f63' };
+    function priBadge(p) { var c = priColor[p || 'medium'] || '#b7841c'; return '<span class="pri" style="color:' + c + ';border:1px solid ' + c + '55;background:' + c + '14">' + escHtml((p || 'medium')) + '</span>'; }
+
+    // rows
+    var rows = phases.map(function (p, i) {
+      var asg = p.assignee ? (db.employee(p.assignee) || { name: '—' }).name : 'Unassigned';
+      var st = p.done ? 'Done' : (p.running ? 'Running' : 'Pending');
+      var stc = p.done ? '#2b8f63' : (p.running ? '#1A43BF' : '#8b93a7');
+      return '<tr>' +
+        '<td class="c mut">' + (i + 1) + '</td>' +
+        '<td><strong>' + escHtml(p.name) + '</strong></td>' +
+        '<td>' + escHtml(asg) + '</td>' +
+        '<td>' + priBadge(p.priority) + '</td>' +
+        '<td class="mono r">' + longDur(phaseElapsed(p)) + '</td>' +
+        '<td class="mono sm">' + (p.firstStart ? fmtDT(p.firstStart) : '—') + '</td>' +
+        '<td class="mono sm">' + (p.completedAt ? fmtDT(p.completedAt) : (p.running ? 'in progress' : '—')) + '</td>' +
+        '<td><span class="stt" style="color:' + stc + ';background:' + stc + '18">' + st + '</span></td>' +
+        '</tr>';
+    }).join('');
+
+    // mini Gantt (only for phases that have started)
+    var started = phases.filter(function (p) { return p.firstStart; });
+    var gantt = '';
+    if (started.length) {
+      var lo = Math.min.apply(null, started.map(function (p) { return p.firstStart; }));
+      var hi = Math.max.apply(null, started.map(function (p) { return p.completedAt || Date.now(); }));
+      if (hi <= lo) hi = lo + 1;
+      gantt = '<div class="sec-t">Timeline</div><div class="gantt">' + phases.map(function (p) {
+        if (!p.firstStart) return '<div class="grow"><span class="glabel">' + escHtml(p.name) + '</span><div class="gtrack"><span class="gbar none">not started</span></div></div>';
+        var end = p.completedAt || Date.now();
+        var left = (p.firstStart - lo) / (hi - lo) * 100, w = Math.max(2, (end - p.firstStart) / (hi - lo) * 100);
+        var cls = p.done ? 'done' : (p.running ? 'run' : '');
+        return '<div class="grow"><span class="glabel">' + escHtml(p.name) + '</span><div class="gtrack"><span class="gbar ' + cls + '" style="left:' + left.toFixed(1) + '%;width:' + w.toFixed(1) + '%">' + longDur(phaseElapsed(p)) + '</span></div></div>';
+      }).join('') + '</div><div class="gspan mono">' + fmtDT(lo) + '  →  ' + fmtDT(hi) + '</div>';
+    }
+
+    var comments = (t.comments || []).map(function (c) {
+      var who = c.byAdmin ? 'Admin' : (db.employee(c.by) || { name: 'Someone' }).name;
+      return '<div class="cmt"><div class="cmt-h"><b>' + escHtml(who) + '</b>' + (c.byAdmin ? ' <span class="af">Admin</span>' : '') + ' · <span class="mono sm">' + fmtDT(c.at) + '</span></div><div class="cmt-b">' + escHtml(c.text) + '</div></div>';
+    }).join('') || '<div class="mut sm">No comments.</div>';
+
+    var flags = [];
+    if (t.restricted) flags.push('<span class="chip red">Restricted</span>');
+    if (t.redFlag) flags.push('<span class="chip red">Red-flagged</span>');
+
+    var html =
+'<!doctype html><html><head><meta charset="utf-8"><title>Task Report · ' + escHtml(t.id) + '</title>' +
+'<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">' +
+'<style>' +
+'*{box-sizing:border-box;margin:0;padding:0}' +
+'body{font-family:Inter,system-ui,Arial,sans-serif;color:#1d2836;background:#eef2f7;padding:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+'.doc{max-width:820px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 12px 40px rgba(20,40,70,.14)}' +
+'.head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:26px 30px;background:#1B2A4A;color:#fff;border-bottom:4px solid #1A43BF}' +
+'.brand{display:flex;align-items:center;gap:14px}' +
+'.mark{width:50px;height:50px;border-radius:13px;background:linear-gradient(150deg,#2E56C4,#0A2472);display:flex;align-items:center;justify-content:center;font-family:Sora;font-weight:800;font-size:26px;color:#fff}' +
+'.brand h1{font-family:Sora;font-size:19px;letter-spacing:.02em}.brand .tag{font-size:12px;opacity:.8}' +
+'.head .meta{text-align:right;font-size:12px;line-height:1.7;opacity:.92}.head .serial{font-family:JetBrains Mono;font-size:15px;font-weight:700;color:#7E9AE8}' +
+'.title{padding:20px 30px 6px;font-family:Sora;font-size:22px;font-weight:800;color:#1B2A4A}' +
+'.chips{padding:0 30px 6px;display:flex;gap:8px;flex-wrap:wrap}' +
+'.chip{font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;background:#eaf0f7;color:#0A2472;border:1px solid #d7e2ef}' +
+'.chip.red{background:#fbeaed;color:#c0455a;border-color:#f2ccd4}' +
+'.desc{padding:8px 30px 4px;color:#4a5568;font-size:13.5px;line-height:1.6}' +
+'.kpis{display:flex;gap:12px;padding:16px 30px 4px}' +
+'.kpi{flex:1;border:1px solid #e4ebf3;border-radius:12px;padding:12px 14px;background:linear-gradient(135deg,#f4f8fc,#fff)}' +
+'.kpi .l{font-size:11px;color:#77869a;text-transform:uppercase;letter-spacing:.04em}.kpi .v{font-family:Sora;font-size:20px;font-weight:800;color:#1B2A4A;margin-top:2px}' +
+'.pbar{margin:14px 30px 2px;height:12px;border-radius:999px;background:#e7edf4;overflow:hidden}.pbar>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#0A2472,#1A43BF,#2E56C4)}' +
+'.pnote{padding:4px 30px 6px;font-size:12px;color:#77869a}' +
+'.sec-t{padding:18px 30px 6px;font-family:Sora;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:#0A2472}' +
+'table{width:calc(100% - 60px);margin:2px 30px;border-collapse:collapse;font-size:12.5px}' +
+'thead th{background:#f2f6fb;color:#0A2472;text-align:left;padding:9px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid #dfe8f2}' +
+'tbody td{padding:9px 10px;border-bottom:1px solid #edf1f6}tbody tr:nth-child(even){background:#fafcfe}' +
+'.mono{font-family:JetBrains Mono}.sm{font-size:11px}.r{text-align:right}.c{text-align:center}.mut{color:#8b96a6}' +
+'.pri{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;text-transform:capitalize}' +
+'.stt{font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:999px}' +
+'tfoot td{padding:10px;font-weight:800;color:#1B2A4A;border-top:2px solid #1B2A4A}' +
+'.gantt{margin:2px 30px}.grow{display:flex;align-items:center;gap:10px;margin:6px 0}.glabel{width:120px;font-size:12px;color:#374356;text-align:right;flex:0 0 120px}' +
+'.gtrack{position:relative;flex:1;height:22px;background:#eef3f9;border-radius:6px}' +
+'.gbar{position:absolute;top:0;height:22px;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-family:JetBrains Mono;font-size:10px;color:#fff;background:linear-gradient(90deg,#1A43BF,#2E56C4);white-space:nowrap;overflow:hidden}' +
+'.gbar.done{background:linear-gradient(90deg,#2b8f63,#57b58c)}.gbar.run{background:linear-gradient(90deg,#0A2472,#1A43BF)}.gbar.none{position:static;background:none;color:#a3adbb;padding-left:0}' +
+'.gspan{padding:6px 30px 2px;font-size:11px;color:#8b96a6}' +
+'.cmts{padding:2px 30px}.cmt{border-left:3px solid #d7e2ef;padding:4px 0 4px 12px;margin:8px 0}.cmt-h{font-size:12px;color:#374356}.cmt-b{font-size:13px;color:#4a5568;margin-top:2px}.af{background:#1A43BF;color:#fff;font-size:9px;padding:1px 6px;border-radius:6px}' +
+'.foot{display:flex;justify-content:space-between;align-items:flex-end;padding:24px 30px 28px;margin-top:10px;border-top:1px dashed #d7e2ef}' +
+'.sign .line{width:180px;border-top:1.5px solid #1B2A4A;margin-bottom:5px}.sign{font-size:12px;color:#4a5568}.note{font-size:11px;color:#98a3b2;text-align:right}' +
+'@media print{body{background:#fff;padding:0}.doc{box-shadow:none;border-radius:0;max-width:100%}@page{size:A4;margin:14mm}}' +
+'</style></head><body><div class="doc">' +
+'<div class="head"><div class="brand"><div class="mark">E</div><div><h1>EPAL GROUP</h1><div class="tag">Task Report · Workforce</div></div></div>' +
+'<div class="meta"><div class="serial">' + escHtml(t.id) + '</div><div>Generated ' + fmtDT(Date.now()) + '</div></div></div>' +
+'<div class="title">' + escHtml(t.title) + '</div>' +
+'<div class="chips"><span class="chip">Status: ' + escHtml(statusTitle) + '</span><span class="chip">Priority: ' + escHtml(t.priority || 'normal') + '</span>' + (t.due ? '<span class="chip">Due: ' + escHtml(ui.date(t.due)) + '</span>' : '') + flags.join('') + '</div>' +
+(t.desc ? '<div class="desc">' + escHtml(t.desc) + '</div>' : '') +
+'<div class="kpis"><div class="kpi"><div class="l">Progress</div><div class="v">' + pct + '%</div></div>' +
+'<div class="kpi"><div class="l">Phases</div><div class="v">' + phases.filter(function (p) { return p.done; }).length + ' / ' + phases.length + '</div></div>' +
+'<div class="kpi"><div class="l">Total time tracked</div><div class="v">' + longDur(totalMs) + '</div></div></div>' +
+'<div class="pbar"><span style="width:' + pct + '%"></span></div><div class="pnote">' + pct + '% complete · ' + phases.length + ' phase' + (phases.length === 1 ? '' : 's') + '</div>' +
+'<div class="sec-t">Phases &amp; time tracking</div>' +
+'<table><thead><tr><th>#</th><th>Phase</th><th>Assignee</th><th>Priority</th><th class="r">Time spent</th><th>Started</th><th>Completed</th><th>Status</th></tr></thead>' +
+'<tbody>' + (rows || '<tr><td colspan="8" class="mut c">No phases.</td></tr>') + '</tbody>' +
+(phases.length ? '<tfoot><tr><td colspan="4">Total time tracked</td><td class="mono r">' + longDur(totalMs) + '</td><td colspan="3"></td></tr></tfoot>' : '') + '</table>' +
+gantt +
+'<div class="sec-t">Comments</div><div class="cmts">' + comments + '</div>' +
+'<div class="foot"><div class="sign"><div class="line"></div>Authorised signature</div><div class="note">Generated by Epal Group ERP<br>' + fmtDT(Date.now()) + '</div></div>' +
+'</div><script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script></body></html>';
+
+    var w = window.open('', '_blank');
+    if (!w) { ui.toast('Allow pop-ups to print the task report', 'error'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   }
   function getRunningElapsed(node) {
     try { var d = JSON.parse(node.getAttribute('data-live-phase')); return (d.accumMs || 0) + (Date.now() - d.startedAt); }

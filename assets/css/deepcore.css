@@ -2,7 +2,7 @@
  * EPAL GROUP ERP  ·  css/deepcore.css
  * ----------------------------------------------------------------------------
  * Styles for the Deep Core Pass primitives: line-item repeaters, branded
- * documents (navy #1B2A4A / gold #3B6FA8), the MD Briefing, approvals inbox,
+ * documents (navy #1B2A4A / gold #1A43BF), the MD Briefing, approvals inbox,
  * audit timeline, RFM grid and account ledgers. Loaded after components.css so
  * it can lean on existing tokens (var(--panel), var(--line), var(--text)…).
  * ==========================================================================*/
@@ -10,8 +10,8 @@
 :root {
   --epal-navy: #1B2A4A;
   --epal-navy-2: #24365c;
-  --epal-gold: #3B6FA8;
-  --epal-gold-soft: #9BBBD8;
+  --epal-gold: #1A43BF;
+  --epal-gold-soft: #7E9AE8;
 }
 
 /* ---- Line-item repeater (forms.js type:'items') --------------------------*/
@@ -49,7 +49,7 @@
 .epal-doc-brand { display: flex; align-items: center; gap: 14px; }
 .epal-doc-logo {
   width: 52px; height: 52px; border-radius: 12px; flex: 0 0 auto;
-  background: linear-gradient(135deg, #6E9AC6, #2C5486);
+  background: linear-gradient(135deg, #2E56C4, #0A2472);
   color: var(--epal-navy); font-weight: 800; font-size: 26px;
   display: flex; align-items: center; justify-content: center; font-family: 'Sora', sans-serif;
 }

@@ -64,12 +64,12 @@
     var el = document.getElementById(canvasId); if (!el || !w.Chart) return;
     var d = Travels.data.revenue;
     var g = el.getContext('2d').createLinearGradient(0, 0, 0, 240);
-    g.addColorStop(0, 'rgba(59,111,168,0.38)'); g.addColorStop(1, 'rgba(59,111,168,0.02)');   // ocean-blue fill
+    g.addColorStop(0, 'rgba(26,67,191,0.38)'); g.addColorStop(1, 'rgba(26,67,191,0.02)');   // ocean-blue fill
     new w.Chart(el, {
       type: 'line',
       data: { labels: d.labels, datasets: [
-        { label: 'Revenue', data: d.revenue, borderColor: '#3B6FA8', backgroundColor: g, fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
-        { label: 'Profit', data: d.profit, borderColor: '#9BBBD8', backgroundColor: 'transparent', tension: 0.4, borderWidth: 2, pointRadius: 0, borderDash: [5,4] }   // sky-blue
+        { label: 'Revenue', data: d.revenue, borderColor: '#1A43BF', backgroundColor: g, fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 },
+        { label: 'Profit', data: d.profit, borderColor: '#7E9AE8', backgroundColor: 'transparent', tension: 0.4, borderWidth: 2, pointRadius: 0, borderDash: [5,4] }   // sky-blue
       ]},
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -89,7 +89,7 @@
     new w.Chart(el, {
       type: 'doughnut',
       data: { labels: d.labels, datasets: [{ data: d.data,
-        backgroundColor: ['#3B6FA8','#2C5486','#6E9AC6','#4E86B5','#7FA6CC'], borderColor: 'rgba(0,0,0,0.2)', borderWidth: 2 }] },   // blue family
+        backgroundColor: ['#1A43BF','#0A2472','#2E56C4','#2E56C4','#5C7AD8'], borderColor: 'rgba(0,0,0,0.2)', borderWidth: 2 }] },   // blue family
       options: { responsive: true, maintainAspectRatio: false, cutout: '68%',
         plugins: { legend: { position: 'right', labels: { color: '#9fb0c9', font: baseFont(), usePointStyle: true, boxWidth: 8, padding: 12 } } } }
     });
