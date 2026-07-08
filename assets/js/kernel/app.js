@@ -56,12 +56,15 @@
       this.renderShell();                // 4. build rail + sidebar + topbar
       this.bindGlobal();                 // 5. keyboard, bus subscriptions
       EPAL.router.mount = $('#view');    // 6. tell router where to render
+      // Subscribe BEFORE router.start(): the initial render emits route:changed,
+      // and onRoute must catch it too (it stamps data-atmos/data-module on #view
+      // for the ambient scenes — missing it left the first pageload unthemed).
+      EPAL.bus.on('route:changed', this.onRoute.bind(this));
       EPAL.router.start();               // 7. go
       if (EPAL.bootEngines) EPAL.bootEngines();  // 8. start Deep Core engines (scheduler, audit…)
       // reactive re-renders
       EPAL.bus.on('modules:changed', this.refreshNav.bind(this));
       EPAL.bus.on('auth:changed', function () { App.renderShell(); EPAL.router.render(); });
-      EPAL.bus.on('route:changed', this.onRoute.bind(this));
       EPAL.bus.on('notify', function (n) {
         ui.toast(n.text, n.level, { title: n.title });
         App.refreshNotifications();

@@ -42,11 +42,20 @@
   top: 0; right: 0;                               /* stays inside the scroll box */
   width: 540px; height: 316px; max-width: 60%;
   opacity: .12;                                   /* felt, not seen (light) */
-  background: color-mix(in srgb, var(--accent) 55%, var(--text));
+  /* NO background here: it is painted only by the per-vertical rules below.
+     (If the base rule painted ink and --atmos was ever unset — e.g. before the
+     router stamps data-atmos — the un-masked box would render as a solid
+     rectangle. Ink and mask must always arrive together.) */
   /* mask nudged up/right so the motif bleeds toward the corner WITHOUT the box
      leaving the container (which would force a horizontal scrollbar). */
   -webkit-mask: var(--atmos, none) no-repeat right -30px top -26px / 116%;
           mask: var(--atmos, none) no-repeat right -30px top -26px / 116%;
+}
+/* ink is applied ONLY when a vertical has claimed the page (mask + paint together) */
+[data-atmos="group"]#view::before, [data-atmos="travels"]#view::before,
+[data-atmos="construction"]#view::before, [data-atmos="woodart"]#view::before,
+[data-atmos="it"]#view::before, [data-atmos="shop"]#view::before {
+  background: color-mix(in srgb, var(--accent) 55%, var(--text));
 }
 [data-theme="dark"] #view::before { opacity: .18; }   /* a touch more on navy */
 /* keep the app content above the watermark */

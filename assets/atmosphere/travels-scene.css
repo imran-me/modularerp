@@ -1,0 +1,162 @@
+/* ============================================================================
+ * EPAL GROUP ERP  ·  assets/atmosphere/travels-scene.css
+ * ----------------------------------------------------------------------------
+ * THE TRAVELS AMBIENT AIRPORT — a faint, cinematic airfield that lives BEHIND
+ * the Travels workspace: drifting clouds, a control tower with a turning beacon,
+ * a runway receding to the horizon with sequenced "comet" centreline lights and
+ * a 2-red/2-white PAPI, a jet-bridge gate with a parked airliner, a plane
+ * taxiing, a departure climbing out, an aircraft tracing a great-circle route,
+ * and a slow ATC radar sweep.
+ *
+ * DESIGN LAW (so it reads premium, never a cartoon):
+ *   1. It is BACKGROUND. Content always paints crisp on top (#view is z-index 1);
+ *      the whole scene sits at a low master opacity and only breathes through the
+ *      negative space. Motion is slow and calm.
+ *   2. Mostly the ONE brand blue (silhouettes, runway, planes, routes). Only a
+ *      few pin-point authentic lights carry colour — PAPI red/white, the red
+ *      anti-collision beacon, blue taxiway edge, a warm gate glow — kept tiny.
+ *   3. GPU-only: every animation is transform/opacity. `will-change` only on the
+ *      few continuously-moving nodes. Freezes to a still frame under
+ *      prefers-reduced-motion; pauses when the tab is hidden.
+ *
+ * BINDING: assets/atmosphere/travels-scene.js injects the markup as the first
+ *   child of `.main`, and toggles `.on` by watching #view[data-atmos]="travels".
+ *
+ * ==> LARAVEL / PHP MAPPING: pure presentation. Ship this folder as a front-end
+ *     asset; render the container once in the Travels layout and gate it on the
+ *     active company. No backend model.
+ * ========================================================================== */
+
+/* The content column becomes the positioning context; content sits above. */
+.main { position: relative; }
+.main > #view { position: relative; z-index: 1; }
+
+/* On Travels the full airport scene replaces the small corner emblem
+   (atmosphere.css) — one atmosphere per screen, never two globes. */
+[data-atmos="travels"]#view::before { display: none; }
+
+/* ------------------------------------------------------------- scene shell */
+.ascene{
+  position: absolute; inset: var(--topbar-h, 62px) 0 0 0; z-index: 0;
+  overflow: hidden; pointer-events: none;
+  opacity: 0; transition: opacity .9s var(--e-out, ease);
+  /* ---- DARK (dusk airfield): lights glow on the app's navy canvas ---- */
+  --ink:        #7E9AE8;   /* silhouettes, runway paint, planes, routes */
+  --ink-soft:   rgba(126,154,232,.5);
+  --glow:       #eaf3ff;   /* white runway / centreline / nav lights    */
+  --papi-red:   #ff6f61;
+  --beacon:     #ff5a4d;   /* red anti-collision                        */
+  --taxi-edge:  #6ea0ff;   /* blue taxiway edge                         */
+  --gate-warm:  #ffbf73;   /* terminal windows / gate apron             */
+  --master:     .62;       /* scene master opacity when active          */
+}
+[data-theme="light"] .ascene{
+  /* ---- LIGHT (hazy daytime airfield): soft navy line-art on pearl ---- */
+  --ink:        #1A43BF;
+  --ink-soft:   rgba(26,67,191,.34);
+  --glow:       #2f6bff;
+  --papi-red:   #d3514b;
+  --beacon:     #d3514b;
+  --taxi-edge:  #2f6bff;
+  --gate-warm:  #c9762a;
+  --master:     .32;
+}
+.ascene.on{ opacity: var(--master); }
+
+/* pause everything when the tab is hidden (battery-friendly) */
+.ascene.paused *{ animation-play-state: paused !important; }
+
+/* the master vignette that seats the airfield into the corners (gentle) */
+.ascene::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  box-shadow: inset 0 -4vmin 10vmin -6vmin color-mix(in srgb, var(--bg, #00072D) 60%, transparent),
+              inset 0 5vmin 14vmin -10vmin color-mix(in srgb, var(--bg, #00072D) 46%, transparent);
+}
+
+/* ------------------------------------------------------------- horizon haze */
+.asky{
+  position:absolute; left:0; right:0; bottom:0; height:62%;
+  background:
+    radial-gradient(120% 90% at 50% 100%, color-mix(in srgb, var(--ink) 22%, transparent), transparent 62%);
+  opacity:.5;
+}
+
+/* ------------------------------------------------------------------ clouds */
+.aclouds{ position:absolute; inset:0; overflow:hidden; }
+.ac{ position:absolute; border-radius:50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--ink) 60%, transparent), transparent);
+  filter: blur(10px); will-change: transform; }
+.ac1{ top:14%; left:-30%; width:44%; height:16%; opacity:.10; animation: ac-drift 150s linear infinite; }
+.ac2{ top:26%; left:-40%; width:60%; height:20%; opacity:.07; filter:blur(16px); animation: ac-drift 240s linear infinite; }
+.ac3{ top:8%;  left:-25%; width:30%; height:12%; opacity:.12; filter:blur(7px); animation: ac-drift 104s linear infinite; }
+@keyframes ac-drift{ from{ transform: translate3d(0,0,0); } to{ transform: translate3d(320%,0,0); } }
+
+/* --------------------------------------------------------------- svg art */
+.ascene-art{ position:absolute; inset:0; width:100%; height:100%; display:block; color: var(--ink); }
+.ascene-art .sil{ fill: color-mix(in srgb, var(--ink) 70%, transparent); }        /* silhouettes */
+.ascene-art .tarmac{ fill: color-mix(in srgb, var(--ink) 10%, transparent); }
+.ascene-art .paint{ stroke: color-mix(in srgb, var(--glow) 60%, transparent); fill:none; }
+.ascene-art .route{ stroke: var(--ink); fill:none; stroke-opacity:.5; stroke-dasharray:3 9; stroke-linecap:round; }
+.ascene-art .plane{ fill: color-mix(in srgb, var(--ink) 82%, transparent); }
+.ascene-art .win{ fill: var(--gate-warm); opacity:.65; }
+.ascene-art .bridge{ stroke: color-mix(in srgb, var(--ink) 70%, transparent); fill: color-mix(in srgb, var(--ink) 14%, transparent); }
+
+/* runway centreline "comet": each lamp flashes in turn, near→far, ~2 Hz.
+   --i is set per-lamp (0 = nearest); the bright window spans a couple of lamps
+   so it reads as a ball of light rushing down the runway toward the horizon. */
+.cl{ fill: var(--glow); }
+.ascene.on .cl{ animation: cl-comet var(--cyc, .5s) linear infinite; }
+.cl{ animation-delay: calc(var(--i,0) * var(--step, .033s) * -1); }
+@keyframes cl-comet{ 0%{ opacity:1; } 12%{ opacity:.34; } 26%,100%{ opacity:.06; } }
+
+/* edge lights — steady, faint */
+.edge{ fill: color-mix(in srgb, var(--glow) 78%, transparent); opacity:.5; }
+
+/* PAPI (2 white far, 2 red near) + threshold — steady */
+.papi-w{ fill: var(--glow); } .papi-r{ fill: var(--papi-red); }
+.thresh{ stroke: color-mix(in srgb, var(--glow) 70%, transparent); }
+
+/* red anti-collision beacon on parked / taxiing planes (~1 Hz) */
+.beacon{ fill: var(--beacon); }
+.ascene.on .beacon{ animation: beacon 1.1s steps(1,end) infinite; }
+@keyframes beacon{ 0%,86%{ opacity:.12; } 88%,100%{ opacity:1; } }
+
+/* white wing strobe — a double-tap every ~1.4s */
+.strobe{ fill: var(--glow); }
+.ascene.on .strobe{ animation: strobe 1.4s linear infinite; }
+@keyframes strobe{ 0%,3%{opacity:1;} 5%,9%{opacity:.08;} 11%,14%{opacity:1;} 16%,100%{opacity:.08;} }
+
+/* control-tower rotating beacon beam + its pip */
+.tower-beam{ fill: var(--glow); transform-box: fill-box; transform-origin: 50% 100%; opacity:.16; }
+.ascene.on .tower-beam{ animation: tower-turn 6s linear infinite; }
+@keyframes tower-turn{ to{ transform: rotate(360deg); } }
+.tower-pip{ fill: var(--beacon); }
+.ascene.on .tower-pip{ animation: beacon 2s steps(1,end) infinite; }
+
+/* a couple of faint twinkling stars at dusk */
+.star{ fill: var(--glow); opacity:.3; }
+.ascene.on .star{ animation: twinkle 4s ease-in-out infinite; }
+.star:nth-of-type(2n){ animation-delay: -1.7s; }
+.star:nth-of-type(3n){ animation-delay: -2.9s; }
+@keyframes twinkle{ 0%,100%{opacity:.12;} 50%{opacity:.5;} }
+
+/* ------------------------------------------------------------------ radar */
+.aradar{ position:absolute; top:6%; right:5%; width:16vmin; height:16vmin; max-width:190px; max-height:190px;
+  border-radius:50%; opacity:.5;
+  background:
+    radial-gradient(circle, transparent 58%, color-mix(in srgb, var(--ink) 26%, transparent) 59% 60%, transparent 61%),
+    repeating-radial-gradient(circle, transparent 0 2.4vmin, color-mix(in srgb, var(--ink) 20%, transparent) 2.4vmin 2.45vmin);
+}
+.ar-sweep{ position:absolute; inset:0; border-radius:50%;
+  background: conic-gradient(from 0deg, color-mix(in srgb, var(--ink) 42%, transparent) 0deg,
+    color-mix(in srgb, var(--ink) 0%, transparent) 62deg, transparent 360deg);
+  will-change: transform; }
+.ascene.on .ar-sweep{ animation: radar-sweep 5s linear infinite; }
+@keyframes radar-sweep{ to{ transform: rotate(360deg); } }
+
+/* ------------------------------------------------ reduced motion → freeze */
+@media (prefers-reduced-motion: reduce){
+  .ascene *{ animation: none !important; }
+  .ar-sweep{ transform: rotate(38deg); }
+  .cl{ opacity:.12; }
+}
