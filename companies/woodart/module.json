@@ -1,0 +1,187 @@
+{
+  "key": "woodart",
+  "title": "Woodart Interiors",
+  "short": "Woodart",
+  "icon": "tree-fill",
+  "accent": "#6f9c1c",
+  "tagline": "Design · Build · Fit-out",
+  "enabled": true,
+  "type": "company",
+  "routes_prefix": "/woodart",
+  "note": "PHASE 2 MANIFEST — declarative mirror of kernel/config.js (live registry until Phase 3).",
+  "modules": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "icon": "speedometer2",
+      "desc": "Projects, pipeline, workshop load, margins.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "crm",
+      "label": "Leads & CRM",
+      "icon": "person-lines-fill",
+      "desc": "Design enquiries → site visits → deals.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "projects",
+      "label": "Projects",
+      "icon": "easel2-fill",
+      "desc": "Design-build projects, phases & milestones.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "active",
+          "label": "Active Projects",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "design",
+          "label": "Design Studio",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "milestones",
+          "label": "Milestones",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "gallery",
+          "label": "Gallery",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "estimates",
+      "label": "Estimates & BOQ",
+      "icon": "calculator-fill",
+      "desc": "Quotations, bill of materials, costing.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "quotations",
+          "label": "Quotations",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "boq",
+          "label": "Bill of Materials",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "costing",
+          "label": "Costing",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "clients",
+      "label": "Clients",
+      "icon": "person-hearts",
+      "desc": "Homeowners, developers, corporates.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "materials",
+      "label": "Materials",
+      "icon": "boxes",
+      "desc": "Wood, laminates, hardware, finishes inventory.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "production",
+      "label": "Workshop",
+      "icon": "hammer",
+      "desc": "Fabrication jobs, machine & labour scheduling.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "installation",
+      "label": "Site & Install",
+      "icon": "truck",
+      "desc": "Delivery, installation, site handover & snags.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "procurement",
+      "label": "Procurement",
+      "icon": "cart-fill",
+      "desc": "Vendors, purchase orders, GRN.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "icon": "cash-stack",
+      "desc": "Income, expenses, project P&L.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "ledgers",
+      "label": "Ledgers",
+      "icon": "journal-text",
+      "desc": "General & client ledgers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "hrm",
+      "label": "HRM",
+      "icon": "people-fill",
+      "desc": "Designers, carpenters, site crew.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "icon": "file-earmark-bar-graph",
+      "desc": "Project, material & financial reports.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "analytics",
+      "label": "Analytics",
+      "icon": "graph-up",
+      "desc": "Margin analysis, wastage, on-time delivery.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "tasks",
+      "label": "My Tasks",
+      "icon": "kanban",
+      "desc": "Personal Kanban board with phase timers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "gear-fill",
+      "desc": "Woodart configuration.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    }
+  ]
+}

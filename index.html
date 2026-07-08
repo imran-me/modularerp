@@ -60,7 +60,7 @@
   <link rel="stylesheet" href="assets/css/atmosphere.css" />
   <!-- Ambient background scenes — all animation themes live in assets/atmosphere/ -->
   <link rel="stylesheet" href="companies/travels/app/atmosphere/travels-scene.css" />
-  <link rel="stylesheet" href="assets/atmosphere/interior-scene.css" />
+  <link rel="stylesheet" href="companies/woodart/app/atmosphere/interior-scene.css" />
   <!-- MIGRATION Phase 1 (see MIGRATION_STATUS.md): committed Tailwind build.
        tw- prefixed utilities only; EMPTY until Phase-4 conversions add classes.
        Loads last so converted screens' utilities win specificity ties. -->
@@ -147,16 +147,16 @@
   <script src="companies/travels/modules/contract-flight/view.js"></script>
   <script src="companies/travels/modules/marketing/view.js"></script>
   <!-- Per-concern deep modules -->
-  <script src="assets/js/views/shop/pos.js"></script>
-  <script src="assets/js/views/construction/projects.js"></script>
-  <script src="assets/js/views/woodart/projects.js"></script>
-  <script src="assets/js/views/it/projects.js"></script>
+  <script src="companies/shop/modules/pos/view.js"></script>
+  <script src="companies/construction/modules/projects/view.js"></script>
+  <script src="companies/woodart/modules/projects/view.js"></script>
+  <script src="companies/it/modules/projects/view.js"></script>
 
   <!-- ===================== BOOT (must be LAST) ===================== -->
   <!-- app.js auto-initialises after all views have registered themselves. -->
   <script src="assets/js/kernel/app.js"></script>
   <!-- Ambient background scenes — self-contained, mount behind the content. -->
   <script src="companies/travels/app/atmosphere/travels-scene.js"></script>
-  <script src="assets/atmosphere/interior-scene.js"></script>
+  <script src="companies/woodart/app/atmosphere/interior-scene.js"></script>
 </body>
 </html>

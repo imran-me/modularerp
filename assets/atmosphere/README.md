@@ -12,7 +12,7 @@ transform/opacity.
 | Scene | Files | Shows on | What it is |
 |-------|-------|----------|------------|
 | **Airport** | `companies/travels/app/atmosphere/travels-scene.{css,js}` (moved in Phase 2 — self-contained with its company) | Travels (`woodart`→ no; `travels`) | A dusk airfield: runway with sequenced "comet" centreline lights + PAPI, a gate with a parked airliner, a taxiing plane, a departure that holds then climbs out, a great-circle cruiser, control tower with a turning beacon, and an ATC radar sweep. |
-| **Interior** | `interior-scene.css` · `interior-scene.js` | Interiors (`woodart`) | A living room that **builds itself as you scroll**: `--p` 0→1 cross-fades _Draft_ (blueprint grid, dimensions, drafting tools, wood swatches) → _Fit-out_ (sofa, rug, table, chair, shelves, plant, floor lamp slide in) → _Reveal_ (lamps warm up, the window turns golden, light pools + dust motes). The pendant sways and the plant breathes throughout. |
+| **Interior** | `companies/woodart/app/atmosphere/interior-scene.{css,js}` (moved in Phase 2) | Interiors (`woodart`) | A living room that **builds itself as you scroll**: `--p` 0→1 cross-fades _Draft_ (blueprint grid, dimensions, drafting tools, wood swatches) → _Fit-out_ (sofa, rug, table, chair, shelves, plant, floor lamp slide in) → _Reveal_ (lamps warm up, the window turns golden, light pools + dust motes). The pendant sways and the plant breathes throughout. |
 
 ## How a scene binds
 
