@@ -1,37 +1,52 @@
 /* ============================================================================
  * EPAL GROUP ERP  ·  assets/atmosphere/travels-scene.js
  * ----------------------------------------------------------------------------
- * Builds the ambient AIRPORT SCENE that sits behind the Travels workspace and
- * shows it only while the user is in the Travels vertical. Everything is drawn
- * from scratch as SVG + a few HTML layers (clouds, radar) — zero external
- * assets, so it ships free on GitHub Pages with no licensing or CSP concerns.
+ * Builds the ambient DUSK AIRFIELD that sits behind the Travels workspace and
+ * shows only while the user is in the Travels vertical. Everything is drawn from
+ * scratch as SVG + a few HTML layers — zero external assets, so it ships free on
+ * GitHub Pages with no licensing or CSP concerns.
  *
  * WHAT IT RENDERS (see travels-scene.css for how each part is lit/animated):
- *   · drifting cloud layers (parallax)                      · a control tower
- *   · a runway receding to the horizon with sequenced        with a blinking
- *     "comet" centreline lights, edge lights, a PAPI and      obstruction pip
- *     a threshold                                            · a jet-bridge gate
- *   · a parked airliner + passenger queue                     with a taxiing and
- *   · a departing aircraft climbing out (hold → rotate)       a great-circle
- *   · an aircraft tracing a great-circle route                cruising aircraft
- *   · a slow ATC radar sweep (HTML/conic-gradient layer)
+ *   ATMOSPHERE   a dusk sky gradient, a low sun with a warm horizon glow,
+ *                dusk stars, drifting parallax clouds, a slow ATC radar sweep
+ *   HORIZON      a two-band city skyline (atmospheric perspective) with tiny lit
+ *                windows that blink; a control tower with a white/green airport
+ *                beacon + a blinking obstruction pip; a hangar; a fluttering
+ *                windsock
+ *   AIRFIELD     a runway receding to the horizon: sequenced "comet" centreline
+ *                lights, edge lights, threshold + piano keys, a 2-red/2-white
+ *                PAPI, and an APPROACH "rabbit" (sequenced flashers) leading a
+ *                landing to the numbers; a lit taxiway (green centre / blue edge)
+ *   TRAFFIC      a LANDING aircraft on final approach (landing light + touchdown
+ *                puff), a DEPARTURE that holds short then rotates and climbs out
+ *                trailing contrails, a high CRUISER on a great-circle with
+ *                contrails, an aircraft TAXIING, a baggage train + fuel bowser on
+ *                the apron, a parked airliner + passenger queue at a jet bridge
  *
- * HOW IT BINDS: injected as the FIRST child of `.main` (so it is behind #view
- *   content, which is z-index 1). A MutationObserver watches the data-atmos that
- *   app.js already stamps on #view and toggles `.on` for travels only. Motion is
- *   paused when the tab is hidden and dropped entirely for reduced-motion users.
+ * DESIGN LAW (so it reads premium, never a cartoon):
+ *   1. It is BACKGROUND. Content paints crisp on top (#view is z-index 1); the
+ *      scene sits at a low master opacity and breathes through the negative space.
+ *   2. Mostly the ONE brand blue; only authentic pin-point lights carry colour —
+ *      PAPI red/white, the white/green beacon, green taxiway centre, blue taxiway
+ *      edge, a warm gate glow + sun — all kept tiny.
+ *   3. GPU-only (transform/opacity + SMIL motion). Freezes to a still frame under
+ *      prefers-reduced-motion; pauses when the tab is hidden.
  *
- * ==> LARAVEL / PHP MAPPING: front-end presentation only. In Blade, render the
- *     same container once in the Travels layout; no controller/model needed.
+ * BINDING: injected as the FIRST child of `.main` (behind #view). A
+ *   MutationObserver watches the data-atmos app.js stamps on #view and toggles
+ *   `.on` for travels only.
+ *
+ * ==> LARAVEL / PHP MAPPING: front-end presentation only; render the container
+ *     once in the Travels layout. No controller/model.
  * ========================================================================== */
 (function () {
   'use strict';
 
   var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ---- tiny geometry helpers (perspective spacing of runway lights) ------- */
+  /* ---- tiny geometry helpers (perspective spacing) ----------------------- */
   function lerp(a, b, t) { return a + (b - a) * t; }
-  function ease(t) { return Math.pow(t, 1.7); }   // compress spacing toward the horizon
+  function ease(t) { return Math.pow(t, 1.7); }   // compress spacing toward horizon
 
   /* ---- runway centreline: lamps that flash in turn = a comet toward horizon */
   function centreline() {
@@ -40,13 +55,11 @@
       var t = k / (n - 1);
       var y = lerp(880, 556, ease(t));
       var r = lerp(5.6, 1.2, t);
-      // --i (0 = nearest lamp) drives the staggered flash in the CSS
       out += '<circle class="cl" cx="800" cy="' + y.toFixed(1) + '" r="' + r.toFixed(1) + '" style="--i:' + k + '"/>';
     }
     return out;
   }
-
-  /* ---- runway edge lights down both sides (steady, perspective-spaced) ----- */
+  /* ---- runway edge lights down both sides (steady, perspective-spaced) ---- */
   function edges() {
     var n = 12, out = '';
     for (var k = 0; k < n; k++) {
@@ -59,8 +72,7 @@
     }
     return out;
   }
-
-  /* ---- centreline dashes painted on the tarmac ---------------------------- */
+  /* ---- centreline dashes painted on the tarmac --------------------------- */
   function centreDashes() {
     var n = 7, out = '';
     for (var k = 0; k < n; k++) {
@@ -71,38 +83,102 @@
     }
     return out;
   }
-
-  /* ---- the passenger queue snaking to the terminal door ------------------- */
+  /* ---- APPROACH "rabbit": sequenced flashers leading up to the threshold -- */
+  function rabbit() {
+    var n = 6, out = '';
+    for (var k = 0; k < n; k++) {
+      var t = k / (n - 1);
+      var y = lerp(548, 470, t);                 // threshold → up toward horizon
+      var r = lerp(2.6, 1.2, t);
+      out += '<circle class="rabbit" cx="800" cy="' + y.toFixed(1) + '" r="' + r.toFixed(1) + '" style="--i:' + k + '"/>';
+    }
+    return out;
+  }
+  /* ---- lit taxiway from the runway exit curving to the gate --------------- */
+  function taxiway() {
+    var pts = [[612, 776], [566, 726], [524, 668], [492, 606], [474, 552]], out = '';
+    for (var i = 0; i < pts.length; i++) {
+      var r = 2.6 - i * 0.32;
+      out += '<circle class="taxi-g" cx="' + pts[i][0] + '" cy="' + pts[i][1] + '" r="' + r.toFixed(1) + '"/>';
+      out += '<circle class="taxi-b" cx="' + (pts[i][0] + 20) + '" cy="' + (pts[i][1] + 2) + '" r="' + (r * 0.7).toFixed(1) + '"/>';
+    }
+    return out;
+  }
+  /* ---- the passenger queue snaking to the terminal door ------------------ */
   function queue() {
     var out = '', x = 214;
     for (var k = 0; k < 7; k++) { out += '<rect class="sil" x="' + (x + k * 9) + '" y="' + (506 - (k % 2)) + '" width="3.4" height="8" rx="1.6"/>'; }
     return out;
   }
 
-  /* ---- reusable aircraft (drawn centred on the origin, nose toward +x so
-         motion-path auto-rotation points them the right way) ---------------- */
-  function planeSide() {
-    return '<path class="plane" d="M-34 2.6 C-34 -2 -28 -4.6 -8 -4.6 L20 -4.6 C30 -4.6 36 -2 40 0 C36 2 30 4.6 20 4.6 L-8 4.6 C-28 4.6 -34 2.6 -34 2.6 Z"/>' +
-           '<path class="plane" d="M-30 -4 L-39 -15 L-32 -15 L-23 -4 Z"/>' +           /* vertical fin  */
-           '<path class="plane" d="M0 4 L17 15 L23 4 Z"/>' +                            /* wing          */
-           '<ellipse class="plane" cx="6" cy="6.2" rx="7" ry="2.6"/>' +                 /* engine        */
-           '<circle class="beacon" cx="-3" cy="-4.6" r="1.7"/>' +                        /* red beacon    */
-           '<circle class="strobe" cx="40" cy="0" r="1.5"/>';                            /* nav strobe    */
+  /* ---- a lit-window grid for skyline towers (a few blink) ---------------- */
+  function winGrid(x, y, w, h) {
+    var out = '', cols = Math.max(1, Math.floor(w / 8)), rows = Math.max(1, Math.floor(h / 10)), i = 0;
+    for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+      i++;
+      out += '<rect class="bwin' + (i % 4 === 0 ? ' blink' : '') + '" x="' + (x + c * 8 + 2) + '" y="' + (y + r * 10 + 2) +
+             '" width="4" height="5" style="--i:' + i + '"/>';
+    }
+    return out;
+  }
+  /* ---- distant city skyline: a faint far band + nearer lit towers -------- */
+  function skyline() {
+    var far = [[600, 496, 20, 24], [624, 486, 16, 34], [646, 498, 22, 22], [672, 490, 18, 30],
+               [1044, 494, 18, 26], [1068, 484, 22, 36], [1094, 496, 26, 24], [1360, 490, 18, 30], [1382, 500, 22, 20]];
+    var b = '';
+    for (var i = 0; i < far.length; i++) b += '<rect class="sil-far" x="' + far[i][0] + '" y="' + far[i][1] + '" width="' + far[i][2] + '" height="' + far[i][3] + '"/>';
+    // two nearer towers on the right with lit, blinking windows
+    b += '<g class="sil">' +
+         '<rect x="1300" y="450" width="34" height="70"/>' +
+         '<rect x="1340" y="470" width="26" height="50"/>' +
+         '</g>' + winGrid(1305, 460, 24, 54) + winGrid(1344, 478, 18, 40);
+    return b;
+  }
+
+  /* ---- reusable aircraft (drawn centred on origin, nose toward +x so
+         motion-path auto-rotation points them the right way). `trail` adds
+         twin contrails for the high, fast movers. ----------------------------*/
+  function planeSide(trail) {
+    return (trail ? '<path class="contrail" d="M-40 -3.4 L-150 -3.4 M-40 3.4 L-150 3.4"/>' : '') +
+           '<path class="plane" d="M-34 2.6 C-34 -2 -28 -4.6 -8 -4.6 L20 -4.6 C30 -4.6 36 -2 40 0 C36 2 30 4.6 20 4.6 L-8 4.6 C-28 4.6 -34 2.6 -34 2.6 Z"/>' +
+           '<path class="plane" d="M-30 -4 L-39 -15 L-32 -15 L-23 -4 Z"/>' +           /* vertical fin */
+           '<path class="plane" d="M0 4 L17 15 L23 4 Z"/>' +                            /* wing         */
+           '<ellipse class="plane" cx="6" cy="6.2" rx="7" ry="2.6"/>' +                 /* engine       */
+           '<circle class="beacon" cx="-3" cy="-4.6" r="1.7"/>' +                        /* red beacon   */
+           '<circle class="strobe" cx="40" cy="0" r="1.5"/>' +                           /* nav strobe   */
+           '<circle class="landing-light" cx="41" cy="1.4" r="1.7"/>';                   /* landing light*/
   }
   function planeTop() {
     return '<ellipse class="plane" cx="0" cy="0" rx="30" ry="4.8"/>' +
-           '<path class="plane" d="M4 0 L-14 -26 L-5 -26 L15 0 Z"/>' +                   /* wings (swept) */
+           '<path class="plane" d="M4 0 L-14 -26 L-5 -26 L15 0 Z"/>' +                   /* wings (swept)*/
            '<path class="plane" d="M4 0 L-14 26 L-5 26 L15 0 Z"/>' +
-           '<path class="plane" d="M-26 0 L-35 -10 L-30 -10 L-21 0 Z"/>' +              /* tailplane     */
+           '<path class="plane" d="M-26 0 L-35 -10 L-30 -10 L-21 0 Z"/>' +              /* tailplane    */
            '<path class="plane" d="M-26 0 L-35 10 L-30 10 L-21 0 Z"/>' +
            '<circle class="beacon" cx="0" cy="0" r="1.8"/>';
   }
+  /* ---- ground-service silhouettes ---------------------------------------- */
+  function bagTrain() {
+    return '<g class="veh">' +
+      '<rect x="0" y="-7" width="15" height="11" rx="2"/>' +                            /* tug   */
+      '<circle class="v-wheel" cx="3.5" cy="5" r="2"/><circle class="v-wheel" cx="11.5" cy="5" r="2"/>' +
+      '<rect x="19" y="-4" width="13" height="8" rx="1.6"/>' +                           /* cart1 */
+      '<rect x="35" y="-4" width="13" height="8" rx="1.6"/>' +                           /* cart2 */
+      '<rect x="51" y="-4" width="13" height="8" rx="1.6"/>' +                           /* cart3 */
+      '</g>';
+  }
+  function bowser() {
+    return '<g class="veh sil" transform="translate(508 654)">' +
+      '<rect x="0" y="-8" width="13" height="11" rx="2"/>' +                             /* cab   */
+      '<rect x="14" y="-11" width="30" height="14" rx="5"/>' +                           /* tank  */
+      '<circle class="v-wheel" cx="5" cy="4" r="2.4"/><circle class="v-wheel" cx="30" cy="4" r="2.4"/><circle class="v-wheel" cx="39" cy="4" r="2.4"/>' +
+      '</g>';
+  }
 
-  /* a mover = an aircraft that travels a named path (unless reduced-motion,
-     in which case we drop it and keep the calm static airfield).
-     `hold` = departure behaviour: sit lined-up for ~28% of the cycle, then go.
-     Every mover fades at the loop seam so the restart never reads as a teleport. */
-  function mover(pathId, dur, scale, plane, hold) {
+  /* a mover = an aircraft/vehicle that travels a named path (dropped for
+     reduced-motion). `hold` = departure behaviour: sit lined-up for ~28% of the
+     cycle, then go. Every mover fades at the loop seam so the restart never
+     reads as a teleport. */
+  function mover(pathId, dur, scale, art, hold) {
     if (REDUCED) return '';
     var motion = hold
       ? '<animateMotion dur="' + dur + 's" repeatCount="indefinite" rotate="auto" calcMode="linear" keyTimes="0;0.28;1" keyPoints="0;0;1"><mpath href="#' + pathId + '"/></animateMotion>'
@@ -110,71 +186,94 @@
     var fade = hold
       ? '<animate attributeName="opacity" dur="' + dur + 's" repeatCount="indefinite" values="1;1;1;0;0" keyTimes="0;0.28;0.86;0.95;1"/>'
       : '<animate attributeName="opacity" dur="' + dur + 's" repeatCount="indefinite" values="0;1;1;0" keyTimes="0;0.08;0.9;1"/>';
-    return '<g>' + motion + fade + '<g transform="scale(' + scale + ')">' + plane + '</g></g>';
+    return '<g>' + motion + fade + '<g transform="scale(' + scale + ')">' + art + '</g></g>';
+  }
+  /* the puff of tyre smoke at the touchdown point, phase-locked to the landing
+     (same duration → stays in sync; blooms only as the wheels kiss the numbers) */
+  function touchdown(dur) {
+    if (REDUCED) return '';
+    return '<circle class="touchdown" cx="800" cy="553" r="2">' +
+      '<animate attributeName="r" dur="' + dur + 's" repeatCount="indefinite" values="1;1;10;16" keyTimes="0;0.9;0.94;0.99"/>' +
+      '<animate attributeName="opacity" dur="' + dur + 's" repeatCount="indefinite" values="0;0;0.55;0" keyTimes="0;0.9;0.93;0.99"/>' +
+      '</circle>';
   }
 
   /* ------------------------------------------------------------- the scene */
   function sceneHTML() {
+    var LAND = 19;    // landing cycle (seconds) — puff is locked to this
     var svg =
       '<svg class="ascene-art" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" aria-hidden="true">' +
-        /* ---- motion paths (invisible carriers) + the two visible routes ---- */
+        /* motion paths (invisible) + the two faint great-circle routes */
         '<defs></defs>' +
-        '<path id="rt-fly" d="M100 260 Q800 70 1500 240" fill="none"/>' +
-        '<path id="rt-dep" d="M812 552 Q1000 480 1180 390 Q1360 300 1520 200" fill="none"/>' +
+        '<path id="rt-fly"  d="M100 250 Q800 64 1500 236" fill="none"/>' +
+        '<path id="rt-dep"  d="M812 552 Q1000 480 1180 390 Q1360 300 1520 196" fill="none"/>' +
+        '<path id="rt-land" d="M118 214 Q470 392 792 552 L808 648" fill="none"/>' +
         '<path id="rt-taxi" d="M648 570 Q810 560 992 570" fill="none"/>' +
-        '<path class="route" d="M100 260 Q800 70 1500 240"/>' +
-        '<path class="route" d="M60 380 Q720 210 1540 360" stroke-opacity="0.3"/>' +
+        '<path id="rt-svc"  d="M170 656 Q680 642 1200 662" fill="none"/>' +
+        '<path class="route" d="M100 250 Q800 64 1500 236"/>' +
+        '<path class="route" d="M60 372 Q720 204 1540 352" stroke-opacity="0.28"/>' +
 
-        /* ---- a few dusk stars ---- */
+        /* dusk stars */
         '<circle class="star" cx="300" cy="150" r="1.6"/><circle class="star" cx="520" cy="96" r="1.3"/>' +
         '<circle class="star" cx="1040" cy="120" r="1.5"/><circle class="star" cx="1300" cy="200" r="1.3"/>' +
         '<circle class="star" cx="760" cy="70" r="1.2"/><circle class="star" cx="1180" cy="80" r="1.4"/>' +
+        '<circle class="star" cx="180" cy="220" r="1.2"/><circle class="star" cx="960" cy="176" r="1.2"/>' +
 
-        /* ---- distant skyline silhouette along the horizon ---- */
-        '<g class="sil">' +
-          '<rect x="612" y="486" width="26" height="34"/><rect x="648" y="474" width="20" height="46"/>' +
-          '<rect x="676" y="492" width="30" height="28"/><rect x="880" y="480" width="22" height="40"/>' +
-          '<rect x="908" y="490" width="26" height="30"/>' +
-        '</g>' +
+        skyline() +
 
-        /* terminal + queue + jet bridge reaching out to the parked airliner
-           (plane sits ON the apron, nose-in toward the bridge, sensible scale) */
+        /* terminal + queue + jet bridge reaching out to the parked airliner */
         '<path class="sil" d="M150 520 L150 470 Q150 460 162 460 L438 460 Q452 460 452 474 L452 520 Z"/>' +
         '<rect class="win" x="176" y="478" width="248" height="6" rx="3"/>' +
         queue() +
         '<path class="bridge" d="M452 480 L498 494 L498 502 L452 488 Z"/>' +
-        '<g transform="translate(548 508) scale(-1.15 1.15)">' + planeSide() + '</g>' +
+        '<g transform="translate(548 508) scale(-1.15 1.15)">' + planeSide(false) + '</g>' +
+        bowser() +
 
         /* hangar */
         '<path class="sil" d="M980 520 L980 476 Q1068 442 1156 476 L1156 520 Z"/>' +
 
-        /* control tower: shaft, cab, rotating beacon beam + blinking pip */
+        /* windsock on a pole beside the runway */
+        '<g class="windsock" transform="translate(1084 452)">' +
+          '<line class="ws-pole" x1="0" y1="0" x2="0" y2="66"/>' +
+          '<g class="ws-cone"><path d="M0 5 L46 1 L42 12 L36 11 L33 18 L27 15 L0 18 Z"/></g>' +
+        '</g>' +
+
+        /* control tower: shaft, cab, white/green airport beacon + obstruction pip */
         '<rect class="sil" x="1236" y="396" width="15" height="124"/>' +
         '<path class="sil" d="M1222 396 L1265 396 L1258 370 L1229 370 Z"/>' +
-        '<path class="tower-beam" d="M1243 366 L1225 322 L1261 322 Z"/>' +
-        '<circle class="tower-pip" cx="1243" cy="366" r="3.2"/>' +
+        '<circle class="beacon-w" cx="1243" cy="360" r="2.6"/>' +
+        '<circle class="beacon-g" cx="1243" cy="360" r="2.6"/>' +
+        '<circle class="tower-pip" cx="1243" cy="384" r="2.6"/>' +
 
-        /* ---- the runway: faint tarmac trapezoid + paint + lights ---- */
+        /* the runway: faint tarmac + paint + lights */
         '<path class="tarmac" d="M584 900 L1016 900 L816 552 L784 552 Z"/>' +
         centreDashes() +
-        '<line class="paint" x1="590" y1="893" x2="1010" y2="893" stroke-width="3"/>' +  /* threshold bar */
-        '<line class="paint" x1="640" y1="876" x2="640" y2="862" stroke-width="3"/>' +   /* piano keys    */
+        '<line class="paint" x1="590" y1="893" x2="1010" y2="893" stroke-width="3"/>' +   /* threshold  */
+        '<line class="paint" x1="640" y1="876" x2="640" y2="862" stroke-width="3"/>' +    /* piano keys */
         '<line class="paint" x1="692" y1="876" x2="692" y2="862" stroke-width="3"/>' +
         '<line class="paint" x1="908" y1="876" x2="908" y2="862" stroke-width="3"/>' +
         '<line class="paint" x1="960" y1="876" x2="960" y2="862" stroke-width="3"/>' +
         edges() +
         centreline() +
+        rabbit() +
+        taxiway() +
         /* PAPI — two white (on slope) then two red, just left of the threshold */
         '<circle class="papi-w" cx="514" cy="870" r="3"/><circle class="papi-w" cx="528" cy="870" r="3"/>' +
         '<circle class="papi-r" cx="542" cy="870" r="3"/><circle class="papi-r" cx="556" cy="870" r="3"/>' +
 
-        /* ---- the moving aircraft ---- */
-        mover('rt-taxi', 46, 0.8, planeTop(), false) +          /* taxiing, slow      */
-        mover('rt-dep', 17, 1.15, planeSide(), true) +          /* departure (hold→go)*/
-        mover('rt-fly', 34, 1.25, planeSide(), false) +         /* great-circle cruise*/
+        touchdown(LAND) +
+
+        /* the moving traffic */
+        mover('rt-svc',  64, 1.0,  bagTrain(),       false) +   /* baggage train, apron  */
+        mover('rt-taxi', 46, 0.8,  planeTop(),       false) +   /* taxiing, slow         */
+        mover('rt-land', LAND, 1.0, planeSide(false), false) +  /* landing on final      */
+        mover('rt-dep',  17, 1.15, planeSide(true),  true) +    /* departure (hold → go) */
+        mover('rt-fly',  34, 1.25, planeSide(true),  false) +   /* great-circle cruise   */
       '</svg>';
 
     return '<div class="ascene" aria-hidden="true">' +
+             '<div class="asky-grad"></div>' +
+             '<div class="asun"></div>' +
              '<div class="asky"></div>' +
              '<div class="aclouds"><span class="ac ac1"></span><span class="ac ac2"></span><span class="ac ac3"></span></div>' +
              svg +
@@ -185,8 +284,8 @@
   /* ------------------------------------------------------------- mount + bind */
   function mount() {
     var main = document.querySelector('.main');
-    if (!main) { return void setTimeout(mount, 120); }       // wait for the shell
-    if (main.querySelector('.ascene')) return;               // already mounted
+    if (!main) { return void setTimeout(mount, 120); }
+    if (main.querySelector('.ascene')) return;
     main.insertAdjacentHTML('afterbegin', sceneHTML());
 
     var view = document.getElementById('view');
@@ -196,8 +295,6 @@
     function refresh() { scene.classList.toggle('on', view.getAttribute('data-atmos') === 'travels'); }
     refresh();
     new MutationObserver(refresh).observe(view, { attributes: true, attributeFilter: ['data-atmos'] });
-
-    // stop animating when the tab is in the background
     document.addEventListener('visibilitychange', function () {
       scene.classList.toggle('paused', document.hidden);
     });
