@@ -58,8 +58,9 @@
   <link rel="stylesheet" href="assets/css/deepcore.css" />
   <link rel="stylesheet" href="assets/css/animations.css" />
   <link rel="stylesheet" href="assets/css/atmosphere.css" />
-  <!-- Ambient airport scene for the Travels vertical (its own folder). -->
+  <!-- Ambient background scenes — all animation themes live in assets/atmosphere/ -->
   <link rel="stylesheet" href="assets/atmosphere/travels-scene.css" />
+  <link rel="stylesheet" href="assets/atmosphere/interior-scene.css" />
 </head>
 
 <body>
@@ -150,7 +151,8 @@
   <!-- ===================== BOOT (must be LAST) ===================== -->
   <!-- app.js auto-initialises after all views have registered themselves. -->
   <script src="assets/js/kernel/app.js"></script>
-  <!-- Ambient Travels airport scene — mounts behind the content, self-contained. -->
+  <!-- Ambient background scenes — self-contained, mount behind the content. -->
   <script src="assets/atmosphere/travels-scene.js"></script>
+  <script src="assets/atmosphere/interior-scene.js"></script>
 </body>
 </html>

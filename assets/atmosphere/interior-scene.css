@@ -1,0 +1,161 @@
+/* ============================================================================
+ * EPAL GROUP ERP  ·  assets/atmosphere/interior-scene.css
+ * ----------------------------------------------------------------------------
+ * THE INTERIORS AMBIENT ROOM — a living room that BUILDS ITSELF AS YOU SCROLL,
+ * behind the Woodart Interiors workspace. A single scroll-progress variable
+ * `--p` (0 at the top of the page → 1 at the bottom, written by interior-scene.js)
+ * cross-fades three phases over an always-present room shell:
+ *
+ *   --p 0.0 → 0.5   THE DRAFT    blueprint floor grid, dimension lines, a
+ *                                drafting set-square + compass, wood swatches
+ *   --p 0.2 → 0.6   THE FIT-OUT  furniture slides up and settles (sofa, rug,
+ *                                table, chair, shelves, plant, floor lamp)
+ *   --p 0.55 → 1.0  THE REVEAL   lamps warm up, the window turns golden, light
+ *                                pools spill on the floor, dust motes drift
+ *
+ * DESIGN LAW (identical to the airport scene):
+ *   1. Background only — #view content paints on top (z-index 1); low master
+ *      opacity, breathes through the negative space.
+ *   2. One brand hue for all line-art; only lamps + window carry warm light.
+ *   3. GPU-only (transform/opacity). Freezes under prefers-reduced-motion;
+ *      pauses when the tab is hidden OR the vertical isn't active.
+ *
+ * BINDING: interior-scene.js injects `.iscene` as the first child of `.main`
+ *   (behind #view), toggles `.on` for woodart, and writes `--p` on scroll.
+ * ========================================================================== */
+
+/* .main is already position:relative + #view z-index:1 (set by travels-scene.css,
+   which loads first). Guard here too in case this ships standalone. */
+.main { position: relative; }
+.main > #view { position: relative; z-index: 1; }
+
+/* On Interiors the full room replaces the small corner emblem (atmosphere.css). */
+[data-atmos="woodart"]#view::before { display: none; }
+
+.iscene{
+  position: absolute; inset: var(--topbar-h, 62px) 0 0 0; z-index: 0;
+  overflow: hidden; pointer-events: none;
+  opacity: 0; transition: opacity .9s var(--e-out, ease);
+  --p: 0;                   /* scroll progress, written by JS */
+  /* ---- DARK (evening styled room): warm lamplight on the navy canvas ---- */
+  --ink:      #7E9AE8;      /* furniture + wall line-art          */
+  --ink-soft: rgba(126,154,232,.5);
+  --line:     rgba(126,154,232,.7);
+  --warm:     #ffbe72;      /* lamplight / golden-hour window     */
+  --warm-2:   #ff9f5a;
+  --glass:    #2a3f74;      /* daytime window fill                */
+  --master:   .58;
+}
+[data-theme="light"] .iscene{
+  /* ---- LIGHT (airy daytime room): soft navy line-art on pearl ---- */
+  --ink:      #1A43BF;
+  --ink-soft: rgba(26,67,191,.32);
+  --line:     rgba(26,67,191,.5);
+  --warm:     #e0912f;
+  --warm-2:   #d3691e;
+  --glass:    #bcd2ff;
+  --master:   .34;
+}
+.iscene.on{ opacity: var(--master); }
+
+/* pause when hidden OR when the vertical isn't active (no wasted compositing) */
+.iscene.paused *, .iscene:not(.on) *{ animation-play-state: paused !important; }
+
+/* seat the room into the frame with a gentle vignette */
+.iscene::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  box-shadow: inset 0 -5vmin 12vmin -7vmin color-mix(in srgb, var(--bg, #00072D) 58%, transparent),
+              inset 0 6vmin 15vmin -11vmin color-mix(in srgb, var(--bg, #00072D) 44%, transparent);
+}
+/* a soft warmth that grows into the room as you reach the reveal */
+.i-haze{
+  position:absolute; inset:0;
+  background: radial-gradient(80% 60% at 78% 34%, color-mix(in srgb, var(--warm) 26%, transparent), transparent 60%);
+  opacity: clamp(0, calc((var(--p) - 0.5) / 0.45), 1); transition: opacity .2s linear;
+}
+
+/* --------------------------------------------------------------- svg base */
+.iscene-art{ position:absolute; inset:0; width:100%; height:100%; display:block; color: var(--ink); }
+.iscene-art line, .iscene-art path, .iscene-art rect, .iscene-art ellipse, .iscene-art circle{
+  vector-effect: non-scaling-stroke;
+}
+
+/* the world pans a touch left as the page scrolls — a gentle camera move */
+.i-world{ transform: translateX(calc(var(--p) * -46px)); transition: transform .18s linear; }
+
+/* room shell — always present, drawn in fine line */
+.r-line { stroke: var(--line); stroke-width: 1.6; fill:none; }
+.r-line-s{ stroke: color-mix(in srgb, var(--ink) 60%, transparent); stroke-width: 1.3; fill:none; }
+.r-skirt{ stroke: var(--ink-soft); stroke-width: 3; }
+.r-sill { stroke: var(--line); stroke-width: 2.4; }
+.r-art  { stroke: var(--ink-soft); stroke-width: 1.4; fill:none; }
+/* the window glass: cool by day, warms toward golden hour with scroll */
+.win-glass{
+  fill: color-mix(in srgb, var(--glass) calc(60% - var(--p) * 10%), transparent);
+  transition: fill .25s linear;
+}
+
+/* ---- THE DRAFT: blueprint, fades out as furniture arrives -------------- */
+.i-draft{ opacity: clamp(0, calc((0.5 - var(--p)) / 0.42), 1); transition: opacity .18s linear; }
+.d-grid { stroke: var(--ink-soft); stroke-width: 1; opacity:.5; }
+.d-dim  { stroke: var(--ink-soft); stroke-width: 1.2; fill:none; }
+.d-tool { stroke: color-mix(in srgb, var(--ink) 65%, transparent); stroke-width: 1.4; fill:none; }
+.d-arc  { stroke-dasharray: 3 6; }
+.d-swatch rect{ fill: none; stroke: var(--ink-soft); stroke-width: 1.2; }
+.d-swatch path{ stroke: var(--ink-soft); stroke-width: 1; fill:none; }
+/* the compass arc quietly re-draws itself — a hand sketching */
+.iscene.on .d-arc{ stroke-dasharray: 200; animation: d-draw 7s ease-in-out infinite; }
+@keyframes d-draw{ 0%{ stroke-dashoffset:200; } 45%,55%{ stroke-dashoffset:0; } 100%{ stroke-dashoffset:-200; } }
+
+/* ---- THE FIT-OUT: furniture builds in, each piece a touch after the last */
+.i-fitout{ opacity: clamp(0, calc((var(--p) - 0.18) / 0.32), 1); transition: opacity .18s linear; }
+.i-fitout .fi{
+  fill: none; stroke: var(--line); stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round;
+  /* slide up + settle; staggered by --d so pieces arrive in sequence */
+  transform: translateY(calc((1 - clamp(0, calc((var(--p) - 0.14 - var(--d,0) * 0.05) / 0.28), 1)) * 30px));
+  transition: transform .2s linear;
+}
+.i-fitout .rug{ stroke-width: 1.4; }
+.i-fitout .rug-in{ stroke: var(--ink-soft); }
+.p-shade{ fill: color-mix(in srgb, var(--ink) 12%, transparent); }
+.i-warm { fill: var(--warm); stroke: none; }      /* lamp/pendant glow, lit in reveal */
+.i-warm2{ stroke: var(--warm-2); }
+
+/* pendant sways from its ceiling anchor at all times */
+.p-cord{ stroke: var(--ink-soft); stroke-width: 1.4; }
+.p-shade{ stroke: var(--line); stroke-width: 1.7; }
+.p-bulb{ stroke: none; }
+.i-pendant{ transform-box: view-box; transform-origin: 770px 96px; }
+.iscene.on .i-pendant{ animation: sway 7.5s ease-in-out infinite; }
+@keyframes sway{ 0%,100%{ transform: rotate(-1.6deg); } 50%{ transform: rotate(1.6deg); } }
+
+/* plant fronds breathe */
+.i-plant .frond{ stroke: var(--line); stroke-width: 1.7; fill:none; }
+.i-plant{ transform-box: fill-box; transform-origin: 50% 100%; }
+.iscene.on .i-plant{ animation: breathe 9s ease-in-out infinite; }
+@keyframes breathe{ 0%,100%{ transform: rotate(-1.1deg) scaleY(1); } 50%{ transform: rotate(1.1deg) scaleY(1.02); } }
+
+/* ---- THE REVEAL: lamps warm, window glows, motes drift ----------------- */
+.i-reveal{ opacity: clamp(0, calc((var(--p) - 0.55) / 0.4), 1); transition: opacity .2s linear; }
+.pool{ fill: var(--warm); opacity:.14; filter: blur(6px); }
+.beam{ fill: var(--warm); opacity:.06; }
+.mote{ fill: var(--warm); opacity:0; }
+.iscene.on .i-reveal .mote{ animation: mote-rise 9s ease-in-out infinite; animation-delay: calc(var(--m,0) * -1.2s); }
+@keyframes mote-rise{
+  0%{ transform: translateY(24px); opacity:0; }
+  30%,70%{ opacity:.7; }
+  100%{ transform: translateY(-70px); opacity:0; }
+}
+/* the warm lamp/pendant glows fade in only for the reveal, then pulse gently.
+   (--p drives the fade so it works cross-branch without a shared ancestor.) */
+.i-warm{ opacity: clamp(0, calc((var(--p) - 0.6) / 0.35), .9); transition: opacity .25s linear; }
+.iscene.on .i-warm{ animation: glow 5s ease-in-out infinite; }
+@keyframes glow{ 0%,100%{ filter: brightness(1); } 50%{ filter: brightness(1.35); } }
+
+/* ------------------------------------------------ reduced motion → freeze */
+@media (prefers-reduced-motion: reduce){
+  .iscene *{ animation: none !important; }
+  .i-world{ transition: none; }
+  /* land on a calm, fully-furnished, softly-lit room */
+  .iscene{ --p: .72; }
+}
