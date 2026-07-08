@@ -1,0 +1,11 @@
+/* ============================================================================
+ * EPAL GROUP ERP  ·  platform/design-system/tailwind.src.css
+ * ----------------------------------------------------------------------------
+ * Tailwind INPUT file (dev-machine build only; output committed to
+ * assets/css/tailwind.built.css). Utilities only:
+ *  - no @tailwind base  → preflight/reset stays with assets/css/base.css (R1)
+ *  - no @tailwind components → nothing invents styles
+ * Utilities are tw- prefixed (see tailwind.config.js) so they can coexist with
+ * the current stylesheets during the screen-by-screen Phase 4 conversion.
+ * ==========================================================================*/
+@tailwind utilities;

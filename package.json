@@ -1,0 +1,12 @@
+{
+  "name": "epal-group-erp",
+  "private": true,
+  "description": "Dev-machine tooling ONLY (Tailwind CLI). The deployed app is a no-build static site — the build OUTPUT (assets/css/tailwind.built.css) is committed; node is never needed to run or deploy the app.",
+  "scripts": {
+    "tw:build": "tailwindcss -c platform/design-system/tailwind.config.js -i platform/design-system/tailwind.src.css -o assets/css/tailwind.built.css --minify",
+    "tw:watch": "tailwindcss -c platform/design-system/tailwind.config.js -i platform/design-system/tailwind.src.css -o assets/css/tailwind.built.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

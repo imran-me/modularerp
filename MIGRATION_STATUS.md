@@ -23,8 +23,10 @@
   - [x] Owner said "go" (2026-07-08); 3 gating decisions asked with
         recommendations (Tailwind mechanism · discovery mechanism · irreducible-CSS
         exemption) — answers recorded below when given
-- [ ] **Phase 1 — Lock the design tokens** (Tailwind config seeded from
-      `assets/css/tokens.css` REAL values; app unchanged with Tailwind present-but-unused)
+- [x] **Phase 1 — Lock the design tokens** — platform/design-system/tailwind.config.js
+      seeded verbatim from tokens.css (tw- prefix, preflight off, theme-aware var()
+      colors); committed build assets/css/tailwind.built.css is EMPTY (0 bytes);
+      verified: computed-style diff = NONE, boot sweep 190/0/0
 - [ ] **Phase 2 — Restructure into self-contained folders** (Travels first, then
       group-cockpit, woodart, it, shop, construction; commit per move; boot sweep per move)
 - [ ] **Phase 3 — Bridge + auto-discovery** (group totals proven identical before
@@ -37,20 +39,26 @@
 | Date | Step | Verified by | Commit |
 |------|------|-------------|--------|
 | 2026-07-08 | Docs + CLAUDE.md + tracker added; backup folder + baseline tag created | 616/616 files; tag on GitHub | (this commit) |
-| 2026-07-08 | Phase 0 inventory: 12-agent verified sweep -> `docs/PHASE0-INVENTORY.md` (exec summary + 6 reports + verdict appendix); tracker updated | 60 claims adversarially checked | (this commit) |
+| 2026-07-08 | Phase 0 inventory: 12-agent verified sweep -> `docs/PHASE0-INVENTORY.md` (exec summary + 6 reports + verdict appendix); tracker updated | 60 claims adversarially checked | c1eaf4b |
+| 2026-07-08 | Phase 1: design lock — tailwind.config from real tokens; empty built css wired last in index.html; owner decisions recorded | computed-style diff NONE; boot sweep 190/0/0 | (this commit) |
 
-## Open decisions (blockers for their phase)
+## Decisions (ruled by owner, 2026-07-08)
 
-1. **Tailwind on a no-build repo** — the app is deliberately build-free (GitHub
-   Pages). Options: Play CDN (runtime JIT) vs a local `npx tailwindcss` build
-   step committed as a static css file vs keeping tokens.css as the single
-   source with utilities referencing vars. → needs owner call at Phase 1.
-2. **Auto-discovery on static hosting** — a browser cannot list folders over
-   HTTP. Closest faithful mechanisms: per-company `module.json` fetch probe
-   (404 = absent) from a candidates list, or one `<script>` tag per company
-   folder whose absence 404s gracefully. → needs owner call at Phase 3.
-3. **Atmosphere scenes CSS** — complex keyframe animations cannot be expressed
-   as pure Tailwind utilities without a plugin/config block; the brief's
-   "animations kept identical" note applies. Proposal: they move INTO their
-   company folder (self-contained) and keep their css files as "animation
-   assets", exempt from the no-custom-css rule. → confirm at Phase 4.
+1. **Tailwind mechanism (Phase 1): local CLI build, committed CSS.** Free
+   Tailwind CLI runs on the dev machine; the generated .css is committed and
+   served statically (Pages stays free/no-build-to-deploy). Engineering notes:
+   Tailwind v3 config-file style per the architecture doc; preflight DISABLED
+   (base.css owns the reset — R1); utilities PREFIXED `tw-` because base.css
+   defines .flex/.gap-2/.hidden/... with DIFFERENT values than Tailwind
+   (inventory finding) and bare-name coexistence would let a converted screen
+   shift unconverted ones; semantic colors map to var(--...) references so
+   [data-theme] and the runtime per-company --accent keep working.
+2. **Auto-discovery (Phase 3): module.json fetch-probe.** Kernel fetches
+   companies/<x>/module.json at boot; 404 = company absent. Implementation must
+   add a graceful fallback when fetch is unavailable (file:// / CORS): boot from
+   the last-known bundled snapshot so the documented double-click file:// usage
+   keeps working (R2).
+3. **CSS scope (Phase 4): convert everything expressible to Tailwind; keep
+   animation/theming CSS that would be ruined as scoped CSS files** (ambient
+   scenes keyframes/SMIL, attribute theming, runtime-accent color-mix), moved
+   into their owning folders, byte-identical.
