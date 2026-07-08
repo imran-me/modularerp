@@ -1,0 +1,297 @@
+{
+  "key": "group",
+  "title": "Epal Group",
+  "short": "Group",
+  "icon": "hexagon-fill",
+  "accent": "#1A43BF",
+  "tagline": "Command Layer",
+  "enabled": true,
+  "type": "group",
+  "routes_prefix": "/group",
+  "folder": "group-cockpit",
+  "note": "PHASE 2 MANIFEST — declarative mirror of kernel/config.js (live registry until Phase 3). Folder is group-cockpit per the architecture doc; the route/company id stays group.",
+  "modules": [
+    {
+      "id": "dashboard",
+      "label": "Command Center",
+      "icon": "grid-1x2-fill",
+      "desc": "Consolidated group health, KPIs, intelligence.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "briefing",
+      "label": "MD Briefing",
+      "icon": "sun-fill",
+      "desc": "Your daily narrative digest — money, risks, exceptions.",
+      "enabled": true,
+      "badge": "AI",
+      "subs": []
+    },
+    {
+      "id": "companies",
+      "label": "Sister Concerns",
+      "icon": "diagram-3-fill",
+      "desc": "All companies at a glance — revenue, margin, risk.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "finance",
+      "label": "Consolidated Finance",
+      "icon": "cash-coin",
+      "desc": "Group P&L, cash position, receivables, payables.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "pnl",
+          "label": "Profit & Loss",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "cashflow",
+          "label": "Cash Flow",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "balance-sheet",
+          "label": "Balance Sheet",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "receivables",
+          "label": "Receivables",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "payables",
+          "label": "Payables",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "banks",
+          "label": "Bank Positions",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "coa",
+          "label": "Chart of Accounts",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "journal",
+          "label": "Journal",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "trial-balance",
+          "label": "Trial Balance",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "consolidation",
+          "label": "Consolidation",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "analytics",
+      "label": "Business Intelligence",
+      "icon": "graph-up-arrow",
+      "desc": "Cross-company trends, forecasts, comparisons.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "trends",
+          "label": "Trends",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "forecast",
+          "label": "Forecast",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "compare",
+          "label": "Company Comparison",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "heatmap",
+          "label": "Activity Heatmap",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "crm",
+      "label": "Group CRM",
+      "icon": "people-fill",
+      "desc": "Unified customer graph shared across all concerns.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "leads",
+          "label": "Leads",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "pipeline",
+          "label": "Pipeline",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "customers",
+          "label": "Customers 360",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "activities",
+          "label": "Activities",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "employees",
+      "label": "Workforce",
+      "icon": "person-badge-fill",
+      "desc": "Every employee of the whole group.",
+      "enabled": true,
+      "admin": true,
+      "subs": [
+        {
+          "id": "directory",
+          "label": "Directory",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "attendance",
+          "label": "Attendance",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "leaves",
+          "label": "Leaves",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "payroll",
+          "label": "Payroll",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "performance",
+          "label": "Performance",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "org-chart",
+          "label": "Org Chart",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "tasks",
+      "label": "Task Oversight",
+      "icon": "kanban-fill",
+      "desc": "Open any employee task board, assign & audit.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "icon": "file-earmark-bar-graph-fill",
+      "desc": "Downloadable, documentation-grade reports.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "documents",
+      "label": "Document Center",
+      "icon": "file-earmark-richtext-fill",
+      "desc": "Every branded invoice, receipt & report — searchable.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "approvals",
+      "label": "Approvals",
+      "icon": "patch-check-fill",
+      "desc": "Maker-checker inbox — authorise the big moves.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "automation",
+      "label": "Automation",
+      "icon": "robot",
+      "desc": "Rules, triggers & workflows across the group.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "activity-log",
+      "label": "Activity Log",
+      "icon": "shield-lock-fill",
+      "desc": "Full audit trail — who did what, when, from where.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    },
+    {
+      "id": "notifications",
+      "label": "Notifications",
+      "icon": "bell-fill",
+      "desc": "System-wide alerts, mentions & approvals.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "module-manager",
+      "label": "Module Control",
+      "icon": "toggles2",
+      "desc": "Turn companies, modules & features on/off live.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "gear-fill",
+      "desc": "Group profile, branding, security, backups.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    }
+  ]
+}
