@@ -1,0 +1,192 @@
+{
+  "key": "it",
+  "title": "Epal IT Solutions",
+  "short": "IT Solutions",
+  "icon": "cpu-fill",
+  "accent": "#7b5cff",
+  "tagline": "Software · Cloud · Support",
+  "enabled": true,
+  "type": "company",
+  "routes_prefix": "/it",
+  "note": "PHASE 2 MANIFEST — declarative mirror of kernel/config.js (live registry until Phase 3).",
+  "modules": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "icon": "speedometer2",
+      "desc": "Projects, MRR, utilisation, support SLA.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "crm",
+      "label": "Leads & CRM",
+      "icon": "person-lines-fill",
+      "desc": "Sales pipeline for software & services.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "projects",
+      "label": "Projects",
+      "icon": "kanban",
+      "desc": "Delivery projects, sprints, phases.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "active",
+          "label": "Active Projects",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "sprints",
+          "label": "Sprints",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "roadmap",
+          "label": "Roadmap",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "services",
+      "label": "Products & SaaS",
+      "icon": "box-seam",
+      "desc": "Recurring products, subscriptions, MRR.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "catalog",
+          "label": "Catalog",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "subscriptions",
+          "label": "Subscriptions",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "mrr",
+          "label": "MRR / Churn",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "clients",
+      "label": "Clients",
+      "icon": "person-hearts",
+      "desc": "Client accounts & contacts.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "support",
+      "label": "Support Desk",
+      "icon": "headset",
+      "desc": "Tickets, SLAs, knowledge base.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "tickets",
+          "label": "Tickets",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "sla",
+          "label": "SLA Monitor",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "kb",
+          "label": "Knowledge Base",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "contracts",
+      "label": "Contracts",
+      "icon": "file-earmark-medical",
+      "desc": "AMС, SLAs, renewals.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "timesheets",
+      "label": "Timesheets",
+      "icon": "clock-history",
+      "desc": "Billable hours, utilisation.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "icon": "cash-stack",
+      "desc": "Invoicing, expenses, project P&L.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "ledgers",
+      "label": "Ledgers",
+      "icon": "journal-text",
+      "desc": "General & client ledgers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "hrm",
+      "label": "HRM",
+      "icon": "people-fill",
+      "desc": "Developers, QA, design, ops.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "icon": "file-earmark-bar-graph",
+      "desc": "Delivery & financial reports.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "analytics",
+      "label": "Analytics",
+      "icon": "graph-up",
+      "desc": "Velocity, margin, churn, forecasts.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "tasks",
+      "label": "My Tasks",
+      "icon": "kanban",
+      "desc": "Personal Kanban board with phase timers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "gear-fill",
+      "desc": "IT Solutions configuration.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    }
+  ]
+}

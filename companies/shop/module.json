@@ -1,0 +1,198 @@
+{
+  "key": "shop",
+  "title": "Epal Shop",
+  "short": "Shop",
+  "icon": "shop",
+  "accent": "#e0356e",
+  "tagline": "Retail · POS · E-commerce",
+  "enabled": true,
+  "type": "company",
+  "routes_prefix": "/shop",
+  "note": "PHASE 2 MANIFEST — declarative mirror of kernel/config.js (live registry until Phase 3).",
+  "modules": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "icon": "speedometer2",
+      "desc": "Sales, best-sellers, stock health, margins.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "pos",
+      "label": "Point of Sale",
+      "icon": "upc-scan",
+      "desc": "Fast checkout terminal.",
+      "enabled": true,
+      "badge": "Live",
+      "subs": []
+    },
+    {
+      "id": "products",
+      "label": "Products",
+      "icon": "box-seam",
+      "desc": "Catalog, variants, pricing, barcodes.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "catalog",
+          "label": "Catalog",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "categories",
+          "label": "Categories",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "brands",
+          "label": "Brands",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "units",
+          "label": "Units",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "discounts",
+          "label": "Discounts",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "inventory",
+      "label": "Inventory",
+      "icon": "boxes",
+      "desc": "Stock, warehouses, transfers, adjustments.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "stock",
+          "label": "Stock",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "warehouses",
+          "label": "Warehouses",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "transfers",
+          "label": "Transfers",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "adjustments",
+          "label": "Adjustments",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "low-stock",
+          "label": "Low Stock",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "orders",
+      "label": "Orders",
+      "icon": "bag-check",
+      "desc": "Online & counter orders, fulfilment.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "purchases",
+      "label": "Purchases",
+      "icon": "cart-plus",
+      "desc": "Suppliers, purchase orders, returns.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "customers",
+      "label": "Customers",
+      "icon": "person-hearts",
+      "desc": "Loyalty, history — shared with Group CRM.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "suppliers",
+      "label": "Suppliers",
+      "icon": "truck",
+      "desc": "Supplier accounts & terms.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "icon": "cash-stack",
+      "desc": "Sales, expenses, daily closing.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "ledgers",
+      "label": "Ledgers",
+      "icon": "journal-text",
+      "desc": "General, customer & supplier ledgers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "hrm",
+      "label": "HRM",
+      "icon": "people-fill",
+      "desc": "Cashiers, floor staff, managers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "icon": "file-earmark-bar-graph",
+      "desc": "Sales, stock, tax, profit reports.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "analytics",
+      "label": "Analytics",
+      "icon": "graph-up",
+      "desc": "Basket analysis, ABC, seasonality.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "tasks",
+      "label": "My Tasks",
+      "icon": "kanban",
+      "desc": "Personal Kanban board with phase timers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "gear-fill",
+      "desc": "Shop configuration & tax.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    }
+  ]
+}

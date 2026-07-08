@@ -1,0 +1,176 @@
+{
+  "key": "construction",
+  "title": "Epal Construction",
+  "short": "Construction",
+  "icon": "buildings-fill",
+  "accent": "#e2721b",
+  "tagline": "Build · Infra · Projects",
+  "enabled": true,
+  "type": "company",
+  "routes_prefix": "/construction",
+  "note": "PHASE 2 MANIFEST — declarative mirror of kernel/config.js (live registry until Phase 3).",
+  "modules": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "icon": "speedometer2",
+      "desc": "Project progress, cost vs budget, cash.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "projects",
+      "label": "Projects / Sites",
+      "icon": "buildings-fill",
+      "desc": "Sites, WBS, progress, milestones.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "active",
+          "label": "Active Sites",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "wbs",
+          "label": "Work Breakdown",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "progress",
+          "label": "Progress",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "milestones",
+          "label": "Milestones",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "tenders",
+      "label": "Tenders",
+      "icon": "clipboard-check",
+      "desc": "Bids, prequalification, awards.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "boq",
+      "label": "BOQ & Estimation",
+      "icon": "calculator-fill",
+      "desc": "Bill of quantities, rate analysis.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "materials",
+      "label": "Materials",
+      "icon": "bricks",
+      "desc": "Cement, steel, aggregates — stock & issue.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "procurement",
+      "label": "Procurement",
+      "icon": "cart-fill",
+      "desc": "Vendors, PO, GRN, comparative statements.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "equipment",
+      "label": "Plant & Assets",
+      "icon": "gear-wide-connected",
+      "desc": "Machinery, utilisation, maintenance.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "subcontractors",
+      "label": "Subcontractors",
+      "icon": "person-workspace",
+      "desc": "Nominated & labour subcontracts.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "labor",
+      "label": "Workforce",
+      "icon": "people",
+      "desc": "Site labour, muster, wages.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "quality",
+      "label": "Quality & Safety",
+      "icon": "shield-check",
+      "desc": "QA/QC checklists, HSE incidents.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "icon": "cash-stack",
+      "desc": "IPCs, expenses, project cost control.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "ledgers",
+      "label": "Ledgers",
+      "icon": "journal-text",
+      "desc": "General & vendor ledgers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "hrm",
+      "label": "HRM",
+      "icon": "people-fill",
+      "desc": "Engineers, supervisors, admin.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "icon": "file-earmark-bar-graph",
+      "desc": "Progress, cost, material reports.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "analytics",
+      "label": "Analytics",
+      "icon": "graph-up",
+      "desc": "EVM, cost overrun risk, cash forecast.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "tasks",
+      "label": "My Tasks",
+      "icon": "kanban",
+      "desc": "Personal Kanban board with phase timers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "gear-fill",
+      "desc": "Construction configuration.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    }
+  ]
+}
