@@ -7,26 +7,29 @@
      loads the design system + the JS runtime, then core/app.js boots and builds
      everything (rail, sidebar, topbar, views) from the config registry.
 
-     ARCHITECTURE AT A GLANCE — the JS is grouped into layers that map 1:1 onto a
-     future Laravel/PHP backend, so a developer can read this front-end as a spec:
+     ARCHITECTURE AT A GLANCE (modular layout — see EPAL_GROUP_ERP_Modular_Architecture.md):
+     the code maps 1:1 onto a future Laravel/PHP backend, readable as a spec:
 
-       assets/css/*         → the bespoke premium design system (navy/platinum/gold;
-                              Bootstrap *Icons* only). ⇢ Laravel: Blade layout + theme.
-       assets/js/kernel/*   → app bootstrap + shell: config (module registry),
-                              eventbus, ui (DOM kit), charts, auth, router, app (boot).
-                              ⇢ Laravel: routing, middleware, service container, layout.
-       assets/js/data/*     → persistence + seeded domain data: state (localStorage
-                              wrapper — the swap seam), database, seed-bd.
-                              ⇢ Laravel: Eloquent Models + Migrations + Seeders.
-       assets/js/engines/*  → business logic services: ledger (double-entry), audit,
-                              approvals (maker-checker), documents, serial, intel,
-                              rules (automation), comments, search, permissions,
-                              engines (registry). ⇢ Laravel: Services / Domain classes.
-       assets/js/kit/*      → reusable UI building blocks: forms, datatable, entity
-                              (CRUD factory). ⇢ Laravel: Blade components / form requests.
-       assets/js/views/*    → one file per screen; each self-registers into EPAL.views.
-                              Unbuilt screens fall back to a live scaffold, so the whole
-                              navigation works today. ⇢ Laravel: Blade views + Controllers.
+       assets/css/*               → the bespoke premium design system (dark-blue brand;
+                                    Bootstrap *Icons* only). ⇢ Laravel: Blade layout + theme.
+       platform/core/*            → app bootstrap + shell: config (module registry),
+                                    eventbus, ui (DOM kit), charts, router, app (boot).
+                                    ⇢ Laravel: routing, middleware, service container.
+       platform/auth-rbac/*       → identity, roles, permissions (auth, permissions).
+       platform/data/*            → persistence + seeded domain data: state (localStorage
+                                    wrapper — the swap seam), database, seed-bd.
+                                    ⇢ Laravel: Eloquent Models + Migrations + Seeders.
+       platform/engines-library/* → shared business machinery: ledger (double-entry),
+                                    audit, approvals (maker-checker), documents, serial,
+                                    intel, rules, comments, search, engines (registry).
+                                    ⇢ Laravel: Services / Domain classes.
+       platform/kit/*             → reusable UI building blocks: forms, datatable, entity.
+       platform/views/*           → view registry + shared wildcard screens + task board.
+       platform/design-system/*   → Tailwind design lock (config + committed build).
+       companies/<x>/             → each sister concern, self-contained: module.json
+                                    manifest, modules/<id>/view.js screens, app/atmosphere
+                                    ambient scenes. Unbuilt screens fall back to a live
+                                    scaffold. ⇢ Laravel: Blade views + Controllers.
 
      LOAD ORDER MATTERS (no build step, everything hangs off a global window.EPAL):
      config first, then the layers in dependency order, views next, app.js LAST.
@@ -85,41 +88,41 @@
 
   <!-- ===================== CORE RUNTIME ===================== -->
   <!-- config MUST load first (ui/db/auth read from it at load time). -->
-  <script src="assets/js/kernel/config.js"></script>
-  <script src="assets/js/data/state.js"></script>
-  <script src="assets/js/kernel/eventbus.js"></script>
-  <script src="assets/js/kernel/ui.js"></script>
-  <script src="assets/js/kernel/charts.js"></script>
+  <script src="platform/core/config.js"></script>
+  <script src="platform/data/state.js"></script>
+  <script src="platform/core/eventbus.js"></script>
+  <script src="platform/core/ui.js"></script>
+  <script src="platform/core/charts.js"></script>
   <!-- Deep Core engine registry (self-registration backbone) — before engines. -->
-  <script src="assets/js/engines/engines.js"></script>
-  <script src="assets/js/data/database.js"></script>
+  <script src="platform/engines-library/engines.js"></script>
+  <script src="platform/data/database.js"></script>
   <!-- deep operational seed for every company (idempotent; consumed by db.seed()) -->
-  <script src="assets/js/data/seed-bd.js"></script>
+  <script src="platform/data/seed-bd.js"></script>
   <!-- ===== Deep Core engines (brain, nerves, backbone) — self-register ===== -->
-  <script src="assets/js/engines/serial.js"></script>
-  <script src="assets/js/engines/ledger.js"></script>
-  <script src="assets/js/engines/audit.js"></script>
-  <script src="assets/js/engines/approvals.js"></script>
-  <script src="assets/js/engines/rules.js"></script>
-  <script src="assets/js/engines/documents.js"></script>
-  <script src="assets/js/engines/intel.js"></script>
-  <script src="assets/js/engines/comments.js"></script>
-  <script src="assets/js/engines/search.js"></script>
+  <script src="platform/engines-library/serial.js"></script>
+  <script src="platform/engines-library/ledger.js"></script>
+  <script src="platform/engines-library/audit.js"></script>
+  <script src="platform/engines-library/approvals.js"></script>
+  <script src="platform/engines-library/rules.js"></script>
+  <script src="platform/engines-library/documents.js"></script>
+  <script src="platform/engines-library/intel.js"></script>
+  <script src="platform/engines-library/comments.js"></script>
+  <script src="platform/engines-library/search.js"></script>
   <!-- shared UI building blocks used by the graduated views -->
-  <script src="assets/js/kit/forms.js"></script>
-  <script src="assets/js/kit/datatable.js"></script>
-  <script src="assets/js/kit/entity.js"></script>
-  <script src="assets/js/kernel/auth.js"></script>
-  <script src="assets/js/engines/permissions.js"></script>
-  <script src="assets/js/kernel/router.js"></script>
+  <script src="platform/kit/forms.js"></script>
+  <script src="platform/kit/datatable.js"></script>
+  <script src="platform/kit/entity.js"></script>
+  <script src="platform/auth-rbac/auth.js"></script>
+  <script src="platform/auth-rbac/permissions.js"></script>
+  <script src="platform/core/router.js"></script>
 
   <!-- ===================== VIEWS (self-registering) ===================== -->
   <!-- registry first (defines EPAL.view + the placeholder scaffold). -->
-  <script src="assets/js/views/registry.js"></script>
+  <script src="platform/views/registry.js"></script>
   <!-- shared wildcard factories: give EVERY company real screens (router prefers
        a specific view, else falls back to these star-slash-module views). -->
-  <script src="assets/js/views/shared/company-dashboard.js"></script>
-  <script src="assets/js/views/shared/company-modules.js"></script>
+  <script src="platform/views/shared/company-dashboard.js"></script>
+  <script src="platform/views/shared/company-modules.js"></script>
   <!-- Group command layer -->
   <script src="companies/group-cockpit/modules/dashboard/view.js"></script>
   <script src="companies/group-cockpit/modules/crm/view.js"></script>
@@ -137,7 +140,7 @@
   <script src="companies/group-cockpit/modules/activity-log/view.js"></script>
   <!-- Admin + cross-company -->
   <script src="companies/group-cockpit/modules/module-manager/view.js"></script>
-  <script src="assets/js/views/tasks/board.js"></script>
+  <script src="platform/views/tasks/board.js"></script>
   <script src="companies/group-cockpit/modules/employees/view.js"></script>
   <!-- Travels (specific views override the shared wildcards) -->
   <script src="companies/travels/modules/dashboard/view.js"></script>
@@ -154,7 +157,7 @@
 
   <!-- ===================== BOOT (must be LAST) ===================== -->
   <!-- app.js auto-initialises after all views have registered themselves. -->
-  <script src="assets/js/kernel/app.js"></script>
+  <script src="platform/core/app.js"></script>
   <!-- Ambient background scenes — self-contained, mount behind the content. -->
   <script src="companies/travels/app/atmosphere/travels-scene.js"></script>
   <script src="companies/woodart/app/atmosphere/interior-scene.js"></script>
