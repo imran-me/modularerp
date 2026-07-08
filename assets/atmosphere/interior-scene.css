@@ -146,11 +146,58 @@
   30%,70%{ opacity:.7; }
   100%{ transform: translateY(-70px); opacity:0; }
 }
-/* the warm lamp/pendant glows fade in only for the reveal, then pulse gently.
-   (--p drives the fade so it works cross-branch without a shared ancestor.) */
+/* the warm lamp/pendant/candle/sconce glows fade in only for the reveal, then
+   pulse gently. (--p drives the fade so it works cross-branch.) */
 .i-warm{ opacity: clamp(0, calc((var(--p) - 0.6) / 0.35), .9); transition: opacity .25s linear; }
 .iscene.on .i-warm{ animation: glow 5s ease-in-out infinite; }
 @keyframes glow{ 0%,100%{ filter: brightness(1); } 50%{ filter: brightness(1.35); } }
+
+/* ---- WALL FIXTURES: always-present line-art (fireplace, gallery, clock…) --- */
+.i-fixtures{ fill: none; stroke: var(--line); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+/* the pendulum wall-clock swings from its pivot */
+.clk-pend{ transform-box: view-box; transform-origin: 1004px 214px; }
+.iscene.on .clk-pend{ animation: clk-swing 2.6s ease-in-out infinite; }
+@keyframes clk-swing{ 0%,100%{ transform: rotate(7deg); } 50%{ transform: rotate(-7deg); } }
+/* window curtains breathe on the draught */
+.curtain{ transform-box: fill-box; transform-origin: 50% 0%; }
+.iscene.on .curtain-l{ animation: curtain-breathe 8.5s ease-in-out infinite; }
+.iscene.on .curtain-r{ animation: curtain-breathe 8.5s ease-in-out infinite reverse; }
+@keyframes curtain-breathe{ 0%,100%{ transform: skewX(0deg) scaleX(1); } 50%{ transform: skewX(2.2deg) scaleX(1.05); } }
+/* hanging macramé plant sways from its hook */
+.i-hangplant .frond{ stroke: var(--line); stroke-width: 1.6; fill:none; }
+.i-hangplant{ transform-box: fill-box; transform-origin: 50% 0%; }
+.iscene.on .i-hangplant{ animation: hp-sway 6.6s ease-in-out infinite; }
+@keyframes hp-sway{ 0%,100%{ transform: rotate(-2.6deg); } 50%{ transform: rotate(2.6deg); } }
+
+/* ---- FIT-OUT extras: cat, turntable, herringbone floor ------------------- */
+/* the cat breathes softly */
+.i-cat{ transform-box: fill-box; transform-origin: 50% 100%; }
+.iscene.on .i-cat{ animation: cat-breathe 4.6s ease-in-out infinite; }
+@keyframes cat-breathe{ 0%,100%{ transform: scaleY(1); } 50%{ transform: scaleY(1.06); } }
+/* the record spins */
+.tt-mark{ stroke: var(--ink-soft); }
+.i-turntable{ transform-box: fill-box; transform-origin: 50% 50%; }
+.iscene.on .i-turntable{ animation: tt-spin 3.4s linear infinite; }
+@keyframes tt-spin{ to{ transform: rotate(360deg); } }
+/* herringbone parquet, drawn faint */
+.i-floor{ fill: none; stroke: var(--ink-soft); stroke-width: 1; }
+
+/* ---- REVEAL extras: hearth flames, moon + stars, coffee steam ------------ */
+.hearth-glow{ opacity: .22; }
+.flame{ fill: var(--warm); stroke: none; transform-box: fill-box; transform-origin: 50% 100%; }
+.flame-b{ fill: var(--warm-2); }
+.iscene.on .flame-a{ animation: flick 0.9s ease-in-out infinite; }
+.iscene.on .flame-b{ animation: flick 0.7s ease-in-out infinite reverse; }
+@keyframes flick{ 0%,100%{ transform: scaleY(1) scaleX(1); opacity:.85; } 50%{ transform: scaleY(1.18) scaleX(.9); opacity:1; } }
+.i-moon{ fill: color-mix(in srgb, var(--warm) 55%, #ffffff); stroke:none; opacity:.5; }
+.i-moon-halo{ fill: var(--warm); stroke:none; opacity:.08; filter: blur(6px); }
+.nstar{ fill: color-mix(in srgb, var(--warm) 30%, #eaf3ff); stroke:none; }
+.iscene.on .i-reveal .nstar{ animation: nstar-twinkle 4s ease-in-out infinite; }
+.nstar:nth-of-type(2n){ animation-delay: -1.6s; } .nstar:nth-of-type(3n){ animation-delay: -2.7s; }
+@keyframes nstar-twinkle{ 0%,100%{ opacity:.2; } 50%{ opacity:.7; } }
+.steam{ fill:none; stroke: var(--warm); stroke-width: 2; stroke-linecap: round; opacity:0; }
+.iscene.on .i-reveal .steam{ animation: steam-rise 5s ease-in-out infinite; animation-delay: calc(var(--s,0) * -2.5s); }
+@keyframes steam-rise{ 0%{ transform: translateY(8px); opacity:0; } 30%,60%{ opacity:.5; } 100%{ transform: translateY(-26px); opacity:0; } }
 
 /* ------------------------------------------------ reduced motion → freeze */
 @media (prefers-reduced-motion: reduce){
