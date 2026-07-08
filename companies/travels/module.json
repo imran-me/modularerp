@@ -1,0 +1,402 @@
+{
+  "key": "travels",
+  "title": "Epal Travels & Consultancy",
+  "short": "Travels",
+  "icon": "airplane-fill",
+  "accent": "#2f6bff",
+  "tagline": "Air · Visa · Consultancy",
+  "enabled": true,
+  "type": "company",
+  "routes_prefix": "/travels",
+  "note": "PHASE 2 MANIFEST — declarative mirror of kernel/config.js (which remains the live registry until Phase 3 auto-discovery consumes this file). Menu/sub ids ARE the route segments #/travels/<module>/<sub>.",
+  "modules": [
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "icon": "speedometer2",
+      "desc": "Travels performance, sales, pipeline, alerts.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "crm",
+      "label": "CRM",
+      "icon": "person-lines-fill",
+      "desc": "Leads, follow-ups, communication hub.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "leads",
+          "label": "Leads",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "pipeline",
+          "label": "Sales Pipeline",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "follow-ups",
+          "label": "Follow-ups",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "comm-hub",
+          "label": "Communication Hub",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "vendor-agent",
+      "label": "Vendor & Agent",
+      "icon": "people",
+      "desc": "Vendors, agents, portals, commission & party ledgers.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "vendors",
+          "label": "Manage Vendors",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "agents",
+          "label": "Manage Agents",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "portals",
+          "label": "Portals / GDS",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "accounts",
+          "label": "Party Accounts",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "commission",
+          "label": "Commission",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "air-ticketing",
+      "label": "Air Ticketing",
+      "icon": "airplane-fill",
+      "desc": "Issue, re-issue, refund, void, EMD + BSP recon.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "ticketing",
+          "label": "Direct Sale",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "manage-sales",
+          "label": "Manage Sales",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "emd",
+          "label": "EMD & Ancillary",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "ttl",
+          "label": "Ticketing Deadlines",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "airlines",
+          "label": "Airlines",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "airports",
+          "label": "Airports",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "bsp",
+          "label": "BSP / ADM Recon",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "refunds",
+          "label": "Refund Tracker",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "contract-flight",
+      "label": "Contract Flight",
+      "icon": "airplane-engines",
+      "desc": "Group/charter seat blocks (Umrah, Hajj, worker).",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "schedule",
+          "label": "Flight Schedule",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "add-flight",
+          "label": "Add Flight",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "category",
+          "label": "Category",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "manage-sales",
+          "label": "Manage Sales",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "visa-processing",
+      "label": "Visa Processing",
+      "icon": "passport-fill",
+      "desc": "End-to-end visa lifecycle.",
+      "enabled": true,
+      "badge": "Core",
+      "subs": [
+        {
+          "id": "categories",
+          "label": "Visa Categories",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "new-application",
+          "label": "New Application",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "application-board",
+          "label": "Application Board",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "manage-sales",
+          "label": "Manage Sales",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "visa-rates",
+          "label": "Visa Rates",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "embassy-tracking",
+          "label": "Embassy Tracking",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "documents",
+          "label": "Required Documents",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "analysis",
+          "label": "Analysis",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "file-management",
+      "label": "File Management",
+      "icon": "folder-fill",
+      "desc": "Embassy files, submission slots, decision tracking.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "files",
+          "label": "All Files",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "add-file",
+          "label": "Add File",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "slot-tracker",
+          "label": "Slot Tracker",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "passport-mgmt",
+      "label": "Passport Mgmt",
+      "icon": "person-vcard",
+      "desc": "Passport holders, categories, expiry radar.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "holders",
+          "label": "Holders",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "categories",
+          "label": "Categories",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "expiry",
+          "label": "Expiry Radar",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "customers",
+      "label": "Customers",
+      "icon": "person-hearts",
+      "desc": "Traveller 360 — shared with Group CRM.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "accounts",
+      "label": "Accounts",
+      "icon": "cash-stack",
+      "desc": "Income, expenses, journals, payment schedules.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "income",
+          "label": "Income",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "expenses",
+          "label": "Expenses",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "journals",
+          "label": "Journals",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "schedules",
+          "label": "Payment Schedules",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "ledgers",
+      "label": "Ledgers",
+      "icon": "journal-text",
+      "desc": "General & party ledgers, trial balance.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "hrm",
+      "label": "HRM",
+      "icon": "people-fill",
+      "desc": "Travels team — attendance, leaves, payroll.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "icon": "file-earmark-spreadsheet",
+      "desc": "Sales, visa, ticketing, financial reports.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "analytics",
+      "label": "Analytics",
+      "icon": "graph-up",
+      "desc": "Profit leak, fraud sentinel, travel-DNA.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "marketing",
+      "label": "Marketing",
+      "icon": "megaphone-fill",
+      "desc": "Email / SMS / WhatsApp campaigns.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "automation",
+      "label": "Automation",
+      "icon": "robot",
+      "desc": "Doc-expiry radar, markup engine, bots.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "tasks",
+      "label": "My Tasks",
+      "icon": "kanban",
+      "desc": "Personal Kanban board with phase timers.",
+      "enabled": true,
+      "subs": []
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "icon": "gear-fill",
+      "desc": "Travels-specific configuration.",
+      "enabled": true,
+      "admin": true,
+      "subs": []
+    }
+  ]
+}
