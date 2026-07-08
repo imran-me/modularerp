@@ -34,7 +34,7 @@
       platform/ holds core, auth-rbac, data (shared store — splitting it would
       change numbers, deferred to Phase 3+ by design), engines-library, kit,
       shared views, design-system (css + tailwind lock). assets/ dissolved.
-      travels/ mini-app left at its public URL deliberately.
+      travels/ mini-app moved into companies/travels/app/frontend/ (owner request, 2026-07-08) — fully self-contained, relocates as a unit; old /travels/*.html URLs now 404.
       6 moves, 6 commits, boot sweep 190/0/0 after EVERY move; computed styles
       vs pre-migration baseline: byte-identical.
 - [ ] **Phase 3 — Bridge + auto-discovery** (group totals proven identical before
@@ -57,6 +57,7 @@
 | 2026-07-08 | Phase 2 M5: group -> companies/group-cockpit (15 views+manifest) | 190/0/0; dashboard real | ea04750 |
 | 2026-07-08 | Phase 2 M6a: shared JS -> platform/{core,auth-rbac,data,engines-library,kit,views} | 190/0/0; finance real | 78ed00b |
 | 2026-07-08 | Phase 2 M6b: css -> platform/design-system/css | style-parity vs BASELINE: NONE differ | 757fe02 |
+| 2026-07-08 | Phase 2 M7: travels mini-app -> companies/travels/app/frontend (owner request) | mini-app renders from new path; SPA 190/0/0 | (this commit) |
 
 ## Decisions (ruled by owner, 2026-07-08)
 

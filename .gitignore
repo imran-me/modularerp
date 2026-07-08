@@ -4,3 +4,6 @@ node_modules/
 # OS noise
 Thumbs.db
 .DS_Store
+
+# Claude verification harness temp files (never commit)
+__*.html
