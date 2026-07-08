@@ -16,10 +16,13 @@
 
 - [x] **Setup** — brief + architecture docs + CLAUDE.md in repo root; backup copy;
       baseline tag; this tracker; session memory updated
-- [ ] **Phase 0 — Inventory & plan** (in progress)
-  - [x] Multi-agent repo inventory (stack, styling, structure, group totals, tooling)
-  - [x] Written report + migration plan delivered to owner — see `docs/PHASE0-INVENTORY.md`
-  - [ ] **Owner approval received** ← GATE: nothing moves before this
+- [x] **Phase 0 — Inventory & plan**
+  - [x] Multi-agent repo inventory: 6 inspectors + 6 adversarial verifiers,
+        60 claims checked (42 confirmed / 17 refined / 1 corrected) —
+        full report: `docs/PHASE0-INVENTORY.md`
+  - [x] Owner said "go" (2026-07-08); 3 gating decisions asked with
+        recommendations (Tailwind mechanism · discovery mechanism · irreducible-CSS
+        exemption) — answers recorded below when given
 - [ ] **Phase 1 — Lock the design tokens** (Tailwind config seeded from
       `assets/css/tokens.css` REAL values; app unchanged with Tailwind present-but-unused)
 - [ ] **Phase 2 — Restructure into self-contained folders** (Travels first, then
@@ -34,7 +37,7 @@
 | Date | Step | Verified by | Commit |
 |------|------|-------------|--------|
 | 2026-07-08 | Docs + CLAUDE.md + tracker added; backup folder + baseline tag created | 616/616 files; tag on GitHub | (this commit) |
-| 2026-07-08 | Phase 0 inventory (6-agent sweep) + report `docs/PHASE0-INVENTORY.md`; plan delivered; 3 decisions pending | boot sweep 190/0/0 baseline re-confirmed | (this commit) |
+| 2026-07-08 | Phase 0 inventory: 12-agent verified sweep -> `docs/PHASE0-INVENTORY.md` (exec summary + 6 reports + verdict appendix); tracker updated | 60 claims adversarially checked | (this commit) |
 
 ## Open decisions (blockers for their phase)
 
