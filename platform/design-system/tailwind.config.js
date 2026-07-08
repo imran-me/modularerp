@@ -32,7 +32,7 @@ module.exports = {
   corePlugins: { preflight: false },
   content: [
     './index.html',
-    './assets/js/**/*.js',
+    './platform/core/**/*.js', './platform/views/**/*.js', './platform/kit/**/*.js', './platform/auth-rbac/**/*.js', './platform/engines-library/**/*.js',
     './companies/**/*.{html,js}',   // Phase 2+ target folders (empty today)
     // NOTE: platform/design-system/ is deliberately NOT scanned — utility names
     // in these config comments would otherwise generate themselves. Add

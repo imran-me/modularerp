@@ -10,7 +10,7 @@
      ARCHITECTURE AT A GLANCE (modular layout — see EPAL_GROUP_ERP_Modular_Architecture.md):
      the code maps 1:1 onto a future Laravel/PHP backend, readable as a spec:
 
-       assets/css/*               → the bespoke premium design system (dark-blue brand;
+       platform/design-system/css/* → the bespoke premium design system (dark-blue brand;
                                     Bootstrap *Icons* only). ⇢ Laravel: Blade layout + theme.
        platform/core/*            → app bootstrap + shell: config (module registry),
                                     eventbus, ui (DOM kit), charts, router, app (boot).
@@ -54,20 +54,20 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
   <!-- Design system (order matters: tokens → base → layout → components → motion) -->
-  <link rel="stylesheet" href="assets/css/tokens.css" />
-  <link rel="stylesheet" href="assets/css/base.css" />
-  <link rel="stylesheet" href="assets/css/layout.css" />
-  <link rel="stylesheet" href="assets/css/components.css" />
-  <link rel="stylesheet" href="assets/css/deepcore.css" />
-  <link rel="stylesheet" href="assets/css/animations.css" />
-  <link rel="stylesheet" href="assets/css/atmosphere.css" />
-  <!-- Ambient background scenes — all animation themes live in assets/atmosphere/ -->
+  <link rel="stylesheet" href="platform/design-system/css/tokens.css" />
+  <link rel="stylesheet" href="platform/design-system/css/base.css" />
+  <link rel="stylesheet" href="platform/design-system/css/layout.css" />
+  <link rel="stylesheet" href="platform/design-system/css/components.css" />
+  <link rel="stylesheet" href="platform/design-system/css/deepcore.css" />
+  <link rel="stylesheet" href="platform/design-system/css/animations.css" />
+  <link rel="stylesheet" href="platform/design-system/css/atmosphere.css" />
+  <!-- Ambient background scenes — each lives with its company (companies/<x>/app/atmosphere/) -->
   <link rel="stylesheet" href="companies/travels/app/atmosphere/travels-scene.css" />
   <link rel="stylesheet" href="companies/woodart/app/atmosphere/interior-scene.css" />
   <!-- MIGRATION Phase 1 (see MIGRATION_STATUS.md): committed Tailwind build.
        tw- prefixed utilities only; EMPTY until Phase-4 conversions add classes.
        Loads last so converted screens' utilities win specificity ties. -->
-  <link rel="stylesheet" href="assets/css/tailwind.built.css" />
+  <link rel="stylesheet" href="platform/design-system/css/tailwind.built.css" />
 </head>
 
 <body>
