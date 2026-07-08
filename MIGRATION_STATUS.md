@@ -27,8 +27,16 @@
       seeded verbatim from tokens.css (tw- prefix, preflight off, theme-aware var()
       colors); committed build assets/css/tailwind.built.css is EMPTY (0 bytes);
       verified: computed-style diff = NONE, boot sweep 190/0/0
-- [ ] **Phase 2 — Restructure into self-contained folders** (Travels first, then
-      group-cockpit, woodart, it, shop, construction; commit per move; boot sweep per move)
+- [x] **Phase 2 — Restructure into self-contained folders** — COMPLETE.
+      companies/{travels,woodart,it,shop,construction,group-cockpit}/ each hold
+      their views (modules/<id>/view.js), atmosphere scenes (app/atmosphere/),
+      and a module.json manifest generated FROM live config (zero transcription).
+      platform/ holds core, auth-rbac, data (shared store — splitting it would
+      change numbers, deferred to Phase 3+ by design), engines-library, kit,
+      shared views, design-system (css + tailwind lock). assets/ dissolved.
+      travels/ mini-app left at its public URL deliberately.
+      6 moves, 6 commits, boot sweep 190/0/0 after EVERY move; computed styles
+      vs pre-migration baseline: byte-identical.
 - [ ] **Phase 3 — Bridge + auto-discovery** (group totals proven identical before
       any old path is removed)
 - [ ] **Phase 4 — Tailwind conversion** (screen-by-screen; side-by-side visual
@@ -40,7 +48,15 @@
 |------|------|-------------|--------|
 | 2026-07-08 | Docs + CLAUDE.md + tracker added; backup folder + baseline tag created | 616/616 files; tag on GitHub | (this commit) |
 | 2026-07-08 | Phase 0 inventory: 12-agent verified sweep -> `docs/PHASE0-INVENTORY.md` (exec summary + 6 reports + verdict appendix); tracker updated | 60 claims adversarially checked | c1eaf4b |
-| 2026-07-08 | Phase 1: design lock — tailwind.config from real tokens; empty built css wired last in index.html; owner decisions recorded | computed-style diff NONE; boot sweep 190/0/0 | (this commit) |
+| 2026-07-08 | Phase 1: design lock — tailwind config from real tokens; empty built css wired; decisions recorded | style-diff NONE; 190/0/0 | 7128c44 |
+| 2026-07-08 | Phase 2 M1: travels views -> companies/travels/modules/ | 190/0/0 + real-screen probe | fea58cc |
+| 2026-07-08 | Phase 2 M2: airport scene -> companies/travels/app/atmosphere | scene binds, 5 movers | 75ba658 |
+| 2026-07-08 | Phase 2: travels module.json (18 modules, generated) | from live config | 6e2b992 |
+| 2026-07-08 | Phase 2 M3: woodart (view+interior scene+manifest) | 190/0/0; iscene on | cc80a0f |
+| 2026-07-08 | Phase 2 M4: it/shop/construction (views+manifests) | 190/0/0; triple-key intact | f7978e9 |
+| 2026-07-08 | Phase 2 M5: group -> companies/group-cockpit (15 views+manifest) | 190/0/0; dashboard real | ea04750 |
+| 2026-07-08 | Phase 2 M6a: shared JS -> platform/{core,auth-rbac,data,engines-library,kit,views} | 190/0/0; finance real | 78ed00b |
+| 2026-07-08 | Phase 2 M6b: css -> platform/design-system/css | style-parity vs BASELINE: NONE differ | 757fe02 |
 
 ## Decisions (ruled by owner, 2026-07-08)
 
