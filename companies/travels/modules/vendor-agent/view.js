@@ -464,8 +464,10 @@
         ],
         rows: agents(),
         searchKeys: ['name', 'agency', 'location'],
-        filters: [{ key: 'status', label: 'Status' }, { key: 'location', label: 'Location' }],
-        pageSize: 10, exportName: 'agents.csv',
+        quickFilter: 'status',                                 // Active/Inactive chips
+        filterPanel: true,                                     // Location + sort in the Filter card
+        filters: [{ key: 'location', label: 'Location' }],
+        pageSize: 10, exportName: 'agents.csv', pdfTitle: 'Sub-Agent Register',
         onRow: function (a) { openLedgerModal(metaFromAgent(a), a); },
         actions: actionsFor(function (a) { editAgent(a); }, function (a) { removeRec('tv_agents', a, draw); }, metaFromAgent),
         empty: { icon: 'person-badge', title: 'No agents yet', hint: 'Add your first sub-agent.' }
