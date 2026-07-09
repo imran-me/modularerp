@@ -371,6 +371,7 @@
       host.innerHTML = '';
       var t = EPAL.table({
         columns: [
+          { key: 'id', label: 'Vendor ID', render: function (v) { return '<span class="mono xs text-mute">' + ui.escapeHtml(v.id || '—') + '</span>'; } },
           { key: 'name', label: 'Vendor', render: function (v) { return '<span class="strong">' + ui.escapeHtml(v.name) + '</span>'; } },
           { key: 'type', label: 'Type', badge: {} },
           { key: 'phone', label: 'Contact', render: function (v) { return ui.escapeHtml(v.phone || v.contact || '—'); } },
@@ -379,12 +380,16 @@
           { key: 'balance', label: 'Payable', num: true, render: function (v) {
               var b = ledgerBalance(v.name, v.balance);
               return '<span class="num ' + (b > 0 ? 'text-bad' : 'text-good') + '">' + ui.money(b) + '</span>'; },
-            sortVal: function (v) { return ledgerBalance(v.name, v.balance); } }
+            sortVal: function (v) { return ledgerBalance(v.name, v.balance); } },
+          { key: 'lastActivity', label: 'Last Activity', sort: true, sortVal: function (v) { return lastActivityTs(v.name); },
+            render: function (v) { var d = lastActivityOf(v.name); return d ? '<span class="text-mute">' + ui.ago(d) + '</span>' : '<span class="text-mute">—</span>'; } },
+          { key: 'status', label: 'Status', sortVal: function (v) { return v.status || 'Active'; },
+            render: function (v) { var s = v.status || 'Active'; return '<span class="badge' + (s === 'Active' ? ' badge-good' : '') + '">' + s + '</span>'; } }
         ],
-        rows: vendors(),
-        searchKeys: ['name', 'type', 'phone', 'terms'],
-        filters: [{ key: 'type', label: 'Type' }, { key: 'terms', label: 'Terms' }],
-        pageSize: 10, exportName: 'vendors.csv',
+        rows: function () { return vendors().map(function (v) { if (!v.status) v.status = 'Active'; return v; }); },
+        searchKeys: ['id', 'name', 'type', 'phone', 'terms'],
+        filters: [{ key: 'type', label: 'Type' }, { key: 'terms', label: 'Terms' }, { key: 'status', label: 'Status' }],
+        pageSize: 10, exportName: 'vendors.csv', pdfTitle: 'Vendor Register',
         onRow: function (v) { openLedgerModal(metaFromVendor(v)); },
         actions: actionsFor(function (v) { editVendor(v); }, function (v) { removeRec('vendors', v, draw); }, metaFromVendor),
         empty: { icon: 'truck', title: 'No vendors yet', hint: 'Add your first GSA or supplier.' }
@@ -412,6 +417,7 @@
         { key: 'openingBalance', label: 'Opening balance (payable)', type: 'money', default: 0 },
         { key: 'creditLimit', label: 'Credit limit', type: 'money', default: 500000, min: 0 },
         { key: 'paymentTerms', label: 'Payment terms', type: 'select', options: TERMS, default: 'Net 15' },
+        { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Inactive'], default: 'Active' },
         { key: 'bank', label: 'Bank / account', type: 'text', col2: true }
       ],
       onSave: function (val) {
@@ -419,7 +425,7 @@
         rec.name = val.name.trim(); rec.type = val.type; rec.contact = val.contact; rec.email = val.email;
         rec.phone = val.phone; rec.country = val.country; rec.city = val.city; rec.address = val.address;
         rec.currency = val.currency; rec.creditLimit = +val.creditLimit || 0; rec.terms = val.paymentTerms;
-        rec.paymentTerms = val.paymentTerms; rec.bank = val.bank;
+        rec.paymentTerms = val.paymentTerms; rec.bank = val.bank; rec.status = val.status || 'Active';
         if (isNew) rec.balance = +val.openingBalance || 0; else rec.openingBalance = +val.openingBalance || 0;
         db.save('vendors', rec);
         ui.toast('Vendor "' + rec.name + '" saved', 'success');
@@ -876,6 +882,14 @@
       if (done) done();
     });
   }
+  // Most recent ledger movement for a party (drives the "Last Activity" column).
+  function lastActivityOf(name) {
+    var list = txnsFor(name); if (!list.length) return null;
+    var best = null;
+    list.forEach(function (t) { var d = t.date || t.created; if (d && (!best || String(d) > String(best))) best = d; });
+    return best;
+  }
+  function lastActivityTs(name) { var d = lastActivityOf(name); return d ? new Date(d).getTime() : 0; }
   function ledgerBalance(name, fallback) {
     var list = txnsFor(name);
     if (!list.length) return +fallback || 0;
