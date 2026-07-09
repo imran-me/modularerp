@@ -168,7 +168,8 @@
         ],
         rows: function () { return flights(); },
         searchKeys: ['airline','flightNo','route','category','vendor','id'],
-        filters: [{ key:'category', label:'Category' }, { key:'status', label:'Status' }],
+        quickFilter: 'category', filterPanel: true, dateKey: 'depDate',
+        filters: [{ key:'status', label:'Status' }], pdfTitle: 'Contract Flight Schedule',
         onRow: function (r) { drawer(r.id, draw); },
         actions: ui.actions({
           print: function (r) { blockVoucher(r); },
@@ -518,6 +519,7 @@
             var p = +r.profit || 0; return '<span class="num ' + (p >= 0 ? 'text-good' : 'text-bad') + '">' + ui.money(p) + '</span>'; } }
       ],
       rows: sales, searchKeys:['ref','desc','customer'], exportName:'contract-seat-sales.csv',
+      filterPanel: true, filters: [], dateKey: 'date', pdfTitle: 'Contract-Seat Sales',
       actions: ui.actions({
         print: function (r) { printSeatSale(r); },
         wa:    function (r) { return { phone:'', text: seatSaleMsg(r) }; },

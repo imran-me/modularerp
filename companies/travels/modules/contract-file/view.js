@@ -93,35 +93,35 @@
       kpi('Contract Value', ui.money(value, { compact: true }), 'cash-stack'),
       kpi('Expiring ≤30d', expiring.length, 'hourglass-split')
     ]));
-    var rows = list.slice().sort(function (a, b) { return a.validTo < b.validTo ? -1 : 1; }).map(function (c) {
-      var margin = c.sellPrice && c.buyPrice ? Math.round((1 - c.buyPrice / c.sellPrice) * 100) : null;
-      return el('tr.row-click', { onclick: function () { cfView(c); } }, [
-        el('td', null, [ el('div.strong', { text: c.ref }), el('div.text-mute.xs', { text: c.kind }) ]),
-        el('td', { text: c.counterparty }),
-        el('td', { text: c.route }),
-        el('td.num', { text: c.seats ? ui.num(c.seats) : '—' }),
-        el('td.num', { text: c.buyPrice ? ui.money(c.buyPrice) : '—' }),
-        el('td.num', { text: c.sellPrice ? ui.money(c.sellPrice) : '—' }),
-        el('td', { text: margin === null ? '—' : margin + '%' }),
-        el('td', { text: c.validFrom + ' → ' + c.validTo }),
-        el('td', null, [ badge(statusOf(c)) ]),
-        el('td', null, [ ui.rowActions(ui.actions({
-          del:   function () { cfDelete(c); },
-          print: function () { cfPrint(c); },
-          wa:    { phone:'', text: cfMsg(c) },
-          gmail: { to:'', subject:'Contract '+c.ref+' — '+c.counterparty, body: cfMsg(c) }
-        })) ])
-      ]);
+    var t = EPAL.table({
+      columns: [
+        { key: 'ref', label: 'Ref', render: function (c) { return '<div class="strong">' + ui.escapeHtml(c.ref) + '</div><div class="text-mute xs">' + ui.escapeHtml(c.kind || '') + '</div>'; } },
+        { key: 'counterparty', label: 'Counterparty' },
+        { key: 'route', label: 'Route' },
+        { key: 'seats', label: 'Seats', num: true, render: function (c) { return c.seats ? ui.num(c.seats) : '—'; } },
+        { key: 'buyPrice', label: 'Buy', num: true, render: function (c) { return c.buyPrice ? ui.money(c.buyPrice) : '—'; }, sortVal: function (c) { return c.buyPrice || 0; } },
+        { key: 'sellPrice', label: 'Sell', num: true, render: function (c) { return c.sellPrice ? ui.money(c.sellPrice) : '—'; }, sortVal: function (c) { return c.sellPrice || 0; } },
+        { key: 'margin', label: 'Margin', num: true, render: function (c) { var m = c.sellPrice && c.buyPrice ? Math.round((1 - c.buyPrice / c.sellPrice) * 100) : null; return m === null ? '—' : m + '%'; },
+          sortVal: function (c) { return c.sellPrice && c.buyPrice ? (1 - c.buyPrice / c.sellPrice) : -1; } },
+        { key: 'validTo', label: 'Validity', render: function (c) { return ui.escapeHtml(c.validFrom + ' → ' + c.validTo); } },
+        { key: 'status', label: 'Status', render: function (c) { return badge(statusOf(c)).outerHTML; }, sortVal: function (c) { return statusOf(c); } }
+      ],
+      rows: list.slice().sort(function (a, b) { return a.validTo < b.validTo ? -1 : 1; }),
+      searchKeys: ['ref', 'kind', 'counterparty', 'route'],
+      quickFilter: 'kind', filterPanel: true, filters: [], exportName: 'contracts.csv', pdfTitle: 'Airline / Vendor Contracts',
+      onRow: function (c) { cfView(c); },
+      actions: ui.actions({
+        del:   function (c) { cfDelete(c); },
+        print: function (c) { cfPrint(c); },
+        wa:    function (c) { return { phone: '', text: cfMsg(c) }; },
+        gmail: function (c) { return { to: '', subject: 'Contract ' + c.ref + ' — ' + c.counterparty, body: cfMsg(c) }; }
+      }),
+      empty: { icon: 'file-earmark-medical', title: 'No contracts on file', hint: 'Add an airline or vendor contract.' }
     });
     page.appendChild(el('div.card', null, [
       el('div.card-head', null, [ el('h3', { html: ui.icon('file-earmark-medical') + ' Contracts' }),
         el('span.card-sub', { text: list.length + ' on file' }) ]),
-      el('div.table-wrap', null, [
-        el('table.tbl', null, [
-          el('thead', null, [ el('tr', null, [['Ref'], ['Counterparty'], ['Route'], ['Seats', 'num'], ['Buy', 'num'], ['Sell', 'num'], ['Margin', 'num'], ['Validity'], ['Status'], ['']].map(function (h) { return el('th' + (h[1] ? '.' + h[1] : ''), { text: h[0] }); })) ]),
-          el('tbody', null, rows)
-        ])
-      ])
+      el('div.card-body', null, [ t.el ])
     ]));
   }
 
