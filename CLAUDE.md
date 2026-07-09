@@ -61,3 +61,24 @@ Phase 2 restructure (Travels first) → Phase 3 bridge + discovery (group totals
 must match exactly) → Phase 4 Tailwind conversion screen-by-screen with visual
 diff sign-off. Old CSS is deleted only after every screen using it is converted
 and signed off.
+
+## Current status (2026-07-09) — read `MIGRATION_STATUS.md`
+
+Phases 0–3 are DONE and pushed (modular `platform/` + `companies/<x>/` folders;
+auto-discovery: delete a company/module folder over HTTP → it disappears from
+menus AND the Group books; group totals proven byte-identical when all present).
+**Phase 4 (Tailwind) is PAUSED while the owner ships feature updates.**
+
+## Adding features during the pause — MUST be folder-wise (`docs/ADDING-A-FEATURE.md`)
+
+Every NEW feature lands in the modular structure, or it regresses the migration:
+- A module = `companies/<company>/modules/<id>/{view.js, module.json,
+  backend/LARAVEL-BLUEPRINT.md}`; its screen self-registers `EPAL.view(
+  '<company>/<id>', …)` in the readable IIFE style, using existing design-system
+  classes (Tailwind comes in Phase 4 for everything at once).
+- Register it in BOTH `platform/core/config.js` (live menus) AND the company/
+  module `module.json` (`built:true`, for discovery) — keep them in sync.
+- Add its `<script>` to `index.html`; if it records money, wire its `bridge.map`
+  event + `EPAL.bridge.emit(...)`.
+- Never reintroduce a flat `assets/` folder. Verify with the boot sweep
+  (0 errors, both themes) and commit small.

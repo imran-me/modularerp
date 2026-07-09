@@ -56,6 +56,19 @@
 - [ ] **Phase 4 — Tailwind conversion** (screen-by-screen; side-by-side visual
       diff sign-off; delete old CSS only after ALL screens using it are signed off)
 
+
+## ⏸ PAUSED at Phase 4 (2026-07-09) — feature-update window
+
+The owner is shipping FEATURE UPDATES before the Tailwind conversion. During this
+window, every new feature MUST follow docs/ADDING-A-FEATURE.md (folder-wise:
+companies/<x>/modules/<id>/{view.js,module.json,backend/LARAVEL-BLUEPRINT.md};
+registered in BOTH platform/core/config.js and the module.json; scripted in
+index.html; bridge-wired if it records money; verified by the boot sweep).
+Resume Phase 4 (Tailwind, screen-by-screen with visual diffs) when the owner says.
+
+Baseline still valid: tag pre-migration-baseline + folder backup. Boot-sweep bar
+is now 190 routes / 0 errors / 0 fails (rises as new modules are added).
+
 ## Step log (append one line per completed step)
 
 | Date | Step | Verified by | Commit |
