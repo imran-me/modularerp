@@ -452,11 +452,12 @@
           tdN(ui.money(comm)),
           td('<span class="num '+(np>=0?'text-good':'text-bad')+'">'+ui.money(np)+'</span>'),
           td(payBadge(x.payStatus).outerHTML), td(statusBadge(x.status).outerHTML),
-          el('td', null, [ ui.rowActions([
-            { icon:'eye', title:'View', onClick:(function(tk){return function(){ ticketDetail(tk, draw); };})(x) },
-            { icon:'printer', title:'Print e-ticket', onClick:(function(tk){return function(){ printTicket(tk); };})(x) },
-            { icon:'send', title:'Send to passenger', onClick:(function(tk){return function(){ shareTicket(tk); };})(x) }
-          ]) ]) ]);
+          el('td', null, [ ui.rowActions(ui.actions({
+            view:  (function(tk){return function(){ ticketDetail(tk, draw); };})(x),
+            print: (function(tk){return function(){ printTicket(tk); };})(x),
+            wa:    { phone:'', text: ticketMsg(x) },
+            gmail: { to:'', subject:'Your e-ticket '+x.id+' — '+x.route, body: ticketMsg(x) }
+          })) ]) ]);
       });
       host.innerHTML='';
       host.appendChild(tableCard('Ticket Sales Ledger',
@@ -472,11 +473,10 @@
       bodyHtml: '<table>' + r('Passenger', x.passenger) + r('Route', x.route) + r('Airline / PNR', x.airlineCode + ' · ' + x.pnr) +
         r('Fare (sale)', ui.money(x.sale)) + r('Payment', x.payStatus) + r('Status', x.status) + '</table>' });
   }
-  function shareTicket(x) {
-    var body = 'e-Ticket ' + x.id + '\nPassenger: ' + x.passenger + '\nRoute: ' + x.route +
+  function ticketMsg(x) {
+    return 'e-Ticket ' + x.id + '\nPassenger: ' + x.passenger + '\nRoute: ' + x.route +
       '\nFlight: ' + x.airlineCode + ' ' + x.pnr + '\nFare: ' + ui.money(x.sale) + '\nStatus: ' + x.status +
       '\n\n— Epal Travels & Consultancy';
-    ui.share({ title: 'Send e-ticket ' + x.id, subject: 'Your e-ticket ' + x.id + ' — ' + x.route, body: body });
   }
 
   /* per-airline & per-agent profit report + bar chart (built once) */

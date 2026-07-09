@@ -105,12 +105,13 @@
         el('td', { text: margin === null ? '—' : margin + '%' }),
         el('td', { text: c.validFrom + ' → ' + c.validTo }),
         el('td', null, [ badge(statusOf(c)) ]),
-        el('td', null, [ ui.rowActions([
-          { icon: 'eye', title: 'View', onClick: function () { cfView(c); } },
-          { icon: 'printer', title: 'Print contract', onClick: function () { cfPrint(c); } },
-          { icon: 'send', title: 'Share', onClick: function () { cfShare(c); } },
-          { icon: 'trash3', title: 'Delete', danger: true, onClick: function () { cfDelete(c); } }
-        ]) ])
+        el('td', null, [ ui.rowActions(ui.actions({
+          view:  function () { cfView(c); },
+          del:   function () { cfDelete(c); },
+          print: function () { cfPrint(c); },
+          wa:    { phone:'', text: cfMsg(c) },
+          gmail: { to:'', subject:'Contract '+c.ref+' — '+c.counterparty, body: cfMsg(c) }
+        })) ])
       ]);
     });
     page.appendChild(el('div.card', null, [
@@ -141,11 +142,10 @@
         pr('Sell price / seat', c.sellPrice ? ui.money(c.sellPrice) : '—') + pr('Valid from', c.validFrom) + pr('Valid to', c.validTo) +
         pr('Document', c.doc) + '</table>' });
   }
-  function cfShare(c) {
-    var body = 'Contract ' + c.ref + ' — ' + c.counterparty + '\n' +
+  function cfMsg(c) {
+    return 'Contract ' + c.ref + ' — ' + c.counterparty + '\n' +
       'Type: ' + c.kind + '\nRoute: ' + c.route + (c.seats ? '\nSeats: ' + c.seats : '') +
       '\nValidity: ' + c.validFrom + ' to ' + c.validTo + '\n\n— Epal Travels & Consultancy';
-    ui.share({ title: 'Share contract ' + c.ref, subject: 'Contract ' + c.ref + ' — ' + c.counterparty, body: body });
   }
   function cfDelete(c) {
     ui.confirm({ title: 'Delete contract', text: 'Delete ' + c.ref + ' (' + c.counterparty + ')?', danger: true, confirmLabel: 'Delete' })

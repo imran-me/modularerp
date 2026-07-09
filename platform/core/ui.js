@@ -247,6 +247,41 @@
     });
   }
 
+  /* ---- Direct one-tap send launchers (no modal) -------------------------- */
+  function waOpen(phone, text) {
+    window.open('https://wa.me/' + String(phone || '').replace(/[^0-9]/g, '') +
+      '?text=' + encodeURIComponent(text || ''), '_blank', 'noopener');
+  }
+  function gmailOpen(to, subject, body) {
+    window.open('https://mail.google.com/mail/?view=cm&fs=1' + (to ? '&to=' + encodeURIComponent(to) : '') +
+      '&su=' + encodeURIComponent(subject || '') + '&body=' + encodeURIComponent(body || ''), '_blank', 'noopener');
+  }
+
+  /* ---- Canonical action set — the SAME six actions, SAME order, everywhere:
+         view · edit · delete  │  print · WhatsApp · Gmail. Pass only the ones a
+         row supports; each is a handler, except wa/gmail which take a payload
+         (or a function returning one) so the message is built per row:
+           view/edit/del/print : function()
+           wa    : { phone, text }   | function -> { phone, text }
+           gmail : { to, subject, body } | function -> { to, subject, body }
+         Returns a descriptor array for ui.rowActions() or datatable actions. */
+  function actions(o) {
+    o = o || {};
+    // wa/gmail payloads may be an object or a function(row) — forward the row the
+    // caller receives (datatable binds it; manual callers close over it, arg unused).
+    function pay(v, r) { return (typeof v === 'function' ? v(r) : v) || {}; }
+    var out = [];
+    if (o.view)  out.push({ icon: 'eye',     title: o.viewTitle  || 'View',   onClick: o.view });
+    if (o.edit)  out.push({ icon: 'pencil',  title: o.editTitle  || 'Edit',   onClick: o.edit });
+    if (o.del)   out.push({ icon: 'trash',   title: o.delTitle   || 'Delete', danger: true, onClick: o.del });
+    // divider sits before the first of the output group that is present
+    var lead = o.print ? 'print' : o.wa ? 'wa' : o.gmail ? 'gmail' : null;
+    if (o.print) out.push({ icon: 'printer',       title: o.printTitle || 'Print',            sep: lead === 'print', onClick: o.print });
+    if (o.wa)    out.push({ icon: 'whatsapp',      title: o.waTitle    || 'Send on WhatsApp', sep: lead === 'wa',    onClick: function (r) { var p = pay(o.wa, r);    waOpen(p.phone, p.text); } });
+    if (o.gmail) out.push({ icon: 'envelope-fill', title: o.gmailTitle || 'Send via Gmail',   sep: lead === 'gmail', onClick: function (r) { var p = pay(o.gmail, r); gmailOpen(p.to, p.subject, p.body); } });
+    return out;
+  }
+
   /* ---- Share (Gmail / WhatsApp / Copy) — a small compose launcher ---------
      opts: { title, subject, body, to, toName, phone }. Opens Gmail's web compose
      and WhatsApp's click-to-chat prefilled — no backend, no API keys. */
@@ -308,10 +343,11 @@
 
   /* ---- Row actions — a compact icon-button group for table rows / cards ---
      actions: [{ icon, title, onClick, danger }] */
-  function rowActions(actions) {
+  function rowActions(list) {
     var wrap = el('div.row-actions');
-    (actions || []).forEach(function (a) {
+    (list || []).forEach(function (a) {
       if (!a) return;
+      if (a.sep) wrap.appendChild(el('span.row-act-sep', { 'aria-hidden': 'true' }));
       wrap.appendChild(el('button.row-act' + (a.danger ? '.row-act-danger' : ''), {
         title: a.title || a.label, 'aria-label': a.title || a.label,
         onclick: function (e) { e.stopPropagation(); a.onClick && a.onClick(e); }, html: icon(a.icon)
@@ -326,7 +362,8 @@
     uid: uid, initials: initials, colorFor: colorFor, escapeHtml: escapeHtml,
     debounce: debounce, icon: icon, copy: copy, countUp: countUp,
     toast: toast, modal: modal, confirm: confirm,
-    share: share, printDoc: printDoc, rowActions: rowActions
+    share: share, waOpen: waOpen, gmailOpen: gmailOpen, actions: actions,
+    printDoc: printDoc, rowActions: rowActions
   };
 
 })(window.EPAL = window.EPAL || {});

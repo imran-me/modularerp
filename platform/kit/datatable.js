@@ -170,10 +170,12 @@
         });
         if (opts.actions && opts.actions.length) {
           var atd = el('td.dt-actions');
-          opts.actions.forEach(function (a) {
-            atd.appendChild(el('button.icon-btn.dt-act', { title: a.title || '', html: ui.icon(a.icon),
-              onclick: function (e) { e.stopPropagation(); a.onClick(r); } }));
-          });
+          // render through the shared row-action bar (inline, single line — never
+          // stacks) so every table matches the cards; bind each handler to this row.
+          atd.appendChild(ui.rowActions(opts.actions.map(function (a) {
+            return { icon: a.icon, title: a.title, danger: a.danger, sep: a.sep,
+                     onClick: function () { a.onClick(r); } };
+          })));
           tr.appendChild(atd);
         }
         if (opts.onRow) tr.addEventListener('click', function () { opts.onRow(r); });

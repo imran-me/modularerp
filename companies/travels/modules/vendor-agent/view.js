@@ -253,14 +253,15 @@
         el('td', { text: c.email || '—' }),
         el('td.num', { text: ui.money(c.value || 0) }),
         el('td', { text: c.since || '—' }),
-        // View · Edit · Print statement · Send message · Delete — compact, one cell
-        el('td', null, [ ui.rowActions([
-          { icon: 'eye', title: 'View', onClick: function () { custView(c); } },
-          { icon: 'pencil', title: 'Edit', onClick: function () { custEdit(c); } },
-          { icon: 'printer', title: 'Print statement', onClick: function () { custPrint(c); } },
-          { icon: 'send', title: 'Send message', onClick: function () { custShare(c); } },
-          { icon: 'trash3', title: 'Delete', danger: true, onClick: function () { custDelete(c); } }
-        ]) ])
+        // canonical set: view · edit · delete │ print · WhatsApp · Gmail — one line
+        el('td', null, [ ui.rowActions(ui.actions({
+          view:  function () { custView(c); },
+          edit:  function () { custEdit(c); },
+          del:   function () { custDelete(c); },
+          print: function () { custPrint(c); },
+          wa:    { phone: c.phone, text: custMsg(c) },
+          gmail: { to: c.email, subject: 'Epal Travels & Consultancy', body: custMsg(c) }
+        })) ])
       ]);
     });
     page.appendChild(el('div.card', null, [
@@ -303,9 +304,8 @@
       bodyHtml: '<table><tr><th>Field</th><th>Value</th></tr>' + pr('Contact person', c.contact) + pr('Phone', c.phone) +
         pr('Email', c.email) + pr('Lifetime value', ui.money(c.value || 0)) + pr('Customer since', c.since) + '</table>' });
   }
-  function custShare(c) {
-    ui.share({ title: 'Message ' + c.name, toName: c.name, to: c.email, phone: c.phone, subject: 'Epal Travels & Consultancy',
-      body: 'Dear ' + c.name + ',\n\nThank you for choosing Epal Travels & Consultancy. Please let us know how we can assist with your next booking.\n\nWarm regards,\nEpal Travels & Consultancy' });
+  function custMsg(c) {
+    return 'Dear ' + c.name + ',\n\nThank you for choosing Epal Travels & Consultancy. Please let us know how we can assist with your next booking.\n\nWarm regards,\nEpal Travels & Consultancy';
   }
 
   /* ======================================================= OVERVIEW */
@@ -387,7 +387,7 @@
         filters: [{ key: 'type', label: 'Type' }, { key: 'terms', label: 'Terms' }],
         pageSize: 10, exportName: 'vendors.csv',
         onRow: function (v) { openLedgerModal(metaFromVendor(v)); },
-        actions: actionsFor(function (v) { editVendor(v); }, function (v) { removeRec('vendors', v, draw); }),
+        actions: actionsFor(function (v) { editVendor(v); }, function (v) { removeRec('vendors', v, draw); }, metaFromVendor),
         empty: { icon: 'truck', title: 'No vendors yet', hint: 'Add your first GSA or supplier.' }
       });
       host.appendChild(t.el);
@@ -460,7 +460,7 @@
         filters: [{ key: 'status', label: 'Status' }, { key: 'location', label: 'Location' }],
         pageSize: 10, exportName: 'agents.csv',
         onRow: function (a) { openLedgerModal(metaFromAgent(a), a); },
-        actions: actionsFor(function (a) { editAgent(a); }, function (a) { removeRec('tv_agents', a, draw); }),
+        actions: actionsFor(function (a) { editAgent(a); }, function (a) { removeRec('tv_agents', a, draw); }, metaFromAgent),
         empty: { icon: 'person-badge', title: 'No agents yet', hint: 'Add your first sub-agent.' }
       });
       host.appendChild(t.el);
@@ -587,13 +587,28 @@
     var util = limit ? Math.round(Math.max(0, led.balance) / limit * 100) : 0;
     var over = util > 90;
 
+    // --- actions: sit TOP-RIGHT of the header, in the vacant space beside the
+    //     name (not their own row) — one clean line of controls. ---
+    var actions = el('div.flex.gap-1.items-center.flex-wrap', { style: { marginLeft: 'auto' } });
+    if (canCreate()) {
+      actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('file-earmark-plus') + ' Record Invoice',
+        onclick: function () { recordTxn(meta, true, function () { renderLedger(host, meta, agentRec); }); } }));
+      actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('cash-coin') + ' Record Payment',
+        onclick: function () { recordTxn(meta, false, function () { renderLedger(host, meta, agentRec); }); } }));
+    }
+    actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement',
+      onclick: function () { openStatement(meta); } }));
+
     // --- header / credit control card ---
     var head = el('div.card', null, [ el('div.card-body', null, [
       el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
         ui.frag('<span class="notif-ico notif-' + (meta.partyType === 'agent' ? 'success' : 'info') + '">' + ui.icon(meta.partyType === 'agent' ? 'person-badge' : 'truck') + '</span>'),
-        el('div.flex-1', null, [ el('div.fw-700', { style: { fontSize: '17px' }, text: meta.name }),
-          el('div.text-mute.sm', { text: cap(meta.partyType) + ' · ' + (meta.location || 'Dhaka') }) ]),
-        typeBadgeNode(meta.partyType)
+        el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: meta.name }),
+          el('div.flex.items-center.gap-2', null, [
+            el('div.text-mute.sm', { text: cap(meta.partyType) + ' · ' + (meta.location || 'Dhaka') }),
+            typeBadgeNode(meta.partyType)
+          ]) ]),
+        actions
       ]),
       el('div.stat-row', null, [
         st2(meta.partyType === 'agent' ? 'Receivable' : 'Payable', ui.money(led.balance)),
@@ -613,18 +628,6 @@
       ])
     ]) ]);
     host.appendChild(head);
-
-    // --- actions ---
-    var actions = el('div.flex.gap-1.flex-wrap.mb-3');
-    if (canCreate()) {
-      actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('file-earmark-plus') + ' Record Invoice',
-        onclick: function () { recordTxn(meta, true, function () { renderLedger(host, meta, agentRec); }); } }));
-      actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('cash-coin') + ' Record Payment',
-        onclick: function () { recordTxn(meta, false, function () { renderLedger(host, meta, agentRec); }); } }));
-    }
-    actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement',
-      onclick: function () { openStatement(meta); } }));
-    host.appendChild(actions);
 
     // --- ageing summary ---
     host.appendChild(el('div.kpi-grid', null, [
@@ -844,25 +847,29 @@
   function canCreate() { return !EPAL.perm || EPAL.perm.can('travels', 'vendor-agent', 'create'); }
   function canDelete() { return !EPAL.perm || EPAL.perm.can('travels', 'vendor-agent', 'delete'); }
 
-  function actionsFor(onEdit, onDelete) {
-    var arr = [
-      { icon: 'pencil', title: 'Edit', onClick: onEdit },
-      { icon: 'printer', title: 'Print statement', onClick: function (r) { printParty(r); } },
-      { icon: 'send', title: 'Send message', onClick: function (r) { shareParty(r); } }
-    ];
-    if (canDelete()) arr.push({ icon: 'trash', title: 'Delete', onClick: onDelete });
-    return arr;
+  // The canonical six-action set for every party row: view · edit · delete │
+  // print · WhatsApp · Gmail. `toMeta` (optional) resolves the row to a ledger
+  // meta so the eye opens the full statement modal.
+  function actionsFor(onEdit, onDelete, toMeta) {
+    return ui.actions({
+      view:  toMeta ? function (r) { openLedgerModal(toMeta(r), r); } : null,
+      edit:  onEdit,
+      del:   canDelete() ? onDelete : null,
+      print: function (r) { printParty(r); },
+      wa:    function (r) { return { phone: r.phone, text: partyMsg(r) }; },
+      gmail: function (r) { return { to: r.email, subject: 'Epal Travels & Consultancy', body: partyMsg(r) }; }
+    });
+  }
+  function partyMsg(r) {
+    var bal = ledgerBalance(r.name, r.balance);
+    return 'Dear ' + r.name + ',\n\nYour current account balance with Epal Travels & Consultancy is ' + ui.money(bal) +
+      '.\nPlease contact us for any queries.\n\nWarm regards,\nEpal Travels & Consultancy';
   }
   function printParty(r) {
     var bal = ledgerBalance(r.name, r.balance);
     function row(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
     ui.printDoc({ title: 'Statement — ' + r.name, subtitle: (r.type || r.agency || 'Party') + ' · Epal Travels & Consultancy', meta: 'Party statement',
       bodyHtml: '<table>' + row('Name', r.name) + row('Contact', r.contact || r.phone) + row('Phone', r.phone) + row('Email', r.email) + row('Balance', ui.money(bal)) + '</table>' });
-  }
-  function shareParty(r) {
-    var bal = ledgerBalance(r.name, r.balance);
-    ui.share({ title: 'Message ' + r.name, toName: r.name, to: r.email, phone: r.phone, subject: 'Epal Travels & Consultancy',
-      body: 'Dear ' + r.name + ',\n\nYour current account balance with Epal Travels & Consultancy is ' + ui.money(bal) + '.\nPlease contact us for any queries.\n\nWarm regards,\nEpal Travels & Consultancy' });
   }
   function removeRec(store, rec, done) {
     ui.confirm({ title: 'Delete "' + rec.name + '"?', danger: true, confirmLabel: 'Delete' }).then(function (ok) {
