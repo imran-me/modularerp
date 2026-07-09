@@ -257,6 +257,39 @@
       '&su=' + encodeURIComponent(subject || '') + '&body=' + encodeURIComponent(body || ''), '_blank', 'noopener');
   }
 
+  // Download a data-URL (e.g. a base64 profile photo) as a file.
+  function downloadDataUrl(dataUrl, filename) {
+    if (!dataUrl) return;
+    var a = el('a', { href: dataUrl, download: filename || 'download' });
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  /* ---- Send with an OPTIONAL profile attachment ---------------------------
+     wa.me / Gmail web-compose CANNOT auto-attach a file, so when a profile is
+     available we offer to DOWNLOAD it (PDF or JPG) for the user to attach, then
+     open the prefilled chat — or just send the message. opts:
+       { channel:'wa'|'gmail', name, phone, to, subject, body,
+         profile: { pdf: fn, jpg: dataUrl|fn } }  (profile optional) */
+  function sendModal(opts) {
+    opts = opts || {};
+    function openChat() { if (opts.channel === 'gmail') gmailOpen(opts.to, opts.subject, opts.body); else waOpen(opts.phone, opts.body); }
+    var prof = opts.profile;
+    if (!prof || (!prof.pdf && !prof.jpg)) { openChat(); return; }
+    var m = modal({ title: 'Send to ' + escapeHtml(opts.name || 'contact'), icon: opts.channel === 'gmail' ? 'envelope-fill' : 'whatsapp', size: 'sm', footer: false, body:
+      el('div', null, [
+        el('p.text-muted.sm', { style: { marginBottom: '14px' },
+          text: (opts.channel === 'gmail' ? 'Gmail' : 'WhatsApp') + ' opens with the message ready. Attaching a file there is manual — download the profile first if you want to include it.' }),
+        el('div.flex.flex-col.gap-2', null, [
+          prof.pdf ? el('button.btn.btn-outline.btn-block', { html: icon('filetype-pdf') + ' Download profile (PDF), then open',
+            onclick: function () { try { prof.pdf(); } catch (e) {} setTimeout(openChat, 500); m.close(); } }) : null,
+          prof.jpg ? el('button.btn.btn-outline.btn-block', { html: icon('filetype-jpg') + ' Download photo (JPG), then open',
+            onclick: function () { downloadDataUrl(typeof prof.jpg === 'function' ? prof.jpg() : prof.jpg, (opts.name || 'profile') + '.jpg'); setTimeout(openChat, 500); m.close(); } }) : null,
+          el('button.btn.btn-primary.btn-block', { html: icon('send') + ' Just send the message',
+            onclick: function () { openChat(); m.close(); } })
+        ])
+      ]) });
+    return m;
+  }
+
   /* ---- Canonical action set — the SAME six actions, SAME order, everywhere:
          view · edit · delete  │  print · WhatsApp · Gmail. Pass only the ones a
          row supports; each is a handler, except wa/gmail which take a payload
@@ -270,6 +303,8 @@
     // wa/gmail payloads may be an object or a function(row) — forward the row the
     // caller receives (datatable binds it; manual callers close over it, arg unused).
     function pay(v, r) { return (typeof v === 'function' ? v(r) : v) || {}; }
+    // optional profile attachment resolver (enables the send-with-attachment chooser)
+    function prof(r) { return o.profile ? (typeof o.profile === 'function' ? o.profile(r) : o.profile) : null; }
     var out = [];
     // NOTE: no 'view'/eye icon — clicking the ROW opens the detail everywhere, so
     // an eye button would be redundant. Modules wire row-click (onRow / tr onclick).
@@ -278,8 +313,8 @@
     // divider sits before the first of the output group that is present
     var lead = o.print ? 'print' : o.wa ? 'wa' : o.gmail ? 'gmail' : null;
     if (o.print) out.push({ icon: 'printer',       title: o.printTitle || 'Print',            sep: lead === 'print', onClick: o.print });
-    if (o.wa)    out.push({ icon: 'whatsapp',      title: o.waTitle    || 'Send on WhatsApp', sep: lead === 'wa',    onClick: function (r) { var p = pay(o.wa, r);    waOpen(p.phone, p.text); } });
-    if (o.gmail) out.push({ icon: 'envelope-fill', title: o.gmailTitle || 'Send via Gmail',   sep: lead === 'gmail', onClick: function (r) { var p = pay(o.gmail, r); gmailOpen(p.to, p.subject, p.body); } });
+    if (o.wa)    out.push({ icon: 'whatsapp',      title: o.waTitle    || 'Send on WhatsApp', sep: lead === 'wa',    onClick: function (r) { var p = pay(o.wa, r);    if (o.profile) sendModal({ channel: 'wa', name: p.name || (prof(r) || {}).name, phone: p.phone, body: p.text, profile: prof(r) }); else waOpen(p.phone, p.text); } });
+    if (o.gmail) out.push({ icon: 'envelope-fill', title: o.gmailTitle || 'Send via Gmail',   sep: lead === 'gmail', onClick: function (r) { var p = pay(o.gmail, r); if (o.profile) sendModal({ channel: 'gmail', name: (prof(r) || {}).name, to: p.to, subject: p.subject, body: p.body, profile: prof(r) }); else gmailOpen(p.to, p.subject, p.body); } });
     return out;
   }
 
@@ -365,6 +400,7 @@
     debounce: debounce, icon: icon, copy: copy, countUp: countUp,
     toast: toast, modal: modal, confirm: confirm,
     share: share, waOpen: waOpen, gmailOpen: gmailOpen, actions: actions,
+    sendModal: sendModal, downloadDataUrl: downloadDataUrl,
     printDoc: printDoc, rowActions: rowActions
   };
 

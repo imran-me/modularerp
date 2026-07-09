@@ -682,10 +682,14 @@
     }
     actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement',
       onclick: function () { openStatement(meta); } }));
-    // WhatsApp + Gmail — icon-only, same row, same behaviour as the row actions
+    // WhatsApp + Gmail — icon-only; offers to attach the party profile (PDF/JPG)
+    // before opening the chat (or just send the message).
     actions.appendChild(ui.rowActions(ui.actions({
       wa:    { phone: meta.phone, text: partyMsg({ name: meta.name, balance: led.balance }) },
-      gmail: { to: meta.email, subject: 'Epal Travels & Consultancy', body: partyMsg({ name: meta.name, balance: led.balance }) }
+      gmail: { to: meta.email, subject: 'Epal Travels & Consultancy', body: partyMsg({ name: meta.name, balance: led.balance }) },
+      profile: { name: meta.name,
+        pdf: function () { printParty({ name: meta.name, phone: meta.phone, email: meta.email, balance: led.balance, type: cap(meta.partyType) }); },
+        jpg: meta.photo || null }
     })));
 
     // --- header / credit control card ---
