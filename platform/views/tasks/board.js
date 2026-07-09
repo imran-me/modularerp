@@ -319,6 +319,8 @@
       }
       controls.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print report',
         onclick: function () { printTaskReport(emp, t); } }));
+      controls.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('send') + ' Share',
+        onclick: function () { shareTask(emp, t); } }));
       controls.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('pencil') + ' Edit',
         onclick: function () { m.close(); openEditor(emp, t, isAdmin, refresh); } }));
 
@@ -504,6 +506,22 @@
   }
 
   function escHtml(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  /* ---- Share a task (WhatsApp / Gmail) — a readable plain-text summary -----*/
+  function shareTask(emp, t) {
+    var L = [];
+    L.push('Task: ' + t.title);
+    L.push('Status: ' + (t.status || '—') + '   Priority: ' + (t.priority || '—'));
+    if (t.due) L.push('Due: ' + t.due);
+    if (Array.isArray(t.labels) && t.labels.length) L.push('Labels: ' + t.labels.join(', '));
+    var phs = t.phases || [];
+    if (phs.length) {
+      L.push(''); L.push('Phases (' + phs.length + '):');
+      phs.forEach(function (p) { L.push('  • ' + (p.name || p.label || p.title || 'Phase') + (p.completedAt ? '  ✓' : '')); });
+    }
+    L.push(''); L.push('— ' + ((emp && emp.name) || 'Epal') + ' · Epal Group ERP');
+    ui.share({ title: 'Share task', subject: 'Task: ' + t.title, body: L.join('\n') });
+  }
 
   /* ---- Branded, print-ready TASK REPORT ---------------------------------
    * A full one-page document of the task + every phase (assignee, priority,

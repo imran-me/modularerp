@@ -104,7 +104,13 @@
         el('td.num', { text: c.sellPrice ? ui.money(c.sellPrice) : '—' }),
         el('td', { text: margin === null ? '—' : margin + '%' }),
         el('td', { text: c.validFrom + ' → ' + c.validTo }),
-        el('td', null, [ badge(statusOf(c)) ])
+        el('td', null, [ badge(statusOf(c)) ]),
+        el('td', null, [ ui.rowActions([
+          { icon: 'eye', title: 'View', onClick: function () { cfView(c); } },
+          { icon: 'printer', title: 'Print contract', onClick: function () { cfPrint(c); } },
+          { icon: 'send', title: 'Share', onClick: function () { cfShare(c); } },
+          { icon: 'trash3', title: 'Delete', danger: true, onClick: function () { cfDelete(c); } }
+        ]) ])
       ]);
     });
     page.appendChild(el('div.card', null, [
@@ -112,11 +118,38 @@
         el('span.card-sub', { text: list.length + ' on file' }) ]),
       el('div.table-wrap', null, [
         el('table.tbl', null, [
-          el('thead', null, [ el('tr', null, ['Ref', 'Counterparty', 'Route', 'Seats', 'Buy', 'Sell', 'Margin', 'Validity', 'Status'].map(function (h) { return el('th', { text: h }); })) ]),
+          el('thead', null, [ el('tr', null, ['Ref', 'Counterparty', 'Route', 'Seats', 'Buy', 'Sell', 'Margin', 'Validity', 'Status', ''].map(function (h) { return el('th', { text: h }); })) ]),
           el('tbody', null, rows)
         ])
       ])
     ]));
+  }
+
+  /* ---- contract row actions (view / print / share / delete) --------------*/
+  function cfRow(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v || '—' }) ]); }
+  function cfView(c) {
+    ui.modal({ title: c.ref + ' · ' + c.counterparty, icon: 'file-earmark-medical', size: 'md', body: el('div.data-list', null, [
+      cfRow('Type', c.kind), cfRow('Route', c.route), cfRow('Seats', c.seats ? ui.num(c.seats) : '—'),
+      cfRow('Buy / seat', c.buyPrice ? ui.money(c.buyPrice) : '—'), cfRow('Sell / seat', c.sellPrice ? ui.money(c.sellPrice) : '—'),
+      cfRow('Validity', c.validFrom + ' → ' + c.validTo), cfRow('Status', statusOf(c)), cfRow('Document', c.doc)
+    ]) });
+  }
+  function cfPrint(c) {
+    function pr(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: 'Contract ' + c.ref, subtitle: c.counterparty + ' · ' + c.kind, meta: 'Airline / vendor contract',
+      bodyHtml: '<table>' + pr('Route', c.route) + pr('Seats', c.seats || '—') + pr('Buy price / seat', c.buyPrice ? ui.money(c.buyPrice) : '—') +
+        pr('Sell price / seat', c.sellPrice ? ui.money(c.sellPrice) : '—') + pr('Valid from', c.validFrom) + pr('Valid to', c.validTo) +
+        pr('Document', c.doc) + '</table>' });
+  }
+  function cfShare(c) {
+    var body = 'Contract ' + c.ref + ' — ' + c.counterparty + '\n' +
+      'Type: ' + c.kind + '\nRoute: ' + c.route + (c.seats ? '\nSeats: ' + c.seats : '') +
+      '\nValidity: ' + c.validFrom + ' to ' + c.validTo + '\n\n— Epal Travels & Consultancy';
+    ui.share({ title: 'Share contract ' + c.ref, subject: 'Contract ' + c.ref + ' — ' + c.counterparty, body: body });
+  }
+  function cfDelete(c) {
+    ui.confirm({ title: 'Delete contract', text: 'Delete ' + c.ref + ' (' + c.counterparty + ')?', danger: true, confirmLabel: 'Delete' })
+      .then(function (ok) { if (!ok) return; S.removeFrom('tv_contracts', c); ui.toast(c.ref + ' deleted', 'good'); EPAL.router.navigate('travels/contract-file/contracts'); });
   }
 
   /* ================================================================ NEW CONTRACT */

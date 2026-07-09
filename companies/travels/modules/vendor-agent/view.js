@@ -252,7 +252,15 @@
         el('td', { text: c.phone || '—' }),
         el('td', { text: c.email || '—' }),
         el('td.num', { text: ui.money(c.value || 0) }),
-        el('td', { text: c.since || '—' })
+        el('td', { text: c.since || '—' }),
+        // View · Edit · Print statement · Send message · Delete — compact, one cell
+        el('td', null, [ ui.rowActions([
+          { icon: 'eye', title: 'View', onClick: function () { custView(c); } },
+          { icon: 'pencil', title: 'Edit', onClick: function () { custEdit(c); } },
+          { icon: 'printer', title: 'Print statement', onClick: function () { custPrint(c); } },
+          { icon: 'send', title: 'Send message', onClick: function () { custShare(c); } },
+          { icon: 'trash3', title: 'Delete', danger: true, onClick: function () { custDelete(c); } }
+        ]) ])
       ]);
     });
     page.appendChild(el('div.card', null, [
@@ -260,11 +268,44 @@
         el('span.card-sub', { text: list.length + ' travellers' }) ]),
       el('div.table-wrap', null, [
         el('table.tbl', null, [
-          el('thead', null, [ el('tr', null, ['Customer', 'Phone', 'Email', 'Lifetime Value', 'Since'].map(function (h) { return el('th', { text: h }); })) ]),
-          el('tbody', null, rows.length ? rows : [ el('tr', null, [ el('td.text-mute', { colspan: 5, text: 'No customers yet.' }) ]) ])
+          el('thead', null, [ el('tr', null, ['Customer', 'Phone', 'Email', 'Lifetime Value', 'Since', ''].map(function (h) { return el('th', { text: h }); })) ]),
+          el('tbody', null, rows.length ? rows : [ el('tr', null, [ el('td.text-mute', { colspan: 6, text: 'No customers yet.' }) ]) ])
         ])
       ])
     ]));
+  }
+  /* ---- customer row-action handlers (view / edit / print / send / delete) --*/
+  function custKv(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v || '—' }) ]); }
+  function custView(c) {
+    ui.modal({ title: c.name, icon: 'person-hearts', size: 'md', body: el('div.data-list', null, [
+      custKv('Contact person', c.contact), custKv('Phone', c.phone), custKv('Email', c.email),
+      custKv('Lifetime value', ui.money(c.value || 0)), custKv('Customer since', c.since || '—')
+    ]) });
+  }
+  function custEdit(c) {
+    var f = { name: c.name, contact: c.contact, phone: c.phone, email: c.email, value: c.value };
+    function fld(label, key, type) { return el('div.field', null, [ el('label', { text: label }),
+      el('input.input', { type: type || 'text', value: f[key] != null ? f[key] : '', oninput: function (e) { f[key] = e.target.value; } }) ]); }
+    ui.modal({ title: 'Edit ' + c.name, icon: 'pencil', size: 'md',
+      body: el('div', null, [ fld('Name', 'name'), fld('Contact person', 'contact'), fld('Phone', 'phone'), fld('Email', 'email', 'email'), fld('Lifetime value', 'value', 'number') ]),
+      actions: [ { label: 'Cancel', variant: 'ghost' }, { label: 'Save', variant: 'primary', onClick: function () {
+        c.name = f.name; c.contact = f.contact; c.phone = f.phone; c.email = f.email; c.value = +f.value || 0;
+        db.saveCustomer(c); ui.toast('Customer saved', 'good'); EPAL.router.render();
+      } } ] });
+  }
+  function custDelete(c) {
+    ui.confirm({ title: 'Delete customer', text: 'Remove ' + c.name + '? This cannot be undone.', danger: true, confirmLabel: 'Delete' })
+      .then(function (ok) { if (!ok) return; EPAL.store.removeFrom('customers', c); ui.toast(c.name + ' deleted', 'good'); EPAL.router.render(); });
+  }
+  function custPrint(c) {
+    function pr(k, v) { return '<tr><td>' + ui.escapeHtml(k) + '</td><td>' + ui.escapeHtml(String(v || '—')) + '</td></tr>'; }
+    ui.printDoc({ title: 'Customer Statement — ' + c.name, subtitle: 'Epal Travels & Consultancy', meta: 'Customer record', footer: 'Confidential',
+      bodyHtml: '<table><tr><th>Field</th><th>Value</th></tr>' + pr('Contact person', c.contact) + pr('Phone', c.phone) +
+        pr('Email', c.email) + pr('Lifetime value', ui.money(c.value || 0)) + pr('Customer since', c.since) + '</table>' });
+  }
+  function custShare(c) {
+    ui.share({ title: 'Message ' + c.name, toName: c.name, to: c.email, phone: c.phone, subject: 'Epal Travels & Consultancy',
+      body: 'Dear ' + c.name + ',\n\nThank you for choosing Epal Travels & Consultancy. Please let us know how we can assist with your next booking.\n\nWarm regards,\nEpal Travels & Consultancy' });
   }
 
   /* ======================================================= OVERVIEW */

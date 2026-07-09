@@ -555,7 +555,17 @@
     Object.keys(DOC_REQS_COUNTRY).forEach(function (country) {
       var list = DOC_REQS_COUNTRY[country];
       cgrid.appendChild(el('div.card', null, [
-        el('div.card-head', null, [ el('h3',{html:(flags[country]?flags[country]+' ':ui.icon('geo-alt-fill')+' ')+ui.escapeHtml(country)}), el('span.card-sub',{text:list.length+' documents'}) ]),
+        el('div.card-head', null, [
+          el('h3',{html:(flags[country]?flags[country]+' ':ui.icon('geo-alt-fill')+' ')+ui.escapeHtml(country)}),
+          // compact Print + Send, right in the card header (no extra row)
+          el('div.flex.items-center.gap-2', null, [
+            el('span.card-sub',{text:list.length}),
+            ui.rowActions([
+              { icon:'printer', title:'Print checklist', onClick:function(){ printDocList(country, list); } },
+              { icon:'send', title:'Send to customer (Gmail / WhatsApp)', onClick:function(){ shareDocList(country, list); } }
+            ])
+          ])
+        ]),
         el('div.card-body', null, [ el('div.data-list', null, list.map(function (d){
           return el('div.data-row', null, [ ui.frag('<span class="notif-ico notif-info">'+ui.icon('file-earmark-text')+'</span>'),
             el('div.flex-1.sm',{text:d}) ]); })) ])
@@ -575,6 +585,18 @@
       ]));
     });
     page.appendChild(grid);
+  }
+  /* ---- send / print a country's required-document checklist ---------------*/
+  function printDocList(country, list) {
+    ui.printDoc({ title: country + ' Visa — Required Documents', subtitle: list.length + ' documents · Epal Travels & Consultancy',
+      meta: 'Visa Document Checklist', footer: 'Tick each item as you collect it.',
+      bodyHtml: '<ul>' + list.map(function (d) { return '<li>' + ui.escapeHtml(d) + '</li>'; }).join('') + '</ul>' });
+  }
+  function shareDocList(country, list) {
+    var body = 'Required documents for your ' + country + ' visa:\n\n' +
+      list.map(function (d, i) { return (i + 1) + '. ' + d; }).join('\n') +
+      '\n\nPlease prepare the above and share with us. — Epal Travels & Consultancy';
+    ui.share({ title: 'Send ' + country + ' document list', subject: 'Required documents — ' + country + ' visa', body: body });
   }
 
   /* ======================================================= ANALYSIS */
