@@ -45,6 +45,8 @@
   color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border); transition: all var(--t-fast); }
 .dt-preset:hover { border-color: var(--accent); color: var(--accent); }
 .dt-fc-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+/* toolbar for the manual tableCard lists (air-ticketing / visa) — search + export */
+.tc-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 16px; }
 .dt-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; }
 .dt-pager { display: flex; gap: 4px; }
 .dt-page-btn { min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px; display: inline-grid; place-items: center;

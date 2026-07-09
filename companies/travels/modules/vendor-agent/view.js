@@ -568,8 +568,9 @@
         ],
         rows: portals(),
         searchKeys: ['name', 'type', 'url'],
-        filters: [{ key: 'type', label: 'Type' }, { key: 'status', label: 'Status' }],
-        pageSize: 10, exportName: 'portals.csv',
+        quickFilter: 'type', filterPanel: true,
+        filters: [{ key: 'status', label: 'Status' }],
+        pageSize: 10, exportName: 'portals.csv', pdfTitle: 'Portals & Channels',
         actions: actionsFor(function (p) { editPortal(p); }, function (p) { removeRec('tv_portals', p, draw); }),
         empty: { icon: 'hdd-network', title: 'No portals yet', hint: 'Connect your first channel.' }
       });

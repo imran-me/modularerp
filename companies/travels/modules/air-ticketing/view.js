@@ -1445,8 +1445,36 @@
       if (first.children[i].classList && first.children[i].classList.contains('num')) numCol[i] = 1;
     table.innerHTML = '<thead><tr>'+headers.map(function(h,i){return '<th'+(numCol[i]?' class="num"':'')+'>'+h+'</th>';}).join('')+'</tr></thead>';
     var tb = el('tbody'); rows.forEach(function(r){ tb.appendChild(r); }); table.appendChild(tb);
+    card.appendChild(tcToolbar(title, headers, tb, numCol));
     card.appendChild(el('div.table-wrap', null, [ table ]));
     return card;
+  }
+  // Toolbar for tableCard lists: half-search (filters visible rows) + Export CSV + PDF.
+  function tcToolbar(title, headers, tb, numCol) {
+    var countEl = el('span.dt-count', { text: tb.children.length + ' records' });
+    var searchIn = el('input.input.dt-search', { placeholder: 'Search…', oninput: function () {
+      var q = searchIn.value.toLowerCase(), n = 0;
+      [].forEach.call(tb.children, function (tr) { var show = !q || (tr.textContent || '').toLowerCase().indexOf(q) >= 0; tr.style.display = show ? '' : 'none'; if (show) n++; });
+      countEl.textContent = n + ' record' + (n === 1 ? '' : 's'); } });
+    function vis() { return [].filter.call(tb.children, function (tr) { return tr.style.display !== 'none'; }); }
+    function cells(tr) { return [].map.call(tr.children, function (td) { return (td.textContent || '').trim(); }); }
+    function csv() {
+      var lines = [headers].concat(vis().map(cells));
+      var blob = new Blob([lines.map(function (l) { return l.map(function (c) { return '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"'; }).join(','); }).join('\n')], { type: 'text/csv' });
+      var a = el('a', { href: URL.createObjectURL(blob), download: (title || 'export').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.csv' });
+      document.body.appendChild(a); a.click(); a.remove(); ui.toast('Exported', 'success');
+    }
+    function pdf() {
+      var head = '<tr>' + headers.map(function (h, i) { return '<th' + (numCol[i] ? ' class="num"' : '') + '>' + ui.escapeHtml(h || '') + '</th>'; }).join('') + '</tr>';
+      var body = vis().map(function (tr) { var cs = cells(tr); return '<tr>' + cs.map(function (c, i) { return '<td' + (numCol[i] ? ' class="num"' : '') + '>' + ui.escapeHtml(c) + '</td>'; }).join('') + '</tr>'; }).join('');
+      ui.printDoc({ title: title || 'Report', subtitle: vis().length + ' records', meta: 'Export', bodyHtml: '<table>' + head + body + '</table>' });
+    }
+    return el('div.tc-toolbar', null, [
+      el('div.dt-search-wrap.half', null, [ ui.frag(ui.icon('search', 'dt-search-ico')), searchIn ]),
+      el('div.spacer'), countEl,
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-csv') + ' Export', onclick: csv }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-pdf') + ' PDF', onclick: pdf })
+    ]);
   }
   function downloadCsv(rows, name) {
     var csv = rows.map(function(r){ return r.map(function(c){ var s=String(c==null?'':c); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }).join(','); }).join('\n');
