@@ -88,6 +88,15 @@
   background: linear-gradient(90deg, transparent, var(--border) 14%, var(--border) 86%, transparent); }
 .kpi-spark canvas { display: block; }
 
+/* Compact KPI STRIP — the small stat tiles above the task board, forced into a
+   single scrollable row. Scoped to [data-strip] so no other dashboard changes. */
+.kpi-grid[data-strip] { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 16px; }
+.kpi-grid[data-strip] .kpi-card { flex: 1 1 0; min-width: 146px; min-height: 0; padding: 12px 15px; }
+.kpi-grid[data-strip] .kpi-top { margin-bottom: 8px; }
+.kpi-grid[data-strip] .kpi-label { font-size: 9.5px; letter-spacing: .07em; }
+.kpi-grid[data-strip] .kpi-ico { width: 30px; height: 30px; border-radius: 9px; font-size: 14px; }
+.kpi-grid[data-strip] .kpi-value { font-size: 21px; }
+
 /* Small stat rows (inside cards) */
 .stat-row { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); background: var(--border); border-radius: var(--r-md); overflow: hidden; }
 .stat { background: var(--surface); padding: 14px 16px; }

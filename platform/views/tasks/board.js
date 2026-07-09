@@ -157,6 +157,18 @@
         list
       ]));
     });
+
+    // Ctrl + mouse-wheel scrolls the columns HORIZONTALLY (instead of the browser
+    // zooming). passive:false lets us block the default zoom. Applies to every
+    // company's board since this one factory builds them all.
+    board.addEventListener('wheel', function (e) {
+      if (!e.ctrlKey) return;                 // plain wheel keeps scrolling the page vertically
+      var dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (!dx) return;
+      e.preventDefault();
+      board.scrollLeft += dx;
+    }, { passive: false });
+
     return board;
   }
 
