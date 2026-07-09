@@ -1,0 +1,34 @@
+{
+  "key": "projects",
+  "company": "it",
+  "title": "Projects",
+  "icon": "kanban",
+  "desc": "Delivery projects, sprints, phases.",
+  "route": "#/it/projects",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "active",
+      "label": "Active Projects",
+      "route": "#/it/projects/active",
+      "enabled": true
+    },
+    {
+      "id": "sprints",
+      "label": "Sprints",
+      "route": "#/it/projects/sprints",
+      "enabled": true
+    },
+    {
+      "id": "roadmap",
+      "label": "Roadmap",
+      "route": "#/it/projects/roadmap",
+      "enabled": true
+    }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

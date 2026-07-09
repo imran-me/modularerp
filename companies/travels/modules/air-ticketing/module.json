@@ -1,0 +1,64 @@
+{
+  "key": "air-ticketing",
+  "company": "travels",
+  "title": "Air Ticketing",
+  "icon": "airplane-fill",
+  "desc": "Issue, re-issue, refund, void, EMD + BSP recon.",
+  "route": "#/travels/air-ticketing",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "ticketing",
+      "label": "Direct Sale",
+      "route": "#/travels/air-ticketing/ticketing",
+      "enabled": true
+    },
+    {
+      "id": "manage-sales",
+      "label": "Manage Sales",
+      "route": "#/travels/air-ticketing/manage-sales",
+      "enabled": true
+    },
+    {
+      "id": "emd",
+      "label": "EMD & Ancillary",
+      "route": "#/travels/air-ticketing/emd",
+      "enabled": true
+    },
+    {
+      "id": "ttl",
+      "label": "Ticketing Deadlines",
+      "route": "#/travels/air-ticketing/ttl",
+      "enabled": true
+    },
+    {
+      "id": "airlines",
+      "label": "Airlines",
+      "route": "#/travels/air-ticketing/airlines",
+      "enabled": true
+    },
+    {
+      "id": "airports",
+      "label": "Airports",
+      "route": "#/travels/air-ticketing/airports",
+      "enabled": true
+    },
+    {
+      "id": "bsp",
+      "label": "BSP / ADM Recon",
+      "route": "#/travels/air-ticketing/bsp",
+      "enabled": true
+    },
+    {
+      "id": "refunds",
+      "label": "Refund Tracker",
+      "route": "#/travels/air-ticketing/refunds",
+      "enabled": true
+    }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

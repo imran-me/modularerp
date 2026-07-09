@@ -1,0 +1,66 @@
+{
+  "key": "visa-processing",
+  "company": "travels",
+  "title": "Visa Processing",
+  "icon": "passport-fill",
+  "desc": "End-to-end visa lifecycle.",
+  "route": "#/travels/visa-processing",
+  "enabled": true,
+  "core": true,
+  "badge": "Core",
+  "menu": [
+    {
+      "id": "categories",
+      "label": "Visa Categories",
+      "route": "#/travels/visa-processing/categories",
+      "enabled": true
+    },
+    {
+      "id": "new-application",
+      "label": "New Application",
+      "route": "#/travels/visa-processing/new-application",
+      "enabled": true
+    },
+    {
+      "id": "application-board",
+      "label": "Application Board",
+      "route": "#/travels/visa-processing/application-board",
+      "enabled": true
+    },
+    {
+      "id": "manage-sales",
+      "label": "Manage Sales",
+      "route": "#/travels/visa-processing/manage-sales",
+      "enabled": true
+    },
+    {
+      "id": "visa-rates",
+      "label": "Visa Rates",
+      "route": "#/travels/visa-processing/visa-rates",
+      "enabled": true
+    },
+    {
+      "id": "embassy-tracking",
+      "label": "Embassy Tracking",
+      "route": "#/travels/visa-processing/embassy-tracking",
+      "enabled": true
+    },
+    {
+      "id": "documents",
+      "label": "Required Documents",
+      "route": "#/travels/visa-processing/documents",
+      "enabled": true
+    },
+    {
+      "id": "analysis",
+      "label": "Analysis",
+      "route": "#/travels/visa-processing/analysis",
+      "enabled": true
+    }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

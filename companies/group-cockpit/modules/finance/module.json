@@ -1,0 +1,76 @@
+{
+  "key": "finance",
+  "company": "group",
+  "title": "Consolidated Finance",
+  "icon": "cash-coin",
+  "desc": "Group P&L, cash position, receivables, payables.",
+  "route": "#/group/finance",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "pnl",
+      "label": "Profit & Loss",
+      "route": "#/group/finance/pnl",
+      "enabled": true
+    },
+    {
+      "id": "cashflow",
+      "label": "Cash Flow",
+      "route": "#/group/finance/cashflow",
+      "enabled": true
+    },
+    {
+      "id": "balance-sheet",
+      "label": "Balance Sheet",
+      "route": "#/group/finance/balance-sheet",
+      "enabled": true
+    },
+    {
+      "id": "receivables",
+      "label": "Receivables",
+      "route": "#/group/finance/receivables",
+      "enabled": true
+    },
+    {
+      "id": "payables",
+      "label": "Payables",
+      "route": "#/group/finance/payables",
+      "enabled": true
+    },
+    {
+      "id": "banks",
+      "label": "Bank Positions",
+      "route": "#/group/finance/banks",
+      "enabled": true
+    },
+    {
+      "id": "coa",
+      "label": "Chart of Accounts",
+      "route": "#/group/finance/coa",
+      "enabled": true
+    },
+    {
+      "id": "journal",
+      "label": "Journal",
+      "route": "#/group/finance/journal",
+      "enabled": true
+    },
+    {
+      "id": "trial-balance",
+      "label": "Trial Balance",
+      "route": "#/group/finance/trial-balance",
+      "enabled": true
+    },
+    {
+      "id": "consolidation",
+      "label": "Consolidation",
+      "route": "#/group/finance/consolidation",
+      "enabled": true
+    }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

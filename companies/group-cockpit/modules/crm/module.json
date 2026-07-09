@@ -1,0 +1,40 @@
+{
+  "key": "crm",
+  "company": "group",
+  "title": "Group CRM",
+  "icon": "people-fill",
+  "desc": "Unified customer graph shared across all concerns.",
+  "route": "#/group/crm",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "leads",
+      "label": "Leads",
+      "route": "#/group/crm/leads",
+      "enabled": true
+    },
+    {
+      "id": "pipeline",
+      "label": "Pipeline",
+      "route": "#/group/crm/pipeline",
+      "enabled": true
+    },
+    {
+      "id": "customers",
+      "label": "Customers 360",
+      "route": "#/group/crm/customers",
+      "enabled": true
+    },
+    {
+      "id": "activities",
+      "label": "Activities",
+      "route": "#/group/crm/activities",
+      "enabled": true
+    }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

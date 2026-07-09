@@ -1,0 +1,15 @@
+{
+  "key": "notifications",
+  "company": "group",
+  "title": "Notifications",
+  "icon": "bell-fill",
+  "desc": "System-wide alerts, mentions & approvals.",
+  "route": "#/group/notifications",
+  "enabled": true,
+  "menu": [],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

@@ -1,0 +1,15 @@
+{
+  "key": "reports",
+  "company": "group",
+  "title": "Reports",
+  "icon": "file-earmark-bar-graph-fill",
+  "desc": "Downloadable, documentation-grade reports.",
+  "route": "#/group/reports",
+  "enabled": true,
+  "menu": [],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

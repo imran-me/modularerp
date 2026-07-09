@@ -1,0 +1,16 @@
+{
+  "key": "settings",
+  "company": "group",
+  "title": "Settings",
+  "icon": "gear-fill",
+  "desc": "Group profile, branding, security, backups.",
+  "route": "#/group/settings",
+  "enabled": true,
+  "admin": true,
+  "menu": [],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

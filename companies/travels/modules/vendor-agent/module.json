@@ -1,0 +1,46 @@
+{
+  "key": "vendor-agent",
+  "company": "travels",
+  "title": "Vendor & Agent",
+  "icon": "people",
+  "desc": "Vendors, agents, portals, commission & party ledgers.",
+  "route": "#/travels/vendor-agent",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "vendors",
+      "label": "Manage Vendors",
+      "route": "#/travels/vendor-agent/vendors",
+      "enabled": true
+    },
+    {
+      "id": "agents",
+      "label": "Manage Agents",
+      "route": "#/travels/vendor-agent/agents",
+      "enabled": true
+    },
+    {
+      "id": "portals",
+      "label": "Portals / GDS",
+      "route": "#/travels/vendor-agent/portals",
+      "enabled": true
+    },
+    {
+      "id": "accounts",
+      "label": "Party Accounts",
+      "route": "#/travels/vendor-agent/accounts",
+      "enabled": true
+    },
+    {
+      "id": "commission",
+      "label": "Commission",
+      "route": "#/travels/vendor-agent/commission",
+      "enabled": true
+    }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

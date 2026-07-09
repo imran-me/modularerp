@@ -1,0 +1,40 @@
+{
+  "key": "projects",
+  "company": "woodart",
+  "title": "Projects",
+  "icon": "easel2-fill",
+  "desc": "Design-build projects, phases & milestones.",
+  "route": "#/woodart/projects",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "active",
+      "label": "Active Projects",
+      "route": "#/woodart/projects/active",
+      "enabled": true
+    },
+    {
+      "id": "design",
+      "label": "Design Studio",
+      "route": "#/woodart/projects/design",
+      "enabled": true
+    },
+    {
+      "id": "milestones",
+      "label": "Milestones",
+      "route": "#/woodart/projects/milestones",
+      "enabled": true
+    },
+    {
+      "id": "gallery",
+      "label": "Gallery",
+      "route": "#/woodart/projects/gallery",
+      "enabled": true
+    }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

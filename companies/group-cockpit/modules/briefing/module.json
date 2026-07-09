@@ -1,0 +1,16 @@
+{
+  "key": "briefing",
+  "company": "group",
+  "title": "MD Briefing",
+  "icon": "sun-fill",
+  "desc": "Your daily narrative digest — money, risks, exceptions.",
+  "route": "#/group/briefing",
+  "enabled": true,
+  "badge": "AI",
+  "menu": [],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

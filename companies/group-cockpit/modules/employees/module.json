@@ -1,0 +1,53 @@
+{
+  "key": "employees",
+  "company": "group",
+  "title": "Workforce",
+  "icon": "person-badge-fill",
+  "desc": "Every employee of the whole group.",
+  "route": "#/group/employees",
+  "enabled": true,
+  "admin": true,
+  "menu": [
+    {
+      "id": "directory",
+      "label": "Directory",
+      "route": "#/group/employees/directory",
+      "enabled": true
+    },
+    {
+      "id": "attendance",
+      "label": "Attendance",
+      "route": "#/group/employees/attendance",
+      "enabled": true
+    },
+    {
+      "id": "leaves",
+      "label": "Leaves",
+      "route": "#/group/employees/leaves",
+      "enabled": true
+    },
+    {
+      "id": "payroll",
+      "label": "Payroll",
+      "route": "#/group/employees/payroll",
+      "enabled": true
+    },
+    {
+      "id": "performance",
+      "label": "Performance",
+      "route": "#/group/employees/performance",
+      "enabled": true
+    },
+    {
+      "id": "org-chart",
+      "label": "Org Chart",
+      "route": "#/group/employees/org-chart",
+      "enabled": true
+    }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

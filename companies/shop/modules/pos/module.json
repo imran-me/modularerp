@@ -1,0 +1,16 @@
+{
+  "key": "pos",
+  "company": "shop",
+  "title": "Point of Sale",
+  "icon": "upc-scan",
+  "desc": "Fast checkout terminal.",
+  "route": "#/shop/pos",
+  "enabled": true,
+  "badge": "Live",
+  "menu": [],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}

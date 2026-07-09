@@ -1,0 +1,15 @@
+{
+  "key": "approvals",
+  "company": "group",
+  "title": "Approvals",
+  "icon": "patch-check-fill",
+  "desc": "Maker-checker inbox — authorise the big moves.",
+  "route": "#/group/approvals",
+  "enabled": true,
+  "menu": [],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "PHASE 2 MANIFEST — declarative mirror of platform/core/config.js (live registry until Phase 3 discovery)."
+}
