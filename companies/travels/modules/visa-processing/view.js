@@ -495,7 +495,7 @@
           gmail: { to:'', subject:'Your '+x.country+' visa — '+x.id, body: visaMsg(x) }
         })) ]) ]);
     });
-    page.appendChild(tableCard('Sales Ledger', ['App','Applicant','Service','Embassy','VFS','Service Fee','Customer Total','Payment','Stage',''], rows, 'No sales yet.'));
+    page.appendChild(tableCard('Sales Ledger', ['App','Applicant','Service','Embassy','VFS','Service Fee','Customer Total','Payment','Stage',''], rows, 'No sales yet.', { chipCol: 8 }));
   }
   function printVisa(x) {
     var f = fees(x);
@@ -561,7 +561,7 @@
       kpi('Approved', apps().filter(function(a){return a.stage==='Approved';}).length, 'patch-check'),
       kpi('Rejected', apps().filter(function(a){return a.stage==='Rejected';}).length, 'x-octagon')
     ]));
-    page.appendChild(tableCard('Embassy & Decision Tracker', ['Applicant','Service','Submitted','Decision Due','Stage','Status',''], rows, 'Nothing submitted yet.'));
+    page.appendChild(tableCard('Embassy & Decision Tracker', ['Applicant','Service','Submitted','Decision Due','Stage','Status',''], rows, 'Nothing submitted yet.', { chipCol: 4 }));
   }
 
   /* ======================================================= DOCUMENTS */
@@ -664,7 +664,7 @@
     return el('div.kpi-card', null, [ el('div.kpi-top',null,[ el('span.kpi-label',{text:label}), el('span.kpi-ico',{html:'<i class="bi bi-'+icon+'"></i>'}) ]),
       el('div.kpi-value',{text:String(value)}) ]);
   }
-  function tableCard(title, headers, rows, emptyMsg) {
+  function tableCard(title, headers, rows, emptyMsg, opts) {
     var card = el('div.card');
     if (title) card.appendChild(el('div.card-head', null, [ el('h3',{text:title}) ]));
     if (!rows.length) { card.appendChild(el('div.empty-state',null,[ ui.frag(ui.icon('inbox')), el('h3',{text:'Nothing here yet'}), el('p.text-muted',{text:emptyMsg||''}) ])); return card; }
@@ -676,17 +676,35 @@
       if (first.children[i].classList && first.children[i].classList.contains('num')) numCol[i] = 1;
     table.innerHTML = '<thead><tr>'+headers.map(function(h,i){return '<th'+(numCol[i]?' class="num"':'')+'>'+h+'</th>';}).join('')+'</tr></thead>';
     var tb = el('tbody'); rows.forEach(function(r){ tb.appendChild(r); }); table.appendChild(tb);
-    card.appendChild(tcToolbar(title, headers, tb, numCol));
+    card.appendChild(tcToolbar(title, headers, tb, numCol, opts || {}));
     card.appendChild(el('div.table-wrap', null, [ table ]));
     return card;
   }
-  // Toolbar for tableCard lists: half-search (filters visible rows) + Export CSV + PDF.
-  function tcToolbar(title, headers, tb, numCol) {
-    var countEl = el('span.dt-count', { text: tb.children.length + ' records' });
-    var searchIn = el('input.input.dt-search', { placeholder: 'Search…', oninput: function () {
+  // Toolbar for tableCard lists: half-search + optional value CHIPS (opts.chipCol =
+  // header index) + Export CSV + PDF. Search & chips combine; both filter visible rows.
+  function tcToolbar(title, headers, tb, numCol, opts) {
+    opts = opts || {};
+    var countEl = el('span.dt-count');
+    var chipState = { col: (opts.chipCol == null ? null : opts.chipCol), val: '__all' };
+    var searchIn = el('input.input.dt-search', { placeholder: 'Search…', oninput: apply });
+    function cellText(tr, i) { var c = tr.children[i]; return c ? (c.textContent || '').trim() : ''; }
+    function apply() {
       var q = searchIn.value.toLowerCase(), n = 0;
-      [].forEach.call(tb.children, function (tr) { var show = !q || (tr.textContent || '').toLowerCase().indexOf(q) >= 0; tr.style.display = show ? '' : 'none'; if (show) n++; });
-      countEl.textContent = n + ' record' + (n === 1 ? '' : 's'); } });
+      [].forEach.call(tb.children, function (tr) {
+        var okQ = !q || (tr.textContent || '').toLowerCase().indexOf(q) >= 0;
+        var okC = chipState.col == null || chipState.val === '__all' || cellText(tr, chipState.col) === chipState.val;
+        var show = okQ && okC; tr.style.display = show ? '' : 'none'; if (show) n++;
+      });
+      countEl.textContent = n + ' record' + (n === 1 ? '' : 's');
+    }
+    var chipWrap = null;
+    if (chipState.col != null) {
+      chipWrap = el('div.dt-chips'); var vals = {};
+      [].forEach.call(tb.children, function (tr) { var v = cellText(tr, chipState.col); if (v) vals[v] = 1; });
+      var mk = function (v, label) { var b = el('button.dt-chip' + (chipState.val === v ? '.active' : ''), { text: label, onclick: function () { chipState.val = v; [].forEach.call(chipWrap.children, function (x) { x.classList.toggle('active', x === b); }); apply(); } }); return b; };
+      chipWrap.appendChild(mk('__all', 'All'));
+      Object.keys(vals).sort().forEach(function (v) { chipWrap.appendChild(mk(v, v)); });
+    }
     function vis() { return [].filter.call(tb.children, function (tr) { return tr.style.display !== 'none'; }); }
     function cells(tr) { return [].map.call(tr.children, function (td2) { return (td2.textContent || '').trim(); }); }
     function csv() {
@@ -700,9 +718,10 @@
       var body = vis().map(function (tr) { var cs = cells(tr); return '<tr>' + cs.map(function (c, i) { return '<td' + (numCol[i] ? ' class="num"' : '') + '>' + ui.escapeHtml(c) + '</td>'; }).join('') + '</tr>'; }).join('');
       ui.printDoc({ title: title || 'Report', subtitle: vis().length + ' records', meta: 'Export', bodyHtml: '<table>' + head + body + '</table>' });
     }
+    countEl.textContent = tb.children.length + ' records';
     return el('div.tc-toolbar', null, [
       el('div.dt-search-wrap.half', null, [ ui.frag(ui.icon('search', 'dt-search-ico')), searchIn ]),
-      el('div.spacer'), countEl,
+      chipWrap, el('div.spacer'), countEl,
       el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-csv') + ' Export', onclick: csv }),
       el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-pdf') + ' PDF', onclick: pdf })
     ]);

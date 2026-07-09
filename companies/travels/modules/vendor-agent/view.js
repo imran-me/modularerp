@@ -623,11 +623,21 @@
         { key: 'phone', label: 'Phone', type: 'phone' },
         { key: 'email', label: 'Email', type: 'email' },
         { key: 'location', label: 'Location', type: 'text', default: 'Dhaka' },
+        { type: 'section', label: 'Responsible Contact' },
+        { key: 'respName', label: 'Responsible person', type: 'text', placeholder: 'Who we deal with' },
+        { key: 'respDesignation', label: 'Designation', type: 'text' },
+        { key: 'respPhone', label: 'Direct phone', type: 'phone' },
+        { key: 'respEmail', label: 'Direct email', type: 'email' },
         { type: 'section', label: 'Commercial' },
         { key: 'commission', label: 'Commission %', type: 'number', default: 4, min: 0, max: 20 },
         { key: 'totalSales', label: 'Total sales (YTD)', type: 'money', default: 0, min: 0 },
         { key: 'balance', label: 'Opening balance (receivable)', type: 'money', default: 0 },
-        { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Inactive'], default: 'Active' }
+        { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Inactive'], default: 'Active' },
+        { type: 'section', label: 'ERP Access (Agent portal)' },
+        { key: 'createLogin', label: 'Give this sub-agent an ERP login (agent role)', type: 'checkbox', col2: true,
+          hint: 'Provisions an agent-role user in the ERP user list (RBAC enforced by the backend later).' },
+        { key: 'loginEmail', label: 'Login email', type: 'email', showIf: function (x) { return x.createLogin; } },
+        { key: 'loginPassword', label: 'Password', type: 'password', showIf: function (x) { return x.createLogin; } }
       ],
       onSave: function (val) {
         var rec = a || { id: 'AGT-' + ui.uid('').slice(-4) };
@@ -635,6 +645,8 @@
         rec.location = val.location; rec.service = val.service || 'Ticketing'; rec.photo = val.photo || '';
         rec.commission = +val.commission || 0; rec.totalSales = +val.totalSales || 0;
         rec.balance = +val.balance || 0; rec.status = val.status;
+        rec.responsible = { name: val.respName || '', designation: val.respDesignation || '', phone: val.respPhone || '', email: val.respEmail || '' };
+        if (val.createLogin && (val.loginEmail || rec.email)) { rec.login = { email: val.loginEmail || rec.email, role: 'agent', enabled: true }; provisionPartyUser(rec, 'agent', val.loginPassword); }
         db.save('tv_agents', rec);
         ui.toast('Agent "' + rec.name + '" saved', 'success');
         EPAL.router.render();

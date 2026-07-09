@@ -460,7 +460,7 @@
       });
       host.innerHTML='';
       host.appendChild(tableCard('Ticket Sales Ledger',
-        ['Ticket','Passenger','Route','Airline · PNR','Base','Tax','Cost','Sale','Comm','Net Profit','Payment','Status',''], rows, 'No tickets sold yet.'));
+        ['Ticket','Passenger','Route','Airline · PNR','Base','Tax','Cost','Sale','Comm','Net Profit','Payment','Status',''], rows, 'No tickets sold yet.', { chipCol: 11 }));
     }
     draw();
   }
@@ -587,6 +587,15 @@
         el('button.btn.btn-sm.btn-outline',{html:ui.icon('arrow-counterclockwise')+' Refund',onclick:function(){ m.close(); refundFromTicket(t, refresh); }}),
         el('button.btn.btn-sm.btn-danger',{html:ui.icon('trash')+' Delete',onclick:function(){ ui.confirm({title:'Delete ticket?',danger:true,confirmLabel:'Delete'}).then(function(ok){ if(ok){ db.remove('airTickets', t.id); m.close(); refresh&&refresh(); ui.toast('Ticket deleted','success'); } }); }})
       ]));
+      // print e-ticket · WhatsApp · Gmail (with e-ticket card attach)
+      body.appendChild(el('div.flex.gap-1.flex-wrap.mt-2', null, [ ui.rowActions(ui.actions({
+        print: function(){ printTicket(t); },
+        wa:    { phone: t.phone, text: ticketMsg(t) },
+        gmail: { to: '', subject: 'Your e-ticket '+t.id+' — '+t.route, body: ticketMsg(t) },
+        profile: { name: t.passenger, card: { title: t.passenger, subtitle: t.route+' · '+t.id, lines: [
+          ['Airline / PNR', (t.airlineCode||'')+' '+(t.pnr||'—')], ['Travel date', t.travelDate?ui.date(t.travelDate):'—'],
+          ['Fare', ui.money(t.sale)], ['Status', t.status], ['Payment', t.payStatus] ] }, pdf: function(){ printTicket(t); } }
+      })) ]));
 
       if (EPAL.comments && EPAL.comments.widget) {
         body.appendChild(el('div.section-label',{text:'Discussion'}));
@@ -1000,7 +1009,7 @@
             gmail: { to:'', subject:'Your refund '+r.id+' — Epal Travels', body: refundMsg(r) }
           })) ]) ]);
       });
-      host.appendChild(tableCard('Refund Requests', ['Ref','Passenger','PNR','Airline','Gross','Penalty','Net Refund','Status',''], rows, 'No refunds yet.'));
+      host.appendChild(tableCard('Refund Requests', ['Ref','Passenger','PNR','Airline','Gross','Penalty','Net Refund','Status',''], rows, 'No refunds yet.', { chipCol: 7 }));
     }
     draw();
   }
@@ -1433,7 +1442,7 @@
     return el('div.kpi-card', null, [ el('div.kpi-top',null,[ el('span.kpi-label',{text:label}), el('span.kpi-ico',{html:'<i class="bi bi-'+icon+'"></i>'}) ]),
       el('div.kpi-value',{text:String(value)}) ]);
   }
-  function tableCard(title, headers, rows, emptyMsg) {
+  function tableCard(title, headers, rows, emptyMsg, opts) {
     var card = el('div.card');
     if (title) card.appendChild(el('div.card-head', null, [ el('h3',{text:title}) ]));
     if (!rows.length) { card.appendChild(el('div.empty-state',null,[ ui.frag(ui.icon('inbox')), el('h3',{text:'Nothing here yet'}), el('p.text-muted',{text:emptyMsg||''}) ])); return card; }
@@ -1445,17 +1454,35 @@
       if (first.children[i].classList && first.children[i].classList.contains('num')) numCol[i] = 1;
     table.innerHTML = '<thead><tr>'+headers.map(function(h,i){return '<th'+(numCol[i]?' class="num"':'')+'>'+h+'</th>';}).join('')+'</tr></thead>';
     var tb = el('tbody'); rows.forEach(function(r){ tb.appendChild(r); }); table.appendChild(tb);
-    card.appendChild(tcToolbar(title, headers, tb, numCol));
+    card.appendChild(tcToolbar(title, headers, tb, numCol, opts || {}));
     card.appendChild(el('div.table-wrap', null, [ table ]));
     return card;
   }
-  // Toolbar for tableCard lists: half-search (filters visible rows) + Export CSV + PDF.
-  function tcToolbar(title, headers, tb, numCol) {
-    var countEl = el('span.dt-count', { text: tb.children.length + ' records' });
-    var searchIn = el('input.input.dt-search', { placeholder: 'Search…', oninput: function () {
+  // Toolbar for tableCard lists: half-search + optional value CHIPS (opts.chipCol =
+  // header index) + Export CSV + PDF. Search & chips combine; both filter visible rows.
+  function tcToolbar(title, headers, tb, numCol, opts) {
+    opts = opts || {};
+    var countEl = el('span.dt-count');
+    var chipState = { col: (opts.chipCol == null ? null : opts.chipCol), val: '__all' };
+    var searchIn = el('input.input.dt-search', { placeholder: 'Search…', oninput: apply });
+    function cellText(tr, i) { var c = tr.children[i]; return c ? (c.textContent || '').trim() : ''; }
+    function apply() {
       var q = searchIn.value.toLowerCase(), n = 0;
-      [].forEach.call(tb.children, function (tr) { var show = !q || (tr.textContent || '').toLowerCase().indexOf(q) >= 0; tr.style.display = show ? '' : 'none'; if (show) n++; });
-      countEl.textContent = n + ' record' + (n === 1 ? '' : 's'); } });
+      [].forEach.call(tb.children, function (tr) {
+        var okQ = !q || (tr.textContent || '').toLowerCase().indexOf(q) >= 0;
+        var okC = chipState.col == null || chipState.val === '__all' || cellText(tr, chipState.col) === chipState.val;
+        var show = okQ && okC; tr.style.display = show ? '' : 'none'; if (show) n++;
+      });
+      countEl.textContent = n + ' record' + (n === 1 ? '' : 's');
+    }
+    var chipWrap = null;
+    if (chipState.col != null) {
+      chipWrap = el('div.dt-chips'); var vals = {};
+      [].forEach.call(tb.children, function (tr) { var v = cellText(tr, chipState.col); if (v) vals[v] = 1; });
+      var mk = function (v, label) { var b = el('button.dt-chip' + (chipState.val === v ? '.active' : ''), { text: label, onclick: function () { chipState.val = v; [].forEach.call(chipWrap.children, function (x) { x.classList.toggle('active', x === b); }); apply(); } }); return b; };
+      chipWrap.appendChild(mk('__all', 'All'));
+      Object.keys(vals).sort().forEach(function (v) { chipWrap.appendChild(mk(v, v)); });
+    }
     function vis() { return [].filter.call(tb.children, function (tr) { return tr.style.display !== 'none'; }); }
     function cells(tr) { return [].map.call(tr.children, function (td) { return (td.textContent || '').trim(); }); }
     function csv() {
@@ -1469,9 +1496,10 @@
       var body = vis().map(function (tr) { var cs = cells(tr); return '<tr>' + cs.map(function (c, i) { return '<td' + (numCol[i] ? ' class="num"' : '') + '>' + ui.escapeHtml(c) + '</td>'; }).join('') + '</tr>'; }).join('');
       ui.printDoc({ title: title || 'Report', subtitle: vis().length + ' records', meta: 'Export', bodyHtml: '<table>' + head + body + '</table>' });
     }
+    countEl.textContent = tb.children.length + ' records';
     return el('div.tc-toolbar', null, [
       el('div.dt-search-wrap.half', null, [ ui.frag(ui.icon('search', 'dt-search-ico')), searchIn ]),
-      el('div.spacer'), countEl,
+      chipWrap, el('div.spacer'), countEl,
       el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-csv') + ' Export', onclick: csv }),
       el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-pdf') + ' PDF', onclick: pdf })
     ]);
