@@ -167,9 +167,10 @@
           { key: 'amount', label: 'Amount', num: true, money: true }
         ],
         rows: function () { return kindFilter ? entries().filter(function (e) { return e.kind === kindFilter; }) : entries(); },
-        filters: [{ key: 'category', label: 'Category' }, { key: 'method', label: 'Method' }],
+        quickFilter: 'category', filterPanel: true, dateKey: 'date',
+        filters: [{ key: 'method', label: 'Method' }],
         searchKeys: ['id', 'category', 'desc'],
-        exportName: cid + '-journal.csv',
+        exportName: cid + '-journal.csv', pdfTitle: 'Journal',
         onRow: function (e) { newEntry(e); },   // row-click opens the entry (edit form)
         actions: ui.actions({
           del: function (e) {
@@ -913,8 +914,13 @@
             return co2 ? '<span class="badge" style="color:' + co2.accent + '">' + co2.short + '</span>' : ''; }).join(' '); }, sort: false }
       ],
       rows: rows, searchKeys: ['name', 'contact', 'phone', 'email'],
-      filters: [{ key: 'tier', label: 'Tier' }], exportName: cid + '-customers.csv',
+      quickFilter: 'tier', filterPanel: true, filters: [], exportName: cid + '-customers.csv', pdfTitle: 'Customers',
       onRow: function (c) { edit(c); },
+      actions: ui.actions({
+        edit:  function (c) { edit(c); },
+        wa:    function (c) { return { phone: c.phone, text: 'Dear ' + c.name + ',\n\nWarm regards,\n' + ctx.company.name }; },
+        gmail: function (c) { return { to: c.email, subject: ctx.company.name, body: 'Dear ' + c.name + ',\n\nWarm regards,\n' + ctx.company.name }; }
+      }),
       empty: { icon: 'person-hearts', title: 'No customers yet' }
     });
     page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ table.el ]) ]));
@@ -1038,8 +1044,8 @@
             { key: 'value', label: 'Value', num: true, money: true },
             { key: 'created', label: 'Created', date: true }
           ],
-          rows: leads, filters: [{ key: 'stage', label: 'Stage' }, { key: 'source', label: 'Source' }],
-          searchKeys: ['name', 'source'], exportName: cid + '-leads.csv',
+          rows: leads, quickFilter: 'stage', filterPanel: true, filters: [{ key: 'source', label: 'Source' }],
+          searchKeys: ['name', 'source'], exportName: cid + '-leads.csv', pdfTitle: 'CRM Leads',
           onRow: function (l) { editLead(l); },   // row-click opens the lead
           actions: ui.actions({
             del: function (l) {
