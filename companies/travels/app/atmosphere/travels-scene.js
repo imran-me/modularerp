@@ -172,16 +172,22 @@
            '<circle class="jet-burner" cx="-31" cy="0" r="2.4"/>' +                       /* afterburner     */
            '<circle class="strobe" cx="42" cy="0" r="1.1"/>';                             /* nose strobe     */
   }
-  /* ---- a DISPLAY FORMATION: a 4-ship diamond (lead, two wingmen stepped back
-         and out, one in the slot) drawn around the origin so the whole flight
-         can be flown as one body. -------------------------------------------*/
-  function formation() {
+  /* ---- FORMATION LAYOUTS: offsets (x back/forward, y out to the sides, scale)
+         around the origin, nose toward +x. The show cycles through these so the
+         sky feels alive: a lone patrol, an escort pair, a vic, the diamond, and
+         a five-ship arrowhead. ----------------------------------------------*/
+  var FORMATIONS = {
+    single:  [[0, 0, 1]],
+    pair:    [[10, 0, 1], [-14, 15, 0.94]],                                   /* echelon */
+    vic:     [[12, 0, 1], [-10, -15, 0.92], [-10, 15, 0.92]],                 /* 3-ship  */
+    diamond: [[12, 0, 1], [-10, -15, 0.92], [-10, 15, 0.92], [-30, 0, 0.86]], /* 4-ship  */
+    arrow:   [[16, 0, 1], [-6, -15, 0.94], [-6, 15, 0.94], [-26, -30, 0.88], [-26, 30, 0.88]] /* 5-ship */
+  };
+  function formation(layout) {
     var jet = fighterTop();
-    function at(x, y, s) { return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')">' + jet + '</g>'; }
-    return at(12, 0, 1) +          /* lead  */
-           at(-10, -15, 0.92) +    /* left wingman  */
-           at(-10, 15, 0.92) +     /* right wingman */
-           at(-30, 0, 0.86);       /* slot / trail  */
+    return (layout || FORMATIONS.diamond).map(function (p) {
+      return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')">' + jet + '</g>';
+    }).join('');
   }
   /* ---- a HELICOPTER (top view): pod fuselage, tail boom + tail rotor, and a
          main rotor disc that spins. Nose toward +x. -------------------------*/
@@ -247,25 +253,40 @@
       '</circle>';
   }
 
-  /* the AEROBATIC display team: the formation banks along an S-weave (rotate=
-     auto rolls it into every turn) and pulls TWO synchronized barrel rolls at
-     mid-pass — scaleY sweeping 1 → 0 (knife-edge) → -1 (inverted) → back reads
-     as the whole diamond rolling about its own axis, the way a real team does. */
-  function aeroTeam(pathId, dur, scale) {
-    if (REDUCED) return '<g transform="translate(300 120) scale(' + scale + ')">' + formation() + '</g>';
-    var motion = '<animateMotion dur="' + dur + 's" repeatCount="indefinite" rotate="auto"><mpath href="#' + pathId + '"/></animateMotion>';
-    var fade = '<animate attributeName="opacity" dur="' + dur + 's" repeatCount="indefinite" values="0;1;1;1;0" keyTimes="0;0.05;0.5;0.93;1"/>';
-    var sp = '0.42 0 0.58 1';   // ease each roll segment
-    var roll =
-      '<animateTransform attributeName="transform" type="scale" dur="' + dur + 's" repeatCount="indefinite" calcMode="spline"' +
-      ' keyTimes="0;0.30;0.36;0.42;0.60;0.66;0.72;1"' +
-      ' values="1 1;1 1;1 0;1 -1;1 -1;1 0;1 1;1 1"' +
-      ' keySplines="' + [sp, sp, sp, sp, sp, sp, sp].join(';') + '"/>';
-    return '<g>' + motion + fade +
-             '<g transform="scale(' + scale + ')">' +
-               '<g>' + roll + formation() + '</g>' +
-             '</g>' +
-           '</g>';
+  /* THE FIGHTER SHOW — a table of scenarios (formation × path × speed × rolls).
+     spawnFighters() picks one at random for each pass, so the sky cycles through
+     a lone patrol, a fast fly-by, a low escort pass, a climbing vic, the diamond
+     airshow with barrel rolls, and a five-ship arrowhead — never the same twice. */
+  var JET_SCENARIOS = [
+    { form: 'single',  path: 'jet-patrol', dur: 26, scale: 0.5,  roll: false },  /* lone patrol, slow R→L   */
+    { form: 'single',  path: 'jet-arc',    dur: 11, scale: 0.5,  roll: false },  /* high-speed fly-by       */
+    { form: 'pair',    path: 'jet-low',    dur: 13, scale: 0.46, roll: false },  /* low runway escort pass  */
+    { form: 'pair',    path: 'jet-bank',   dur: 16, scale: 0.48, roll: false },  /* banking escort turn     */
+    { form: 'vic',     path: 'jet-climb',  dur: 17, scale: 0.5,  roll: false },  /* climbing 3-ship         */
+    { form: 'vic',     path: 'jet-arc',    dur: 14, scale: 0.5,  roll: true  },  /* vic with rolls          */
+    { form: 'diamond', path: 'jet-weave',  dur: 16, scale: 0.5,  roll: true  },  /* diamond airshow rolls   */
+    { form: 'diamond', path: 'jet-bank',   dur: 17, scale: 0.5,  roll: false },  /* diamond banking         */
+    { form: 'arrow',   path: 'jet-weave',  dur: 18, scale: 0.46, roll: true  },  /* five-ship show w/ rolls */
+    { form: 'arrow',   path: 'jet-arc',    dur: 15, scale: 0.46, roll: false }   /* five-ship fly-by        */
+  ];
+  /* Build ONE pass for a scenario: the formation flies its path once (rotate=auto
+     banks it into every turn), fading in at the start and out at the seam; when
+     roll is set it pulls two synchronized barrel rolls (scaleY knife-edge flip). */
+  function fighterGroup(scn) {
+    var layout = FORMATIONS[scn.form] || FORMATIONS.diamond;
+    if (REDUCED) return '<g transform="translate(320 118) scale(' + scn.scale + ')">' + formation(layout) + '</g>';
+    var motion = '<animateMotion dur="' + scn.dur + 's" repeatCount="1" fill="freeze" rotate="auto"><mpath href="#' + scn.path + '"/></animateMotion>';
+    var fade = '<animate attributeName="opacity" dur="' + scn.dur + 's" repeatCount="1" fill="freeze" values="0;1;1;1;0" keyTimes="0;0.05;0.5;0.92;1"/>';
+    var inner = formation(layout);
+    if (scn.roll) {
+      var sp = '0.42 0 0.58 1';
+      var roll = '<animateTransform attributeName="transform" type="scale" dur="' + scn.dur + 's" repeatCount="1" fill="freeze" calcMode="spline"' +
+        ' keyTimes="0;0.30;0.36;0.42;0.60;0.66;0.72;1"' +
+        ' values="1 1;1 1;1 0;1 -1;1 -1;1 0;1 1;1 1"' +
+        ' keySplines="' + [sp, sp, sp, sp, sp, sp, sp].join(';') + '"/>';
+      inner = '<g>' + roll + inner + '</g>';
+    }
+    return '<g>' + motion + fade + '<g transform="scale(' + scn.scale + ')">' + inner + '</g></g>';
   }
 
   /* ------------------------------------------------------------- the scene */
@@ -287,9 +308,15 @@
         '<path id="rt-taxi" d="M648 570 Q810 560 992 570" fill="none"/>' +
         '<path id="rt-svc"  d="M170 656 Q680 642 1200 662" fill="none"/>' +
         '<path id="rt-heli" d="M1520 300 Q 800 342 90 300" fill="none"/>' +
-        /* DISPLAY RUN: an S-weave across the upper sky so the formation banks
-           through each curve (rotate=auto) before its mid-pass barrel rolls. */
-        '<path id="rt-jet"  d="M30 132 C 300 44 520 214 800 150 C 1080 86 1300 250 1572 150" fill="none"/>' +
+        /* FIGHTER SHOW — a family of flight paths the display team flies at random:
+           weave (barrel rolls), high arc, sweeping bank, low runway pass,
+           climb-out, and a right-to-left patrol. spawnFighters() picks one each run. */
+        '<path id="jet-weave"  d="M30 132 C 300 44 520 214 800 150 C 1080 86 1300 250 1572 150" fill="none"/>' +
+        '<path id="jet-arc"    d="M40 120 Q 800 58 1560 128" fill="none"/>' +
+        '<path id="jet-bank"   d="M60 190 Q 480 40 880 120 Q 1200 182 1560 96" fill="none"/>' +
+        '<path id="jet-low"    d="M30 452 Q 420 470 800 462 Q 1180 454 1572 470" fill="none"/>' +
+        '<path id="jet-climb"  d="M120 648 Q 560 520 1000 320 Q 1280 208 1548 138" fill="none"/>' +
+        '<path id="jet-patrol" d="M1560 176 Q 820 108 40 196" fill="none"/>' +
         '<path class="route" d="M100 250 Q800 64 1500 236"/>' +
         '<path class="route" d="M60 372 Q720 204 1540 352" stroke-opacity="0.28"/>' +
 
@@ -350,7 +377,7 @@
         mover('rt-dep',  20,  1.18, planeTop(), { hold: true, scaleTo: 0.42 }) + /* airliner take-off (shrinks climbing away) */
         mover('rt-fly',  34, 1.25, planeSide(true),  false) +   /* airliner great-circle   */
         mover('rt-heli', 30, 0.9,  heliTop(),        false) +   /* helicopter crossing     */
-        aeroTeam('rt-jet', 15, 0.5) +                          /* 4-ship aerobatic team, banking + rolling */
+        '<g id="jet-stage">' + (REDUCED ? fighterGroup(JET_SCENARIOS[6]) : '') + '</g>' +   /* fighter show (spawnFighters cycles it) */
       '</svg>';
 
     return '<div class="ascene" aria-hidden="true">' +
@@ -380,6 +407,25 @@
     document.addEventListener('visibilitychange', function () {
       scene.classList.toggle('paused', document.hidden);
     });
+
+    /* --- fighter show loop: fly one random scenario per pass, with a short gap
+       between passes, but only while the Travels scene is actually on-screen
+       (and never under reduced-motion, which shows a single static formation). */
+    var stage = document.getElementById('jet-stage');
+    if (stage && !REDUCED) {
+      var timer, last = -1;
+      var spawn = function () {
+        if (!scene.classList.contains('on') || document.hidden) { timer = setTimeout(spawn, 4000); return; }
+        var i = Math.floor(Math.random() * JET_SCENARIOS.length);
+        if (i === last) i = (i + 1) % JET_SCENARIOS.length;   // avoid immediate repeats
+        last = i;
+        var scn = JET_SCENARIOS[i];
+        stage.innerHTML = fighterGroup(scn);
+        var gap = 2200 + Math.random() * 4200;                // 2.2–6.4s between passes
+        timer = setTimeout(spawn, scn.dur * 1000 + gap);
+      };
+      setTimeout(spawn, 1500);                                // first pass shortly after mount
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
