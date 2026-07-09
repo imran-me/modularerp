@@ -670,28 +670,91 @@
         quickFilter: 'type', filterPanel: true,
         filters: [{ key: 'status', label: 'Status' }],
         pageSize: 10, exportName: 'portals.csv', pdfTitle: 'Portals & Channels',
+        onRow: function (p) { portalDetail(p); },
         actions: actionsFor(function (p) { editPortal(p); }, function (p) { removeRec('tv_portals', p, draw); }),
         empty: { icon: 'hdd-network', title: 'No portals yet', hint: 'Connect your first channel.' }
       });
       host.appendChild(t.el);
     }
   }
+  function portalMsg(p) {
+    return 'Channel: ' + p.name + ' (' + (p.type || '—') + ')\nEndpoint: ' + (p.url || '—') + '\nWallet: ' + ui.money(p.balance || 0) +
+      '\nStatus: ' + (p.status || '—') + '\n\n— Epal Travels & Consultancy';
+  }
+  function printPortal(p) {
+    function r(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: 'Channel · ' + p.name, subtitle: (p.type || '') + ' · Epal Travels & Consultancy', meta: 'Portal / channel',
+      bodyHtml: '<table>' + r('Name', p.name) + r('Type', p.type) + r('Endpoint', p.url) + r('Wallet balance', ui.money(p.balance || 0)) +
+        r('Auto-sync', p.autoSync) + r('Status', p.status) + r('Account manager', p.responsible && p.responsible.name) + '</table>' });
+  }
+  /* ---- portal detail — the SAME rich layout: header + KPIs + connection info */
+  function portalDetail(p) {
+    var body = el('div');
+    ui.modal({ title: p.name, icon: 'hdd-network', size: 'lg', body: body, footer: false });
+    var resp = p.responsible || {};
+    var actions = el('div.flex.gap-1.items-center.flex-wrap', { style: { marginLeft: 'auto' } });
+    if (canCreate()) actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { editPortal(p); } }));
+    actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printPortal(p); } }));
+    actions.appendChild(ui.rowActions(ui.actions({
+      wa: { phone: resp.phone, text: portalMsg(p) }, gmail: { to: resp.email, subject: 'Epal Travels — ' + p.name, body: portalMsg(p) },
+      profile: { name: p.name, card: { title: p.name, subtitle: (p.type || 'Channel'), lines: [
+        ['Endpoint', p.url || '—'], ['Wallet', ui.money(p.balance || 0)], ['Auto-sync', p.autoSync || '—'], ['Status', p.status || '—'] ] }, pdf: function () { printPortal(p); } }
+    })));
+    var tone = p.status === 'Connected' ? 'good' : p.status === 'Error' ? 'warn' : 'bad';
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+        p.logo ? ui.frag('<span class="avatar" style="width:42px;height:42px;background-image:url(' + p.logo + ');background-size:cover;background-position:center"></span>')
+               : ui.frag('<span class="notif-ico notif-info">' + ui.icon('hdd-network') + '</span>'),
+        el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: p.name }),
+          el('div.flex.items-center.gap-2.flex-wrap', null, [ el('span.badge', { text: p.type || '—' }),
+            el('span.badge.badge-' + tone, { text: p.status || '—' }),
+            p.url ? el('div.text-mute.sm', { text: p.url }) : null ]) ]),
+        actions
+      ]),
+      el('div.stat-row', null, [
+        st2('Wallet Balance', ui.money(p.balance || 0)), st2('Auto-sync', p.autoSync || '—'),
+        st2('Status', p.status || '—'), st2('Type', p.type || '—')
+      ])
+    ]) ]));
+    body.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('sliders') + ' Connection & Contact' }) ]),
+      el('div.card-body', null, [ el('div.data-list', null, [
+        drow('Endpoint / URL', p.url), drow('API key / username', p.apiKey ? String(p.apiKey).replace(/.(?=.{4})/g, '•') : '—'),
+        drow('Auto-sync', p.autoSync), drow('Account manager', resp.name), drow('Manager phone', resp.phone), drow('Manager email', resp.email),
+        drow('Notes', p.notes)
+      ]) ])
+    ]));
+  }
+  function drow(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v == null || v === '' ? '—' : String(v) }) ]); }
   function editPortal(p) {
     var isNew = !p;
     EPAL.formModal({
-      title: isNew ? 'Add Portal' : 'Edit Portal', icon: 'hdd-network', size: 'lg', record: p || {},
+      title: isNew ? 'Add Portal / Channel' : 'Edit Portal', icon: 'hdd-network', size: 'lg', record: p || {},
       fields: [
+        { type: 'section', label: 'Channel' },
+        { key: 'logo', label: 'Logo', type: 'image', icon: 'hdd-network', col2: true },
         { key: 'name', label: 'Portal name', type: 'text', required: true, col2: true },
         { key: 'type', label: 'Type', type: 'select', options: PORTAL_TYPES, default: 'GDS' },
         { key: 'url', label: 'Endpoint / URL', type: 'text' },
-        { key: 'balance', label: 'Wallet / balance', type: 'money', default: 0 },
+        { type: 'section', label: 'Credentials' },
+        { key: 'apiKey', label: 'API key / username', type: 'text' },
+        { key: 'apiSecret', label: 'API secret / password', type: 'password' },
         { key: 'autoSync', label: 'Auto-sync', type: 'select', options: SYNC_OPTS, default: 'Hourly' },
-        { key: 'status', label: 'Status', type: 'select', options: ['Connected', 'Disconnected', 'Error'], default: 'Connected' }
+        { type: 'section', label: 'Account Manager' },
+        { key: 'respName', label: 'Contact name', type: 'text' },
+        { key: 'respPhone', label: 'Phone', type: 'phone' },
+        { key: 'respEmail', label: 'Email', type: 'email' },
+        { type: 'section', label: 'Commercial' },
+        { key: 'balance', label: 'Wallet / balance', type: 'money', default: 0 },
+        { key: 'status', label: 'Status', type: 'select', options: ['Connected', 'Disconnected', 'Error'], default: 'Connected' },
+        { key: 'notes', label: 'Notes', type: 'textarea', col2: true }
       ],
       onSave: function (val) {
         var rec = p || { id: 'PTL-' + ui.uid('').slice(-4) };
-        rec.name = val.name.trim(); rec.type = val.type; rec.url = val.url;
-        rec.balance = +val.balance || 0; rec.autoSync = val.autoSync; rec.status = val.status;
+        rec.name = val.name.trim(); rec.type = val.type; rec.url = val.url; rec.logo = val.logo || '';
+        rec.apiKey = val.apiKey; rec.apiSecret = val.apiSecret; rec.autoSync = val.autoSync;
+        rec.responsible = { name: val.respName || '', phone: val.respPhone || '', email: val.respEmail || '' };
+        rec.balance = +val.balance || 0; rec.status = val.status; rec.notes = val.notes;
         db.save('tv_portals', rec);
         ui.toast('Portal "' + rec.name + '" saved', 'success');
         EPAL.router.render();
@@ -712,7 +775,9 @@
     // A searchable LIST of every party — click a row to open its full ledger.
     var rows = names.map(function (nm) {
       var p = pm[nm], bal = ledgerBalance(nm, 0), last = lastActivityOf(nm);
-      return { name: nm, partyType: cap(p.partyType), location: p.location || 'Dhaka',
+      var limit = +p.creditLimit || (p.partyType === 'agent' ? 800000 : 500000);
+      return { name: nm, partyType: cap(p.partyType), creditLimit: limit,
+        util: limit ? Math.round(Math.max(0, bal) / limit * 100) : 0, txns: txnsFor(nm).length,
         balance: bal, lastTs: lastActivityTs(nm), lastLabel: last ? ui.ago(last) : '—',
         status: p.status || 'Active', _meta: p };
     });
@@ -725,15 +790,22 @@
               : '<span class="avatar" style="width:26px;height:26px;font-size:10px;background:' + ui.colorFor(r.name) + '">' + ui.initials(r.name) + '</span>';
             return '<div class="flex items-center gap-1">' + av + '<span class="strong">' + ui.escapeHtml(r.name) + '</span></div>'; } },
         { key: 'partyType', label: 'Type', render: function (r) { return typeBadgeNode(r._meta.partyType).outerHTML; }, sortVal: function (r) { return r.partyType; } },
-        { key: 'location', label: 'Location' },
+        { key: 'creditLimit', label: 'Credit Limit', num: true, money: true },
         { key: 'balance', label: 'Balance', num: true, render: function (r) {
             return '<span class="num ' + (r.balance > 0 ? (r._meta.partyType === 'agent' ? 'text-good' : 'text-bad') : 'text-mute') + '">' + ui.money(r.balance) + '</span>'; },
           sortVal: function (r) { return r.balance; } },
+        { key: 'util', label: 'Credit Used', sort: true, sortVal: function (r) { return r.util; }, render: function (r) {
+            var col = r.util > 90 ? '#f0506e' : r.util > 70 ? '#f4b740' : '#23c17e';
+            return '<div style="display:flex;align-items:center;gap:8px;min-width:132px">' +
+              '<div style="flex:1;height:6px;border-radius:6px;background:var(--surface-3,#2a3350);overflow:hidden">' +
+              '<div style="width:' + Math.min(100, r.util) + '%;height:100%;background:' + col + '"></div></div>' +
+              '<span class="num xs" style="min-width:30px">' + r.util + '%</span></div>'; } },
+        { key: 'txns', label: 'Txns', num: true, render: function (r) { return '<span class="text-mute">' + r.txns + '</span>'; } },
         { key: 'lastLabel', label: 'Last Activity', sortVal: function (r) { return r.lastTs; },
           render: function (r) { return '<span class="text-mute">' + r.lastLabel + '</span>'; } },
         { key: 'status', label: 'Status', render: function (r) { return '<span class="badge' + (r.status === 'Active' ? ' badge-good' : '') + '">' + r.status + '</span>'; } }
       ],
-      rows: rows, searchKeys: ['name', 'partyType', 'location'],
+      rows: rows, searchKeys: ['name', 'partyType'],
       quickFilter: 'partyType', filterPanel: true, filters: [{ key: 'status', label: 'Status' }],
       exportName: 'party-ledger.csv', pdfTitle: 'Party Ledger',
       onRow: function (r) { openLedgerModal(r._meta, r._meta.agentRec); },
