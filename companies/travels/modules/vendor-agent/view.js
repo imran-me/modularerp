@@ -329,6 +329,20 @@
       ])
     ]) ]));
 
+    // Travel Profile — passport & traveller details (the domain fields a TMC needs)
+    if (c.passportNo || c.nationality || c.dob || c.passportExpiry || c.frequentFlyer) {
+      var pxTone = '';
+      if (c.passportExpiry) { var mo = Math.round((new Date(c.passportExpiry).getTime() - Date.now()) / (86400000 * 30.4)); pxTone = mo < 0 ? 'text-bad' : mo <= 6 ? 'text-warn' : ''; }
+      host.appendChild(el('div.card', null, [
+        el('div.card-head', null, [ el('h3', { html: ui.icon('person-vcard') + ' Travel Profile' }) ]),
+        el('div.card-body', null, [ el('div.data-list', null, [
+          drow('Passport No', c.passportNo), drow('Nationality', c.nationality),
+          el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: 'Passport expiry' }), el('div.strong' + (pxTone ? '.' + pxTone : ''), { text: c.passportExpiry ? ui.date(c.passportExpiry) : '—' }) ]),
+          drow('Date of birth', c.dob ? ui.date(c.dob) : '—'), drow('Frequent flyer', c.frequentFlyer), drow('Preferred airline', c.preferredAirline)
+        ]) ])
+      ]));
+    }
+
     if (sales.length) {
       var t = EPAL.table({
         columns: [
@@ -360,6 +374,13 @@
         { key: 'service', label: 'Interest', type: 'select', options: ['Ticketing', 'Visa', 'Hotel', 'Package'], default: 'Ticketing' },
         { key: 'phone', label: 'Phone', type: 'phone' },
         { key: 'email', label: 'Email', type: 'email' },
+        { type: 'section', label: 'Travel Profile' },
+        { key: 'passportNo', label: 'Passport No', type: 'text', placeholder: 'e.g. B1234567' },
+        { key: 'passportExpiry', label: 'Passport expiry', type: 'date' },
+        { key: 'nationality', label: 'Nationality', type: 'text', default: 'Bangladeshi' },
+        { key: 'dob', label: 'Date of birth', type: 'date' },
+        { key: 'frequentFlyer', label: 'Frequent flyer No', type: 'text' },
+        { key: 'preferredAirline', label: 'Preferred airline', type: 'text' },
         { type: 'section', label: 'Commercial' },
         { key: 'tier', label: 'Tier', type: 'select', options: ['Standard', 'Silver', 'Gold', 'Platinum'], default: 'Standard' },
         { key: 'value', label: 'Lifetime value', type: 'money', default: 0, min: 0 },
@@ -377,6 +398,8 @@
         t.name = (val.name || '').trim(); t.contact = val.contact; t.phone = val.phone; t.email = val.email;
         t.service = val.service; t.tier = val.tier; t.value = +val.value || 0; t.since = val.since || t.since;
         t.address = val.address; t.photo = val.photo || '';
+        t.passportNo = val.passportNo; t.passportExpiry = val.passportExpiry; t.nationality = val.nationality;
+        t.dob = val.dob; t.frequentFlyer = val.frequentFlyer; t.preferredAirline = val.preferredAirline;
         if (!t.companyIds) t.companyIds = ['travels']; else if (t.companyIds.indexOf('travels') < 0) t.companyIds.push('travels');
         if (val.createLogin && (val.loginEmail || t.email)) { t.login = { email: val.loginEmail || t.email, role: 'customer', enabled: true }; provisionPartyUser(t, 'customer', val.loginPassword); }
         db.saveCustomer(t);
@@ -732,6 +755,9 @@
       el('div.card-head', null, [ el('h3', { html: ui.icon('sliders') + ' Connection & Contact' }) ]),
       el('div.card-body', null, [ el('div.data-list', null, [
         drow('Endpoint / URL', p.url), drow('API key / username', p.apiKey ? String(p.apiKey).replace(/.(?=.{4})/g, '•') : '—'),
+        p.pcc ? drow('PCC / Office ID', p.pcc) : null, p.iataNo ? drow('IATA / ARC number', p.iataNo) : null,
+        p.bspRegion ? drow('BSP region', p.bspRegion) : null, p.vfsAccount ? drow('VFS / embassy account', p.vfsAccount) : null,
+        p.propertyAccess ? drow('Property / rate access', p.propertyAccess) : null,
         drow('Auto-sync', p.autoSync), drow('Account manager', resp.name), drow('Manager phone', resp.phone), drow('Manager email', resp.email),
         drow('Notes', p.notes)
       ]) ])
@@ -752,6 +778,12 @@
         { key: 'apiKey', label: 'API key / username', type: 'text' },
         { key: 'apiSecret', label: 'API secret / password', type: 'password' },
         { key: 'autoSync', label: 'Auto-sync', type: 'select', options: SYNC_OPTS, default: 'Hourly' },
+        { type: 'section', label: 'Channel Config' },
+        { key: 'pcc', label: 'PCC / Office ID', type: 'text', hint: 'GDS pseudo-city / office ID', showIf: function (x) { return ['GDS', 'Settlement'].indexOf(x.type) >= 0; } },
+        { key: 'iataNo', label: 'IATA / ARC number', type: 'text', showIf: function (x) { return ['GDS', 'Settlement', 'Aggregator'].indexOf(x.type) >= 0; } },
+        { key: 'bspRegion', label: 'BSP region / market', type: 'text', default: 'Bangladesh', showIf: function (x) { return x.type === 'Settlement'; } },
+        { key: 'vfsAccount', label: 'VFS / embassy account', type: 'text', showIf: function (x) { return x.type === 'Visa'; } },
+        { key: 'propertyAccess', label: 'Property / rate access', type: 'text', showIf: function (x) { return x.type === 'Hotel Aggregator'; } },
         { type: 'section', label: 'Account Manager' },
         { key: 'respName', label: 'Contact name', type: 'text' },
         { key: 'respPhone', label: 'Phone', type: 'phone' },
@@ -765,6 +797,7 @@
         var rec = p || { id: 'PTL-' + ui.uid('').slice(-4) };
         rec.name = val.name.trim(); rec.type = val.type; rec.url = val.url; rec.logo = val.logo || '';
         rec.apiKey = val.apiKey; rec.apiSecret = val.apiSecret; rec.autoSync = val.autoSync;
+        rec.pcc = val.pcc; rec.iataNo = val.iataNo; rec.bspRegion = val.bspRegion; rec.vfsAccount = val.vfsAccount; rec.propertyAccess = val.propertyAccess;
         rec.responsible = { name: val.respName || '', phone: val.respPhone || '', email: val.respEmail || '' };
         rec.balance = +val.balance || 0; rec.status = val.status; rec.notes = val.notes;
         db.save('tv_portals', rec);
