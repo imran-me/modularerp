@@ -170,6 +170,35 @@
         vendor: pick(['Al-Haramain','Galaxy GSA','Zamzam Travels']),
         status: sold >= seats ? 'Sold Out' : pick(['Selling','Selling','Selling','Departed']), created: dt() };
     });
+    /* Contract-SEAT SALES — reference the seeded flights so the CF sales ledger
+       fills (idempotent via its own CF-ref guard; kept out of financials on purpose
+       like the note above — the manage-sales view sums the sales store directly). */
+    (function () {
+      var salesList = S.list('sales');
+      if (salesList.some(function (s) { return /^CF/i.test(String(s.ref || '')); })) return;
+      var flights = S.list('tv_contract_flights');
+      var buyers = ['Al-Madina Hajj Kafela', 'Baitullah Travels', 'Nur Umrah Group', 'Green Crescent Tours', 'Dhaka Hajj Mission', 'Salam Pilgrim Services', 'Makkah Express BD'];
+      var add = [];
+      flights.forEach(function (f, idx) {
+        var soldLeft = +f.sold || 0; if (!soldLeft) return;
+        var chunks = Math.min(3, Math.max(1, Math.round(soldLeft / 12)));
+        for (var c = 0; c < chunks && soldLeft > 0; c++) {
+          var qty = (c === chunks - 1) ? soldLeft : Math.max(1, Math.round((+f.sold || 0) / chunks));
+          qty = Math.min(qty, soldLeft); soldLeft -= qty;
+          var price = Math.round((+f.saleSeat || 0) * (0.98 + rnd() * 0.08));
+          add.push({ id: 'SL-CF' + idx + '' + c + '' + ri(100, 999), companyId: 'travels', date: dt(ri(0, 5)),
+            amount: qty * price, cost: qty * (+f.costSeat || 0), profit: qty * price - qty * (+f.costSeat || 0),
+            ref: f.id, desc: 'Contract seats ' + f.route + ' (' + qty + '×)', customer: pick(buyers) });
+        }
+      });
+      if (add.length) S.set('sales', salesList.concat(add));
+    })();
+    /* a couple of vendor-role ERP users (the directory the vendor-login flow writes to) */
+    gen('erp_users', 3, function (i) {
+      var v = [['Galaxy GSA', 'ops@galaxygsa.com', 'Ticketing'], ['Al-Haramain', 'accounts@alharamain.com', 'Hotel'], ['Zamzam Travels', 'desk@zamzam.com', 'Ticketing']][i];
+      return { id: seq('USR', i, 3), name: v[0], email: v[1], role: 'vendor', scope: 'travels',
+        partyType: 'vendor', designation: 'Vendor · ' + v[2], status: 'Active', createdAt: 0 };
+    });
     gen('tv_agents', 14, function (i) {
       return { id: seq('AGT', i, 3), name: pick(PEOPLE), agency: pick(['Sky','Green','Metro','Royal','Delta','Prime']) + ' ' + pick(['Travels','Tours','Aviation','Holidays']),
         phone: phone(), location: pick(AREAS), commission: ri(2, 7), balance: ri(-5, 25) * 10000,
