@@ -35,8 +35,15 @@
 .grid-auto { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .kpi-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px; }
 /* compact variant — ~20% smaller cards + roomier gap, SAME text size (ageing, tiers) */
-.kpi-grid.kpi-compact { gap: 18px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.kpi-grid.kpi-compact { gap: 18px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
 .kpi-grid.kpi-compact .kpi-card { padding: 17px 18px; min-height: 132px; }
+/* clickable slab-tier cards (commission) — filter the ledger on tap */
+.grid-auto.kpi-compact { gap: 18px; }
+.tier-card { cursor: pointer; text-align: left; width: 100%; background: var(--surface);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast); }
+.tier-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.tier-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.section-label.mt-0 { margin-top: 0; }
 .kpi-card {
   display: flex; flex-direction: column;
   /* a whisper of accent light off the top-right (behind the jewel icon) over a

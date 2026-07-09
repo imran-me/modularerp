@@ -126,11 +126,13 @@
     var map = {};
     vendors().forEach(function (v) {
       map[v.name] = { name: v.name, partyType: 'vendor', creditLimit: +v.creditLimit || 500000,
-        location: v.city || v.country || 'Dhaka' };
+        location: v.city || v.country || 'Dhaka', phone: v.phone, email: v.email, status: v.status || 'Active',
+        photo: v.photo, responsible: v.responsible, login: v.login };
     });
     agents().forEach(function (a) {
       map[a.name] = { name: a.name, partyType: 'agent', creditLimit: +a.creditLimit || 800000,
-        location: a.location || 'Dhaka', commission: +a.commission || 0, totalSales: +a.totalSales || 0 };
+        location: a.location || 'Dhaka', commission: +a.commission || 0, totalSales: +a.totalSales || 0,
+        phone: a.phone, email: a.email, status: a.status || 'Active', photo: a.photo, responsible: a.responsible, login: a.login };
     });
     txns().forEach(function (t) {
       if (!map[t.party]) map[t.party] = { name: t.party, partyType: t.partyType || 'vendor',
@@ -607,24 +609,46 @@
         el('h3', { text: 'No parties yet' }), el('p.text-muted', { text: 'Add a vendor or agent first.' }) ]));
       return;
     }
-    var picker = el('select.select', { style: { maxWidth: '360px' } });
-    var vg = el('optgroup', { label: 'Vendors' }), ag = el('optgroup', { label: 'Sub-Agents' });
-    names.forEach(function (nm) {
-      var o = el('option', { value: nm, text: nm });
-      (pm[nm].partyType === 'agent' ? ag : vg).appendChild(o);
+    // A searchable LIST of every party — click a row to open its full ledger.
+    var rows = names.map(function (nm) {
+      var p = pm[nm], bal = ledgerBalance(nm, 0), last = lastActivityOf(nm);
+      return { name: nm, partyType: cap(p.partyType), location: p.location || 'Dhaka',
+        balance: bal, lastTs: lastActivityTs(nm), lastLabel: last ? ui.ago(last) : '—',
+        status: p.status || 'Active', _meta: p };
     });
-    if (vg.children.length) picker.appendChild(vg);
-    if (ag.children.length) picker.appendChild(ag);
-
-    page.appendChild(el('div.card', null, [ el('div.card-body', null, [
-      el('div.form-grid', null, [
-        el('div.field.col-2', null, [ el('label', { text: 'Select party (vendor or sub-agent)' }), picker ])
-      ])
-    ]) ]));
-
-    var host = el('div'); page.appendChild(host);
-    picker.addEventListener('change', function () { renderLedger(host, pm[picker.value]); });
-    renderLedger(host, pm[picker.value] || pm[names[0]]);
+    var t = EPAL.table({
+      columns: [
+        { key: 'name', label: 'Party', render: function (r) {
+            var p = r._meta;
+            var av = p.photo
+              ? '<span class="avatar" style="width:26px;height:26px;background-image:url(' + p.photo + ');background-size:cover;background-position:center"></span>'
+              : '<span class="avatar" style="width:26px;height:26px;font-size:10px;background:' + ui.colorFor(r.name) + '">' + ui.initials(r.name) + '</span>';
+            return '<div class="flex items-center gap-1">' + av + '<span class="strong">' + ui.escapeHtml(r.name) + '</span></div>'; } },
+        { key: 'partyType', label: 'Type', render: function (r) { return typeBadgeNode(r._meta.partyType).outerHTML; }, sortVal: function (r) { return r.partyType; } },
+        { key: 'location', label: 'Location' },
+        { key: 'balance', label: 'Balance', num: true, render: function (r) {
+            return '<span class="num ' + (r.balance > 0 ? (r._meta.partyType === 'agent' ? 'text-good' : 'text-bad') : 'text-mute') + '">' + ui.money(r.balance) + '</span>'; },
+          sortVal: function (r) { return r.balance; } },
+        { key: 'lastLabel', label: 'Last Activity', sortVal: function (r) { return r.lastTs; },
+          render: function (r) { return '<span class="text-mute">' + r.lastLabel + '</span>'; } },
+        { key: 'status', label: 'Status', render: function (r) { return '<span class="badge' + (r.status === 'Active' ? ' badge-good' : '') + '">' + r.status + '</span>'; } }
+      ],
+      rows: rows, searchKeys: ['name', 'partyType', 'location'],
+      quickFilter: 'partyType', filterPanel: true, filters: [{ key: 'status', label: 'Status' }],
+      exportName: 'party-ledger.csv', pdfTitle: 'Party Ledger',
+      onRow: function (r) { openLedgerModal(r._meta, r._meta.agentRec); },
+      actions: ui.actions({
+        print: function (r) { printParty({ name: r.name, balance: r.balance, phone: r._meta.phone, email: r._meta.email }); },
+        wa:    function (r) { return { phone: r._meta.phone, text: partyMsg({ name: r.name, balance: r.balance }) }; },
+        gmail: function (r) { return { to: r._meta.email, subject: 'Epal Travels & Consultancy', body: partyMsg({ name: r.name, balance: r.balance }) }; }
+      }),
+      empty: { icon: 'people', title: 'No parties yet', hint: 'Add a vendor or sub-agent first.' }
+    });
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('people-fill') + ' Party Ledger' }),
+        el('span.card-sub', { text: rows.length + ' parties · click to open the full statement' }) ]),
+      el('div.card-body', null, [ t.el ])
+    ]));
   }
 
   // Full party ledger — shared by the accounts sub AND the row-click modal.
@@ -852,25 +876,20 @@
     list.forEach(function (r) { totExp += r.expected; totRec += r.received; totOut += r.outstanding; });
     var top = list.slice().sort(function (a, b) { return b.expected - a.expected; })[0];
 
-    page.appendChild(el('div.kpi-grid.stagger', null, [
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
       kpi('Expected Commission', ui.money(totExp, { compact: true }), 'percent'),
       kpi('Received', ui.money(totRec, { compact: true }), 'check2-circle'),
       kpi('Outstanding', ui.money(totOut, { compact: true }), 'hourglass-split'),
       kpi('Top Agent', top ? top.name : '—', 'trophy')
     ]));
 
-    // slab tiers card
-    page.appendChild(el('div.section-label', { text: 'Commission Slab Tiers' }));
-    page.appendChild(el('div.grid-auto.stagger', null, SLABS.map(function (s) {
-      return el('div.card', null, [ el('div.card-pad', null, [
-        el('div.flex.items-center.gap-2', null, [
-          el('span', { style: { width: '10px', height: '10px', borderRadius: '99px', background: s.color, display: 'inline-block' } }),
-          el('div.flex-1', null, [ el('div.fw-700', { text: s.tier } ), el('div.text-mute.sm', { text: s.range }) ]),
-          el('span.badge.badge-good', { text: s.rate }) ])
-      ]) ]);
-    })));
+    function agentRec(r) { return agents().filter(function (a) { return a.id === r.id || a.name === r.name; })[0]; }
+    function commissionMsg(r) {
+      return 'Dear ' + r.name + ',\n\nCommission summary (Epal Travels & Consultancy):\nExpected: ' + ui.money(r.expected) +
+        '\nReceived: ' + ui.money(r.received) + '\nOutstanding: ' + ui.money(r.outstanding) + '\n\nWarm regards,\nAccounts, Epal Travels & Consultancy';
+    }
 
-    page.appendChild(el('div.section-label', { text: 'Agent Commission Ledger' }));
+    // the ledger — search (half) + Filter card (sort) + WhatsApp/Gmail per agent
     var t = EPAL.table({
       columns: [
         { key: 'name', label: 'Agent', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.name) + '</span>'; } },
@@ -883,13 +902,38 @@
         { key: 'outstanding', label: 'Outstanding', num: true, render: function (r) { return r.outstanding > 0 ? '<span class="text-bad">' + ui.money(r.outstanding) + '</span>' : '—'; }, sortVal: function (r) { return r.outstanding; } }
       ],
       rows: list, searchKeys: ['name', 'agency'],
-      filters: [{ key: 'tier', label: 'Tier' }], pageSize: 12, exportName: 'agent-commission.csv',
-      onRow: function (r) { openLedgerModal(metaFromAgent(agents().filter(function (a) { return a.id === r.id || a.name === r.name; })[0] || { name: r.name, commission: r.commission, totalSales: r.totalSales }), r); },
+      filterPanel: true, filters: [], pageSize: 12, exportName: 'agent-commission.csv', pdfTitle: 'Agent Commission',
+      onRow: function (r) { openLedgerModal(metaFromAgent(agentRec(r) || { name: r.name, commission: r.commission, totalSales: r.totalSales }), r); },
+      actions: ui.actions({
+        wa:    function (r) { var a = agentRec(r); return { phone: a && a.phone, text: commissionMsg(r) }; },
+        gmail: function (r) { var a = agentRec(r); return { to: a && a.email, subject: 'Commission — Epal Travels', body: commissionMsg(r) }; }
+      }),
       empty: { icon: 'percent', title: 'No agents yet', hint: 'Add sub-agents to track commission.' }
     });
-    var card = el('div.card', null, [ el('div.card-body') ]);
-    card.querySelector('.card-body').appendChild(t.el);
-    page.appendChild(card);
+
+    // clickable slab tiers — Bronze/Silver/Gold/Platinum filter the ledger by tier
+    var selectedTier = null;
+    var tierGrid = el('div.grid-auto.kpi-compact.stagger.mb-3');
+    function paintTiers() {
+      tierGrid.innerHTML = '';
+      SLABS.forEach(function (s) {
+        var active = selectedTier === s.tier;
+        tierGrid.appendChild(el('button.card.tier-card' + (active ? '.active' : ''), { type: 'button', onclick: function () {
+          selectedTier = active ? null : s.tier;
+          t.state.filters.tier = selectedTier || '__all'; t.state.page = 0; t.refresh(); paintTiers();
+        } }, [ el('div.card-pad', null, [
+          el('div.flex.items-center.gap-2', null, [
+            el('span', { style: { width: '10px', height: '10px', borderRadius: '99px', background: s.color, display: 'inline-block' } }),
+            el('div.flex-1', null, [ el('div.fw-700', { text: s.tier }), el('div.text-mute.sm', { text: s.range }) ]),
+            el('span.badge.badge-good', { text: s.rate }) ])
+        ]) ]));
+      });
+    }
+    paintTiers();
+    page.appendChild(el('div.section-label.mt-0', { text: 'Commission Slab Tiers — tap to filter' }));
+    page.appendChild(tierGrid);
+    page.appendChild(el('div.section-label', { text: 'Agent Commission Ledger' }));
+    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ t.el ]) ]));
   }
   function receivedRatio(key) {
     var s = String(key), h = 0;
