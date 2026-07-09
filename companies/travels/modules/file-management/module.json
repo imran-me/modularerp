@@ -1,0 +1,18 @@
+{
+  "key": "file-management",
+  "company": "travels",
+  "title": "File Management",
+  "icon": "folder-fill",
+  "desc": "Embassy files, submission slots, decision tracking.",
+  "route": "#/travels/file-management",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "files", "label": "All Files", "route": "#/travels/file-management/files", "enabled": true },
+    { "id": "add-file", "label": "Add File", "route": "#/travels/file-management/add-file", "enabled": true },
+    { "id": "slot-tracker", "label": "Slot Tracker", "route": "#/travels/file-management/slot-tracker", "enabled": true }
+  ],
+  "files": { "view": "view.js" },
+  "store": "tv_files",
+  "note": "Built 2026-07-09. Live registry: platform/core/config.js TRAVELS_MODULES; data seeded in platform/data/seed-bd.js (tv_files)."
+}

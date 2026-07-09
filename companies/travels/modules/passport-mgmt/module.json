@@ -1,0 +1,18 @@
+{
+  "key": "passport-mgmt",
+  "company": "travels",
+  "title": "Passport Management",
+  "icon": "person-vcard",
+  "desc": "Passport holders, categories, expiry radar.",
+  "route": "#/travels/passport-mgmt",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "holders", "label": "Holders", "route": "#/travels/passport-mgmt/holders", "enabled": true },
+    { "id": "categories", "label": "Categories", "route": "#/travels/passport-mgmt/categories", "enabled": true },
+    { "id": "expiry", "label": "Expiry Radar", "route": "#/travels/passport-mgmt/expiry", "enabled": true }
+  ],
+  "files": { "view": "view.js" },
+  "store": "tv_passports",
+  "note": "Built 2026-07-09. Live registry: platform/core/config.js TRAVELS_MODULES; data seeded in platform/data/seed-bd.js (tv_passports)."
+}
