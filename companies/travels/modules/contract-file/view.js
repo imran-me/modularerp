@@ -119,7 +119,7 @@
         el('span.card-sub', { text: list.length + ' on file' }) ]),
       el('div.table-wrap', null, [
         el('table.tbl', null, [
-          el('thead', null, [ el('tr', null, ['Ref', 'Counterparty', 'Route', 'Seats', 'Buy', 'Sell', 'Margin', 'Validity', 'Status', ''].map(function (h) { return el('th', { text: h }); })) ]),
+          el('thead', null, [ el('tr', null, [['Ref'], ['Counterparty'], ['Route'], ['Seats', 'num'], ['Buy', 'num'], ['Sell', 'num'], ['Margin', 'num'], ['Validity'], ['Status'], ['']].map(function (h) { return el('th' + (h[1] ? '.' + h[1] : ''), { text: h[0] }); })) ]),
           el('tbody', null, rows)
         ])
       ])

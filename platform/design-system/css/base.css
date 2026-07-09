@@ -107,15 +107,22 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl thead th {
   text-align: left; font-weight: 600; font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
   color: var(--text-mute); padding: 12px 14px; background: var(--surface-2); position: sticky; top: 0; z-index: 1;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); white-space: nowrap;
 }
-.tbl tbody td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text-dim); }
+/* cells stay on ONE line — the .table-wrap scrolls horizontally when cramped,
+   instead of ragged multi-line wrapping. Opt a cell back in with .wrap. */
+.tbl tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: var(--text-dim);
+  font-variant-numeric: tabular-nums; vertical-align: middle; white-space: nowrap; }
+.tbl td.wrap, .tbl th.wrap { white-space: normal; }
 .tbl tbody tr { transition: background var(--t-fast); }
 .tbl tbody tr:hover { background: var(--surface-2); }
 .tbl tbody tr:last-child td { border-bottom: none; }
 .tbl td .strong, .tbl td strong { color: var(--text); font-weight: 600; }
 .tbl td.num { text-align: right; color: var(--text); }
+.tbl thead th.num { text-align: right; }         /* numeric header aligns over its right-aligned figures */
 .tbl .row-click { cursor: pointer; }
+/* left-align numeric figures in a cell while keeping tabular spacing (phones, refs) */
+.tbl td.lnum, .tnum { font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------- Badges / chips */
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill);

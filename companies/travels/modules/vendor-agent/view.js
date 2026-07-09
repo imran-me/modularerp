@@ -269,7 +269,7 @@
         el('span.card-sub', { text: list.length + ' travellers' }) ]),
       el('div.table-wrap', null, [
         el('table.tbl', null, [
-          el('thead', null, [ el('tr', null, ['Customer', 'Phone', 'Email', 'Lifetime Value', 'Since', ''].map(function (h) { return el('th', { text: h }); })) ]),
+          el('thead', null, [ el('tr', null, [['Customer'], ['Phone'], ['Email'], ['Lifetime Value', 'num'], ['Since'], ['']].map(function (h) { return el('th' + (h[1] ? '.' + h[1] : ''), { text: h[0] }); })) ]),
           el('tbody', null, rows.length ? rows : [ el('tr', null, [ el('td.text-mute', { colspan: 6, text: 'No customers yet.' }) ]) ])
         ])
       ])

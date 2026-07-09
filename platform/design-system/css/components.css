@@ -103,17 +103,18 @@
   white-space: pre-wrap; max-height: 220px; overflow: auto; }
 
 /* Row action buttons — the canonical set: view · edit · delete │ print · WhatsApp · Gmail.
-   Always a single horizontal line (never wraps), whether in a table cell or a card. */
-.row-actions { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 3px; white-space: nowrap; }
-.row-act { width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 8px; flex: none;
-  color: var(--text-mute); border: 1px solid transparent; background: transparent; cursor: pointer;
-  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast); }
-.row-act:hover { background: var(--surface-2); color: var(--accent); border-color: var(--border); }
-.row-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.row-act i { font-size: 15px; }
+   Deliberately CALM: small, low-contrast at rest (they recede), colour + surface
+   only on hover. Always a single horizontal line, left-aligned in the cell. */
+.row-actions { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 1px; white-space: nowrap; justify-content: flex-start; }
+.row-act { width: 24px; height: 24px; display: inline-grid; place-items: center; border-radius: 6px; flex: none;
+  color: var(--text-mute); opacity: .7; border: 1px solid transparent; background: transparent; cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast), opacity var(--t-fast); }
+.row-act:hover { opacity: 1; background: var(--surface-2); color: var(--accent); border-color: var(--border); }
+.row-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
+.row-act i { font-size: 12.5px; line-height: 1; }
 .row-act-danger:hover { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 30%, transparent); }
-/* thin divider between the record group (view/edit/delete) and the send group (print/wa/gmail) */
-.row-act-sep { flex: none; width: 1px; height: 16px; margin: 0 3px; background: var(--border); align-self: center; }
+/* faint divider between the record group (view/edit/delete) and the send group */
+.row-act-sep { flex: none; width: 1px; height: 12px; margin: 0 3px; background: var(--border); align-self: center; opacity: .7; }
 
 /* Compact KPI STRIP — the small stat tiles above the task board, forced into a
    single scrollable row. Scoped to [data-strip] so no other dashboard changes. */
