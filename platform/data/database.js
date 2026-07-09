@@ -113,6 +113,15 @@
     return out;
   }
 
+  // AUTO-DISCOVERY (Phase 3b): a company whose FOLDER was deleted leaves the
+  // group books. This checks folder-presence only (NOT the enable/disable toggle),
+  // so group totals are byte-identical when every folder is present and the
+  // existing Module-Control toggle behaviour is unchanged. On file:// discovery
+  // is inert → present() is always true → identical.
+  function present(companyId) {
+    return !EPAL.discovery || EPAL.discovery.presentFor(companyId);
+  }
+
   /* ==========================================================================
    * SEED DATA — only written the first time (idempotent).
    * ========================================================================*/
@@ -463,6 +472,7 @@
     finance: function (companyId, months) {
       var rows = this.financials();
       if (companyId) rows = rows.filter(function (r) { return r.companyId === companyId; });
+      else rows = rows.filter(function (r) { return present(r.companyId); });   // group-wide → present folders only
       if (months) { var keep = lastMonths(months); rows = rows.filter(function (r) { return keep.indexOf(r.ym) >= 0; }); }
       var rev = 0, exp = 0; rows.forEach(function (r) { rev += r.revenue; exp += r.expense; });
       return { revenue: rev, expense: exp, profit: rev - exp, margin: rev ? ((rev - exp) / rev) * 100 : 0 };
@@ -471,7 +481,7 @@
     // Monthly series for charts: {labels[], revenue[], expense[], profit[]}
     series: function (companyId) {
       var months = lastMonths(12), rows = this.financials()
-        .filter(function (r) { return !companyId || r.companyId === companyId; });
+        .filter(function (r) { return companyId ? r.companyId === companyId : present(r.companyId); });
       var byM = {};
       rows.forEach(function (r) { (byM[r.ym] = byM[r.ym] || { r:0, e:0 }); byM[r.ym].r += r.revenue; byM[r.ym].e += r.expense; });
       return {
@@ -501,7 +511,7 @@
     // Everything the Group Command Center needs in one call.
     groupSnapshot: function () {
       var self = this;
-      var comps = EPAL.config.companies.filter(function (c) { return c.type === 'company' && c.enabled; });
+      var comps = EPAL.config.companies.filter(function (c) { return c.type === 'company' && c.enabled && present(c.id); });
       var per = comps.map(function (c) {
         var f = self.finance(c.id, 12), m3 = self.finance(c.id, 3);
         return { id:c.id, name:c.name, short:c.short, accent:c.accent, icon:c.icon,

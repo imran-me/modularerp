@@ -37,7 +37,7 @@
       travels/ mini-app moved into companies/travels/app/frontend/ (owner request, 2026-07-08) — fully self-contained, relocates as a unit; old /travels/*.html URLs now 404.
       6 moves, 6 commits, boot sweep 190/0/0 after EVERY move; computed styles
       vs pre-migration baseline: byte-identical.
-- [~] **Phase 3 — Bridge + auto-discovery** (in progress)
+- [x] **Phase 3 — Bridge + auto-discovery** — COMPLETE
   - [x] **3a Auto-discovery** — platform/discovery/discovery.js fetch-probes each
         companies/<x>/module.json (+ built modules); folded into the single
         visibility truth-check EPAL.modules.isEnabled. Default-present +
@@ -45,8 +45,14 @@
         HTTP: all-present = no change; delete a company folder = it vanishes
         from the rail; delete a module folder = it vanishes, company + siblings
         stay. file:// sweep 190/0/0.
-  - [ ] **3b Bridge** — event line + group consolidation mirror, proven to match
-        today’s totals before any on-read path is retired
+  - [x] **3b Bridge** — (i) the group on-read reads (db.series/finance/groupSnapshot,
+        ledger.consolidatedTrialBalance) now honour discovery via a folder-presence
+        filter, so a deleted company leaves the Group BOOKS too — proven byte-identical
+        when present (23.36Cr/5 concerns) and correct on deletion (delete IT -> 19.04Cr/
+        4 concerns, drops from hero + sister-concerns + consolidated TB); (ii) explicit
+        event line platform/bridge/bridge.js (emit/on + normalized bridge.maps) with
+        verify() asserting on-read == sum-of-present (match:true). Additive; on-read
+        stays the live source (R4).
 - [ ] **Phase 4 — Tailwind conversion** (screen-by-screen; side-by-side visual
       diff sign-off; delete old CSS only after ALL screens using it are signed off)
 
@@ -68,7 +74,8 @@
 | 2026-07-08 | Phase 2 M7: travels mini-app -> companies/travels/app/frontend (owner request) | mini-app renders from new path; SPA 190/0/0 | e2d0445 |
 | 2026-07-09 | Module anatomy: 25 module.json + 26 backend blueprints + companies/README | 26/26; 190/0/0 | cc5ff9a |
 | 2026-07-09 | Uniform company shell: app/{frontend,theme,atmosphere,backend} + bridge.map + COMPANY-BACKEND-BLUEPRINT for all 6 | 190/0/0; all identical | cb33081 |
-| 2026-07-09 | Phase 3a auto-discovery (discovery.js + isEnabled guard + post-boot scan + built flags) | file:// 190/0/0 + HTTP delete-company/module proven; all-present identical | (this commit) |
+| 2026-07-09 | Phase 3a auto-discovery (discovery.js + isEnabled guard + post-boot scan + built flags) | file:// 190/0/0 + HTTP delete-company/module proven; all-present identical | 930d2e6 |
+| 2026-07-09 | Phase 3b bridge: group reads discovery-aware + platform/bridge/bridge.js event line + verify() | all-present 23.36Cr identical; delete IT -> 19.04Cr; verify match:true; 190/0/0 | (this commit) |
 
 ## Decisions (ruled by owner, 2026-07-08)
 

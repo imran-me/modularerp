@@ -119,6 +119,10 @@
        present + file:// fallback, so no visual/behaviour change when all folders
        exist. Loads before app.js (which runs the scan after boot). -->
   <script src="platform/discovery/discovery.js"></script>
+  <!-- Group bridge (Phase 3b): the explicit event line companies roll up through.
+       Additive — the group books are computed on-read (now discovery-aware); this
+       is the contract seam + an equivalence check. Changes no number. -->
+  <script src="platform/bridge/bridge.js"></script>
 
   <!-- ===================== VIEWS (self-registering) ===================== -->
   <!-- registry first (defines EPAL.view + the placeholder scaffold). -->

@@ -263,7 +263,10 @@
    *     elimination, group}], totals:{per:{co:{debit,credit}}, group:{debit,credit}} } */
   function consolidatedTrialBalance() {
     var comps = (EPAL.config.companies || []).filter(function (c) {
-      return c.type === 'company' && c.enabled !== false;
+      // Phase 3b: a deleted-folder company also drops out of the consolidation
+      // (folder-presence only; identical when all present — see database.js present()).
+      var present = !EPAL.discovery || EPAL.discovery.presentFor(c.id);
+      return c.type === 'company' && c.enabled !== false && present;
     }).map(function (c) { return { id: c.id, name: c.name, short: c.short }; });
     var coa = accounts(), rows = [];
     comps.forEach(function (c) { c._dr = 0; c._cr = 0; });
