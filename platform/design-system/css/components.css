@@ -34,6 +34,9 @@
 /* --------------------------------------------------------------- KPI tiles */
 .grid-auto { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .kpi-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px; }
+/* compact variant — ~20% smaller cards + roomier gap, SAME text size (ageing, tiers) */
+.kpi-grid.kpi-compact { gap: 18px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.kpi-grid.kpi-compact .kpi-card { padding: 17px 18px; min-height: 132px; }
 .kpi-card {
   display: flex; flex-direction: column;
   /* a whisper of accent light off the top-right (behind the jewel icon) over a

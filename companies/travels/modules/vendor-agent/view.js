@@ -475,7 +475,8 @@
   }
   function metaFromVendor(v) {
     return { name: v.name, partyType: 'vendor', creditLimit: +v.creditLimit || 500000,
-      location: v.city || v.country || 'Dhaka', photo: v.photo, responsible: v.responsible, login: v.login };
+      location: v.city || v.country || 'Dhaka', phone: v.phone, email: v.email,
+      photo: v.photo, responsible: v.responsible, login: v.login };
   }
 
   /* ======================================================= AGENTS */
@@ -542,7 +543,8 @@
   }
   function metaFromAgent(a) {
     return { name: a.name, partyType: 'agent', creditLimit: +a.creditLimit || 800000,
-      location: a.location || 'Dhaka', commission: +a.commission || 0, totalSales: +a.totalSales || 0 };
+      location: a.location || 'Dhaka', commission: +a.commission || 0, totalSales: +a.totalSales || 0,
+      phone: a.phone, email: a.email, photo: a.photo, responsible: a.responsible, login: a.login };
   }
 
   /* ======================================================= PORTALS */
@@ -644,16 +646,28 @@
     }
     actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement',
       onclick: function () { openStatement(meta); } }));
+    // WhatsApp + Gmail — icon-only, same row, same behaviour as the row actions
+    actions.appendChild(ui.rowActions(ui.actions({
+      wa:    { phone: meta.phone, text: partyMsg({ name: meta.name, balance: led.balance }) },
+      gmail: { to: meta.email, subject: 'Epal Travels & Consultancy', body: partyMsg({ name: meta.name, balance: led.balance }) }
+    })));
 
     // --- header / credit control card ---
     var head = el('div.card', null, [ el('div.card-body', null, [
       el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
-        ui.frag('<span class="notif-ico notif-' + (meta.partyType === 'agent' ? 'success' : 'info') + '">' + ui.icon(meta.partyType === 'agent' ? 'person-badge' : 'truck') + '</span>'),
+        meta.photo
+          ? ui.frag('<span class="avatar" style="width:42px;height:42px;background-image:url(' + meta.photo + ');background-size:cover;background-position:center"></span>')
+          : ui.frag('<span class="notif-ico notif-' + (meta.partyType === 'agent' ? 'success' : 'info') + '">' + ui.icon(meta.partyType === 'agent' ? 'person-badge' : 'truck') + '</span>'),
         el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: meta.name }),
-          el('div.flex.items-center.gap-2', null, [
+          el('div.flex.items-center.gap-2.flex-wrap', null, [
             el('div.text-mute.sm', { text: cap(meta.partyType) + ' · ' + (meta.location || 'Dhaka') }),
-            typeBadgeNode(meta.partyType)
-          ]) ]),
+            typeBadgeNode(meta.partyType),
+            (meta.login && meta.login.enabled) ? el('span.badge.badge-good', { html: ui.icon('person-check') + ' ERP login' }) : null
+          ]),
+          (meta.responsible && meta.responsible.name)
+            ? el('div.text-mute.xs.mt-1', { text: 'Responsible: ' + meta.responsible.name + (meta.responsible.designation ? ' · ' + meta.responsible.designation : '') + (meta.responsible.phone ? ' · ' + meta.responsible.phone : '') })
+            : null
+        ]),
         actions
       ]),
       el('div.stat-row', null, [
@@ -675,8 +689,8 @@
     ]) ]);
     host.appendChild(head);
 
-    // --- ageing summary ---
-    host.appendChild(el('div.kpi-grid', null, [
+    // --- ageing summary (compact cards, roomier gap) ---
+    host.appendChild(el('div.kpi-grid.kpi-compact', null, [
       agBucket('Current', ag.current, ag.total, '#23c17e'),
       agBucket('1 – 30 days', ag.d30, ag.total, '#f4b740'),
       agBucket('31 – 60 days', ag.d60, ag.total, '#e2721b'),
