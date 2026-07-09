@@ -69,6 +69,34 @@
         return;
       }
 
+      // ---- Image / photo picker (profile pics, logos) — stores a base64 data URL
+      if (f.type === 'image') {
+        var imgState = { data: record[f.key] != null ? record[f.key] : (f.default || '') };
+        var preview = el('div.img-picker-preview' + (f.round ? '.round' : ''));
+        var paintImg = function () {
+          preview.innerHTML = '';
+          preview.appendChild(imgState.data ? el('img', { src: imgState.data, alt: '' })
+            : ui.frag('<span class="img-picker-ph">' + ui.icon(f.icon || 'image') + '</span>'));
+        };
+        paintImg();
+        var fileIn = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' }, onchange: function (e) {
+          var fl = e.target.files && e.target.files[0]; if (!fl) return;
+          var rd = new FileReader(); rd.onload = function () { imgState.data = String(rd.result); paintImg(); }; rd.readAsDataURL(fl); } });
+        var errImg = el('div.field-error');
+        var wrapImg = el('div.field' + (f.col2 ? '.col-2' : ''), null, [
+          el('label', { html: ui.escapeHtml(f.label || f.key) }),
+          el('div.img-picker', null, [ preview, el('div.img-picker-ctrls', null, [
+            el('button.btn.btn-sm.btn-outline', { type: 'button', html: ui.icon('upload') + ' Upload', onclick: function () { fileIn.click(); } }),
+            el('button.btn.btn-sm.btn-ghost', { type: 'button', html: ui.icon('trash') + ' Remove', onclick: function () { imgState.data = ''; paintImg(); } }),
+            fileIn
+          ]) ]),
+          f.hint ? el('div.hint', { text: f.hint }) : null, errImg
+        ]);
+        root.appendChild(wrapImg);
+        ctrls[f.key] = { input: wrapImg, spec: f, errEl: errImg, wrap: wrapImg, getVal: function () { return imgState.data; } };
+        return;
+      }
+
       var input;
       var val = record[f.key] != null ? record[f.key] : (f.default != null ? f.default : '');
 
@@ -192,7 +220,7 @@
       var out = {};
       Object.keys(ctrls).forEach(function (k) {
         var c = ctrls[k], t = c.spec.type;
-        if (c.isItems) out[k] = c.getVal();
+        if (c.getVal) out[k] = c.getVal();            // items + image controls
         else if (t === 'checkbox') out[k] = c.input.checked;
         else if (t === 'number' || t === 'money') out[k] = c.input.value === '' ? null : +c.input.value;
         else out[k] = c.input.value;

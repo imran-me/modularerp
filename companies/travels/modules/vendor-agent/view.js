@@ -372,7 +372,11 @@
       var t = EPAL.table({
         columns: [
           { key: 'id', label: 'Vendor ID', render: function (v) { return '<span class="mono xs text-mute">' + ui.escapeHtml(v.id || '—') + '</span>'; } },
-          { key: 'name', label: 'Vendor', render: function (v) { return '<span class="strong">' + ui.escapeHtml(v.name) + '</span>'; } },
+          { key: 'name', label: 'Vendor', render: function (v) {
+              var av = v.photo
+                ? '<span class="avatar" style="width:26px;height:26px;background-image:url(' + v.photo + ');background-size:cover;background-position:center"></span>'
+                : '<span class="avatar" style="width:26px;height:26px;font-size:10px;background:' + ui.colorFor(v.name) + '">' + ui.initials(v.name) + '</span>';
+              return '<div class="flex items-center gap-1">' + av + '<span class="strong">' + ui.escapeHtml(v.name) + '</span></div>'; } },
           { key: 'type', label: 'Type', badge: {} },
           { key: 'phone', label: 'Contact', render: function (v) { return ui.escapeHtml(v.phone || v.contact || '—'); } },
           { key: 'terms', label: 'Terms' },
@@ -405,11 +409,17 @@
       title: isNew ? 'Add Vendor' : 'Edit Vendor', icon: 'truck', size: 'lg', record: v || {},
       fields: [
         { type: 'section', label: 'Identity' },
+        { key: 'photo', label: 'Vendor profile picture', type: 'image', icon: 'buildings', col2: true, round: false, hint: 'Logo or photo — shown on the vendor card & statements.' },
         { key: 'name', label: 'Vendor name', type: 'text', required: true, col2: true, placeholder: 'e.g. Galaxy GSA' },
         { key: 'type', label: 'Type', type: 'select', options: VENDOR_TYPES, default: 'Ticketing' },
         { key: 'contact', label: 'Contact person', type: 'text' },
         { key: 'email', label: 'Email', type: 'email' },
         { key: 'phone', label: 'Phone', type: 'phone' },
+        { type: 'section', label: 'Responsible Contact' },
+        { key: 'respName', label: 'Responsible person', type: 'text', placeholder: 'Who we deal with' },
+        { key: 'respDesignation', label: 'Designation', type: 'text', placeholder: 'e.g. Sales Manager' },
+        { key: 'respPhone', label: 'Direct phone', type: 'phone' },
+        { key: 'respEmail', label: 'Direct email', type: 'email' },
         { type: 'section', label: 'Address' },
         { key: 'country', label: 'Country', type: 'text', default: 'Bangladesh' },
         { key: 'city', label: 'City', type: 'text', default: 'Dhaka' },
@@ -420,7 +430,12 @@
         { key: 'creditLimit', label: 'Credit limit', type: 'money', default: 500000, min: 0 },
         { key: 'paymentTerms', label: 'Payment terms', type: 'select', options: TERMS, default: 'Net 15' },
         { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Inactive'], default: 'Active' },
-        { key: 'bank', label: 'Bank / account', type: 'text', col2: true }
+        { key: 'bank', label: 'Bank / account', type: 'text', col2: true },
+        { type: 'section', label: 'ERP Access (Vendor role)' },
+        { key: 'createLogin', label: 'Give this vendor an ERP login (vendor role)', type: 'checkbox', col2: true,
+          hint: 'Provisions a vendor-role user in the ERP user list. Access control is enforced by the backend (RBAC — coming later).' },
+        { key: 'loginEmail', label: 'Login email', type: 'email', showIf: function (x) { return x.createLogin; } },
+        { key: 'loginPassword', label: 'Password', type: 'password', showIf: function (x) { return x.createLogin; }, placeholder: 'Set an initial password' }
       ],
       onSave: function (val) {
         var rec = v || { id: 'VN-' + ui.uid('').slice(-4) };
@@ -428,17 +443,39 @@
         rec.phone = val.phone; rec.country = val.country; rec.city = val.city; rec.address = val.address;
         rec.currency = val.currency; rec.creditLimit = +val.creditLimit || 0; rec.terms = val.paymentTerms;
         rec.paymentTerms = val.paymentTerms; rec.bank = val.bank; rec.status = val.status || 'Active';
+        rec.photo = val.photo || '';
+        rec.responsible = { name: val.respName || '', designation: val.respDesignation || '', phone: val.respPhone || '', email: val.respEmail || '' };
         if (isNew) rec.balance = +val.openingBalance || 0; else rec.openingBalance = +val.openingBalance || 0;
+        // ERP user provisioning (data only — RBAC enforcement lands with the backend)
+        if (val.createLogin && (val.loginEmail || rec.email)) {
+          rec.login = { email: val.loginEmail || rec.email, role: 'vendor', enabled: true };
+          provisionVendorUser(rec, val.loginPassword);
+        }
         db.save('vendors', rec);
-        ui.toast('Vendor "' + rec.name + '" saved', 'success');
+        ui.toast('Vendor "' + rec.name + '" saved' + (val.createLogin ? ' · ERP login provisioned' : ''), 'success');
         EPAL.router.render();
         return true;
       }
     });
   }
+  // Provision a vendor-role user in the ERP user directory (a separate store so it
+  // never pollutes HR headcount). The Laravel backend maps this to a User + 'vendor'
+  // role/scope; here we just persist the record so it exists in the user list.
+  function provisionVendorUser(rec, password) {
+    var u = {
+      id: 'USR-' + String(rec.id || ui.uid('')).replace(/[^0-9A-Za-z]/g, ''),
+      name: rec.name, email: (rec.login && rec.login.email) || rec.email || '',
+      role: 'vendor', scope: 'travels', partyType: 'vendor', partyId: rec.id,
+      photo: rec.photo || '', phone: rec.phone || '', status: rec.status || 'Active',
+      designation: 'Vendor · ' + (rec.type || ''), createdAt: Date.now()
+    };
+    if (password) u.password = password;   // demo only — hashed server-side in Laravel
+    try { db.save('erp_users', u); } catch (e) {}
+    if (EPAL.bus && EPAL.bus.emit) EPAL.bus.emit('data:changed', { store: 'erp_users', action: 'upsert', record: u });
+  }
   function metaFromVendor(v) {
     return { name: v.name, partyType: 'vendor', creditLimit: +v.creditLimit || 500000,
-      location: v.city || v.country || 'Dhaka' };
+      location: v.city || v.country || 'Dhaka', photo: v.photo, responsible: v.responsible, login: v.login };
   }
 
   /* ======================================================= AGENTS */
