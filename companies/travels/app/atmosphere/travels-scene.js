@@ -156,16 +156,32 @@
            '<path class="plane" d="M-26 0 L-35 10 L-30 10 L-21 0 Z"/>' +
            '<circle class="beacon" cx="0" cy="0" r="1.8"/>';
   }
-  /* ---- a MILITARY jet (top view): sharp nose, swept delta wings, twin tail,
-         a thin vapour trail. Nose toward +x. --------------------------------*/
+  /* ---- a MODERN FIGHTER (top view): needle nose, LERX + cranked-delta wings,
+         twin canted tails, tailplanes, a bubble canopy and an afterburner
+         nozzle glow, streaming display smoke. Nose toward +x. ---------------*/
   function fighterTop() {
-    return '<path class="contrail" d="M-24 0 L-96 0"/>' +
-           '<path class="plane" d="M36 0 L-4 -5 L-24 -4 L-24 4 L-4 5 Z"/>' +            /* fuselage (dart) */
-           '<path class="plane" d="M2 0 L-28 -24 L-16 -24 L6 0 Z"/>' +                  /* delta wing (swept)*/
-           '<path class="plane" d="M2 0 L-28 24 L-16 24 L6 0 Z"/>' +
-           '<path class="plane" d="M-20 0 L-32 -10 L-25 -10 L-15 0 Z"/>' +             /* twin tail       */
-           '<path class="plane" d="M-20 0 L-32 10 L-25 10 L-15 0 Z"/>' +
-           '<circle class="strobe" cx="36" cy="0" r="1.3"/>';                           /* nose light      */
+    return '<path class="jet-trail" d="M-30 0 L-150 0"/>' +                               /* display smoke   */
+           '<path class="plane" d="M42 0 L14 -2.6 L-8 -3.4 L-28 -3 L-30 -2.4 L-30 2.4 L-28 3 L-8 3.4 L14 2.6 Z"/>' + /* fuselage (needle nose) */
+           '<path class="plane" d="M12 -2 L-4 -6 L-24 -20 L-30 -19 L-30 -3 Z"/>' +        /* cranked delta wing (R) */
+           '<path class="plane" d="M12 2 L-4 6 L-24 20 L-30 19 L-30 3 Z"/>' +             /* cranked delta wing (L) */
+           '<path class="plane" d="M-23 -2 L-36 -11 L-40 -10 L-28 -1.5 Z"/>' +            /* tailplane (R)   */
+           '<path class="plane" d="M-23 2 L-36 11 L-40 10 L-28 1.5 Z"/>' +               /* tailplane (L)   */
+           '<path class="plane" d="M-21 -1.6 L-31 -6 L-27 -6.6 L-19 -1.6 Z"/>' +          /* canted tail (R) */
+           '<path class="plane" d="M-21 1.6 L-31 6 L-27 6.6 L-19 1.6 Z"/>' +             /* canted tail (L) */
+           '<ellipse class="jet-canopy" cx="22" cy="0" rx="6.5" ry="2.2"/>' +            /* bubble canopy   */
+           '<circle class="jet-burner" cx="-31" cy="0" r="2.4"/>' +                       /* afterburner     */
+           '<circle class="strobe" cx="42" cy="0" r="1.1"/>';                             /* nose strobe     */
+  }
+  /* ---- a DISPLAY FORMATION: a 4-ship diamond (lead, two wingmen stepped back
+         and out, one in the slot) drawn around the origin so the whole flight
+         can be flown as one body. -------------------------------------------*/
+  function formation() {
+    var jet = fighterTop();
+    function at(x, y, s) { return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')">' + jet + '</g>'; }
+    return at(12, 0, 1) +          /* lead  */
+           at(-10, -15, 0.92) +    /* left wingman  */
+           at(-10, 15, 0.92) +     /* right wingman */
+           at(-30, 0, 0.86);       /* slot / trail  */
   }
   /* ---- a HELICOPTER (top view): pod fuselage, tail boom + tail rotor, and a
          main rotor disc that spins. Nose toward +x. -------------------------*/
@@ -231,6 +247,27 @@
       '</circle>';
   }
 
+  /* the AEROBATIC display team: the formation banks along an S-weave (rotate=
+     auto rolls it into every turn) and pulls TWO synchronized barrel rolls at
+     mid-pass — scaleY sweeping 1 → 0 (knife-edge) → -1 (inverted) → back reads
+     as the whole diamond rolling about its own axis, the way a real team does. */
+  function aeroTeam(pathId, dur, scale) {
+    if (REDUCED) return '<g transform="translate(300 120) scale(' + scale + ')">' + formation() + '</g>';
+    var motion = '<animateMotion dur="' + dur + 's" repeatCount="indefinite" rotate="auto"><mpath href="#' + pathId + '"/></animateMotion>';
+    var fade = '<animate attributeName="opacity" dur="' + dur + 's" repeatCount="indefinite" values="0;1;1;1;0" keyTimes="0;0.05;0.5;0.93;1"/>';
+    var sp = '0.42 0 0.58 1';   // ease each roll segment
+    var roll =
+      '<animateTransform attributeName="transform" type="scale" dur="' + dur + 's" repeatCount="indefinite" calcMode="spline"' +
+      ' keyTimes="0;0.30;0.36;0.42;0.60;0.66;0.72;1"' +
+      ' values="1 1;1 1;1 0;1 -1;1 -1;1 0;1 1;1 1"' +
+      ' keySplines="' + [sp, sp, sp, sp, sp, sp, sp].join(';') + '"/>';
+    return '<g>' + motion + fade +
+             '<g transform="scale(' + scale + ')">' +
+               '<g>' + roll + formation() + '</g>' +
+             '</g>' +
+           '</g>';
+  }
+
   /* ------------------------------------------------------------- the scene */
   function sceneHTML() {
     var LAND = 24;    // landing cycle (seconds) — puff is locked to this
@@ -250,7 +287,9 @@
         '<path id="rt-taxi" d="M648 570 Q810 560 992 570" fill="none"/>' +
         '<path id="rt-svc"  d="M170 656 Q680 642 1200 662" fill="none"/>' +
         '<path id="rt-heli" d="M1520 300 Q 800 342 90 300" fill="none"/>' +
-        '<path id="rt-jet"  d="M60 150 Q 800 108 1540 172" fill="none"/>' +
+        /* DISPLAY RUN: an S-weave across the upper sky so the formation banks
+           through each curve (rotate=auto) before its mid-pass barrel rolls. */
+        '<path id="rt-jet"  d="M30 132 C 300 44 520 214 800 150 C 1080 86 1300 250 1572 150" fill="none"/>' +
         '<path class="route" d="M100 250 Q800 64 1500 236"/>' +
         '<path class="route" d="M60 372 Q720 204 1540 352" stroke-opacity="0.28"/>' +
 
@@ -311,7 +350,7 @@
         mover('rt-dep',  20,  1.18, planeTop(), { hold: true, scaleTo: 0.42 }) + /* airliner take-off (shrinks climbing away) */
         mover('rt-fly',  34, 1.25, planeSide(true),  false) +   /* airliner great-circle   */
         mover('rt-heli', 30, 0.9,  heliTop(),        false) +   /* helicopter crossing     */
-        mover('rt-jet',  9,  0.85, fighterTop(),     false) +   /* military jet, fast pass */
+        aeroTeam('rt-jet', 15, 0.5) +                          /* 4-ship aerobatic team, banking + rolling */
       '</svg>';
 
     return '<div class="ascene" aria-hidden="true">' +
