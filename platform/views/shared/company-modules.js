@@ -170,12 +170,13 @@
         filters: [{ key: 'category', label: 'Category' }, { key: 'method', label: 'Method' }],
         searchKeys: ['id', 'category', 'desc'],
         exportName: cid + '-journal.csv',
-        actions: [
-          { icon: 'pencil', title: 'Edit', onClick: function (e) { newEntry(e); } },
-          { icon: 'trash', title: 'Delete', onClick: function (e) {
+        onRow: function (e) { newEntry(e); },   // row-click opens the entry (edit form)
+        actions: ui.actions({
+          del: function (e) {
             ui.confirm({ title: 'Delete entry ' + e.id + '?', danger: true, confirmLabel: 'Delete' }).then(function (ok) {
-              if (ok) { db().remove('acc_entries', e.id); EPAL.router.render(); } }); } }
-        ],
+              if (ok) { db().remove('acc_entries', e.id); EPAL.router.render(); } });
+          }
+        }),
         empty: { icon: 'journal', title: 'No entries yet' }
       });
       page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ enTable.el ]) ]));
@@ -792,27 +793,27 @@
           '<tr><th>Expense</th><td class="num">' + ui.money(f.expense) + '</td></tr>' +
           '<tr><th>Net Profit</th><td class="num">' + ui.money(f.profit) + '</td></tr>' +
           '<tr><th>Margin</th><td class="num">' + ui.pct(f.margin) + '</td></tr></table>' +
-          '<h2>Monthly Breakdown</h2><table><tr><th>Month</th><th>Revenue</th><th>Expense</th><th>Profit</th></tr>' + rows + '</table>'));
+          '<h2>Monthly Breakdown</h2><table><tr><th>Month</th><th class="num">Revenue</th><th class="num">Expense</th><th class="num">Profit</th></tr>' + rows + '</table>'));
       } else if (id === 'sales') {
         var sales = db().sales(cid);
         var rows2 = sales.map(function (x) {
           return '<tr><td>' + x.id + '</td><td>' + ui.date(x.date) + '</td><td>' + ui.escapeHtml(x.customer || '—') + '</td><td>' + ui.escapeHtml(x.desc || '') + '</td><td class="num">' + ui.money(x.amount) + '</td><td class="num">' + ui.money(x.profit) + '</td></tr>';
         }).join('');
         dl(cid + '-sales-register.html', htmlDoc('Sales Register',
-          '<table><tr><th>Ref</th><th>Date</th><th>Customer</th><th>Description</th><th>Amount</th><th>Profit</th></tr>' + rows2 + '</table>'));
+          '<table><tr><th>Ref</th><th>Date</th><th>Customer</th><th>Description</th><th class="num">Amount</th><th class="num">Profit</th></tr>' + rows2 + '</table>'));
       } else if (id === 'expense') {
         var exp = db().col('acc_entries').filter(function (e) { return e.companyId === cid && e.kind === 'Expense'; });
         var byCat = {}; exp.forEach(function (e) { byCat[e.category] = (byCat[e.category] || 0) + e.amount; });
         var rows3 = Object.keys(byCat).sort(function (a3, b3) { return byCat[b3] - byCat[a3]; })
           .map(function (k) { return '<tr><td>' + ui.escapeHtml(k) + '</td><td class="num">' + ui.money(byCat[k]) + '</td></tr>'; }).join('');
         dl(cid + '-expense-register.html', htmlDoc('Expense Register',
-          '<table><tr><th>Category</th><th>Total</th></tr>' + rows3 + '</table>'));
+          '<table><tr><th>Category</th><th class="num">Total</th></tr>' + rows3 + '</table>'));
       } else if (id === 'attendance') {
         var team = db().employees({ companyId: cid });
         var rows4 = team.map(function (e) { var t = e.attendance || {};
           return '<tr><td>' + ui.escapeHtml(e.name) + '</td><td>' + ui.escapeHtml(e.designation) + '</td><td class="num">' + (t.present || 0) + '</td><td class="num">' + (t.absent || 0) + '</td><td class="num">' + (t.late || 0) + '</td><td class="num">' + (t.leave || 0) + '</td></tr>'; }).join('');
         dl(cid + '-attendance.html', htmlDoc('Team Attendance Sheet',
-          '<table><tr><th>Employee</th><th>Designation</th><th>Present</th><th>Absent</th><th>Late</th><th>Leave</th></tr>' + rows4 + '</table>'));
+          '<table><tr><th>Employee</th><th>Designation</th><th class="num">Present</th><th class="num">Absent</th><th class="num">Late</th><th class="num">Leave</th></tr>' + rows4 + '</table>'));
       } else if (id === 'salary') {
         var team2 = db().employees({ companyId: cid }).filter(function (e) { return e.salary > 0; });
         var lines = [['ID', 'Name', 'Designation', 'Gross', 'Tax5%', 'Net']].concat(team2.map(function (e) {
@@ -1039,9 +1040,12 @@
           ],
           rows: leads, filters: [{ key: 'stage', label: 'Stage' }, { key: 'source', label: 'Source' }],
           searchKeys: ['name', 'source'], exportName: cid + '-leads.csv',
-          onRow: function (l) { editLead(l); },
-          actions: [{ icon: 'trash', title: 'Delete', onClick: function (l) {
-            ui.confirm({ title: 'Delete lead?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { db().remove('leads', l.id); draw(); } }); } }],
+          onRow: function (l) { editLead(l); },   // row-click opens the lead
+          actions: ui.actions({
+            del: function (l) {
+              ui.confirm({ title: 'Delete lead?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { db().remove('leads', l.id); draw(); } });
+            }
+          }),
           empty: { icon: 'funnel', title: 'No leads yet' }
         });
         body.appendChild(el('div.card', null, [ el('div.card-pad', null, [ t.el ]) ]));
