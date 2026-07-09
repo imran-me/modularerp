@@ -488,9 +488,26 @@
         td('<span class="strong">'+x.id+'</span>'), td(x.flag+' '+ui.escapeHtml(x.applicant)),
         td(x.country+' · '+x.visaType), tdN(ui.money(f.embassy)), tdN(ui.money(f.vfs)),
         td('<span class="num text-good">'+ui.money(f.service)+'</span>'), tdN(ui.money(f.customerTotal)),
-        td(payBadge(x.payStatus).outerHTML), td(stBadge(x.stage).outerHTML) ]);
+        td(payBadge(x.payStatus).outerHTML), td(stBadge(x.stage).outerHTML),
+        el('td', null, [ ui.rowActions([
+          { icon:'printer', title:'Print invoice', onClick:(function(ap){return function(){ printVisa(ap); };})(x) },
+          { icon:'send', title:'Send to applicant', onClick:(function(ap){return function(){ shareVisa(ap); };})(x) }
+        ]) ]) ]);
     });
-    page.appendChild(tableCard('Sales Ledger', ['App','Applicant','Service','Embassy','VFS','Service Fee','Customer Total','Payment','Stage'], rows, 'No sales yet.'));
+    page.appendChild(tableCard('Sales Ledger', ['App','Applicant','Service','Embassy','VFS','Service Fee','Customer Total','Payment','Stage',''], rows, 'No sales yet.'));
+  }
+  function printVisa(x) {
+    var f = fees(x);
+    function r(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: 'Visa Invoice · ' + x.id, subtitle: x.applicant + ' · ' + x.country + ' ' + x.visaType, meta: 'Visa application',
+      bodyHtml: '<table>' + r('Applicant', x.applicant) + r('Service', x.country + ' · ' + x.visaType) + r('Embassy fee', ui.money(f.embassy)) +
+        r('VFS', ui.money(f.vfs)) + r('Service fee', ui.money(f.service)) + r('Customer total', ui.money(f.customerTotal)) + r('Payment', x.payStatus) + r('Stage', x.stage) + '</table>' });
+  }
+  function shareVisa(x) {
+    var f = fees(x);
+    var body = 'Visa application ' + x.id + '\nApplicant: ' + x.applicant + '\nService: ' + x.country + ' ' + x.visaType +
+      '\nTotal: ' + ui.money(f.customerTotal) + '\nStage: ' + x.stage + '\n\n— Epal Travels & Consultancy';
+    ui.share({ title: 'Send visa update ' + x.id, subject: 'Your ' + x.country + ' visa — ' + x.id, body: body });
   }
   function exportSales() {
     var rows=[['App','Applicant','Country','Type','Embassy','VFS','ServiceFee','CustomerTotal','Payment','Stage']];

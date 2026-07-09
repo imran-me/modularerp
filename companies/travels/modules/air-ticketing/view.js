@@ -451,13 +451,32 @@
           tdN(ui.money(base)), tdN(ui.money(tax)), tdN(ui.money(x.cost)), tdN(ui.money(x.sale)),
           tdN(ui.money(comm)),
           td('<span class="num '+(np>=0?'text-good':'text-bad')+'">'+ui.money(np)+'</span>'),
-          td(payBadge(x.payStatus).outerHTML), td(statusBadge(x.status).outerHTML) ]);
+          td(payBadge(x.payStatus).outerHTML), td(statusBadge(x.status).outerHTML),
+          el('td', null, [ ui.rowActions([
+            { icon:'eye', title:'View', onClick:(function(tk){return function(){ ticketDetail(tk, draw); };})(x) },
+            { icon:'printer', title:'Print e-ticket', onClick:(function(tk){return function(){ printTicket(tk); };})(x) },
+            { icon:'send', title:'Send to passenger', onClick:(function(tk){return function(){ shareTicket(tk); };})(x) }
+          ]) ]) ]);
       });
       host.innerHTML='';
       host.appendChild(tableCard('Ticket Sales Ledger',
-        ['Ticket','Passenger','Route','Airline · PNR','Base','Tax','Cost','Sale','Comm','Net Profit','Payment','Status'], rows, 'No tickets sold yet.'));
+        ['Ticket','Passenger','Route','Airline · PNR','Base','Tax','Cost','Sale','Comm','Net Profit','Payment','Status',''], rows, 'No tickets sold yet.'));
     }
     draw();
+  }
+
+  /* print / share a ticket (e-ticket to the passenger) --------------------*/
+  function printTicket(x) {
+    function r(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: 'e-Ticket · ' + x.id, subtitle: x.passenger + ' · ' + x.route, meta: 'Air Ticket',
+      bodyHtml: '<table>' + r('Passenger', x.passenger) + r('Route', x.route) + r('Airline / PNR', x.airlineCode + ' · ' + x.pnr) +
+        r('Fare (sale)', ui.money(x.sale)) + r('Payment', x.payStatus) + r('Status', x.status) + '</table>' });
+  }
+  function shareTicket(x) {
+    var body = 'e-Ticket ' + x.id + '\nPassenger: ' + x.passenger + '\nRoute: ' + x.route +
+      '\nFlight: ' + x.airlineCode + ' ' + x.pnr + '\nFare: ' + ui.money(x.sale) + '\nStatus: ' + x.status +
+      '\n\n— Epal Travels & Consultancy';
+    ui.share({ title: 'Send e-ticket ' + x.id, subject: 'Your e-ticket ' + x.id + ' — ' + x.route, body: body });
   }
 
   /* per-airline & per-agent profit report + bar chart (built once) */

@@ -464,6 +464,20 @@
   }
 
   /* ========================================================= MANAGE SALES */
+  function printSeatSale(r) {
+    var f = flight(r.ref);
+    function row(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: 'Seat Sale · ' + r.ref, subtitle: (f ? f.route + ' · ' : '') + (r.customer || ''), meta: 'Contract-seat sale',
+      bodyHtml: '<table>' + row('Date', r.date) + row('Flight', r.ref) + (f ? row('Route', f.route) : '') + row('Description', r.desc) +
+        row('Customer', r.customer) + row('Sale', ui.money(r.amount)) + row('Profit', ui.money(r.profit)) + '</table>' });
+  }
+  function shareSeatSale(r) {
+    var f = flight(r.ref);
+    var body = 'Contract seat sale ' + r.ref + (f ? '\nRoute: ' + f.route : '') + '\nCustomer: ' + (r.customer || '—') +
+      '\nAmount: ' + ui.money(r.amount) + '\n\n— Epal Travels & Consultancy';
+    ui.share({ title: 'Share seat sale', subject: 'Seat sale ' + r.ref, body: body });
+  }
+
   function manageSales(page) {
     var fl = flights();
     var sales = db.sales('travels').filter(function (s) { return /^CF/i.test(String(s.ref || '')); })
@@ -495,6 +509,10 @@
             var p = +r.profit || 0; return '<span class="num ' + (p >= 0 ? 'text-good' : 'text-bad') + '">' + ui.money(p) + '</span>'; } }
       ],
       rows: sales, searchKeys:['ref','desc','customer'], exportName:'contract-seat-sales.csv',
+      actions: [
+        { icon:'printer', title:'Print', onClick:function (r) { printSeatSale(r); } },
+        { icon:'send', title:'Share', onClick:function (r) { shareSeatSale(r); } }
+      ],
       empty: { icon:'cart', title:'No seat sales yet', hint:'Open a flight on the Schedule and use “Sell Seats” — each sale lands here and in Travels finance.' }
     });
     page.appendChild(el('div.card', null, [

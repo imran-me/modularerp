@@ -845,9 +845,24 @@
   function canDelete() { return !EPAL.perm || EPAL.perm.can('travels', 'vendor-agent', 'delete'); }
 
   function actionsFor(onEdit, onDelete) {
-    var arr = [{ icon: 'pencil', title: 'Edit', onClick: onEdit }];
+    var arr = [
+      { icon: 'pencil', title: 'Edit', onClick: onEdit },
+      { icon: 'printer', title: 'Print statement', onClick: function (r) { printParty(r); } },
+      { icon: 'send', title: 'Send message', onClick: function (r) { shareParty(r); } }
+    ];
     if (canDelete()) arr.push({ icon: 'trash', title: 'Delete', onClick: onDelete });
     return arr;
+  }
+  function printParty(r) {
+    var bal = ledgerBalance(r.name, r.balance);
+    function row(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: 'Statement — ' + r.name, subtitle: (r.type || r.agency || 'Party') + ' · Epal Travels & Consultancy', meta: 'Party statement',
+      bodyHtml: '<table>' + row('Name', r.name) + row('Contact', r.contact || r.phone) + row('Phone', r.phone) + row('Email', r.email) + row('Balance', ui.money(bal)) + '</table>' });
+  }
+  function shareParty(r) {
+    var bal = ledgerBalance(r.name, r.balance);
+    ui.share({ title: 'Message ' + r.name, toName: r.name, to: r.email, phone: r.phone, subject: 'Epal Travels & Consultancy',
+      body: 'Dear ' + r.name + ',\n\nYour current account balance with Epal Travels & Consultancy is ' + ui.money(bal) + '.\nPlease contact us for any queries.\n\nWarm regards,\nEpal Travels & Consultancy' });
   }
   function removeRec(store, rec, done) {
     ui.confirm({ title: 'Delete "' + rec.name + '"?', danger: true, confirmLabel: 'Delete' }).then(function (ok) {
