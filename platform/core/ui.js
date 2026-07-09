@@ -271,7 +271,8 @@
     // caller receives (datatable binds it; manual callers close over it, arg unused).
     function pay(v, r) { return (typeof v === 'function' ? v(r) : v) || {}; }
     var out = [];
-    if (o.view)  out.push({ icon: 'eye',     title: o.viewTitle  || 'View',   onClick: o.view });
+    // NOTE: no 'view'/eye icon — clicking the ROW opens the detail everywhere, so
+    // an eye button would be redundant. Modules wire row-click (onRow / tr onclick).
     if (o.edit)  out.push({ icon: 'pencil',  title: o.editTitle  || 'Edit',   onClick: o.edit });
     if (o.del)   out.push({ icon: 'trash',   title: o.delTitle   || 'Delete', danger: true, onClick: o.del });
     // divider sits before the first of the output group that is present

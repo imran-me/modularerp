@@ -247,15 +247,14 @@
       kpi('Avg / Customer', ui.money(list.length ? Math.round(totVal / list.length) : 0, { compact: true }), 'graph-up')
     ]));
     var rows = list.slice().sort(function (a, b) { return (b.value || 0) - (a.value || 0); }).map(function (c) {
-      return el('tr', null, [
+      return el('tr.row-click', { onclick: function () { custView(c); } }, [
         el('td', null, [ el('div.strong', { text: c.name }), c.contact ? el('div.text-mute.xs', { text: c.contact }) : null ]),
         el('td', { text: c.phone || '—' }),
         el('td', { text: c.email || '—' }),
         el('td.num', { text: ui.money(c.value || 0) }),
         el('td', { text: c.since || '—' }),
-        // canonical set: view · edit · delete │ print · WhatsApp · Gmail — one line
+        // canonical set (row-click opens the view): edit · delete │ print · WhatsApp · Gmail
         el('td', null, [ ui.rowActions(ui.actions({
-          view:  function () { custView(c); },
           edit:  function () { custEdit(c); },
           del:   function () { custDelete(c); },
           print: function () { custPrint(c); },
@@ -847,12 +846,10 @@
   function canCreate() { return !EPAL.perm || EPAL.perm.can('travels', 'vendor-agent', 'create'); }
   function canDelete() { return !EPAL.perm || EPAL.perm.can('travels', 'vendor-agent', 'delete'); }
 
-  // The canonical six-action set for every party row: view · edit · delete │
-  // print · WhatsApp · Gmail. `toMeta` (optional) resolves the row to a ledger
-  // meta so the eye opens the full statement modal.
+  // The canonical action set for every party row (row-click opens the statement):
+  // edit · delete │ print · WhatsApp · Gmail. `toMeta` kept for signature parity.
   function actionsFor(onEdit, onDelete, toMeta) {
     return ui.actions({
-      view:  toMeta ? function (r) { openLedgerModal(toMeta(r), r); } : null,
       edit:  onEdit,
       del:   canDelete() ? onDelete : null,
       print: function (r) { printParty(r); },

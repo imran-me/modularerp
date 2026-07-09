@@ -453,7 +453,6 @@
           td('<span class="num '+(np>=0?'text-good':'text-bad')+'">'+ui.money(np)+'</span>'),
           td(payBadge(x.payStatus).outerHTML), td(statusBadge(x.status).outerHTML),
           el('td', null, [ ui.rowActions(ui.actions({
-            view:  (function(tk){return function(){ ticketDetail(tk, draw); };})(x),
             print: (function(tk){return function(){ printTicket(tk); };})(x),
             wa:    { phone:'', text: ticketMsg(x) },
             gmail: { to:'', subject:'Your e-ticket '+x.id+' — '+x.route, body: ticketMsg(x) }

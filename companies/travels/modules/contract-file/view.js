@@ -95,7 +95,7 @@
     ]));
     var rows = list.slice().sort(function (a, b) { return a.validTo < b.validTo ? -1 : 1; }).map(function (c) {
       var margin = c.sellPrice && c.buyPrice ? Math.round((1 - c.buyPrice / c.sellPrice) * 100) : null;
-      return el('tr', null, [
+      return el('tr.row-click', { onclick: function () { cfView(c); } }, [
         el('td', null, [ el('div.strong', { text: c.ref }), el('div.text-mute.xs', { text: c.kind }) ]),
         el('td', { text: c.counterparty }),
         el('td', { text: c.route }),
@@ -106,7 +106,6 @@
         el('td', { text: c.validFrom + ' → ' + c.validTo }),
         el('td', null, [ badge(statusOf(c)) ]),
         el('td', null, [ ui.rowActions(ui.actions({
-          view:  function () { cfView(c); },
           del:   function () { cfDelete(c); },
           print: function () { cfPrint(c); },
           wa:    { phone:'', text: cfMsg(c) },

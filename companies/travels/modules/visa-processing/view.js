@@ -484,7 +484,7 @@
     ]));
     var rows = a.map(function (x) {
       var f=fees(x);
-      return el('tr', null, [
+      return el('tr.row-click', { onclick: function () { appDetail(x); } }, [
         td('<span class="strong">'+x.id+'</span>'), td(x.flag+' '+ui.escapeHtml(x.applicant)),
         td(x.country+' · '+x.visaType), tdN(ui.money(f.embassy)), tdN(ui.money(f.vfs)),
         td('<span class="num text-good">'+ui.money(f.service)+'</span>'), tdN(ui.money(f.customerTotal)),
