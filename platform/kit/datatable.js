@@ -62,9 +62,12 @@
     toolbar.appendChild(el('div.spacer'));
     toolbar.appendChild(countEl);
     if (opts.exportName !== false) {
-      toolbar.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('download') + ' Export',
+      toolbar.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-csv') + ' Export',
         title: 'Export the current filtered rows as CSV',
         onclick: function () { exportCSV(); } }));
+      toolbar.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-pdf') + ' PDF',
+        title: 'Export the current filtered rows as a printable PDF',
+        onclick: function () { exportPDF(); } }));
     }
     root.appendChild(toolbar);
 
@@ -222,6 +225,27 @@
       var a = el('a', { href: URL.createObjectURL(blob), download: opts.exportName || 'export.csv' });
       document.body.appendChild(a); a.click(); a.remove();
       ui.toast('Exported ' + rows.length + ' rows', 'success');
+    }
+
+    // Plain display value for a cell (no HTML) — used by CSV + PDF export.
+    function cellExport(r, c) {
+      if (c.exportVal) return c.exportVal(r);
+      var v = r[c.key];
+      if (c.money) return v == null ? '' : ui.money(v);
+      if (c.date)  return v ? ui.date(v) : '';
+      return v == null ? '' : String(v);
+    }
+    // Export the current filtered/sorted rows as a branded, printable PDF (the
+    // browser's Save-as-PDF) — zero dependencies, works offline on GitHub Pages.
+    function exportPDF() {
+      var rows = filtered();
+      var title = opts.pdfTitle || (opts.exportName && String(opts.exportName).replace(/\.csv$/i, '').replace(/[-_]+/g, ' ').replace(/\b\w/g, function (m) { return m.toUpperCase(); })) || 'Report';
+      var head = '<tr>' + cols.map(function (c) { return '<th' + (c.num ? ' class="num"' : '') + '>' + ui.escapeHtml(c.label || c.key) + '</th>'; }).join('') + '</tr>';
+      var body = rows.map(function (r) {
+        return '<tr>' + cols.map(function (c) { return '<td' + (c.num ? ' class="num"' : '') + '>' + ui.escapeHtml(String(cellExport(r, c))) + '</td>'; }).join('') + '</tr>';
+      }).join('');
+      ui.printDoc({ title: title, subtitle: rows.length + ' record' + (rows.length === 1 ? '' : 's'), meta: 'Exported ' + ui.date(new Date(), 'full'),
+        bodyHtml: '<table>' + head + body + '</table>' });
     }
 
     draw();

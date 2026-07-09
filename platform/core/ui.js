@@ -330,6 +330,7 @@
       '.doc-sub{color:#54607d;font-size:13px;margin-bottom:20px;}' +
       'ul{padding:0;list-style:none;margin:0;} li{padding:10px 2px;border-bottom:1px solid #e6ebf5;font-size:14px;} li:before{content:"\\2610";color:#1A43BF;margin-right:10px;font-size:15px;}' +
       'table{width:100%;border-collapse:collapse;} td,th{padding:9px 10px;border-bottom:1px solid #e6ebf5;text-align:left;font-size:13px;} th{color:#8a93a9;text-transform:uppercase;font-size:10.5px;letter-spacing:.05em;}' +
+      '.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}' +
       '.foot{margin-top:30px;color:#8a93a9;font-size:11px;border-top:1px solid #e6ebf5;padding-top:12px;}';
     w.document.write('<html><head><title>' + escapeHtml(opts.title || 'Print') + '</title><style>' + css + '</style></head><body>' +
       '<div class="h"><div class="brand">' + escapeHtml(brand) + '</div><div class="meta">' + escapeHtml(opts.meta || '') + '</div></div>' +
