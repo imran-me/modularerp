@@ -255,14 +255,15 @@
               ? '<span class="avatar" style="width:26px;height:26px;background-image:url(' + c.photo + ');background-size:cover;background-position:center"></span>'
               : '<span class="avatar" style="width:26px;height:26px;font-size:10px;background:' + ui.colorFor(c.name) + '">' + ui.initials(c.name) + '</span>';
             return '<div class="flex items-center gap-1">' + av + '<div><div class="strong">' + ui.escapeHtml(c.name) + '</div>' + (c.contact ? '<div class="text-mute xs">' + ui.escapeHtml(c.contact) + '</div>' : '') + '</div></div>'; } },
+        { key: 'service', label: 'Interest', badge: {} },
         { key: 'phone', label: 'Phone' },
         { key: 'email', label: 'Email' },
         { key: 'value', label: 'Lifetime Value', num: true, money: true },
         { key: 'since', label: 'Since' }
       ],
-      rows: list.slice().sort(function (a, b) { return (b.value || 0) - (a.value || 0); }),
-      searchKeys: ['name', 'contact', 'phone', 'email'],
-      filterPanel: true, filters: [], exportName: 'travel-customers.csv', pdfTitle: 'Travel Customers',
+      rows: (function () { var SV = ['Ticketing', 'Visa', 'Hotel', 'Package']; return list.slice().sort(function (a, b) { return (b.value || 0) - (a.value || 0); }).map(function (c, i) { if (!c.service) c.service = SV[i % SV.length]; return c; }); })(),
+      searchKeys: ['name', 'contact', 'phone', 'email', 'service'],
+      quickFilter: 'service', filterPanel: true, filters: [], exportName: 'travel-customers.csv', pdfTitle: 'Travel Customers',
       onRow: function (c) { custView(c); },
       actions: ui.actions({
         edit:  function (c) { custEdit(c); },
@@ -496,20 +497,23 @@
         columns: [
           { key: 'name', label: 'Agent', render: function (a) { return '<span class="strong">' + ui.escapeHtml(a.name) + '</span>'; } },
           { key: 'agency', label: 'Agency' },
-          { key: 'location', label: 'Location' },
+          { key: 'service', label: 'Service', badge: {} },
           { key: 'commission', label: 'Comm %', num: true, render: function (a) { return (a.commission || 0) + '%'; }, sortVal: function (a) { return a.commission || 0; } },
           { key: 'totalSales', label: 'Sales', num: true, money: true },
           { key: 'balance', label: 'Receivable', num: true, render: function (a) {
               var b = ledgerBalance(a.name, a.balance);
               return '<span class="num ' + (b > 0 ? 'text-good' : 'text-mute') + '">' + ui.money(b) + '</span>'; },
             sortVal: function (a) { return ledgerBalance(a.name, a.balance); } },
+          { key: 'lastActivity', label: 'Last Activity', sortVal: function (a) { return lastActivityTs(a.name); },
+            render: function (a) { var d = lastActivityOf(a.name); return '<span class="text-mute">' + (d ? ui.ago(d) : '—') + '</span>'; } },
           { key: 'status', label: 'Status', badge: { Active: 'good', Inactive: '' } }
         ],
-        rows: agents(),
-        searchKeys: ['name', 'agency', 'location'],
-        quickFilter: 'status',                                 // Active/Inactive chips
-        filterPanel: true,                                     // Location + sort in the Filter card
-        filters: [{ key: 'location', label: 'Location' }],
+        // location dropped from the grid (it shows in the detail); kept searchable + in the Filter card
+        rows: function () { var SV = ['Ticketing', 'Visa', 'Hotel', 'Package']; return agents().map(function (a, i) { if (!a.status) a.status = 'Active'; if (!a.service) a.service = SV[i % SV.length]; return a; }); },
+        searchKeys: ['name', 'agency', 'location', 'service'],
+        quickFilter: 'service',                                // Ticketing / Visa / Hotel / Package chips
+        filterPanel: true,                                     // Status + Location + sort in the Filter card
+        filters: [{ key: 'status', label: 'Status' }, { key: 'location', label: 'Location' }],
         pageSize: 10, exportName: 'agents.csv', pdfTitle: 'Sub-Agent Register',
         onRow: function (a) { openLedgerModal(metaFromAgent(a), a); },
         actions: actionsFor(function (a) { editAgent(a); }, function (a) { removeRec('tv_agents', a, draw); }, metaFromAgent),
@@ -524,9 +528,12 @@
       title: isNew ? 'Add Sub-Agent' : 'Edit Sub-Agent', icon: 'person-badge', size: 'lg', record: a || {},
       fields: [
         { type: 'section', label: 'Agent' },
+        { key: 'photo', label: 'Profile picture', type: 'image', icon: 'person-badge', col2: true, round: true },
         { key: 'name', label: 'Agent name', type: 'text', required: true, col2: true },
         { key: 'agency', label: 'Agency', type: 'text', required: true },
+        { key: 'service', label: 'Service line', type: 'select', options: ['Ticketing', 'Visa', 'Hotel', 'Package'], default: 'Ticketing' },
         { key: 'phone', label: 'Phone', type: 'phone' },
+        { key: 'email', label: 'Email', type: 'email' },
         { key: 'location', label: 'Location', type: 'text', default: 'Dhaka' },
         { type: 'section', label: 'Commercial' },
         { key: 'commission', label: 'Commission %', type: 'number', default: 4, min: 0, max: 20 },
@@ -536,7 +543,8 @@
       ],
       onSave: function (val) {
         var rec = a || { id: 'AGT-' + ui.uid('').slice(-4) };
-        rec.name = val.name.trim(); rec.agency = val.agency; rec.phone = val.phone; rec.location = val.location;
+        rec.name = val.name.trim(); rec.agency = val.agency; rec.phone = val.phone; rec.email = val.email;
+        rec.location = val.location; rec.service = val.service || 'Ticketing'; rec.photo = val.photo || '';
         rec.commission = +val.commission || 0; rec.totalSales = +val.totalSales || 0;
         rec.balance = +val.balance || 0; rec.status = val.status;
         db.save('tv_agents', rec);
