@@ -156,6 +156,27 @@
            '<path class="plane" d="M-26 0 L-35 10 L-30 10 L-21 0 Z"/>' +
            '<circle class="beacon" cx="0" cy="0" r="1.8"/>';
   }
+  /* ---- a MILITARY jet (top view): sharp nose, swept delta wings, twin tail,
+         a thin vapour trail. Nose toward +x. --------------------------------*/
+  function fighterTop() {
+    return '<path class="contrail" d="M-24 0 L-96 0"/>' +
+           '<path class="plane" d="M36 0 L-4 -5 L-24 -4 L-24 4 L-4 5 Z"/>' +            /* fuselage (dart) */
+           '<path class="plane" d="M2 0 L-28 -24 L-16 -24 L6 0 Z"/>' +                  /* delta wing (swept)*/
+           '<path class="plane" d="M2 0 L-28 24 L-16 24 L6 0 Z"/>' +
+           '<path class="plane" d="M-20 0 L-32 -10 L-25 -10 L-15 0 Z"/>' +             /* twin tail       */
+           '<path class="plane" d="M-20 0 L-32 10 L-25 10 L-15 0 Z"/>' +
+           '<circle class="strobe" cx="36" cy="0" r="1.3"/>';                           /* nose light      */
+  }
+  /* ---- a HELICOPTER (top view): pod fuselage, tail boom + tail rotor, and a
+         main rotor disc that spins. Nose toward +x. -------------------------*/
+  function heliTop() {
+    return '<ellipse class="plane" cx="2" cy="0" rx="17" ry="6.5"/>' +                  /* fuselage pod    */
+           '<path class="plane" d="M-15 0 L-42 0" stroke="currentColor" stroke-width="2.4" fill="none"/>' + /* tail boom */
+           '<path class="plane" d="M-42 -6 L-42 6" stroke="currentColor" stroke-width="2" fill="none"/>' +  /* tail fin  */
+           '<g class="heli-rotor"><line x1="-34" y1="0" x2="34" y2="0"/><line x1="0" y1="-34" x2="0" y2="34"/></g>' +
+           '<circle class="plane" cx="0" cy="0" r="2.6"/>' +                            /* rotor hub       */
+           '<circle class="beacon" cx="16" cy="0" r="1.5"/>';                           /* nose beacon     */
+  }
   /* ---- ground-service silhouettes ---------------------------------------- */
   function bagTrain() {
     return '<g class="veh">' +
@@ -192,7 +213,7 @@
      (same duration → stays in sync; blooms only as the wheels kiss the numbers) */
   function touchdown(dur) {
     if (REDUCED) return '';
-    return '<circle class="touchdown" cx="800" cy="553" r="2">' +
+    return '<circle class="touchdown" cx="788" cy="553" r="2">' +
       '<animate attributeName="r" dur="' + dur + 's" repeatCount="indefinite" values="1;1;10;16" keyTimes="0;0.9;0.94;0.99"/>' +
       '<animate attributeName="opacity" dur="' + dur + 's" repeatCount="indefinite" values="0;0;0.55;0" keyTimes="0;0.9;0.93;0.99"/>' +
       '</circle>';
@@ -200,16 +221,21 @@
 
   /* ------------------------------------------------------------- the scene */
   function sceneHTML() {
-    var LAND = 19;    // landing cycle (seconds) — puff is locked to this
+    var LAND = 24;    // landing cycle (seconds) — puff is locked to this
     var svg =
       '<svg class="ascene-art" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" aria-hidden="true">' +
         /* motion paths (invisible) + the two faint great-circle routes */
         '<defs></defs>' +
         '<path id="rt-fly"  d="M100 250 Q800 64 1500 236" fill="none"/>' +
         '<path id="rt-dep"  d="M812 552 Q1000 480 1180 390 Q1360 300 1520 196" fill="none"/>' +
-        '<path id="rt-land" d="M118 214 Q470 392 792 552 L808 648" fill="none"/>' +
+        /* a REALISTIC approach: a long shallow glideslope, a gentle flare
+           (control point above the touchdown line lifts the nose), then a level
+           roll-out — instead of the old near-vertical drop that nosedived. */
+        '<path id="rt-land" d="M-70 326 Q 430 512 786 552 Q 858 548 1040 560" fill="none"/>' +
         '<path id="rt-taxi" d="M648 570 Q810 560 992 570" fill="none"/>' +
         '<path id="rt-svc"  d="M170 656 Q680 642 1200 662" fill="none"/>' +
+        '<path id="rt-heli" d="M1520 300 Q 800 342 90 300" fill="none"/>' +
+        '<path id="rt-jet"  d="M60 150 Q 800 108 1540 172" fill="none"/>' +
         '<path class="route" d="M100 250 Q800 64 1500 236"/>' +
         '<path class="route" d="M60 372 Q720 204 1540 352" stroke-opacity="0.28"/>' +
 
@@ -263,12 +289,14 @@
 
         touchdown(LAND) +
 
-        /* the moving traffic */
-        mover('rt-svc',  64, 1.0,  bagTrain(),       false) +   /* baggage train, apron  */
-        mover('rt-taxi', 46, 0.8,  planeTop(),       false) +   /* taxiing, slow         */
-        mover('rt-land', LAND, 1.0, planeSide(false), false) +  /* landing on final      */
-        mover('rt-dep',  17, 1.15, planeSide(true),  true) +    /* departure (hold → go) */
-        mover('rt-fly',  34, 1.25, planeSide(true),  false) +   /* great-circle cruise   */
+        /* the moving traffic — a mix of aircraft types */
+        mover('rt-svc',  64, 1.0,  bagTrain(),       false) +   /* baggage train, apron   */
+        mover('rt-taxi', 46, 0.8,  planeTop(),       false) +   /* airliner taxiing       */
+        mover('rt-land', LAND, 1.0, planeSide(false), false) +  /* airliner on final       */
+        mover('rt-dep',  17, 1.15, planeSide(true),  true) +    /* airliner departing      */
+        mover('rt-fly',  34, 1.25, planeSide(true),  false) +   /* airliner great-circle   */
+        mover('rt-heli', 30, 0.9,  heliTop(),        false) +   /* helicopter crossing     */
+        mover('rt-jet',  9,  0.85, fighterTop(),     false) +   /* military jet, fast pass */
       '</svg>';
 
     return '<div class="ascene" aria-hidden="true">' +
