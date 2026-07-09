@@ -149,12 +149,17 @@
            '<circle class="landing-light" cx="41" cy="1.4" r="1.7"/>';                   /* landing light*/
   }
   function planeTop() {
-    return '<ellipse class="plane" cx="0" cy="0" rx="30" ry="4.8"/>' +
-           '<path class="plane" d="M4 0 L-14 -26 L-5 -26 L15 0 Z"/>' +                   /* wings (swept)*/
-           '<path class="plane" d="M4 0 L-14 26 L-5 26 L15 0 Z"/>' +
-           '<path class="plane" d="M-26 0 L-35 -10 L-30 -10 L-21 0 Z"/>' +              /* tailplane    */
-           '<path class="plane" d="M-26 0 L-35 10 L-30 10 L-21 0 Z"/>' +
-           '<circle class="beacon" cx="0" cy="0" r="1.8"/>';
+    return '<path class="plane" d="M32 0 C30 -3.4 22 -5 6 -5 L-24 -4.4 C-30 -4 -32 -2 -32 0 C-32 2 -30 4 -24 4.4 L6 5 C22 5 30 3.4 32 0 Z"/>' + /* shaped fuselage, pointed nose */
+           '<path class="plane" d="M6 -2 L-16 -27 L-6 -27 L14 -2 Z"/>' +                 /* swept wing (R) */
+           '<path class="plane" d="M6 2 L-16 27 L-6 27 L14 2 Z"/>' +                     /* swept wing (L) */
+           '<ellipse class="plane" cx="-4" cy="-13" rx="4.6" ry="2"/>' +                 /* engine nacelle (R) */
+           '<ellipse class="plane" cx="-4" cy="13" rx="4.6" ry="2"/>' +                  /* engine nacelle (L) */
+           '<path class="plane" d="M-26 -1.6 L-35 -10 L-30 -10 L-21 -1 Z"/>' +           /* tailplane (R) */
+           '<path class="plane" d="M-26 1.6 L-35 10 L-30 10 L-21 1 Z"/>' +              /* tailplane (L) */
+           '<line class="plane-spine" x1="24" y1="0" x2="-22" y2="0"/>' +                 /* cabin spine / windows */
+           '<circle class="navlight-r" cx="-15" cy="-26.5" r="1.3"/>' +                   /* port wingtip (red)  */
+           '<circle class="navlight-g" cx="-15" cy="26.5" r="1.3"/>' +                    /* stbd wingtip (green)*/
+           '<circle class="beacon" cx="0" cy="0" r="1.6"/>';
   }
   /* ---- a MODERN FIGHTER (top view): needle nose, LERX + cranked-delta wings,
          twin canted tails, tailplanes, a bubble canopy and an afterburner
@@ -360,6 +365,13 @@
         '<line class="paint" x1="692" y1="876" x2="692" y2="862" stroke-width="3"/>' +
         '<line class="paint" x1="908" y1="876" x2="908" y2="862" stroke-width="3"/>' +
         '<line class="paint" x1="960" y1="876" x2="960" y2="862" stroke-width="3"/>' +
+        /* touchdown-zone bars (near threshold) + aiming-point block (mid-field) */
+        '<line class="paint tzone" x1="726" y1="832" x2="742" y2="832" stroke-width="4"/>' +
+        '<line class="paint tzone" x1="858" y1="832" x2="874" y2="832" stroke-width="4"/>' +
+        '<line class="paint tzone" x1="740" y1="792" x2="754" y2="792" stroke-width="3.4"/>' +
+        '<line class="paint tzone" x1="846" y1="792" x2="860" y2="792" stroke-width="3.4"/>' +
+        '<line class="paint" x1="772" y1="742" x2="772" y2="716" stroke-width="6"/>' +   /* aiming point */
+        '<line class="paint" x1="828" y1="742" x2="828" y2="716" stroke-width="6"/>' +
         edges() +
         centreline() +
         rabbit() +

@@ -178,6 +178,15 @@
 /* twin contrails trailing the high, fast movers */
 .contrail{ stroke: var(--glow); stroke-width:2.2; stroke-linecap:round; opacity:.12; filter: blur(1.2px); }
 
+/* airliner detail: cabin spine (window line) + red/green wingtip nav lights */
+.plane-spine{ stroke: color-mix(in srgb, var(--glow) 42%, transparent); stroke-width:1.3; stroke-linecap:round; opacity:.55; }
+.navlight-r{ fill: var(--beacon); }
+.navlight-g{ fill: var(--beacon-green); }
+.ascene.on .navlight-r{ animation: strobe 1.6s linear infinite; }
+.ascene.on .navlight-g{ animation: strobe 1.6s linear infinite; animation-delay:-.8s; }
+/* runway touchdown-zone bars — a touch dimmer than the main paint */
+.paint.tzone{ opacity:.7; }
+
 /* fighter display team: streaming smoke, glass canopy, flickering afterburner */
 .jet-trail{ stroke: color-mix(in srgb, var(--glow) 66%, transparent); stroke-width:2; stroke-linecap:round; opacity:.16; filter: blur(1.4px); }
 .jet-canopy{ fill: color-mix(in srgb, var(--glow) 42%, transparent); opacity:.7; }
