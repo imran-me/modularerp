@@ -1,0 +1,5 @@
+# Epal Group — bridge.map
+#
+# The Group cockpit RECEIVES only: it consolidates every other company's rolled-up
+# events into the group dashboard + Consolidated Finance. It emits nothing upward.
+# (Wired in Phase 3; today group totals are computed on read from the shared store.)

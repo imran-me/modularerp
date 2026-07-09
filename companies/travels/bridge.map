@@ -1,0 +1,12 @@
+# Epal Travels & Consultancy — bridge.map
+#
+# What this company rolls UP to the Group through the kernel event bridge.
+# Format:  <domain.event>  ->  <group.bucket>   (target account code)
+# DECLARATIVE ONLY until Phase 3 wires the bridge; account codes are the TARGET
+# mapping and must be reconciled with the ledger chart-of-accounts before the
+# old on-read consolidation path is removed (numbers must match exactly).
+#
+ticket.sold          -> group.revenue    (4001)
+visa.approved        -> group.revenue    (4002)
+payment.received     -> group.cash       (1001)
+expense.recorded     -> group.expense    (5001)

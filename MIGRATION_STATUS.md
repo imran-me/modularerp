@@ -58,7 +58,8 @@
 | 2026-07-08 | Phase 2 M6a: shared JS -> platform/{core,auth-rbac,data,engines-library,kit,views} | 190/0/0; finance real | 78ed00b |
 | 2026-07-08 | Phase 2 M6b: css -> platform/design-system/css | style-parity vs BASELINE: NONE differ | 757fe02 |
 | 2026-07-08 | Phase 2 M7: travels mini-app -> companies/travels/app/frontend (owner request) | mini-app renders from new path; SPA 190/0/0 | e2d0445 |
-| 2026-07-09 | Module anatomy completed: 25 per-module module.json (generated from live config) + 26 backend/LARAVEL-BLUEPRINT.md (one agent per module, read from actual view.js code) + companies/README.md anatomy map | 26/26 OK; boot sweep 190/0/0 | (this commit) |
+| 2026-07-09 | Module anatomy: 25 module.json + 26 backend blueprints + companies/README | 26/26; 190/0/0 | cc5ff9a |
+| 2026-07-09 | Uniform company shell: every company now has app/{frontend,theme,atmosphere,backend} + bridge.map + COMPANY-BACKEND-BLUEPRINT (owner: make all like Travels) | 190/0/0; all 6 identical | (this commit) |
 
 ## Decisions (ruled by owner, 2026-07-08)
 

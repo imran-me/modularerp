@@ -1,0 +1,12 @@
+# Woodart Interiors — bridge.map
+#
+# What this company rolls UP to the Group through the kernel event bridge.
+# Format:  <domain.event>  ->  <group.bucket>   (target account code)
+# DECLARATIVE ONLY until Phase 3 wires the bridge; account codes are the TARGET
+# mapping and must be reconciled with the ledger chart-of-accounts before the
+# old on-read consolidation path is removed (numbers must match exactly).
+#
+project.invoiced     -> group.revenue    (4001)
+milestone.billed     -> group.revenue    (4002)
+material.purchased   -> group.expense    (5002)
+expense.recorded     -> group.expense    (5001)
