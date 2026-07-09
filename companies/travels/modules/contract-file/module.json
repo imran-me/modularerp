@@ -1,0 +1,17 @@
+{
+  "key": "contract-file",
+  "company": "travels",
+  "title": "Contract File",
+  "icon": "file-earmark-medical",
+  "desc": "Airline & vendor contracts — block-seat agreements, validity & documents.",
+  "route": "#/travels/contract-file",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "contracts", "label": "All Contracts", "route": "#/travels/contract-file/contracts", "enabled": true },
+    { "id": "add", "label": "New Contract", "route": "#/travels/contract-file/add", "enabled": true },
+    { "id": "documents", "label": "Documents", "route": "#/travels/contract-file/documents", "enabled": true }
+  ],
+  "files": { "view": "view.js", "backend": "backend/LARAVEL-BLUEPRINT.md" },
+  "note": "Added 2026-07-09. Live registry: platform/core/config.js TRAVELS_MODULES."
+}
