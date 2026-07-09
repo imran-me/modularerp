@@ -248,32 +248,35 @@
       kpi('Lifetime Value', ui.money(totVal, { compact: true }), 'cash-coin'),
       kpi('Avg / Customer', ui.money(list.length ? Math.round(totVal / list.length) : 0, { compact: true }), 'graph-up')
     ]));
-    var rows = list.slice().sort(function (a, b) { return (b.value || 0) - (a.value || 0); }).map(function (c) {
-      return el('tr.row-click', { onclick: function () { custView(c); } }, [
-        el('td', null, [ el('div.strong', { text: c.name }), c.contact ? el('div.text-mute.xs', { text: c.contact }) : null ]),
-        el('td', { text: c.phone || '—' }),
-        el('td', { text: c.email || '—' }),
-        el('td.num', { text: ui.money(c.value || 0) }),
-        el('td', { text: c.since || '—' }),
-        // canonical set (row-click opens the view): edit · delete │ print · WhatsApp · Gmail
-        el('td', null, [ ui.rowActions(ui.actions({
-          edit:  function () { custEdit(c); },
-          del:   function () { custDelete(c); },
-          print: function () { custPrint(c); },
-          wa:    { phone: c.phone, text: custMsg(c) },
-          gmail: { to: c.email, subject: 'Epal Travels & Consultancy', body: custMsg(c) }
-        })) ])
-      ]);
+    var t = EPAL.table({
+      columns: [
+        { key: 'name', label: 'Customer', render: function (c) {
+            var av = c.photo
+              ? '<span class="avatar" style="width:26px;height:26px;background-image:url(' + c.photo + ');background-size:cover;background-position:center"></span>'
+              : '<span class="avatar" style="width:26px;height:26px;font-size:10px;background:' + ui.colorFor(c.name) + '">' + ui.initials(c.name) + '</span>';
+            return '<div class="flex items-center gap-1">' + av + '<div><div class="strong">' + ui.escapeHtml(c.name) + '</div>' + (c.contact ? '<div class="text-mute xs">' + ui.escapeHtml(c.contact) + '</div>' : '') + '</div></div>'; } },
+        { key: 'phone', label: 'Phone' },
+        { key: 'email', label: 'Email' },
+        { key: 'value', label: 'Lifetime Value', num: true, money: true },
+        { key: 'since', label: 'Since' }
+      ],
+      rows: list.slice().sort(function (a, b) { return (b.value || 0) - (a.value || 0); }),
+      searchKeys: ['name', 'contact', 'phone', 'email'],
+      filterPanel: true, filters: [], exportName: 'travel-customers.csv', pdfTitle: 'Travel Customers',
+      onRow: function (c) { custView(c); },
+      actions: ui.actions({
+        edit:  function (c) { custEdit(c); },
+        del:   function (c) { custDelete(c); },
+        print: function (c) { custPrint(c); },
+        wa:    function (c) { return { phone: c.phone, text: custMsg(c) }; },
+        gmail: function (c) { return { to: c.email, subject: 'Epal Travels & Consultancy', body: custMsg(c) }; }
+      }),
+      empty: { icon: 'person-hearts', title: 'No customers yet', hint: 'Direct travellers you sell to will appear here.' }
     });
     page.appendChild(el('div.card', null, [
       el('div.card-head', null, [ el('h3', { html: ui.icon('person-hearts') + ' Travel Customers' }),
         el('span.card-sub', { text: list.length + ' travellers' }) ]),
-      el('div.table-wrap', null, [
-        el('table.tbl', null, [
-          el('thead', null, [ el('tr', null, [['Customer'], ['Phone'], ['Email'], ['Lifetime Value', 'num'], ['Since'], ['']].map(function (h) { return el('th' + (h[1] ? '.' + h[1] : ''), { text: h[0] }); })) ]),
-          el('tbody', null, rows.length ? rows : [ el('tr', null, [ el('td.text-mute', { colspan: 6, text: 'No customers yet.' }) ]) ])
-        ])
-      ])
+      el('div.card-body', null, [ t.el ])
     ]));
   }
   /* ---- customer row-action handlers (view / edit / print / send / delete) --*/
