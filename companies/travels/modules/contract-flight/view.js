@@ -170,6 +170,11 @@
         searchKeys: ['airline','flightNo','route','category','vendor','id'],
         filters: [{ key:'category', label:'Category' }, { key:'status', label:'Status' }],
         onRow: function (r) { drawer(r.id, draw); },
+        actions: ui.actions({
+          print: function (r) { blockVoucher(r); },
+          wa:    function (r) { return { phone:'', text: flightMsg(r) }; },
+          gmail: function (r) { return { to:'', subject:'Contract flight '+(r.flightNo||r.id)+' — Epal Travels', body: flightMsg(r) }; }
+        }),
         exportName: 'contract-flights.csv',
         empty: { icon:'airplane', title:'No contract flights yet', hint:'Contract your first seat block from the Add Flight screen.' }
       });
@@ -296,6 +301,11 @@
     });
   }
 
+  function flightMsg(r) {
+    return 'Contract flight ' + (r.flightNo || r.id) + '\nAirline: ' + (r.airline || '—') + '\nRoute: ' + (r.route || '—') +
+      '\nDeparture: ' + ui.date(r.depDate) + '\nSeats: ' + (r.seats || 0) + ' (sold ' + (r.sold || 0) + ')' +
+      '\n\n— Epal Travels & Consultancy';
+  }
   function blockVoucher(f) {
     if (!EPAL.doc || !EPAL.doc.open) { ui.toast('Document engine unavailable', 'error'); return; }
     var un = unsoldOf(f);
@@ -540,6 +550,7 @@
             return '<span class="num ' + (r.pnl >= 0 ? 'text-good' : 'text-bad') + '">' + ui.money(r.pnl) + '</span>'; } }
       ],
       rows: brk, searchKeys:['route','category','id'], exportName:'contract-flight-pnl.csv', pageSize: 15,
+      onRow: function (r) { drawer(r.id, function () { EPAL.router.render(); }); },   // each block opens its drawer
       empty: { icon:'airplane', title:'No blocks contracted', hint:'Add a contract flight to see per-block profitability.' }
     });
     page.appendChild(el('div.card', null, [

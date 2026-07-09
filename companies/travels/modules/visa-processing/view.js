@@ -543,12 +543,17 @@
       var cat = cats().filter(function(c){return c.id===a.catId;})[0] || { days:14 };
       var due = new Date(new Date(a.created).getTime() + cat.days*86400000);
       var overdue = a.stage==='Under Process' && due < new Date();
-      return el('tr', null, [
+      return el('tr.row-click', { onclick:(function(ap){ return function(){ appDetail(ap); }; })(a) }, [
         td(a.flag+' <span class="strong">'+ui.escapeHtml(a.applicant)+'</span>'),
         td(a.country+' · '+a.visaType), td(ui.date(a.created)),
         td('<span class="'+(overdue?'text-bad':'')+'">'+ui.date(due)+'</span>'),
-        stBadge(a.stage).outerHTML,
-        td(overdue?'<span class="badge badge-bad">Overdue</span>':'<span class="badge badge-good">On track</span>') ]);
+        td(stBadge(a.stage).outerHTML),
+        td(overdue?'<span class="badge badge-bad">Overdue</span>':'<span class="badge badge-good">On track</span>'),
+        el('td', null, [ ui.rowActions(ui.actions({
+          print: (function(ap){ return function(){ printVisa(ap); }; })(a),
+          wa:    { phone:'', text: visaMsg(a) },
+          gmail: { to:'', subject:'Your '+a.country+' visa — '+a.id, body: visaMsg(a) }
+        })) ]) ]);
     });
     page.appendChild(el('div.kpi-grid', null, [
       kpi('Submitted', apps().filter(function(a){return a.stage==='Submitted';}).length, 'send'),
@@ -556,7 +561,7 @@
       kpi('Approved', apps().filter(function(a){return a.stage==='Approved';}).length, 'patch-check'),
       kpi('Rejected', apps().filter(function(a){return a.stage==='Rejected';}).length, 'x-octagon')
     ]));
-    page.appendChild(tableCard('Embassy & Decision Tracker', ['Applicant','Service','Submitted','Decision Due','Stage','Status'], rows, 'Nothing submitted yet.'));
+    page.appendChild(tableCard('Embassy & Decision Tracker', ['Applicant','Service','Submitted','Decision Due','Stage','Status',''], rows, 'Nothing submitted yet.'));
   }
 
   /* ======================================================= DOCUMENTS */
@@ -596,7 +601,15 @@
     var grid = el('div.grid-auto.stagger');
     Object.keys(DOC_REQS).forEach(function (type) {
       grid.appendChild(el('div.card', null, [
-        el('div.card-head', null, [ el('h3',{html:ui.icon('folder-check')+' '+type+' Visa'}), el('span.card-sub',{text:DOC_REQS[type].length+' documents'}) ]),
+        el('div.card-head', null, [ el('h3',{html:ui.icon('folder-check')+' '+type+' Visa'}),
+          el('div.flex.items-center.gap-2', null, [
+            el('span.card-sub',{text:DOC_REQS[type].length+' documents'}),
+            ui.rowActions(ui.actions({
+              print: (function(t,l){ return function(){ printDocList(t+' Visa', l); }; })(type, DOC_REQS[type]),
+              wa:    { phone:'', text: docListMsg(type+' Visa', DOC_REQS[type]) },
+              gmail: { to:'', subject:'Required documents — '+type+' Visa', body: docListMsg(type+' Visa', DOC_REQS[type]) }
+            }))
+          ]) ]),
         el('div.card-body', null, [ el('div.data-list', null, DOC_REQS[type].map(function (d){
           return el('div.data-row', null, [ ui.frag('<span class="notif-ico notif-info">'+ui.icon('file-earmark-text')+'</span>'),
             el('div.flex-1.sm',{text:d}) ]); })) ])

@@ -993,11 +993,26 @@
           td('<span class="strong">'+r.id+'</span>'), td(ui.escapeHtml(r.passenger)),
           td('<span class="mono">'+ui.escapeHtml(r.pnr||'—')+'</span>'), td(ui.escapeHtml(r.airline||'—')),
           tdN(ui.money(r.gross)), tdN(ui.money(r.penalty)), tdN(ui.money(r.netRefund)),
-          td(refundBadge(r.status).outerHTML) ]);
+          td(refundBadge(r.status).outerHTML),
+          el('td', null, [ ui.rowActions(ui.actions({
+            print: (function(rf){ return function(){ printRefund(rf); }; })(r),
+            wa:    { phone:'', text: refundMsg(r) },
+            gmail: { to:'', subject:'Your refund '+r.id+' — Epal Travels', body: refundMsg(r) }
+          })) ]) ]);
       });
-      host.appendChild(tableCard('Refund Requests', ['Ref','Passenger','PNR','Airline','Gross','Penalty','Net Refund','Status'], rows, 'No refunds yet.'));
+      host.appendChild(tableCard('Refund Requests', ['Ref','Passenger','PNR','Airline','Gross','Penalty','Net Refund','Status',''], rows, 'No refunds yet.'));
     }
     draw();
+  }
+  function refundMsg(r) {
+    return 'Refund ' + r.id + '\nPassenger: ' + r.passenger + '\nPNR: ' + (r.pnr || '—') +
+      '\nNet refund: ' + ui.money(r.netRefund) + '\nStatus: ' + r.status + '\n\n— Epal Travels & Consultancy';
+  }
+  function printRefund(r) {
+    function row(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: 'Refund Voucher · ' + r.id, subtitle: r.passenger + (r.airline ? ' · ' + r.airline : ''), meta: 'Ticket refund',
+      bodyHtml: '<table>' + row('Passenger', r.passenger) + row('PNR', r.pnr) + row('Airline', r.airline) +
+        row('Gross fare', ui.money(r.gross)) + row('Penalty', ui.money(r.penalty)) + row('Net refund', ui.money(r.netRefund)) + row('Status', r.status) + '</table>' });
   }
   function refundFromTicket(t, after) {
     editRefund({ id:'RF-'+Date.now().toString().slice(-4), pnr:t.pnr, passenger:t.passenger, airline:t.airline,
@@ -1115,6 +1130,11 @@
       filters:[{ key:'serviceType', label:'Service' }, { key:'payStatus', label:'Payment' }],
       pageSize:10, exportName:'emd-ancillary.csv',
       onRow:function(r){ emdDetail(r); },
+      actions: ui.actions({
+        print: function(r){ emdReceipt([r], r.emdNo, r.passenger, r.sale||0, r.cost||0); },
+        wa:    function(r){ return { phone:'', text: emdMsg(r) }; },
+        gmail: function(r){ return { to:'', subject:'EMD '+r.emdNo+' — Epal Travels', body: emdMsg(r) }; }
+      }),
       empty:{ icon:'receipt', title:'No EMDs yet', hint:'Sell an ancillary service to raise your first EMD.' }
     });
     var card = el('div.card', null, [ el('div.card-body') ]);
@@ -1210,6 +1230,11 @@
     });
   }
 
+  function emdMsg(r) {
+    return 'EMD ' + r.emdNo + '\nPassenger: ' + r.passenger + '\nService: ' + (r.serviceType || '—') +
+      '\nTicket/PNR: ' + (r.ticketRef || '—') + '\nAmount: ' + ui.money(r.sale || 0) + '\nPayment: ' + (r.payStatus || '—') +
+      '\n\n— Epal Travels & Consultancy';
+  }
   function emdReceipt(rows, emdNo, passenger, totalSale, totalCost) {
     if (!(EPAL.doc && EPAL.doc.open)) return;
     EPAL.doc.open({
