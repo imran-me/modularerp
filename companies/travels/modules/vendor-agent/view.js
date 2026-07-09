@@ -276,28 +276,115 @@
     });
     page.appendChild(el('div.card', null, [
       el('div.card-head', null, [ el('h3', { html: ui.icon('person-hearts') + ' Travel Customers' }),
-        el('span.card-sub', { text: list.length + ' travellers' }) ]),
+        el('div.flex.items-center.gap-2', null, [
+          el('span.card-sub', { text: list.length + ' travellers' }),
+          canCreate() ? el('button.btn.btn-sm.btn-primary', { html: ui.icon('person-plus') + ' New Customer', onclick: function () { custEdit(null); } }) : null
+        ]) ]),
       el('div.card-body', null, [ t.el ])
     ]));
   }
-  /* ---- customer row-action handlers (view / edit / print / send / delete) --*/
-  function custKv(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v || '—' }) ]); }
+  /* ---- customer detail — the SAME rich layout as a party: header + KPIs +
+         purchase history + print/WhatsApp/Gmail (with profile attach) --------*/
   function custView(c) {
-    ui.modal({ title: c.name, icon: 'person-hearts', size: 'md', body: el('div.data-list', null, [
-      custKv('Contact person', c.contact), custKv('Phone', c.phone), custKv('Email', c.email),
-      custKv('Lifetime value', ui.money(c.value || 0)), custKv('Customer since', c.since || '—')
-    ]) });
+    var body = el('div');
+    var m = ui.modal({ title: c.name, icon: 'person-hearts', size: 'lg', body: body, footer: false });
+    renderCustomer(body, c);
+    return m;
   }
+  function renderCustomer(host, c) {
+    host.innerHTML = '';
+    var sales = (db.sales ? db.sales('travels') : []).filter(function (s) { return String(s.customer || '').toLowerCase() === String(c.name || '').toLowerCase(); })
+      .sort(function (a, b) { return (a.date < b.date) ? 1 : -1; });
+    var spend = sales.reduce(function (a, s) { return a + (+s.amount || 0); }, 0);
+    var lastOrder = sales.length ? sales[0].date : null;
+
+    var actions = el('div.flex.gap-1.items-center.flex-wrap', { style: { marginLeft: 'auto' } });
+    if (canCreate()) actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { custEdit(c); } }));
+    actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement', onclick: function () { custPrint(c); } }));
+    actions.appendChild(ui.rowActions(ui.actions({
+      wa: { phone: c.phone, text: custMsg(c) }, gmail: { to: c.email, subject: 'Epal Travels & Consultancy', body: custMsg(c) },
+      profile: { name: c.name,
+        card: { title: c.name, subtitle: 'Customer · ' + (c.tier || 'Standard'), lines: [
+          ['Lifetime value', ui.money(c.value || 0)], ['Recorded spend', ui.money(spend)], ['Orders', String(sales.length)], ['Phone', c.phone || '—'], ['Email', c.email || '—'] ] },
+        pdf: function () { custPrint(c); } }
+    })));
+
+    host.appendChild(el('div.card', null, [ el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+        c.photo
+          ? ui.frag('<span class="avatar" style="width:42px;height:42px;background-image:url(' + c.photo + ');background-size:cover;background-position:center"></span>')
+          : ui.frag('<span class="notif-ico notif-info">' + ui.icon('person-hearts') + '</span>'),
+        el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: c.name }),
+          el('div.flex.items-center.gap-2.flex-wrap', null, [
+            el('div.text-mute.sm', { text: (c.contact ? c.contact + ' · ' : '') + (c.phone || '—') }),
+            el('span.badge' + (c.tier === 'Platinum' ? '.badge-accent' : c.tier === 'Gold' ? '.badge-warn' : ''), { text: c.tier || 'Standard' }),
+            c.service ? el('span.badge', { text: c.service }) : null,
+            (c.login && c.login.enabled) ? el('span.badge.badge-good', { html: ui.icon('person-check') + ' Portal login' }) : null
+          ]) ]),
+        actions
+      ]),
+      el('div.stat-row', null, [
+        st2('Lifetime Value', ui.money(c.value || 0)), st2('Recorded Spend', ui.money(spend)),
+        st2('Orders', String(sales.length)), st2('Last Order', lastOrder ? ui.date(lastOrder) : '—')
+      ])
+    ]) ]));
+
+    if (sales.length) {
+      var t = EPAL.table({
+        columns: [
+          { key: 'date', label: 'Date', date: true }, { key: 'ref', label: 'Reference' }, { key: 'desc', label: 'Description' },
+          { key: 'amount', label: 'Amount', num: true, money: true },
+          { key: 'profit', label: 'Profit', num: true, render: function (r) { return '<span class="text-good">' + ui.money(r.profit) + '</span>'; }, sortVal: function (r) { return r.profit; } }
+        ],
+        rows: sales, searchKeys: ['ref', 'desc'], pageSize: 8, dateKey: 'date',
+        exportName: 'customer-' + String(c.name).replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.csv', pdfTitle: 'Purchases — ' + c.name,
+        empty: { icon: 'bag', title: 'No purchases' }
+      });
+      host.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('bag-check') + ' Purchase History' }), el('span.card-sub', { text: sales.length + ' orders' }) ]), el('div.card-body', null, [ t.el ]) ]));
+    } else {
+      host.appendChild(el('div.empty-state', null, [ ui.frag(ui.icon('bag')), el('h3', { text: 'No recorded purchases' }), el('p.text-muted', { text: 'Sales recorded against this customer will appear here.' }) ]));
+    }
+    if (EPAL.comments && EPAL.comments.widget) { host.appendChild(el('div.section-label', { text: 'Notes & Discussion' })); host.appendChild(EPAL.comments.widget('customer', c.name)); }
+  }
+  /* ---- customer add/edit — the SAME rich form pattern as vendors ----------*/
   function custEdit(c) {
-    var f = { name: c.name, contact: c.contact, phone: c.phone, email: c.email, value: c.value };
-    function fld(label, key, type) { return el('div.field', null, [ el('label', { text: label }),
-      el('input.input', { type: type || 'text', value: f[key] != null ? f[key] : '', oninput: function (e) { f[key] = e.target.value; } }) ]); }
-    ui.modal({ title: 'Edit ' + c.name, icon: 'pencil', size: 'md',
-      body: el('div', null, [ fld('Name', 'name'), fld('Contact person', 'contact'), fld('Phone', 'phone'), fld('Email', 'email', 'email'), fld('Lifetime value', 'value', 'number') ]),
-      actions: [ { label: 'Cancel', variant: 'ghost' }, { label: 'Save', variant: 'primary', onClick: function () {
-        c.name = f.name; c.contact = f.contact; c.phone = f.phone; c.email = f.email; c.value = +f.value || 0;
-        db.saveCustomer(c); ui.toast('Customer saved', 'good'); EPAL.router.render();
-      } } ] });
+    var isNew = !c || !c.name;
+    var rec = c || {};
+    EPAL.formModal({
+      title: isNew ? 'Add Customer' : 'Edit Customer', icon: 'person-hearts', size: 'lg', record: rec,
+      fields: [
+        { type: 'section', label: 'Identity' },
+        { key: 'photo', label: 'Profile picture', type: 'image', icon: 'person', col2: true, round: true },
+        { key: 'name', label: 'Customer name', type: 'text', required: true, col2: true, placeholder: 'e.g. Rahim Uddin' },
+        { key: 'contact', label: 'Contact person', type: 'text' },
+        { key: 'service', label: 'Interest', type: 'select', options: ['Ticketing', 'Visa', 'Hotel', 'Package'], default: 'Ticketing' },
+        { key: 'phone', label: 'Phone', type: 'phone' },
+        { key: 'email', label: 'Email', type: 'email' },
+        { type: 'section', label: 'Commercial' },
+        { key: 'tier', label: 'Tier', type: 'select', options: ['Standard', 'Silver', 'Gold', 'Platinum'], default: 'Standard' },
+        { key: 'value', label: 'Lifetime value', type: 'money', default: 0, min: 0 },
+        { key: 'since', label: 'Customer since', type: 'text', placeholder: 'e.g. 2021-06' },
+        { key: 'address', label: 'Address', type: 'textarea', col2: true },
+        { type: 'section', label: 'ERP Access (Customer portal)' },
+        { key: 'createLogin', label: 'Give this customer a portal login', type: 'checkbox', col2: true,
+          hint: 'Provisions a customer-role user in the ERP user list. Access control is enforced by the backend (RBAC — later).' },
+        { key: 'loginEmail', label: 'Login email', type: 'email', showIf: function (x) { return x.createLogin; } },
+        { key: 'loginPassword', label: 'Password', type: 'password', showIf: function (x) { return x.createLogin; } }
+      ],
+      saveLabel: isNew ? 'Add Customer' : 'Save',
+      onSave: function (val) {
+        var t = isNew ? { id: 'CU-' + ui.uid('').slice(-4).toUpperCase(), companyIds: ['travels'], since: val.since || '' } : rec;
+        t.name = (val.name || '').trim(); t.contact = val.contact; t.phone = val.phone; t.email = val.email;
+        t.service = val.service; t.tier = val.tier; t.value = +val.value || 0; t.since = val.since || t.since;
+        t.address = val.address; t.photo = val.photo || '';
+        if (!t.companyIds) t.companyIds = ['travels']; else if (t.companyIds.indexOf('travels') < 0) t.companyIds.push('travels');
+        if (val.createLogin && (val.loginEmail || t.email)) { t.login = { email: val.loginEmail || t.email, role: 'customer', enabled: true }; provisionPartyUser(t, 'customer', val.loginPassword); }
+        db.saveCustomer(t);
+        ui.toast('Customer "' + t.name + '" saved' + (val.createLogin ? ' · portal login provisioned' : ''), 'success');
+        EPAL.router.render();
+        return true;
+      }
+    });
   }
   function custDelete(c) {
     ui.confirm({ title: 'Delete customer', text: 'Remove ' + c.name + '? This cannot be undone.', danger: true, confirmLabel: 'Delete' })
@@ -455,7 +542,7 @@
         // ERP user provisioning (data only — RBAC enforcement lands with the backend)
         if (val.createLogin && (val.loginEmail || rec.email)) {
           rec.login = { email: val.loginEmail || rec.email, role: 'vendor', enabled: true };
-          provisionVendorUser(rec, val.loginPassword);
+          provisionPartyUser(rec, 'vendor', val.loginPassword);
         }
         db.save('vendors', rec);
         ui.toast('Vendor "' + rec.name + '" saved' + (val.createLogin ? ' · ERP login provisioned' : ''), 'success');
@@ -464,16 +551,17 @@
       }
     });
   }
-  // Provision a vendor-role user in the ERP user directory (a separate store so it
-  // never pollutes HR headcount). The Laravel backend maps this to a User + 'vendor'
-  // role/scope; here we just persist the record so it exists in the user list.
-  function provisionVendorUser(rec, password) {
+  // Provision a role-scoped user in the ERP user directory (a separate store so it
+  // never pollutes HR headcount). The Laravel backend maps this to a User + role;
+  // here we just persist the record so it exists in the user list. Shared by
+  // vendors / sub-agents / customers — any party that logs into a portal.
+  function provisionPartyUser(rec, role, password) {
     var u = {
       id: 'USR-' + String(rec.id || ui.uid('')).replace(/[^0-9A-Za-z]/g, ''),
       name: rec.name, email: (rec.login && rec.login.email) || rec.email || '',
-      role: 'vendor', scope: 'travels', partyType: 'vendor', partyId: rec.id,
+      role: role, scope: 'travels', partyType: role, partyId: rec.id,
       photo: rec.photo || '', phone: rec.phone || '', status: rec.status || 'Active',
-      designation: 'Vendor · ' + (rec.type || ''), createdAt: Date.now()
+      designation: cap(role) + (rec.type ? ' · ' + rec.type : ''), createdAt: Date.now()
     };
     if (password) u.password = password;   // demo only — hashed server-side in Laravel
     try { db.save('erp_users', u); } catch (e) {}
@@ -688,8 +776,11 @@
       wa:    { phone: meta.phone, text: partyMsg({ name: meta.name, balance: led.balance }) },
       gmail: { to: meta.email, subject: 'Epal Travels & Consultancy', body: partyMsg({ name: meta.name, balance: led.balance }) },
       profile: { name: meta.name,
-        pdf: function () { printParty({ name: meta.name, phone: meta.phone, email: meta.email, balance: led.balance, type: cap(meta.partyType) }); },
-        jpg: meta.photo || null }
+        card: { title: meta.name, subtitle: cap(meta.partyType) + ' · ' + (meta.location || 'Dhaka'), lines: [
+          [meta.partyType === 'agent' ? 'Receivable' : 'Payable', ui.money(led.balance)],
+          ['Total Charged', ui.money(led.debit)], ['Total Settled', ui.money(led.credit)],
+          ['Credit Limit', ui.money(limit)], ['Phone', meta.phone || '—'], ['Email', meta.email || '—'] ] },
+        pdf: function () { printParty({ name: meta.name, phone: meta.phone, email: meta.email, balance: led.balance, type: cap(meta.partyType) }); } }
     })));
 
     // --- header / credit control card ---
