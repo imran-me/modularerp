@@ -148,6 +148,9 @@
 .search-trigger:hover { border-color: var(--border-strong); color: var(--text-dim); }
 .search-trigger span { flex: 1; text-align: left; }
 .search-trigger kbd { margin-left: auto; }
+/* topbar My Task button — sits beside search; label collapses on small screens */
+.topbar-task { flex: none; gap: 6px; }
+@media (max-width: 720px) { .tb-task-lbl { display: none; } .search-trigger { min-width: 0; } }
 .notif-dot { position: absolute; top: 5px; right: 5px; min-width: 16px; height: 16px; padding: 0 4px;
   border-radius: 999px; background: var(--bad); color: #fff; font-size: 10px; font-weight: 800;
   display: grid; place-items: center; border: 2px solid var(--bg); }

@@ -176,6 +176,10 @@
       bar.appendChild(el('button.search-trigger', { onclick: function () { App.openCommandPalette(); } }, [
         ui.frag(ui.icon('search')), el('span', { text:'Search or jump to…' }), el('kbd', { text:'Ctrl K' })
       ]));
+      // My Task — always-available jump to the current vertical's personal board
+      bar.appendChild(el('button.btn.btn-ghost.btn-sm.topbar-task', { id:'mytask-btn', title:'My Task',
+        onclick: function () { EPAL.router.navigate((App.activeCompany || 'group') + '/tasks'); },
+        html: ui.icon('kanban') + ' <span class="tb-task-lbl">My Task</span>' }));
       // notifications
       bar.appendChild(el('button.icon-btn', { id:'notif-btn', 'aria-label':'Notifications',
         onclick: function (e) { App.openNotifications(e); },

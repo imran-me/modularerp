@@ -207,7 +207,7 @@
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
       var page = el('div.page');
-      var titles = { overview: 'Vendor & Agent', vendors: 'Vendors', agents: 'Sub-Agents',
+      var titles = { overview: 'Vendor, Agent & Customer', vendors: 'Vendors', agents: 'Sub-Agents', customers: 'Customers',
         portals: 'Portals & Channels', accounts: 'Party Ledger', commission: 'Agent Commission' };
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Vendor & Agent',
@@ -219,19 +219,52 @@
             html: ui.icon('journal-text') + ' Party Ledger' }) : null
         ]
       }));
-      ({ overview: overview, vendors: vendorsView, agents: agentsView, portals: portalsView,
-         accounts: accountsView, commission: commissionView }[sub] || overview)(page, ctx);
+      ({ overview: overview, vendors: vendorsView, agents: agentsView, customers: customersView,
+         portals: portalsView, accounts: accountsView, commission: commissionView }[sub] || overview)(page, ctx);
       ctx.mount.appendChild(page);
     }
   });
 
   function subDesc(sub) {
-    return ({ overview: 'Payables to vendors, receivables from sub-agents, and the party ledger.',
+    return ({ overview: 'Payables to vendors, receivables from sub-agents, customers, and the party ledger.',
       vendors: 'GSAs, consolidators and suppliers — credit limits, terms and balances.',
       agents: 'Sub-agents who sell on our behalf — commission, sales and balances.',
+      customers: 'Travellers who buy directly — contact, lifetime value and history.',
       portals: 'Booking, settlement and tracking channels (GDS, BSP, VFS, embassy).',
       accounts: 'Running-balance statement, ageing and credit control for any party.',
       commission: 'Expected vs received vs outstanding commission by sub-agent.' }[sub]) || '';
+  }
+
+  /* ======================================================= CUSTOMERS
+   * Merged in from the old standalone Travels › Customers module (2026-07-09):
+   * direct travellers now live alongside vendors & agents as a party type. */
+  function customersView(page) {
+    var list = db.customers('travels');
+    var totVal = list.reduce(function (a, c) { return a + (c.value || 0); }, 0);
+    page.appendChild(el('div.kpi-grid.stagger', null, [
+      kpi('Customers', list.length, 'person-hearts'),
+      kpi('Lifetime Value', ui.money(totVal, { compact: true }), 'cash-coin'),
+      kpi('Avg / Customer', ui.money(list.length ? Math.round(totVal / list.length) : 0, { compact: true }), 'graph-up')
+    ]));
+    var rows = list.slice().sort(function (a, b) { return (b.value || 0) - (a.value || 0); }).map(function (c) {
+      return el('tr', null, [
+        el('td', null, [ el('div.strong', { text: c.name }), c.contact ? el('div.text-mute.xs', { text: c.contact }) : null ]),
+        el('td', { text: c.phone || '—' }),
+        el('td', { text: c.email || '—' }),
+        el('td.num', { text: ui.money(c.value || 0) }),
+        el('td', { text: c.since || '—' })
+      ]);
+    });
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('person-hearts') + ' Travel Customers' }),
+        el('span.card-sub', { text: list.length + ' travellers' }) ]),
+      el('div.table-wrap', null, [
+        el('table.tbl', null, [
+          el('thead', null, [ el('tr', null, ['Customer', 'Phone', 'Email', 'Lifetime Value', 'Since'].map(function (h) { return el('th', { text: h }); })) ]),
+          el('tbody', null, rows.length ? rows : [ el('tr', null, [ el('td.text-mute', { colspan: 5, text: 'No customers yet.' }) ]) ])
+        ])
+      ])
+    ]));
   }
 
   /* ======================================================= OVERVIEW */

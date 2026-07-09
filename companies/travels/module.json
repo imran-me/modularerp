@@ -16,49 +16,25 @@
       "icon": "speedometer2",
       "desc": "Travels performance, sales, pipeline, alerts.",
       "enabled": true,
-      "subs": [],
-      "built": true
+      "built": true,
+      "subs": []
     },
     {
-      "id": "crm",
-      "label": "CRM",
-      "icon": "person-lines-fill",
-      "desc": "Leads, follow-ups, communication hub.",
+      "id": "tasks",
+      "label": "My Task",
+      "icon": "kanban",
+      "desc": "Personal Kanban board with phase timers.",
       "enabled": true,
-      "subs": [
-        {
-          "id": "leads",
-          "label": "Leads",
-          "icon": "dot",
-          "enabled": true
-        },
-        {
-          "id": "pipeline",
-          "label": "Sales Pipeline",
-          "icon": "dot",
-          "enabled": true
-        },
-        {
-          "id": "follow-ups",
-          "label": "Follow-ups",
-          "icon": "dot",
-          "enabled": true
-        },
-        {
-          "id": "comm-hub",
-          "label": "Communication Hub",
-          "icon": "dot",
-          "enabled": true
-        }
-      ],
-      "built": false
+      "built": false,
+      "subs": []
     },
     {
       "id": "vendor-agent",
-      "label": "Vendor & Agent",
+      "label": "Vendor, Agent & Customer",
       "icon": "people",
-      "desc": "Vendors, agents, portals, commission & party ledgers.",
+      "desc": "Vendors, agents, customers, portals, commission & party ledgers.",
       "enabled": true,
+      "built": true,
       "subs": [
         {
           "id": "vendors",
@@ -69,6 +45,12 @@
         {
           "id": "agents",
           "label": "Manage Agents",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "customers",
+          "label": "Customers",
           "icon": "dot",
           "enabled": true
         },
@@ -90,8 +72,7 @@
           "icon": "dot",
           "enabled": true
         }
-      ],
-      "built": true
+      ]
     },
     {
       "id": "air-ticketing",
@@ -99,6 +80,7 @@
       "icon": "airplane-fill",
       "desc": "Issue, re-issue, refund, void, EMD + BSP recon.",
       "enabled": true,
+      "built": true,
       "subs": [
         {
           "id": "ticketing",
@@ -148,42 +130,7 @@
           "icon": "dot",
           "enabled": true
         }
-      ],
-      "built": true
-    },
-    {
-      "id": "contract-flight",
-      "label": "Contract Flight",
-      "icon": "airplane-engines",
-      "desc": "Group/charter seat blocks (Umrah, Hajj, worker).",
-      "enabled": true,
-      "subs": [
-        {
-          "id": "schedule",
-          "label": "Flight Schedule",
-          "icon": "dot",
-          "enabled": true
-        },
-        {
-          "id": "add-flight",
-          "label": "Add Flight",
-          "icon": "dot",
-          "enabled": true
-        },
-        {
-          "id": "category",
-          "label": "Category",
-          "icon": "dot",
-          "enabled": true
-        },
-        {
-          "id": "manage-sales",
-          "label": "Manage Sales",
-          "icon": "dot",
-          "enabled": true
-        }
-      ],
-      "built": true
+      ]
     },
     {
       "id": "visa-processing",
@@ -192,6 +139,7 @@
       "desc": "End-to-end visa lifecycle.",
       "enabled": true,
       "badge": "Core",
+      "built": true,
       "subs": [
         {
           "id": "categories",
@@ -241,8 +189,69 @@
           "icon": "dot",
           "enabled": true
         }
-      ],
-      "built": true
+      ]
+    },
+    {
+      "id": "contract-flight",
+      "label": "Contract Flight",
+      "icon": "airplane-engines",
+      "desc": "Group/charter seat blocks (Umrah, Hajj, worker).",
+      "enabled": true,
+      "built": true,
+      "subs": [
+        {
+          "id": "schedule",
+          "label": "Flight Schedule",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "add-flight",
+          "label": "Add Flight",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "category",
+          "label": "Category",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "manage-sales",
+          "label": "Manage Sales",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": "contract-file",
+      "label": "Contract File",
+      "icon": "file-earmark-medical",
+      "desc": "Airline & vendor contracts — block-seat agreements, validity & documents.",
+      "enabled": true,
+      "built": true,
+      "subs": [
+        {
+          "id": "contracts",
+          "label": "All Contracts",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "add",
+          "label": "New Contract",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "documents",
+          "label": "Documents",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
     },
     {
       "id": "file-management",
@@ -250,6 +259,7 @@
       "icon": "folder-fill",
       "desc": "Embassy files, submission slots, decision tracking.",
       "enabled": true,
+      "built": false,
       "subs": [
         {
           "id": "files",
@@ -269,15 +279,15 @@
           "icon": "dot",
           "enabled": true
         }
-      ],
-      "built": false
+      ]
     },
     {
       "id": "passport-mgmt",
-      "label": "Passport Mgmt",
+      "label": "Passport Management",
       "icon": "person-vcard",
       "desc": "Passport holders, categories, expiry radar.",
       "enabled": true,
+      "built": false,
       "subs": [
         {
           "id": "holders",
@@ -297,17 +307,7 @@
           "icon": "dot",
           "enabled": true
         }
-      ],
-      "built": false
-    },
-    {
-      "id": "customers",
-      "label": "Customers",
-      "icon": "person-hearts",
-      "desc": "Traveller 360 — shared with Group CRM.",
-      "enabled": true,
-      "subs": [],
-      "built": false
+      ]
     },
     {
       "id": "accounts",
@@ -315,6 +315,7 @@
       "icon": "cash-stack",
       "desc": "Income, expenses, journals, payment schedules.",
       "enabled": true,
+      "built": false,
       "subs": [
         {
           "id": "income",
@@ -340,8 +341,7 @@
           "icon": "dot",
           "enabled": true
         }
-      ],
-      "built": false
+      ]
     },
     {
       "id": "ledgers",
@@ -349,17 +349,8 @@
       "icon": "journal-text",
       "desc": "General & party ledgers, trial balance.",
       "enabled": true,
-      "subs": [],
-      "built": false
-    },
-    {
-      "id": "hrm",
-      "label": "HRM",
-      "icon": "people-fill",
-      "desc": "Travels team — attendance, leaves, payroll.",
-      "enabled": true,
-      "subs": [],
-      "built": false
+      "built": false,
+      "subs": []
     },
     {
       "id": "reports",
@@ -367,8 +358,8 @@
       "icon": "file-earmark-spreadsheet",
       "desc": "Sales, visa, ticketing, financial reports.",
       "enabled": true,
-      "subs": [],
-      "built": false
+      "built": false,
+      "subs": []
     },
     {
       "id": "analytics",
@@ -376,8 +367,17 @@
       "icon": "graph-up",
       "desc": "Profit leak, fraud sentinel, travel-DNA.",
       "enabled": true,
-      "subs": [],
-      "built": false
+      "built": false,
+      "subs": []
+    },
+    {
+      "id": "hrm",
+      "label": "HRM",
+      "icon": "people-fill",
+      "desc": "Travels team — attendance, leaves, payroll.",
+      "enabled": true,
+      "built": false,
+      "subs": []
     },
     {
       "id": "marketing",
@@ -385,8 +385,42 @@
       "icon": "megaphone-fill",
       "desc": "Email / SMS / WhatsApp campaigns.",
       "enabled": true,
-      "subs": [],
-      "built": true
+      "built": true,
+      "subs": []
+    },
+    {
+      "id": "crm",
+      "label": "CRM",
+      "icon": "person-lines-fill",
+      "desc": "Leads, follow-ups, communication hub.",
+      "enabled": true,
+      "built": false,
+      "subs": [
+        {
+          "id": "leads",
+          "label": "Leads",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "pipeline",
+          "label": "Sales Pipeline",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "follow-ups",
+          "label": "Follow-ups",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "comm-hub",
+          "label": "Communication Hub",
+          "icon": "dot",
+          "enabled": true
+        }
+      ]
     },
     {
       "id": "automation",
@@ -394,17 +428,8 @@
       "icon": "robot",
       "desc": "Doc-expiry radar, markup engine, bots.",
       "enabled": true,
-      "subs": [],
-      "built": false
-    },
-    {
-      "id": "tasks",
-      "label": "My Tasks",
-      "icon": "kanban",
-      "desc": "Personal Kanban board with phase timers.",
-      "enabled": true,
-      "subs": [],
-      "built": false
+      "built": false,
+      "subs": []
     },
     {
       "id": "settings",
@@ -413,8 +438,8 @@
       "desc": "Travels-specific configuration.",
       "enabled": true,
       "admin": true,
-      "subs": [],
-      "built": false
+      "built": false,
+      "subs": []
     }
   ]
 }
