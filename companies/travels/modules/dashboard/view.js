@@ -38,6 +38,34 @@
         kpi('Visa Sales Value', ui.money(visaRevenue,{compact:true}), 'cash-coin', 'up', ui.money(visaProfit,{compact:true})+' profit')
       ]));
 
+      // --- Action Center: what needs attention today (each row navigates) ---
+      var tickets = db.col ? db.col('airTickets') : [];
+      var ttls    = db.col ? db.col('air_ttl') : [];
+      var customers = db.customers ? db.customers('travels') : [];
+      var now = Date.now();
+      function daysLeft(d){ return d ? Math.round((new Date(d).getTime()-now)/86400000) : null; }
+      function monthsLeft(d){ return d ? Math.round((new Date(d).getTime()-now)/(86400000*30.4)) : null; }
+      var held = tickets.filter(function(t){ return t.status==='Hold'; });
+      var ttlDue = ttls.filter(function(r){ var dl=daysLeft(r.ttl||r.deadline||r.due); return dl!=null && dl<=3 && r.status!=='Ticketed'; });
+      var visaOverdue = apps.filter(function(a){ if(a.stage!=='Under Process')return false; var cat=cats.filter(function(c){return c.id===a.catId;})[0]||{days:14}; return new Date(new Date(a.created).getTime()+cat.days*86400000) < new Date(); });
+      var pxSoon = customers.filter(function(c,i){ var exp=c.passportExpiry; if(!exp){ var d=new Date(2026,6,15); d.setMonth(d.getMonth()+(((i*7)%16)-2)); exp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-15'; } var m=monthsLeft(exp); return m!=null && m>=0 && m<=6; });
+      var alerts = [
+        held.length      ? { icon:'pause-circle-fill', tone:'warning', n:held.length,        text:'held tickets awaiting issue',            route:'travels/air-ticketing/manage-sales' } : null,
+        ttlDue.length    ? { icon:'alarm-fill',        tone:'error',   n:ttlDue.length,       text:'ticketing deadlines within 3 days',      route:'travels/air-ticketing/ttl' } : null,
+        visaOverdue.length ? { icon:'hourglass-bottom', tone:'error',  n:visaOverdue.length,  text:'visa decisions overdue',                 route:'travels/visa-processing/embassy-tracking' } : null,
+        pxSoon.length    ? { icon:'person-vcard',      tone:'warning', n:pxSoon.length,       text:'customer passports expiring ≤6 months',  route:'travels/vendor-agent/customers' } : null
+      ].filter(Boolean);
+      if (alerts.length) {
+        page.appendChild(el('div.section-label',{text:'Action Center — needs attention'}));
+        page.appendChild(el('div.card', null, [ el('div.card-body', null, alerts.map(function(a){
+          return el('div.data-row', { style:{cursor:'pointer'}, onclick:(function(rt){ return function(){ EPAL.router.navigate(rt); }; })(a.route) }, [
+            ui.frag('<span class="notif-ico notif-'+a.tone+'">'+ui.icon(a.icon)+'</span>'),
+            el('div.flex-1', null, [ el('span.strong',{text:a.n+' '}), el('span.text-dim',{text:a.text}) ]),
+            ui.frag('<span class="text-mute">'+ui.icon('chevron-right')+'</span>')
+          ]);
+        })) ]));
+      }
+
       // trend + visa stage funnel
       var row = el('div.two-col');
       row.appendChild(el('div.card', null, [

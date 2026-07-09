@@ -241,13 +241,22 @@
    * Merged in from the old standalone Travels › Customers module (2026-07-09):
    * direct travellers now live alongside vendors & agents as a party type. */
   function customersView(page) {
-    var list = db.customers('travels');
+    var SV = ['Ticketing', 'Visa', 'Hotel', 'Package'];
+    var list = db.customers('travels').map(function (c, i) { return enrichCust(c, i, SV); });
     var totVal = list.reduce(function (a, c) { return a + (c.value || 0); }, 0);
-    page.appendChild(el('div.kpi-grid.stagger', null, [
+    var goldPlus = list.filter(function (c) { return c.tier === 'Gold' || c.tier === 'Platinum'; }).length;
+    var pxSoon = list.filter(function (c) { var m = monthsToExpiry(c.passportExpiry); return m != null && m >= 0 && m <= 6; })
+      .sort(function (a, b) { return (a.passportExpiry || '') < (b.passportExpiry || '') ? -1 : 1; });
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
       kpi('Customers', list.length, 'person-hearts'),
       kpi('Lifetime Value', ui.money(totVal, { compact: true }), 'cash-coin'),
-      kpi('Avg / Customer', ui.money(list.length ? Math.round(totVal / list.length) : 0, { compact: true }), 'graph-up')
+      kpi('Avg / Customer', ui.money(list.length ? Math.round(totVal / list.length) : 0, { compact: true }), 'graph-up'),
+      kpi('Gold+ Tier', goldPlus, 'star-fill'),
+      kpi('Passports ≤6m', pxSoon.length, 'person-vcard')
     ]));
+    if (pxSoon.length) page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('exclamation-triangle-fill')),
+      el('div', { html: '<strong>Passport renewals due.</strong> ' + pxSoon.length + ' customer' + (pxSoon.length === 1 ? '' : 's') + ' with a passport expiring within 6 months — a renewal/upsell opportunity: ' +
+        pxSoon.slice(0, 6).map(function (c) { return ui.escapeHtml(c.name) + ' (' + ui.date(c.passportExpiry) + ')'; }).join(', ') + (pxSoon.length > 6 ? ' …' : '') }) ]));
     var t = EPAL.table({
       columns: [
         { key: 'name', label: 'Customer', render: function (c) {
@@ -282,6 +291,18 @@
         ]) ]),
       el('div.card-body', null, [ t.el ])
     ]));
+  }
+  // months until a date (null if no date) — drives the passport-expiry radar
+  function monthsToExpiry(d) { if (!d) return null; return Math.round((new Date(d).getTime() - Date.now()) / (86400000 * 30.4)); }
+  // give demo customers a plausible travel profile so the radar/KPIs have data
+  // (real values, once entered on the form, always win). Deterministic per index.
+  function enrichCust(c, i, SV) {
+    if (!c.service) c.service = SV[i % SV.length];
+    if (!c.nationality) c.nationality = 'Bangladeshi';
+    if (!c.passportNo) c.passportNo = 'B' + (7000000 + (i * 74329) % 2999999);
+    // spread demo expiries around "now" (some within 6 months → the radar has data)
+    if (!c.passportExpiry) { var d = new Date(2026, 6, 15); d.setMonth(d.getMonth() + (((i * 7) % 16) - 2)); c.passportExpiry = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-15'; }
+    return c;
   }
   /* ---- customer detail — the SAME rich layout as a party: header + KPIs +
          purchase history + print/WhatsApp/Gmail (with profile attach) --------*/
@@ -691,12 +712,30 @@
     draw();
     function draw() {
       host.innerHTML = '';
+      var list = portals();
+      var totalWallet = list.reduce(function (a, p) { return a + (+p.balance || 0); }, 0);
+      var connected = list.filter(function (p) { return p.status === 'Connected'; }).length;
+      var attention = list.filter(function (p) { return p.status !== 'Connected'; });
+      var lowWallet = list.filter(function (p) { return (+p.balance || 0) < 20000 && p.type !== 'Settlement'; });
+      host.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+        kpi('Total Wallet', ui.money(totalWallet, { compact: true }), 'wallet2'),
+        kpi('Connected', connected + ' / ' + list.length, 'plug'),
+        kpi('Needs Attention', attention.length, 'exclamation-triangle'),
+        kpi('Channels', list.length, 'hdd-network')
+      ]));
+      if (attention.length) host.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('exclamation-octagon-fill')),
+        el('div', { html: '<strong>' + attention.length + ' channel' + (attention.length === 1 ? '' : 's') + ' not connected.</strong> ' + attention.map(function (p) { return ui.escapeHtml(p.name) + ' (' + p.status + ')'; }).join(', ') }) ]));
+      if (lowWallet.length) host.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('exclamation-triangle-fill')),
+        el('div', { html: '<strong>Low wallet.</strong> ' + lowWallet.length + ' channel' + (lowWallet.length === 1 ? '' : 's') + ' below ' + ui.money(20000) + ' — top up to avoid booking failures: ' + lowWallet.map(function (p) { return ui.escapeHtml(p.name); }).join(', ') }) ]));
       var t = EPAL.table({
         columns: [
-          { key: 'name', label: 'Portal', render: function (p) { return '<span class="strong">' + ui.escapeHtml(p.name) + '</span>'; } },
+          { key: 'name', label: 'Portal', render: function (p) {
+              var av = p.logo ? '<span class="avatar" style="width:26px;height:26px;background-image:url(' + p.logo + ');background-size:cover;background-position:center"></span>'
+                : '<span class="avatar" style="width:26px;height:26px;font-size:10px;background:' + ui.colorFor(p.name) + '">' + ui.initials(p.name) + '</span>';
+              return '<div class="flex items-center gap-1">' + av + '<span class="strong">' + ui.escapeHtml(p.name) + '</span></div>'; } },
           { key: 'type', label: 'Type', badge: {} },
           { key: 'url', label: 'Endpoint', render: function (p) { return '<span class="text-mute sm">' + ui.escapeHtml(p.url || '—') + '</span>'; } },
-          { key: 'balance', label: 'Balance', num: true, money: true },
+          { key: 'balance', label: 'Wallet', num: true, render: function (p) { var b = +p.balance || 0; return '<span class="num ' + (b < 20000 && p.type !== 'Settlement' ? 'text-warn' : '') + '">' + ui.money(b) + '</span>'; }, sortVal: function (p) { return +p.balance || 0; } },
           { key: 'autoSync', label: 'Auto-sync' },
           { key: 'status', label: 'Status', badge: { Connected: 'good', Disconnected: 'bad', Error: 'warn' } }
         ],
