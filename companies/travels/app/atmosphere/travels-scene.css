@@ -243,6 +243,14 @@
   will-change: transform; }
 .ascene.on .ar-sweep{ animation: radar-sweep 5s linear infinite; }
 @keyframes radar-sweep{ to{ transform: rotate(360deg); } }
+/* radar contacts: faint blips that flash as the 5s sweep arm passes over them */
+.ar-blip{ position:absolute; width:5px; height:5px; border-radius:50%; background: var(--taxi-green);
+  box-shadow: 0 0 6px var(--taxi-green); opacity:0; }
+.ascene.on .ar-blip{ animation: ar-ping 5s linear infinite; }
+.ar-blip.b1{ left:63%; top:37%; animation-delay:-.3s; }
+.ar-blip.b2{ left:43%; top:61%; animation-delay:-2.1s; }
+.ar-blip.b3{ left:69%; top:66%; animation-delay:-3.5s; }
+@keyframes ar-ping{ 0%{opacity:0;} 4%{opacity:.9;} 34%{opacity:.4;} 62%{opacity:0;} 100%{opacity:0;} }
 
 /* ------------------------------------------------ reduced motion → freeze */
 @media (prefers-reduced-motion: reduce){

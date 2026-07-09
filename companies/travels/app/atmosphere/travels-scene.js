@@ -194,6 +194,17 @@
       return '<g transform="translate(' + p[0] + ' ' + p[1] + ') scale(' + p[2] + ')">' + jet + '</g>';
     }).join('');
   }
+  /* ---- a CARGO FREIGHTER (side view): a fat high-wing fuselage, tall tail and
+         a heavy contrail — reads distinctly from the sleek airliner. Nose +x. */
+  function cargoSide() {
+    return '<path class="contrail" d="M-46 -3.6 L-158 -3.6 M-46 3.6 L-158 3.6"/>' +
+           '<path class="plane" d="M-46 3.4 C-46 -3 -40 -6.4 -14 -6.4 L26 -6.4 C42 -6.4 50 -3 54 0 C50 3 42 6.4 26 6.4 L-14 6.4 C-40 6.4 -46 3.4 -46 3.4 Z"/>' + /* fat fuselage */
+           '<path class="plane" d="M-40 -6 L-51 -22 L-42 -22 L-30 -6 Z"/>' +           /* tall tail   */
+           '<path class="plane" d="M4 -6 L22 -22 L30 -6 Z"/>' +                        /* high wing   */
+           '<ellipse class="plane" cx="12" cy="-6" rx="6" ry="2.2"/>' +                /* wing engine */
+           '<circle class="beacon" cx="-8" cy="-6" r="1.6"/>' +                         /* beacon      */
+           '<circle class="strobe" cx="54" cy="0" r="1.4"/>';                           /* nav strobe  */
+  }
   /* ---- a HELICOPTER (top view): pod fuselage, tail boom + tail rotor, and a
          main rotor disc that spins. Nose toward +x. -------------------------*/
   function heliTop() {
@@ -312,6 +323,7 @@
         '<path id="rt-land" d="M556 352 Q778 462 800 553 L800 884" fill="none"/>' +
         '<path id="rt-taxi" d="M648 570 Q810 560 992 570" fill="none"/>' +
         '<path id="rt-svc"  d="M170 656 Q680 642 1200 662" fill="none"/>' +
+        '<path id="rt-cargo" d="M1560 300 Q820 214 40 292" fill="none"/>' +   /* high freighter lane, slow R→L */
         '<path id="rt-heli" d="M1520 300 Q 800 342 90 300" fill="none"/>' +
         /* FIGHTER SHOW — a family of flight paths the display team flies at random:
            weave (barrel rolls), high arc, sweeping bank, low runway pass,
@@ -388,6 +400,7 @@
         mover('rt-land', LAND, 0.42, planeTop(), { scaleTo: 1.18 }) +          /* airliner landing (grows toward viewer) */
         mover('rt-dep',  20,  1.18, planeTop(), { hold: true, scaleTo: 0.42 }) + /* airliner take-off (shrinks climbing away) */
         mover('rt-fly',  34, 1.25, planeSide(true),  false) +   /* airliner great-circle   */
+        mover('rt-cargo',82, 1.0,  cargoSide(),      false) +   /* cargo freighter, high slow lane */
         mover('rt-heli', 30, 0.9,  heliTop(),        false) +   /* helicopter crossing     */
         '<g id="jet-stage">' + (REDUCED ? fighterGroup(JET_SCENARIOS[6]) : '') + '</g>' +   /* fighter show (spawnFighters cycles it) */
       '</svg>';
@@ -398,7 +411,9 @@
              '<div class="asky"></div>' +
              '<div class="aclouds"><span class="ac ac1"></span><span class="ac ac2"></span><span class="ac ac3"></span></div>' +
              svg +
-             '<div class="aradar"><span class="ar-sweep"></span></div>' +
+             '<div class="aradar"><span class="ar-sweep"></span>' +
+               '<span class="ar-blip b1"></span><span class="ar-blip b2"></span><span class="ar-blip b3"></span>' +
+             '</div>' +
            '</div>';
   }
 

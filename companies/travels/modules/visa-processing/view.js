@@ -656,7 +656,12 @@
     if (title) card.appendChild(el('div.card-head', null, [ el('h3',{text:title}) ]));
     if (!rows.length) { card.appendChild(el('div.empty-state',null,[ ui.frag(ui.icon('inbox')), el('h3',{text:'Nothing here yet'}), el('p.text-muted',{text:emptyMsg||''}) ])); return card; }
     var table = el('table.tbl');
-    table.innerHTML = '<thead><tr>'+headers.map(function(h){return '<th>'+h+'</th>';}).join('')+'</tr></thead>';
+    // right-align numeric HEADERS over their right-aligned (.num) cells — detect
+    // which columns are numeric from the first row so we never mistag a text column.
+    var numCol = {}, first = rows[0];
+    if (first && first.children) for (var i = 0; i < first.children.length; i++)
+      if (first.children[i].classList && first.children[i].classList.contains('num')) numCol[i] = 1;
+    table.innerHTML = '<thead><tr>'+headers.map(function(h,i){return '<th'+(numCol[i]?' class="num"':'')+'>'+h+'</th>';}).join('')+'</tr></thead>';
     var tb = el('tbody'); rows.forEach(function(r){ tb.appendChild(r); }); table.appendChild(tb);
     card.appendChild(el('div.table-wrap', null, [ table ]));
     return card;
