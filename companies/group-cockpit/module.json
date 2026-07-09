@@ -17,7 +17,8 @@
       "icon": "grid-1x2-fill",
       "desc": "Consolidated group health, KPIs, intelligence.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "briefing",
@@ -26,7 +27,8 @@
       "desc": "Your daily narrative digest — money, risks, exceptions.",
       "enabled": true,
       "badge": "AI",
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "companies",
@@ -34,7 +36,8 @@
       "icon": "diagram-3-fill",
       "desc": "All companies at a glance — revenue, margin, risk.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "finance",
@@ -103,7 +106,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "analytics",
@@ -136,7 +140,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "crm",
@@ -169,7 +174,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "employees",
@@ -215,7 +221,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "tasks",
@@ -224,7 +231,8 @@
       "desc": "Open any employee task board, assign & audit.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "reports",
@@ -232,7 +240,8 @@
       "icon": "file-earmark-bar-graph-fill",
       "desc": "Downloadable, documentation-grade reports.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "documents",
@@ -240,7 +249,8 @@
       "icon": "file-earmark-richtext-fill",
       "desc": "Every branded invoice, receipt & report — searchable.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "approvals",
@@ -248,7 +258,8 @@
       "icon": "patch-check-fill",
       "desc": "Maker-checker inbox — authorise the big moves.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "automation",
@@ -256,7 +267,8 @@
       "icon": "robot",
       "desc": "Rules, triggers & workflows across the group.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "activity-log",
@@ -265,7 +277,8 @@
       "desc": "Full audit trail — who did what, when, from where.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "notifications",
@@ -273,7 +286,8 @@
       "icon": "bell-fill",
       "desc": "System-wide alerts, mentions & approvals.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "module-manager",
@@ -282,7 +296,8 @@
       "desc": "Turn companies, modules & features on/off live.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "settings",
@@ -291,7 +306,8 @@
       "desc": "Group profile, branding, security, backups.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": true
     }
   ]
 }

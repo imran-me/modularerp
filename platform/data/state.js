@@ -122,6 +122,11 @@
 
     /* Is this node enabled? (respects override, else config default) -------*/
     isEnabled: function (companyId, moduleId, subId) {
+      // AUTO-DISCOVERY gate (Phase 3a): a company/module whose folder is proven
+      // absent is hidden regardless of config or overrides. Defaults to present,
+      // so this is a no-op until a scan (HTTP only) proves otherwise — the app is
+      // byte-identical when every folder is present and on file://.
+      if (EPAL.discovery && !EPAL.discovery.presentFor(companyId, moduleId)) return false;
       var ov = this.overrides();
       var key = this.keyFor(companyId, moduleId, subId);
       if (key in ov) return ov[key];

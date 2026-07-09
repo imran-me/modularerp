@@ -16,7 +16,8 @@
       "icon": "speedometer2",
       "desc": "Projects, MRR, utilisation, support SLA.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "crm",
@@ -24,7 +25,8 @@
       "icon": "person-lines-fill",
       "desc": "Sales pipeline for software & services.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "projects",
@@ -51,7 +53,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "services",
@@ -78,7 +81,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "clients",
@@ -86,7 +90,8 @@
       "icon": "person-hearts",
       "desc": "Client accounts & contacts.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "support",
@@ -113,7 +118,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "contracts",
@@ -121,7 +127,8 @@
       "icon": "file-earmark-medical",
       "desc": "AMС, SLAs, renewals.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "timesheets",
@@ -129,7 +136,8 @@
       "icon": "clock-history",
       "desc": "Billable hours, utilisation.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "accounts",
@@ -137,7 +145,8 @@
       "icon": "cash-stack",
       "desc": "Invoicing, expenses, project P&L.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "ledgers",
@@ -145,7 +154,8 @@
       "icon": "journal-text",
       "desc": "General & client ledgers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "hrm",
@@ -153,7 +163,8 @@
       "icon": "people-fill",
       "desc": "Developers, QA, design, ops.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "reports",
@@ -161,7 +172,8 @@
       "icon": "file-earmark-bar-graph",
       "desc": "Delivery & financial reports.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "analytics",
@@ -169,7 +181,8 @@
       "icon": "graph-up",
       "desc": "Velocity, margin, churn, forecasts.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "tasks",
@@ -177,7 +190,8 @@
       "icon": "kanban",
       "desc": "Personal Kanban board with phase timers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "settings",
@@ -186,7 +200,8 @@
       "desc": "IT Solutions configuration.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": false
     }
   ]
 }

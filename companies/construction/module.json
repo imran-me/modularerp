@@ -16,7 +16,8 @@
       "icon": "speedometer2",
       "desc": "Project progress, cost vs budget, cash.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "projects",
@@ -49,7 +50,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "tenders",
@@ -57,7 +59,8 @@
       "icon": "clipboard-check",
       "desc": "Bids, prequalification, awards.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "boq",
@@ -65,7 +68,8 @@
       "icon": "calculator-fill",
       "desc": "Bill of quantities, rate analysis.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "materials",
@@ -73,7 +77,8 @@
       "icon": "bricks",
       "desc": "Cement, steel, aggregates — stock & issue.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "procurement",
@@ -81,7 +86,8 @@
       "icon": "cart-fill",
       "desc": "Vendors, PO, GRN, comparative statements.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "equipment",
@@ -89,7 +95,8 @@
       "icon": "gear-wide-connected",
       "desc": "Machinery, utilisation, maintenance.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "subcontractors",
@@ -97,7 +104,8 @@
       "icon": "person-workspace",
       "desc": "Nominated & labour subcontracts.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "labor",
@@ -105,7 +113,8 @@
       "icon": "people",
       "desc": "Site labour, muster, wages.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "quality",
@@ -113,7 +122,8 @@
       "icon": "shield-check",
       "desc": "QA/QC checklists, HSE incidents.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "accounts",
@@ -121,7 +131,8 @@
       "icon": "cash-stack",
       "desc": "IPCs, expenses, project cost control.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "ledgers",
@@ -129,7 +140,8 @@
       "icon": "journal-text",
       "desc": "General & vendor ledgers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "hrm",
@@ -137,7 +149,8 @@
       "icon": "people-fill",
       "desc": "Engineers, supervisors, admin.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "reports",
@@ -145,7 +158,8 @@
       "icon": "file-earmark-bar-graph",
       "desc": "Progress, cost, material reports.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "analytics",
@@ -153,7 +167,8 @@
       "icon": "graph-up",
       "desc": "EVM, cost overrun risk, cash forecast.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "tasks",
@@ -161,7 +176,8 @@
       "icon": "kanban",
       "desc": "Personal Kanban board with phase timers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "settings",
@@ -170,7 +186,8 @@
       "desc": "Construction configuration.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": false
     }
   ]
 }

@@ -16,7 +16,8 @@
       "icon": "speedometer2",
       "desc": "Travels performance, sales, pipeline, alerts.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "crm",
@@ -49,7 +50,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "vendor-agent",
@@ -88,7 +90,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "air-ticketing",
@@ -145,7 +148,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "contract-flight",
@@ -178,7 +182,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "visa-processing",
@@ -236,7 +241,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "file-management",
@@ -263,7 +269,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "passport-mgmt",
@@ -290,7 +297,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "customers",
@@ -298,7 +306,8 @@
       "icon": "person-hearts",
       "desc": "Traveller 360 — shared with Group CRM.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "accounts",
@@ -331,7 +340,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "ledgers",
@@ -339,7 +349,8 @@
       "icon": "journal-text",
       "desc": "General & party ledgers, trial balance.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "hrm",
@@ -347,7 +358,8 @@
       "icon": "people-fill",
       "desc": "Travels team — attendance, leaves, payroll.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "reports",
@@ -355,7 +367,8 @@
       "icon": "file-earmark-spreadsheet",
       "desc": "Sales, visa, ticketing, financial reports.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "analytics",
@@ -363,7 +376,8 @@
       "icon": "graph-up",
       "desc": "Profit leak, fraud sentinel, travel-DNA.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "marketing",
@@ -371,7 +385,8 @@
       "icon": "megaphone-fill",
       "desc": "Email / SMS / WhatsApp campaigns.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "automation",
@@ -379,7 +394,8 @@
       "icon": "robot",
       "desc": "Doc-expiry radar, markup engine, bots.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "tasks",
@@ -387,7 +403,8 @@
       "icon": "kanban",
       "desc": "Personal Kanban board with phase timers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "settings",
@@ -396,7 +413,8 @@
       "desc": "Travels-specific configuration.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": false
     }
   ]
 }

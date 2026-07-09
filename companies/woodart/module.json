@@ -16,7 +16,8 @@
       "icon": "speedometer2",
       "desc": "Projects, pipeline, workshop load, margins.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "crm",
@@ -24,7 +25,8 @@
       "icon": "person-lines-fill",
       "desc": "Design enquiries → site visits → deals.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "projects",
@@ -57,7 +59,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": true
     },
     {
       "id": "estimates",
@@ -84,7 +87,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "clients",
@@ -92,7 +96,8 @@
       "icon": "person-hearts",
       "desc": "Homeowners, developers, corporates.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "materials",
@@ -100,7 +105,8 @@
       "icon": "boxes",
       "desc": "Wood, laminates, hardware, finishes inventory.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "production",
@@ -108,7 +114,8 @@
       "icon": "hammer",
       "desc": "Fabrication jobs, machine & labour scheduling.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "installation",
@@ -116,7 +123,8 @@
       "icon": "truck",
       "desc": "Delivery, installation, site handover & snags.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "procurement",
@@ -124,7 +132,8 @@
       "icon": "cart-fill",
       "desc": "Vendors, purchase orders, GRN.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "accounts",
@@ -132,7 +141,8 @@
       "icon": "cash-stack",
       "desc": "Income, expenses, project P&L.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "ledgers",
@@ -140,7 +150,8 @@
       "icon": "journal-text",
       "desc": "General & client ledgers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "hrm",
@@ -148,7 +159,8 @@
       "icon": "people-fill",
       "desc": "Designers, carpenters, site crew.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "reports",
@@ -156,7 +168,8 @@
       "icon": "file-earmark-bar-graph",
       "desc": "Project, material & financial reports.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "analytics",
@@ -164,7 +177,8 @@
       "icon": "graph-up",
       "desc": "Margin analysis, wastage, on-time delivery.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "tasks",
@@ -172,7 +186,8 @@
       "icon": "kanban",
       "desc": "Personal Kanban board with phase timers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "settings",
@@ -181,7 +196,8 @@
       "desc": "Woodart configuration.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": false
     }
   ]
 }

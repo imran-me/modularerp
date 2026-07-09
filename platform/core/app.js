@@ -71,6 +71,16 @@
       });
       // Remove the pre-boot splash.
       var splash = $('#boot-splash'); if (splash) { splash.classList.add('gone'); setTimeout(function () { splash.remove(); }, 500); }
+
+      // AUTO-DISCOVERY (Phase 3a): after the shell is up, probe which company /
+      // module folders actually exist (HTTP only; file:// no-ops). Re-render ONLY
+      // if a folder was found deleted — so the normal all-present load never
+      // re-renders and stays byte-identical to before discovery existed.
+      if (EPAL.discovery && EPAL.discovery.scan) {
+        EPAL.discovery.scan().then(function (d) {
+          if (d.changed()) { App.renderShell(); EPAL.router.render(); }
+        });
+      }
     },
 
     /* ---- THEME -----------------------------------------------------------*/

@@ -115,6 +115,10 @@
   <script src="platform/auth-rbac/auth.js"></script>
   <script src="platform/auth-rbac/permissions.js"></script>
   <script src="platform/core/router.js"></script>
+  <!-- Auto-discovery (Phase 3a): folder present = company/module appears. Default
+       present + file:// fallback, so no visual/behaviour change when all folders
+       exist. Loads before app.js (which runs the scan after boot). -->
+  <script src="platform/discovery/discovery.js"></script>
 
   <!-- ===================== VIEWS (self-registering) ===================== -->
   <!-- registry first (defines EPAL.view + the placeholder scaffold). -->

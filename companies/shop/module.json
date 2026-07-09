@@ -16,7 +16,8 @@
       "icon": "speedometer2",
       "desc": "Sales, best-sellers, stock health, margins.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "pos",
@@ -25,7 +26,8 @@
       "desc": "Fast checkout terminal.",
       "enabled": true,
       "badge": "Live",
-      "subs": []
+      "subs": [],
+      "built": true
     },
     {
       "id": "products",
@@ -64,7 +66,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "inventory",
@@ -103,7 +106,8 @@
           "icon": "dot",
           "enabled": true
         }
-      ]
+      ],
+      "built": false
     },
     {
       "id": "orders",
@@ -111,7 +115,8 @@
       "icon": "bag-check",
       "desc": "Online & counter orders, fulfilment.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "purchases",
@@ -119,7 +124,8 @@
       "icon": "cart-plus",
       "desc": "Suppliers, purchase orders, returns.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "customers",
@@ -127,7 +133,8 @@
       "icon": "person-hearts",
       "desc": "Loyalty, history — shared with Group CRM.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "suppliers",
@@ -135,7 +142,8 @@
       "icon": "truck",
       "desc": "Supplier accounts & terms.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "accounts",
@@ -143,7 +151,8 @@
       "icon": "cash-stack",
       "desc": "Sales, expenses, daily closing.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "ledgers",
@@ -151,7 +160,8 @@
       "icon": "journal-text",
       "desc": "General, customer & supplier ledgers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "hrm",
@@ -159,7 +169,8 @@
       "icon": "people-fill",
       "desc": "Cashiers, floor staff, managers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "reports",
@@ -167,7 +178,8 @@
       "icon": "file-earmark-bar-graph",
       "desc": "Sales, stock, tax, profit reports.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "analytics",
@@ -175,7 +187,8 @@
       "icon": "graph-up",
       "desc": "Basket analysis, ABC, seasonality.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "tasks",
@@ -183,7 +196,8 @@
       "icon": "kanban",
       "desc": "Personal Kanban board with phase timers.",
       "enabled": true,
-      "subs": []
+      "subs": [],
+      "built": false
     },
     {
       "id": "settings",
@@ -192,7 +206,8 @@
       "desc": "Shop configuration & tax.",
       "enabled": true,
       "admin": true,
-      "subs": []
+      "subs": [],
+      "built": false
     }
   ]
 }
