@@ -40,36 +40,122 @@
   var ui = EPAL.ui, el = ui.el;
 
   EPAL.table = function (opts) {
-    var state = { q: '', sortKey: null, sortDir: 1, page: 0, filters: {} };
+    var state = { q: '', sortKey: null, sortDir: 1, page: 0, filters: {}, dateFrom: '', dateTo: '', datePreset: null };
     var cols = opts.columns || [];
     var pageSize = opts.pageSize || 10;
 
     var root = el('div.dt');
-    /* ---- toolbar: search + filters + export -----------------------------*/
+    /* ---- toolbar: search + quick chips + (inline filters | filter panel) + export
+       Opt-in extras (all default OFF so existing tables are unchanged):
+         opts.quickFilter : column key → renders value CHIPS after a HALF search
+         opts.filterPanel : true → a "Filter" button opens a card (filters + date
+                            presets + highest/lowest sort); filters move off the bar
+         opts.dateKey     : column key the date-range presets filter on            */
+    var compact = !!(opts.quickFilter || opts.filterPanel);
     var toolbar = el('div.dt-toolbar');
     var searchIn = el('input.input.dt-search', { placeholder: opts.searchPlaceholder || 'Search…',
       oninput: ui.debounce(function () { state.q = searchIn.value.toLowerCase(); state.page = 0; draw(); }, 120) });
-    toolbar.appendChild(el('div.dt-search-wrap', null, [ ui.frag(ui.icon('search', 'dt-search-ico')), searchIn ]));
+    toolbar.appendChild(el('div.dt-search-wrap' + (compact ? '.half' : ''), null, [ ui.frag(ui.icon('search', 'dt-search-ico')), searchIn ]));
 
-    (opts.filters || []).forEach(function (f) {
+    var chipWrap = null;
+    if (opts.quickFilter) { chipWrap = el('div.dt-chips'); toolbar.appendChild(chipWrap); }
+
+    // build the filter <select>s once (used inline OR inside the panel)
+    var filterSelects = (opts.filters || []).map(function (f) {
       var sel = el('select.select.dt-filter', { onchange: function () {
         state.filters[f.key] = sel.value; state.page = 0; draw(); } });
-      toolbar.appendChild(sel);
-      f._sel = sel;   // options are (re)derived from data in draw()
+      f._sel = sel; return sel;
     });
+    if (!opts.filterPanel) filterSelects.forEach(function (sel) { toolbar.appendChild(sel); });
 
     var countEl = el('span.dt-count');
     toolbar.appendChild(el('div.spacer'));
     toolbar.appendChild(countEl);
+
+    var filterBtn = null, panel = null;
+    if (opts.filterPanel) {
+      filterBtn = el('button.btn.btn-sm.btn-ghost.dt-filter-btn', { html: ui.icon('sliders') + ' Filter',
+        title: 'Filters, date range & sorting', onclick: function () { panel.classList.toggle('open'); } });
+      toolbar.appendChild(filterBtn);
+    }
     if (opts.exportName !== false) {
       toolbar.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-csv') + ' Export',
-        title: 'Export the current filtered rows as CSV',
-        onclick: function () { exportCSV(); } }));
+        title: 'Export the current filtered rows as CSV', onclick: function () { exportCSV(); } }));
       toolbar.appendChild(el('button.btn.btn-sm.btn-ghost', { html: ui.icon('filetype-pdf') + ' PDF',
-        title: 'Export the current filtered rows as a printable PDF',
-        onclick: function () { exportPDF(); } }));
+        title: 'Export the current filtered rows as a printable PDF', onclick: function () { exportPDF(); } }));
     }
     root.appendChild(toolbar);
+    if (opts.filterPanel) { panel = buildFilterPanel(filterSelects); root.appendChild(panel); }
+
+    /* the Filter card — filters + date-range presets + highest/lowest sort */
+    function buildFilterPanel(selects) {
+      var card = el('div.dt-filter-card');
+      if (selects.length) {
+        card.appendChild(el('div.dt-fc-label', { text: 'Filter by' }));
+        var fg = el('div.dt-fc-row'); selects.forEach(function (s) { fg.appendChild(s); }); card.appendChild(fg);
+      }
+      if (opts.dateKey) {
+        card.appendChild(el('div.dt-fc-label', { text: 'Date range' }));
+        var dr = el('div.dt-fc-row');
+        [[7, 'Last 7 days'], [30, 'Last 30 days'], [90, 'Last 90 days'], [0, 'All time']].forEach(function (p) {
+          dr.appendChild(el('button.dt-preset', { text: p[1], onclick: function () { applyDatePreset(p[0]); } }));
+        });
+        card.appendChild(dr);
+        var fromIn = el('input.input.dt-date', { type: 'date', onchange: function () { state.dateFrom = fromIn.value; state.datePreset = null; state.page = 0; draw(); } });
+        var toIn = el('input.input.dt-date', { type: 'date', onchange: function () { state.dateTo = toIn.value; state.datePreset = null; state.page = 0; draw(); } });
+        state._fromIn = fromIn; state._toIn = toIn;
+        card.appendChild(el('div.dt-fc-row.dt-fc-custom', null, [ el('span.dt-fc-sub', { text: 'From' }), fromIn, el('span.dt-fc-sub', { text: 'To' }), toIn ]));
+      }
+      var numCols = cols.filter(function (c) { return c.num && c.sort !== false; });
+      if (numCols.length) {
+        var sortCol = opts.sortNumKey || numCols[numCols.length - 1].key;   // usually the amount/payable column
+        card.appendChild(el('div.dt-fc-label', { text: 'Sort' }));
+        card.appendChild(el('div.dt-fc-row', null, [
+          el('button.dt-preset', { html: ui.icon('sort-down') + ' Highest', onclick: function () { state.sortKey = sortCol; state.sortDir = -1; state.page = 0; draw(); } }),
+          el('button.dt-preset', { html: ui.icon('sort-up') + ' Lowest', onclick: function () { state.sortKey = sortCol; state.sortDir = 1; state.page = 0; draw(); } })
+        ]));
+      }
+      card.appendChild(el('div.dt-fc-foot', null, [
+        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('x-circle') + ' Clear all', onclick: function () { clearFilters(); } }),
+        el('button.btn.btn-sm.btn-primary', { text: 'Done', onclick: function () { panel.classList.remove('open'); } })
+      ]));
+      return card;
+    }
+    function applyDatePreset(days) {
+      if (!days) { state.dateFrom = ''; state.dateTo = ''; }
+      else { var d = new Date(); d.setDate(d.getDate() - days); state.dateFrom = d.toISOString().slice(0, 10); state.dateTo = ''; }
+      state.datePreset = days || null; state.page = 0;
+      if (state._fromIn) state._fromIn.value = state.dateFrom;
+      if (state._toIn) state._toIn.value = state.dateTo;
+      draw();
+    }
+    function clearFilters() {
+      state.filters = {}; state.dateFrom = ''; state.dateTo = ''; state.datePreset = null;
+      (opts.filters || []).forEach(function (f) { if (f._sel) f._sel.value = '__all'; });
+      if (state._fromIn) state._fromIn.value = ''; if (state._toIn) state._toIn.value = '';
+      state.page = 0; draw();
+    }
+    function buildChips() {
+      if (!chipWrap) return;
+      var key = opts.quickFilter, cur = state.filters[key];
+      var vals = {}; getRows().forEach(function (r) { if (r[key] != null) vals[r[key]] = 1; });
+      chipWrap.innerHTML = '';
+      function chip(val, label) {
+        var active = val === '__all' ? (!cur || cur === '__all') : cur === val;
+        return el('button.dt-chip' + (active ? '.active' : ''), { text: label,
+          onclick: function () { state.filters[key] = val; state.page = 0; draw(); } });
+      }
+      chipWrap.appendChild(chip('__all', 'All'));
+      Object.keys(vals).sort().forEach(function (v) { chipWrap.appendChild(chip(v, v)); });
+    }
+    function syncFilterBtn() {
+      if (!filterBtn) return;
+      var n = 0;
+      (opts.filters || []).forEach(function (f) { var v = state.filters[f.key]; if (v && v !== '__all') n++; });
+      if (state.dateFrom || state.dateTo) n++;
+      filterBtn.classList.toggle('has', n > 0);
+      filterBtn.innerHTML = ui.icon('sliders') + ' Filter' + (n ? ' <span class="dt-filter-n">' + n + '</span>' : '');
+    }
 
     /* ---- table + pagination ---------------------------------------------*/
     var wrap = el('div.table-wrap');
@@ -91,11 +177,21 @@
       if (state.q) rows = rows.filter(function (r) {
         return keys.some(function (k) { return String(r[k] == null ? '' : r[k]).toLowerCase().indexOf(state.q) >= 0; });
       });
-      // dropdown filters
+      // dropdown / chip filters
       Object.keys(state.filters).forEach(function (k) {
         var v = state.filters[k];
         if (v && v !== '__all') rows = rows.filter(function (r) { return String(r[k]) === v; });
       });
+      // date-range filter (opt-in via opts.dateKey)
+      if (opts.dateKey && (state.dateFrom || state.dateTo)) {
+        rows = rows.filter(function (r) {
+          var d = r[opts.dateKey]; if (!d) return false;
+          var ds = String(d).slice(0, 10);
+          if (state.dateFrom && ds < state.dateFrom) return false;
+          if (state.dateTo && ds > state.dateTo) return false;
+          return true;
+        });
+      }
       // sort
       if (state.sortKey) {
         var c = cols.filter(function (x) { return x.key === state.sortKey; })[0] || {};
@@ -122,6 +218,8 @@
         });
         if (cur !== '__all') f._sel.value = cur;
       });
+      buildChips();
+      syncFilterBtn();
 
       countEl.textContent = rows.length + ' record' + (rows.length === 1 ? '' : 's');
 

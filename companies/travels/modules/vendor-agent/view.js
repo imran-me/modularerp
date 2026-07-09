@@ -388,7 +388,9 @@
         ],
         rows: function () { return vendors().map(function (v) { if (!v.status) v.status = 'Active'; return v; }); },
         searchKeys: ['id', 'name', 'type', 'phone', 'terms'],
-        filters: [{ key: 'type', label: 'Type' }, { key: 'terms', label: 'Terms' }, { key: 'status', label: 'Status' }],
+        quickFilter: 'type',                                   // Type values become chips
+        filterPanel: true,                                     // Terms/Status + sort in the Filter card
+        filters: [{ key: 'terms', label: 'Terms' }, { key: 'status', label: 'Status' }],
         pageSize: 10, exportName: 'vendors.csv', pdfTitle: 'Vendor Register',
         onRow: function (v) { openLedgerModal(metaFromVendor(v)); },
         actions: actionsFor(function (v) { editVendor(v); }, function (v) { removeRec('vendors', v, draw); }, metaFromVendor),

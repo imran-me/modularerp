@@ -17,6 +17,34 @@
 .dt-th.sortable:hover { color: var(--text); }
 .dt-sort-ico { font-size: 9px; color: var(--accent); }
 .dt-actions { white-space: nowrap; text-align: left; width: 1%; }
+
+/* half-width search when quick chips / filter panel are in use */
+.dt-search-wrap.half { flex: 0 1 360px; min-width: 200px; }
+/* quick-filter chips (a column's values as toggle buttons) */
+.dt-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dt-chip { padding: 6px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border); transition: all var(--t-fast); white-space: nowrap; }
+.dt-chip:hover { border-color: var(--border-strong); color: var(--text); }
+.dt-chip.active { background: var(--accent); color: #fff; border-color: transparent; }
+/* Filter button active state + count pill */
+.dt-filter-btn.has { border-color: var(--border-accent); color: var(--accent); }
+.dt-filter-n { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; margin-left: 2px;
+  border-radius: 999px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 700; }
+/* the Filter card — opens on the left, medium width */
+.dt-filter-card { display: none; max-width: 440px; margin: 0 0 14px; padding: 16px 18px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--shadow-card); }
+.dt-filter-card.open { display: block; animation: dt-fc-in .18s var(--e-out, ease); }
+@keyframes dt-fc-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.dt-fc-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-mute); margin: 12px 0 7px; }
+.dt-fc-label:first-child { margin-top: 0; }
+.dt-fc-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dt-fc-row .dt-filter { min-width: 150px; }
+.dt-fc-custom .dt-date { width: 150px; padding: 8px 10px; }
+.dt-fc-sub { font-size: 12px; color: var(--text-mute); font-weight: 600; }
+.dt-preset { padding: 7px 13px; border-radius: var(--r-sm); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border); transition: all var(--t-fast); }
+.dt-preset:hover { border-color: var(--accent); color: var(--accent); }
+.dt-fc-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
 .dt-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; }
 .dt-pager { display: flex; gap: 4px; }
 .dt-page-btn { min-width: 30px; height: 30px; padding: 0 8px; border-radius: 8px; display: inline-grid; place-items: center;
