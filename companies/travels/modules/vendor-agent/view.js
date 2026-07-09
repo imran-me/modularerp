@@ -210,8 +210,8 @@
       var titles = { overview: 'Vendor, Agent & Customer', vendors: 'Vendors', agents: 'Sub-Agents', customers: 'Customers',
         portals: 'Portals & Channels', accounts: 'Party Ledger', commission: 'Agent Commission' };
       page.appendChild(EPAL.pageHead({
-        eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Vendor & Agent',
-        icon: 'people-fill', title: titles[sub] || 'Vendor & Agent', sub: subDesc(sub),
+        eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Vendor, Agent & Customer',
+        icon: 'people-fill', title: titles[sub] || 'Vendor, Agent & Customer', sub: subDesc(sub),
         actions: [
           sub !== 'overview' ? el('a.btn.btn-ghost', { href: '#/travels/vendor-agent',
             html: ui.icon('grid') + ' Overview' }) : null,
