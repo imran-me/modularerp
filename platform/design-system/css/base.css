@@ -102,7 +102,7 @@ img, svg { display: block; max-width: 100%; }
 .switch input:checked + .track::before { transform: translateX(18px); }
 
 /* ---------------------------------------------------------------- Tables */
-.table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
+.table-wrap { overflow: auto; max-width: 100%; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); }
 table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl thead th {
   text-align: left; font-weight: 600; font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
