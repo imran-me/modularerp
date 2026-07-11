@@ -1,0 +1,20 @@
+{
+  "key": "automation",
+  "company": "travels",
+  "title": "Automation",
+  "icon": "robot",
+  "desc": "Rules & bots, document-expiry radar and markup engine.",
+  "route": "#/travels/automation",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "rules", "label": "Rules & Bots", "route": "#/travels/automation/rules", "enabled": true },
+    { "id": "radar", "label": "Doc-Expiry Radar", "route": "#/travels/automation/radar", "enabled": true },
+    { "id": "markup", "label": "Markup Engine", "route": "#/travels/automation/markup", "enabled": true }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Graduates the module off the generic placeholder into a working rules/bots + radar + markup screen."
+}
