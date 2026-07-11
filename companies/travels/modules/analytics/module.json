@@ -1,0 +1,20 @@
+{
+  "key": "analytics",
+  "company": "travels",
+  "title": "Analytics",
+  "icon": "graph-up",
+  "desc": "Forecast, profit-leak scanner, fraud sentinel & travel-DNA.",
+  "route": "#/travels/analytics",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "profit-leak", "label": "Profit Leak", "route": "#/travels/analytics/profit-leak", "enabled": true },
+    { "id": "fraud", "label": "Fraud Sentinel", "route": "#/travels/analytics/fraud", "enabled": true },
+    { "id": "travel-dna", "label": "Travel DNA", "route": "#/travels/analytics/travel-dna", "enabled": true }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Travels override of the shared star-slash-analytics view (router prefers specific)."
+}
