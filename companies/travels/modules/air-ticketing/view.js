@@ -63,7 +63,27 @@
   EPAL.registerEngine({ name: 'air-ticketing-seed', seed: function () {
     S.seedOnce('air_emd', seedEmd());
     S.seedOnce('air_ttl', seedTtl());
+    S.seedOnce('air_stock', seedStock());
   }});
+
+  /* Ticket Manage — route STOCK / inventory (pre-loaded ticket routes with price
+     + quantity; remaining = qty − sold). Mirrors the legacy "Ticket Manage". */
+  function seedStock() {
+    var data = [
+      { fromCode:'DAC', toCode:'KUL', via:'BKK', airlineCode:'MH', vendor:'GDS Aggregator BD', portal:'Amadeus',  price:78927, cost:71000, qty:2,  sold:1 },
+      { fromCode:'DAC', toCode:'DXB', via:'',    airlineCode:'EK', vendor:'Emirates GSA',       portal:'Sabre',    price:62000, cost:54000, qty:12, sold:5 },
+      { fromCode:'DAC', toCode:'JED', via:'',    airlineCode:'SV', vendor:'Galaxy GSA',         portal:'BSP IATA', price:58000, cost:51000, qty:20, sold:8 },
+      { fromCode:'KTM', toCode:'DAC', via:'',    airlineCode:'BG', vendor:'',                   portal:'',         price:15700, cost:14200, qty:6,  sold:6 },
+      { fromCode:'DAC', toCode:'DOH', via:'',    airlineCode:'QR', vendor:'GDS Aggregator BD',  portal:'Galileo',  price:64000, cost:57000, qty:8,  sold:2 },
+      { fromCode:'DAC', toCode:'SIN', via:'',    airlineCode:'SQ', vendor:'Sky Holidays',       portal:'Sabre',    price:71000, cost:63000, qty:5,  sold:0 },
+      { fromCode:'DAC', toCode:'IST', via:'',    airlineCode:'TK', vendor:'GDS Aggregator BD',  portal:'Amadeus',  price:82000, cost:73000, qty:4,  sold:1, status:'Inactive' }
+    ];
+    return data.map(function (d, i) {
+      return Object.assign({ id:'STK-'+(6001+i), status:'Active',
+        route: d.via ? (d.fromCode+' → '+d.via+' → '+d.toCode) : (d.fromCode+' → '+d.toCode),
+        created: Date.now() - (i*7200000) }, d);
+    });
+  }
 
   function prng(seed) { var s = seed; return function (n) { s = (s * 1103515245 + 12345) & 0x7fffffff; return s % n; }; }
 
@@ -151,7 +171,7 @@
         ]
       }));
 
-      ({ overview:overview, ticketing:directSale, 'manage-sales':manageSales,
+      ({ overview:overview, stock:stockView, ticketing:directSale, 'manage-sales':manageSales,
          emd:emdView, ttl:ttlView,
          airlines:airlinesView, airports:airportsView, bsp:bspView, refunds:refundsView }[sub] || overview)(page, ctx);
 
@@ -161,6 +181,7 @@
 
   function subDesc(sub) {
     return ({ overview:'Issue, re-issue, refund and void air tickets — with BSP/ADM reconciliation.',
+      stock:'Ticket routes, pricing and stock — pre-loaded inventory with remaining vs sold quantity.',
       ticketing:'Multi-passenger fare model with markup, agent commission, live profit and a branded invoice.',
       'manage-sales':'Costing, sale, commission and net profit for every ticket — plus per-airline/agent reports.',
       emd:'Sell ancillary services (baggage, seats, meals, insurance, lounge) as EMDs with a branded receipt.',
@@ -253,6 +274,136 @@
         tdN(ui.money(x.sale)), td(statusBadge(x.status).outerHTML) ]);
     });
     page.appendChild(tableCard(null, ['Ticket','Passenger','Route','Flight','Sale','Status'], rows, 'No tickets issued yet.'));
+  }
+
+  /* ======================================================= TICKET MANAGE (stock) */
+  function stock() { return S.list('air_stock'); }
+  function remOf(s) { return Math.max(0, (+s.qty||0) - (+s.sold||0)); }
+  function airlineNameOf(code) { var a=(airlines()||[]).filter(function(x){ return x.iata===code; })[0]; return a ? a.name+' ('+code+')' : (code||'—'); }
+  var STOCK_PORTALS = ['', 'Sabre', 'Amadeus', 'Galileo', 'BSP IATA', 'Direct'];
+
+  function stockView(page) {
+    page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost', { html: ui.icon('plus-lg')+' Add New Ticket', onclick:function(){ stockForm(null); } }));
+    var host = el('div'); page.appendChild(host);
+    drawStock(host);
+  }
+  function drawStock(host) {
+    host.innerHTML = '';
+    var list = stock();
+    var totQty=0, totSold=0, stockVal=0, totSales=0, active=0;
+    list.forEach(function(s){ totQty+=(+s.qty||0); totSold+=(+s.sold||0); stockVal+=remOf(s)*(+s.cost||0); totSales+=(+s.sold||0)*(+s.price||0); if(s.status!=='Inactive') active++; });
+    var rem = totQty - totSold;
+    host.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
+      kpi('Routes', list.length, 'signpost-split', function(){ stockList('All Routes — '+list.length, list); }),
+      kpi('Total Stock', ui.num(totQty), 'stack', function(){ stockList('Ticket Stock — '+ui.num(totQty), list); }),
+      kpi('Sold', ui.num(totSold), 'check2-circle', function(){ stockList('Sold', list.filter(function(s){ return (+s.sold||0)>0; })); }),
+      kpi('Remaining', ui.num(rem), 'box-seam', function(){ stockList('Remaining stock', list.filter(function(s){ return remOf(s)>0; })); }),
+      kpi('Stock Value', ui.money(stockVal,{compact:true}), 'lock-fill', function(){ stockList('Unsold stock value', list.filter(function(s){ return remOf(s)>0; })); }),
+      kpi('Total Sales', ui.money(totSales,{compact:true}), 'cash-coin', function(){ stockList('Sales by route', list); }),
+      kpi('Active Routes', String(active), 'toggle-on', function(){ stockList('Active routes', list.filter(function(s){ return s.status!=='Inactive'; })); })
+    ]));
+    var t = stockTable(list, function(){ drawStock(host); });
+    host.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('card-list')+' Ticket List' }), el('span.card-sub', { text: list.length+' route'+(list.length===1?'':'s')+' · price, stock & sales' }) ]),
+      el('div.card-body', null, [ t.el ])
+    ]));
+  }
+  function stockTable(rows, refresh) {
+    return EPAL.table({
+      columns: [
+        { key:'route', label:'Ticket Route', render:function(s){ return '<div class="strong">'+ui.escapeHtml(s.route||'')+'</div><div class="mt-1"><span class="badge">'+ui.escapeHtml((s.fromCode||'')+' ⇄ '+(s.toCode||''))+'</span></div>'; }, sortVal:function(s){ return s.route; } },
+        { key:'airlineCode', label:'Airline', render:function(s){ return ui.escapeHtml(airlineNameOf(s.airlineCode)); }, sortVal:function(s){ return s.airlineCode; } },
+        { key:'vendor', label:'Vendor', render:function(s){ return ui.escapeHtml(s.vendor||'—'); } },
+        { key:'portal', label:'Portal', render:function(s){ return s.portal? '<span class="badge">'+ui.escapeHtml(s.portal)+'</span>' : '—'; } },
+        { key:'price', label:'Price', num:true, money:true },
+        { key:'remaining', label:'Remaining Qty', num:true, sortVal:function(s){ return remOf(s); }, render:function(s){ var r=remOf(s); return '<span class="num '+(r===0?'text-mute':r<=2?'text-warn':'')+'">'+r+'</span>'; } },
+        { key:'sold', label:'Sale Qty', num:true, render:function(s){ return String(+s.sold||0); } },
+        { key:'totalSales', label:'Total Sales', num:true, sortVal:function(s){ return (+s.sold||0)*(+s.price||0); }, render:function(s){ return '<span class="num strong">'+ui.money((+s.sold||0)*(+s.price||0))+'</span>'; } },
+        { key:'status', label:'Status', badge:{ Active:'good', Inactive:'' } }
+      ],
+      rows:rows, searchKeys:['route','fromCode','toCode','airlineCode','vendor','portal'],
+      quickFilter:'airlineCode', filterPanel:true, filters:[{ key:'status', label:'Status' }, { key:'vendor', label:'Vendor' }],
+      pageSize:12, exportName:'ticket-stock.csv', pdfTitle:'Ticket Stock',
+      onRow:function(s){ stockDetail(s, refresh); },
+      actions: ui.actions({
+        edit:  function(s){ stockForm(s, refresh); },
+        del:   function(s){ ui.confirm({ title:'Delete route "'+s.route+'"?', danger:true, confirmLabel:'Delete' }).then(function(ok){ if(ok){ S.removeFrom('air_stock', s.id); ui.toast('Deleted','success'); if(refresh) refresh(); }}); },
+        print: function(s){ stockPrint(s); }
+      }),
+      empty:{ icon:'ticket-perforated', title:'No ticket stock yet', hint:'Add a route with its price & quantity.' }
+    });
+  }
+  function stockList(title, rows) { var body=kpiShell(title, 'ticket-perforated', [['Routes', rows.length], ['Stock', ui.num(rows.reduce(function(a,s){return a+(+s.qty||0);},0))], ['Sold', ui.num(rows.reduce(function(a,s){return a+(+s.sold||0);},0))], ['Sales', ui.money(rows.reduce(function(a,s){return a+(+s.sold||0)*(+s.price||0);},0))]]); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ stockTable(rows, null).el ]) ])); }
+
+  function stockDetail(s, refresh) {
+    var body = el('div');
+    var m = ui.modal({ title: s.route, icon:'ticket-perforated', size:'lg', body:body, footer:false });
+    var rem = remOf(s), totalSales = (+s.sold||0)*(+s.price||0), margin = s.price? Math.round((s.price-(+s.cost||0))/s.price*100):0;
+    var actions = el('div.flex.gap-1.items-center.flex-wrap', { style:{ marginLeft:'auto' } });
+    actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil')+' Edit', onclick:function(){ m.close(); stockForm(s, refresh); } }));
+    actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer')+' Print', onclick:function(){ stockPrint(s); } }));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+        ui.frag('<span class="notif-ico notif-info">'+ui.icon('airplane-fill')+'</span>'),
+        el('div.flex-1', { style:{ minWidth:'180px' } }, [ el('div.fw-700', { style:{ fontSize:'17px' }, text: s.route }),
+          el('div.flex.items-center.gap-2.flex-wrap', null, [ el('span.badge', { text: s.fromCode+' ⇄ '+s.toCode }), el('span.badge', { text: airlineNameOf(s.airlineCode) }),
+            el('span.badge.badge-'+(s.status==='Inactive'?'':'good'), { text: s.status||'Active' }) ]) ]),
+        actions
+      ]),
+      el('div.stat-row', null, [ st2('Price', ui.money(s.price||0)), st2('Total Qty', ui.num(s.qty||0)), st2('Sold', ui.num(s.sold||0)), st2('Remaining', ui.num(rem)) ]),
+      el('div.stat-row.mt-2', null, [ st2('Total Sales', ui.money(totalSales)), st2('Cost / seat', ui.money(s.cost||0)), st2('Margin', margin+'%'), st2('Stock Value', ui.money(rem*(+s.cost||0))) ])
+    ]) ]));
+    body.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('info-circle')+' Route & Sourcing' }) ]),
+      el('div.card-body', null, [ el('div.data-list', null, [
+        drow('From', s.fromCode), drow('Via', s.via), drow('To', s.toCode), drow('Airline', airlineNameOf(s.airlineCode)),
+        drow('Vendor', s.vendor), drow('Portal / GDS', s.portal), drow('Status', s.status||'Active')
+      ]) ]) ]));
+    if (EPAL.comments && EPAL.comments.widget) { body.appendChild(el('div.section-label', { text:'Notes' })); body.appendChild(EPAL.comments.widget('air-stock', s.id)); }
+  }
+  function stockForm(s, refresh) {
+    var isNew = !s;
+    var apOpts = (airports()||[]).map(function(a){ return [a.iata, a.iata+' · '+a.city]; });
+    var alOpts = (airlines()||[]).filter(function(a){ return a.status==='active' || !a.status; }).map(function(a){ return [a.iata, a.name+' ('+a.iata+')']; });
+    var vnOpts = [['','— none —']].concat((db.vendors?db.vendors():[]).map(function(v){ return [v.name, v.name]; }));
+    EPAL.formModal({
+      title: isNew ? 'Add New Ticket' : 'Edit Ticket Route', icon:'ticket-perforated', size:'lg', record: s || { status:'Active', qty:1, sold:0 },
+      fields: [
+        { type:'section', label:'Route' },
+        { key:'fromCode', label:'From', type:'select', options:apOpts, required:true },
+        { key:'via', label:'Via (optional)', type:'select', options:[['','— direct —']].concat(apOpts) },
+        { key:'toCode', label:'To', type:'select', options:apOpts, required:true },
+        { key:'airlineCode', label:'Airline', type:'select', options:alOpts, required:true },
+        { type:'section', label:'Sourcing' },
+        { key:'vendor', label:'Vendor', type:'select', options:vnOpts },
+        { key:'portal', label:'Portal / GDS', type:'select', options:STOCK_PORTALS.map(function(p){ return [p, p||'— none —']; }), default:'' },
+        { type:'section', label:'Pricing & Stock' },
+        { key:'cost', label:'Cost / seat (৳)', type:'money', default:0, min:0 },
+        { key:'price', label:'Sale price (৳)', type:'money', required:true, min:0 },
+        { key:'qty', label:'Total quantity (stock)', type:'number', required:true, min:0, default:1 },
+        { key:'sold', label:'Sold quantity', type:'number', default:0, min:0 },
+        { key:'status', label:'Status', type:'select', options:['Active','Inactive'], default:'Active' }
+      ],
+      saveLabel: isNew ? 'Add Ticket' : 'Save',
+      onSave: function(val){
+        if (val.fromCode === val.toCode) { ui.toast('From and To must differ','error'); return false; }
+        var r = s || { id:'STK-'+ui.uid('').slice(-4).toUpperCase(), created:Date.now() };
+        r.fromCode=val.fromCode; r.toCode=val.toCode; r.via=val.via||''; r.airlineCode=val.airlineCode;
+        r.vendor=val.vendor||''; r.portal=val.portal||''; r.cost=+val.cost||0; r.price=+val.price||0;
+        r.qty=+val.qty||0; r.sold=Math.min(+val.sold||0, +val.qty||0); r.status=val.status||'Active';
+        r.route = r.via ? (r.fromCode+' → '+r.via+' → '+r.toCode) : (r.fromCode+' → '+r.toCode);
+        S.upsert('air_stock', r);
+        ui.toast('Ticket route "'+r.route+'" saved','success');
+        if (refresh) refresh(); else EPAL.router.render();
+        return true;
+      }
+    });
+  }
+  function stockPrint(s) {
+    function row(k,v){ return '<tr><td>'+ui.escapeHtml(k)+'</td><td>'+ui.escapeHtml(String(v==null||v===''?'—':v))+'</td></tr>'; }
+    ui.printDoc({ title:'Ticket Route · '+s.route, subtitle:'Epal Travels & Consultancy · Ticket Stock', meta:airlineNameOf(s.airlineCode), footer:'Ticketing Desk',
+      bodyHtml:'<table>'+row('Route', s.route)+row('Sector', s.fromCode+' ⇄ '+s.toCode)+row('Airline', airlineNameOf(s.airlineCode))+row('Vendor', s.vendor)+row('Portal', s.portal)+
+        row('Cost / seat', ui.money(s.cost||0))+row('Price', ui.money(s.price||0))+row('Total qty', s.qty||0)+row('Sold', s.sold||0)+row('Remaining', remOf(s))+
+        '<tr><th>Total Sales</th><th>'+ui.money((+s.sold||0)*(+s.price||0))+'</th></tr></table>' });
   }
 
   /* ======================================================= DIRECT SALE (issue) */
@@ -1555,6 +1706,7 @@
 
   /* ---- KPI drill-downs: click a card on the overview for the full breakdown --*/
   function st2(l, v) { return el('div.stat', null, [ el('div.stat-label',{text:l}), el('div.stat-value',{text:String(v)}) ]); }
+  function drow(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text:k }), el('div.strong', { text: v==null||v===''?'—':String(v) }) ]); }
   function outstandingOf(x){ return (x.receivable && +x.receivable.amount) ? +x.receivable.amount : (x.sale||0); }
   function byAirlineStats(list){
     var m = {}; list.forEach(function(x){ var k=x.airlineCode||'—'; if(!m[k]) m[k]={ code:k, tickets:0, sale:0, cost:0, comm:0, profit:0 };
