@@ -184,13 +184,13 @@
     // 7 KPIs — slim cards (~30% smaller, same text size/colour), all on ONE row;
     // click any for a full breakdown.
     page.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
-      kpi('Tickets Sold', t.length, 'ticket-perforated', function(){ kpiTickets(t); }),
+      kpi('Tickets Sold', t.length, 'ticket-perforated', function(){ kpiTickets(t); }, momentum(t)),
       kpi('Issued', issued.length, 'check2-circle', function(){ kpiList('Issued Tickets — '+issued.length, 'check2-circle', issued,
         [['Issued', issued.length], ['Issue rate', t.length?Math.round(issued.length/t.length*100)+'%':'—'], ['Value', ui.money(issued.reduce(function(s,x){ return s+(x.sale||0); },0))]]); }),
       kpi('Held', held.length, 'hourglass-split', function(){ kpiList('Held — awaiting issue', 'hourglass-split', held,
         [['Held', held.length], ['At-risk value', ui.money(held.reduce(function(s,x){ return s+(x.sale||0); },0))]]); }),
-      kpi('Sales Value', ui.money(revenue,{compact:true}), 'cash-coin', function(){ kpiSales(t); }),
-      kpi('Net Profit', ui.money(profit,{compact:true}), 'graph-up-arrow', function(){ kpiProfit(t); }),
+      kpi('Sales Value', ui.money(revenue,{compact:true}), 'cash-coin', function(){ kpiSales(t); }, momentum(t, function(x){ return x.sale||0; })),
+      kpi('Net Profit', ui.money(profit,{compact:true}), 'graph-up-arrow', function(){ kpiProfit(t); }, momentum(t, function(x){ return netProfitOf(x); })),
       kpi('Avg Margin', margin+'%', 'percent', function(){ kpiMargin(t); }),
       kpi('Outstanding', ui.money(outstanding,{compact:true}), 'wallet2', function(){ kpiList('Outstanding Payment', 'wallet2', unpaid,
         [['Unpaid tickets', unpaid.length], ['Total outstanding', ui.money(outstanding)]]); })
@@ -223,6 +223,7 @@
     }
 
     // Route Network map + Top Routes, Airline League, Forward Bookings
+    bspCountdown(page);
     routeNetwork(page, t);
     airlineLeague(page, t);
     demandRow(page, t);
@@ -1535,10 +1536,21 @@
   function svcBadgeEl(t) { var s=el('span'); s.innerHTML = svcChip(t); return s.firstChild; }
 
   /* ---------------------------------------------------- shared helpers */
-  function kpi(label, value, icon, onClick) {
+  function kpi(label, value, icon, onClick, delta) {
+    var top = [ el('span.kpi-label',{text:label}) ];
+    if (delta) top.push(el('span', { title:'last 30 days vs prior 30', style:{ marginLeft:'auto', fontSize:'10.5px', fontWeight:'700', whiteSpace:'nowrap', color: delta.dir==='up'?'#23c17e':'#f0506e' }, html:(delta.dir==='up'?'▲ ':'▼ ')+delta.txt }));
+    top.push(el('span.kpi-ico', { html:'<i class="bi bi-'+icon+'"></i>', style: delta?{ marginLeft:'8px' }:null }));
     return el('div.kpi-card' + (onClick ? '.drill' : ''), onClick ? { onclick: onClick } : null,
-      [ el('div.kpi-top',null,[ el('span.kpi-label',{text:label}), el('span.kpi-ico',{html:'<i class="bi bi-'+icon+'"></i>'}) ]),
-        el('div.kpi-value',{text:String(value)}) ]);
+      [ el('div.kpi-top', null, top), el('div.kpi-value',{text:String(value)}) ]);
+  }
+  // Momentum: metric over the last 30 days vs the prior 30 (by ticket created date).
+  function momentum(list, valFn){
+    var now = new Date('2026-07-05').getTime(), d30 = now - 30*86400000, d60 = now - 60*86400000, cur = 0, prev = 0;
+    list.forEach(function(x){ var t=new Date(x.created||x.purchaseDate||'').getTime(); if(isNaN(t)) return; var v=valFn?valFn(x):1;
+      if(t>d30 && t<=now) cur+=v; else if(t>d60 && t<=d30) prev+=v; });
+    if(prev<=0) return cur>0 ? { dir:'up', txt:'new' } : null;
+    var pct = Math.round((cur-prev)/prev*100);
+    return { dir: pct>=0?'up':'down', txt: Math.abs(pct)+'%' };
   }
 
   /* ---- KPI drill-downs: click a card on the overview for the full breakdown --*/
@@ -1571,13 +1583,15 @@
     }).el;
   }
   function airlineStatsTable(list){
+    var rby = refundByCode();
     return EPAL.table({
       columns:[
         { key:'code', label:'Airline', render:function(r){ return '<span class="strong">'+ui.escapeHtml(r.code)+'</span>'; } },
         { key:'tickets', label:'Tickets', num:true },
         { key:'sale', label:'Sales', num:true, money:true }, { key:'cost', label:'Cost', num:true, money:true },
         { key:'profit', label:'Net Profit', num:true, sortVal:function(r){ return r.profit; }, render:function(r){ return '<span class="num '+(r.profit>=0?'text-good':'text-bad')+'">'+ui.money(r.profit)+'</span>'; } },
-        { key:'margin', label:'Margin', num:true, sortVal:function(r){ return r.sale? r.profit/r.sale*100 : 0; }, render:function(r){ var m=r.sale?Math.round(r.profit/r.sale*100):0; return '<span class="num '+(m>=0?'':'text-bad')+'">'+m+'%</span>'; } }
+        { key:'margin', label:'Margin', num:true, sortVal:function(r){ return r.sale? r.profit/r.sale*100 : 0; }, render:function(r){ var m=r.sale?Math.round(r.profit/r.sale*100):0; return '<span class="num '+(m>=0?'':'text-bad')+'">'+m+'%</span>'; } },
+        { key:'refunds', label:'Refund %', num:true, sortVal:function(r){ return r.tickets? (rby[r.code]||0)/r.tickets*100 : 0; }, render:function(r){ var n=rby[r.code]||0, pct=r.tickets?Math.round(n/r.tickets*100):0; return n? '<span class="num '+(pct>=25?'text-bad':pct>=10?'text-warn':'')+'">'+pct+'% ('+n+')</span>' : '<span class="text-mute">—</span>'; } }
       ],
       rows:byAirlineStats(list), pageSize:12, exportName:'air-by-airline.csv', pdfTitle:'By Airline', empty:{ icon:'airplane', title:'No data' }
     }).el;
@@ -1803,6 +1817,41 @@
     var host=el('div.grid-auto'), f=fwdCard(t), s=statusCard(t);
     if(f) host.appendChild(f); if(s) host.appendChild(s);
     if(host.children.length){ page.appendChild(el('div.section-label',{ html: ui.icon('activity')+' Demand & Pipeline' })); page.appendChild(host); }
+  }
+
+  /* ---- BSP SETTLEMENT COUNTDOWN — next BSP billing settlement, open ADM
+     dispute deadlines (raised + 30d) and recoverable unused-ticket value. */
+  function ymd(y,m,d){ return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
+  function daysToDate(str){ var a=new Date(str).getTime(), b=new Date('2026-07-05').getTime(); return Math.round((a-b)/86400000); }
+  function addDaysStr(str,n){ var d=new Date(str); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+  function nextBspSettlement(){ var t=new Date('2026-07-05'), y=t.getFullYear(), m=t.getMonth(), d=t.getDate();
+    if(d<15) return ymd(y,m,15); var eom=new Date(y,m+1,0).getDate(); if(d<eom) return ymd(y,m,eom); return ymd(y,m+1,15); }
+  function bspTile(label, value, sub, tone){
+    return el('div.kpi-card', null, [ el('div.kpi-top', null, [ el('span.kpi-label',{text:label}) ]),
+      el('div.kpi-value' + (tone?'.'+tone:''), { text:String(value) }), sub? el('div.kpi-foot',null,[ el('span.text-muted',{text:sub}) ]) : null ]);
+  }
+  function bspCountdown(page){
+    var bsp = db.airBsp ? db.airBsp() : { adms:[], unused:[] };
+    var next = nextBspSettlement(), dTo = daysToDate(next);
+    var openAdms = (bsp.adms||[]).filter(function(x){ return x.status!=='Settled'; });
+    var admTotal = openAdms.reduce(function(s,x){ return s+(x.amount||0); }, 0);
+    var soonest = openAdms.map(function(x){ return { x:x, due:addDaysStr(x.date, 30) }; }).sort(function(a,b){ return new Date(a.due)-new Date(b.due); })[0];
+    var admSub = soonest ? ('soonest dispute in '+daysToDate(soonest.due)+'d') : 'no open ADMs';
+    var unusedVal = (bsp.unused||[]).reduce(function(s,x){ return s+(x.value||0); }, 0);
+    page.appendChild(el('div.section-label',{ html: ui.icon('shield-check')+' BSP Settlement & ADM Watch' }));
+    var grid = el('div.kpi-grid.kpi-compact', { style:{ cursor:'pointer' }, onclick:function(){ EPAL.router.navigate('travels/air-ticketing/bsp'); } }, [
+      bspTile('Next BSP Settlement', dTo+' days', ui.date(next), dTo<=3?'text-warn':''),
+      bspTile('Open ADMs', String(openAdms.length), ui.money(admTotal)+' · '+admSub, openAdms.length?'text-bad':'text-good'),
+      bspTile('Unused Recoverable', ui.money(unusedVal,{compact:true}), 'file back / reissue', unusedVal?'text-warn':'')
+    ]);
+    page.appendChild(grid);
+  }
+
+  /* ---- refund counts per airline (refunds carry the airline NAME) ----------*/
+  function refundByCode(){
+    var als=airlines()||[], nameToCode={}; als.forEach(function(a){ nameToCode[a.name]=a.iata; nameToCode[a.iata]=a.iata; });
+    var by={}; (db.airRefunds?db.airRefunds():[]).forEach(function(r){ var code=nameToCode[r.airline]||r.airline; by[code]=(by[code]||0)+1; });
+    return by;
   }
   function tableCard(title, headers, rows, emptyMsg, opts) {
     var card = el('div.card');
