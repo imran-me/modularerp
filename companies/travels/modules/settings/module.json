@@ -1,0 +1,22 @@
+{
+  "key": "settings",
+  "company": "travels",
+  "title": "Settings",
+  "icon": "gear-fill",
+  "desc": "Company profile, financial defaults, document numbering & alerts.",
+  "route": "#/travels/settings",
+  "enabled": true,
+  "built": true,
+  "admin": true,
+  "menu": [
+    { "id": "financial", "label": "Financial", "route": "#/travels/settings/financial", "enabled": true },
+    { "id": "documents", "label": "Documents", "route": "#/travels/settings/documents", "enabled": true },
+    { "id": "notifications", "label": "Notifications", "route": "#/travels/settings/notifications", "enabled": true },
+    { "id": "data", "label": "Data & Access", "route": "#/travels/settings/data", "enabled": true }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Travels override of the shared star-slash-settings view; preserves the settings.travels store key + fields."
+}
