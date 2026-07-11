@@ -205,7 +205,7 @@
         overview:'Air Ticketing', stock:'Ticket Manage', purchase:'Ticket Purchase',
         ticketing:'Ticket Operations', 'manage-sales':'Manage Sales',
         emd:'EMD & Ancillary', ttl:'Ticketing Deadlines',
-        masters:'Masters', airlines:'Airlines', airports:'Airports', countries:'Country', states:'States',
+        masters:'Setup', airlines:'Airlines', airports:'Airports', countries:'Country', states:'States',
         bsp:'BSP / ADM Recon', refunds:'Refund Tracker'
       };
       page.appendChild(EPAL.pageHead({
@@ -1355,18 +1355,39 @@
     var pa = page.querySelector('.page-actions'); if (pa) pa.prepend(el('button.btn.btn-ghost',{html:ui.icon('plus-lg')+' Add Airline',onclick:function(){ editAirline(null, function(){ drawAirlines(host); }); }}));
     var host = el('div'); page.appendChild(host); drawAirlines(host);
   }
+  function airlineTable(rows, refresh) {
+    return EPAL.table({
+      columns:[
+        { key:'iata', label:'IATA', render:function(a){ return '<span class="badge mono">'+ui.escapeHtml(a.iata||'—')+'</span>'; } },
+        { key:'name', label:'Airline', render:function(a){ return '<span class="strong">'+ui.icon('airplane-engines')+' '+ui.escapeHtml(a.name||'')+'</span>'; } },
+        { key:'country', label:'Country', render:function(a){ return ui.escapeHtml(a.country||'—'); } },
+        { key:'status', label:'Status', badge:{ active:'good', inactive:'' } }
+      ],
+      rows:rows, searchKeys:['iata','name','country'], quickFilter:'status', filterPanel:true, filters:[{ key:'country', label:'Country' }], pageSize:15,
+      exportName:'airlines.csv', pdfTitle:'Airlines',
+      onRow:function(a){ airlineDetail(a, refresh); },
+      actions: ui.actions({
+        edit:  function(a){ editAirline(a, refresh); },
+        del:   function(a){ ui.confirm({ title:'Delete "'+a.name+'"?', danger:true, confirmLabel:'Delete' }).then(function(ok){ if(ok){ try{ db.remove('airlines', a.id); }catch(e){ S.removeFrom('airlines', a.id); } ui.toast('Deleted','success'); if(refresh)refresh(); }}); }
+      }),
+      empty:{ icon:'airplane-engines', title:'No airlines', hint:'Add your first carrier.' }
+    });
+  }
+  function airlineMasterList(title, rows) { var body=kpiShell(title+' — '+rows.length, 'airplane-engines-fill', null); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ airlineTable(rows, null).el ]) ])); }
   function drawAirlines(host) {
     host.innerHTML='';
-    var rows = airlines().map(function (a) {
-      return el('tr.row-click', { onclick:(function(al){ return function(){ airlineDetail(al, function(){ drawAirlines(host); }); }; })(a) }, [
-        td('<span class="badge mono">'+ui.escapeHtml(a.iata)+'</span>'),
-        td('<span class="strong">'+ui.escapeHtml(a.name)+'</span>'),
-        td(ui.escapeHtml(a.country||'—')),
-        td('<span class="badge '+(a.status==='active'?'badge-good':'')+'">'+a.status+'</span>') ]);
-    });
+    var list = airlines();
+    var active = list.filter(function(a){ return a.status==='active'; }).length;
+    var cc = {}; list.forEach(function(a){ if(a.country) cc[a.country]=1; });
+    host.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
+      kpi('Total Airlines', list.length, 'airplane-engines-fill', function(){ airlineMasterList('All Airlines', list); }),
+      kpi('Active', active, 'check2-circle', function(){ airlineMasterList('Active Airlines', list.filter(function(a){ return a.status==='active'; })); }),
+      kpi('Inactive', list.length-active, 'pause-circle', function(){ airlineMasterList('Inactive Airlines', list.filter(function(a){ return a.status!=='active'; })); }),
+      kpi('Countries', Object.keys(cc).length, 'globe-americas', function(){ airlineMasterList('Airlines by Country', list); })
+    ]));
     host.appendChild(el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('airplane-engines-fill')+' Airlines' }), el('span.card-sub', { text: airlines().length+' carriers' }) ]),
-      el('div.card-body', null, [ tableCard(null, ['IATA','Airline','Country','Status'], rows, 'No airlines. Add your first carrier.', { chipCol: 3 }) ])
+      el('div.card-head', null, [ el('h3', { html: ui.icon('airplane-engines-fill')+' Airlines' }), el('span.card-sub', { text: list.length+' carriers' }) ]),
+      el('div.card-body', null, [ airlineTable(list, function(){ drawAirlines(host); }).el ])
     ]));
   }
 

@@ -119,16 +119,21 @@ img, svg { display: block; max-width: 100%; }
 .table-wrap::-webkit-scrollbar { height: 10px; }
 .table-wrap::-webkit-scrollbar-thumb { background: var(--border-strong, var(--border)); border-radius: 8px; border: 2px solid var(--surface); }
 .table-wrap::-webkit-scrollbar-track { background: transparent; }
-table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: auto; }
 .tbl thead th {
-  text-align: left; font-weight: 600; font-size: 11px; letter-spacing: .05em; text-transform: uppercase;
-  color: var(--text-mute); padding: 10px 12px; background: var(--surface-2); position: sticky; top: 0; z-index: 1;
-  border-bottom: 1px solid var(--border); white-space: nowrap;
+  text-align: left; font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-mute); padding: 8px 9px; background: var(--surface-2); position: sticky; top: 0; z-index: 1;
+  border-bottom: 1px solid var(--border); white-space: normal; line-height: 1.15;   /* headers wrap → columns stay narrow */
 }
-/* cells stay on ONE line — the .table-wrap scrolls horizontally when cramped,
-   instead of ragged multi-line wrapping. Opt a cell back in with .wrap. */
-.tbl tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text-dim);
-  font-variant-numeric: tabular-nums; vertical-align: middle; white-space: nowrap; }
+/* FIT, don't scroll: text cells WRAP so every column (incl. the Actions buttons)
+   stays visible without a horizontal scrollbar at normal zoom. Numbers, status
+   badges and the action icons stay on one line; long tokens break. Force a cell
+   back to one line with .nowrap; the .table-wrap scroll remains only as a last
+   resort on very narrow (mobile) widths. */
+.tbl tbody td { padding: 6px 9px; border-bottom: 1px solid var(--border); color: var(--text-dim);
+  font-variant-numeric: tabular-nums; vertical-align: middle; white-space: normal; overflow-wrap: anywhere; }
+.tbl td.num, .tbl thead th.num, .tbl td.dt-actions, .tbl td.nowrap, .tbl th.nowrap { white-space: nowrap; overflow-wrap: normal; }
+.tbl td .badge, .tbl td .mono { white-space: nowrap; }
 .tbl td.wrap, .tbl th.wrap { white-space: normal; }
 .tbl tbody tr { transition: background var(--t-fast); }
 .tbl tbody tr:hover { background: var(--surface-2); }

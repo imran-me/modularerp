@@ -107,7 +107,7 @@
               ['accounts','Party Accounts'],['commission','Commission']] }),
     m('air-ticketing',   'Air Ticketing',    'airplane-fill', { desc:'Issue, re-issue, refund, void, EMD + BSP recon.',
         subs:[['stock','Ticket Manage'],['purchase','Ticket Purchase'],['ticketing','Ticketing'],['manage-sales','Manage Sales'],['emd','EMD & Ancillary'],
-              ['ttl','Ticketing Deadlines'],['masters','Masters'],
+              ['ttl','Ticketing Deadlines'],['masters','Setup'],
               ['bsp','BSP / ADM Recon'],['refunds','Refund Tracker']] }),
     m('visa-processing', 'Visa Processing',  'passport-fill', { badge:'Core', desc:'End-to-end visa lifecycle.',
         subs:[['categories','Visa Categories'],['new-application','New Application'],['application-board','Application Board'],

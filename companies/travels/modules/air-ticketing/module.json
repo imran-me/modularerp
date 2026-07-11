@@ -45,7 +45,7 @@
     },
     {
       "id": "masters",
-      "label": "Masters",
+      "label": "Setup",
       "route": "#/travels/air-ticketing/masters",
       "enabled": true
     },
