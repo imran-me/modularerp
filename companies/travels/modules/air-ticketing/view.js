@@ -184,6 +184,32 @@
       kpi('Net Profit', ui.money(profit,{compact:true}), 'graph-up-arrow')
     ]));
 
+    // --- Action Center: what needs attention (each row navigates) ---
+    var ttls = db.col ? db.col('air_ttl') : [];
+    var refs = db.airRefunds ? db.airRefunds() : [];
+    var acNow = Date.now();
+    function acDaysLeft(d){ return d ? Math.round((new Date(d).getTime()-acNow)/86400000) : null; }
+    var held = t.filter(function(x){ return x.status==='Hold'; });
+    var duePay = t.filter(function(x){ return ['Due','Unpaid','Partial'].indexOf(x.payStatus)>=0; });
+    var ttlDue = ttls.filter(function(r){ var dl=acDaysLeft(r.ttl||r.deadline||r.due); return dl!=null && dl<=3 && r.status!=='Ticketed'; });
+    var refPending = refs.filter(function(r){ return ['Requested','Filed','Received'].indexOf(r.status)>=0; });
+    var acAlerts = [
+      held.length      ? { icon:'pause-circle-fill',      tone:'warning', n:held.length,       text:'held tickets awaiting issue',       route:'travels/air-ticketing/manage-sales' } : null,
+      ttlDue.length    ? { icon:'alarm-fill',             tone:'error',   n:ttlDue.length,      text:'ticketing deadlines within 3 days', route:'travels/air-ticketing/ttl' } : null,
+      duePay.length    ? { icon:'cash-coin',              tone:'warning', n:duePay.length,      text:'tickets with outstanding payment',  route:'travels/air-ticketing/manage-sales' } : null,
+      refPending.length ? { icon:'arrow-counterclockwise', tone:'info',   n:refPending.length,  text:'refunds in progress',               route:'travels/air-ticketing/refunds' } : null
+    ].filter(Boolean);
+    if (acAlerts.length) {
+      page.appendChild(el('div.section-label',{text:'Action Center — needs attention'}));
+      page.appendChild(el('div.card', null, [ el('div.card-body', null, acAlerts.map(function(a){
+        return el('div.data-row', { style:{cursor:'pointer'}, onclick:(function(rt){ return function(){ EPAL.router.navigate(rt); }; })(a.route) }, [
+          ui.frag('<span class="notif-ico notif-'+a.tone+'">'+ui.icon(a.icon)+'</span>'),
+          el('div.flex-1', null, [ el('span.strong',{text:a.n+' '}), el('span.text-dim',{text:a.text}) ]),
+          ui.frag('<span class="text-mute">'+ui.icon('chevron-right')+'</span>')
+        ]);
+      })) ]));
+    }
+
     var sections = [
       ['ticketing','Direct Sale','ticket-detailed-fill','Issue a new ticket'],
       ['manage-sales','Manage Sales','cash-stack','Costing, profit & reports'],
@@ -241,7 +267,8 @@
       { key:'pax', type:'items', label:'Passengers (one ticket each)', required:true, min:1, addLabel:'Add passenger',
         columns:[
           { key:'passenger', label:'Passenger', type:'text', width:'2fr' },
-          { key:'ticketNo', label:'Ticket No', type:'text', width:'1.5fr' },
+          { key:'passport', label:'Passport No', type:'text', width:'1.4fr' },
+          { key:'ticketNo', label:'Ticket No', type:'text', width:'1.4fr' },
           { key:'baseFare', label:'Base Fare', type:'money' },
           { key:'taxes', label:'Taxes', type:'money' },
           { key:'vendor', label:'Vendor', type:'select', options:vendorPairs, width:'1.5fr' }
@@ -357,7 +384,7 @@
         var t = {
           id:'TK-' + stamp + '-' + (idx+1),
           pnr: batchPnr, ticketNo:(p.ticketNo||'').trim(),
-          passenger:(p.passenger||'').trim(), phone:'', passport:'',
+          passenger:(p.passenger||'').trim(), phone:'', passport:(p.passport||'').trim(),
           fromCode:v.fromCode, toCode:v.toCode, route:route,
           tripType:v.tripType, airlineCode:v.airlineCode, airline: al.name || v.airlineCode,
           flightNo:v.flightNo, vendor:(p.vendor||'Direct Airline'), portal:v.portal,
@@ -678,15 +705,42 @@
     function draw() {
       host.innerHTML='';
       var rows = airlines().map(function (a) {
-        return el('tr.row-click', { onclick:(function(al){ return function(){ editAirline(al, draw); }; })(a) }, [
+        return el('tr.row-click', { onclick:(function(al){ return function(){ airlineDetail(al, draw); }; })(a) }, [
           td('<span class="badge mono">'+ui.escapeHtml(a.iata)+'</span>'),
           td('<span class="strong">'+ui.escapeHtml(a.name)+'</span>'),
           td(ui.escapeHtml(a.country||'—')),
           td('<span class="badge '+(a.status==='active'?'badge-good':'')+'">'+a.status+'</span>') ]);
       });
-      host.appendChild(tableCard(null, ['IATA','Airline','Country','Status'], rows, 'No airlines. Add your first carrier.'));
+      host.appendChild(tableCard(null, ['IATA','Airline','Country','Status'], rows, 'No airlines. Add your first carrier.', { chipCol: 3 }));
     }
     draw();
+  }
+  // rich airline profile — carrier stats + the tickets sold on it (row-click opens it)
+  function airlineDetail(a, refresh) {
+    var body = el('div');
+    ui.modal({ title: a.name + ' · ' + a.iata, icon: 'airplane-engines', size: 'lg', body: body, footer: false });
+    var tks = tickets().filter(function (t) { return t.airlineCode === a.iata || t.airline === a.name; });
+    var revenue = tks.reduce(function (s, t) { return s + (t.sale || 0); }, 0);
+    var profit = tks.reduce(function (s, t) { return s + netProfitOf(t); }, 0);
+    var actions = el('div.flex.gap-1.items-center', { style: { marginLeft: 'auto' } });
+    actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { editAirline(a, refresh || function () { EPAL.router.render(); }); } }));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div.flex.items-center.gap-2.flex-wrap', null, [
+      ui.frag('<span class="notif-ico notif-info">' + ui.icon('airplane-engines-fill') + '</span>'),
+      el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: a.name }),
+        el('div.flex.items-center.gap-2', null, [ el('span.badge.mono', { text: a.iata }), el('div.text-mute.sm', { text: a.country || '—' }), el('span.badge' + (a.status === 'active' ? '.badge-good' : ''), { text: a.status }) ]) ]),
+      actions ]) ]) ]));
+    body.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Tickets', tks.length, 'ticket-perforated'), kpi('Sales Value', ui.money(revenue, { compact: true }), 'cash-coin'),
+      kpi('Net Profit', ui.money(profit, { compact: true }), 'graph-up-arrow'), kpi('Avg Fare', ui.money(tks.length ? Math.round(revenue / tks.length) : 0, { compact: true }), 'calculator')
+    ]));
+    if (tks.length) {
+      var trs = tks.slice().sort(function (x, y) { return x.created < y.created ? 1 : -1; }).slice(0, 10).map(function (x) {
+        return el('tr.row-click', { onclick: (function (tk) { return function () { ticketDetail(tk); }; })(x) }, [
+          td('<span class="strong">' + x.id + '</span>'), td(ui.escapeHtml(x.passenger)), td('<span class="mono">' + x.route + '</span>'), tdN(ui.money(x.sale)), td(statusBadge(x.status).outerHTML) ]);
+      });
+      body.appendChild(el('div.section-label', { text: 'Recent tickets on ' + a.iata }));
+      body.appendChild(tableCard(null, ['Ticket', 'Passenger', 'Route', 'Sale', 'Status'], trs, ''));
+    } else body.appendChild(el('div.empty-state', null, [ ui.frag(ui.icon('ticket-perforated')), el('h3', { text: 'No tickets yet on this carrier' }) ]));
   }
   function editAirline(a, done) {
     var isNew = !a;
@@ -712,14 +766,40 @@
     function draw() {
       host.innerHTML='';
       var rows = airports().map(function (a) {
-        return el('tr.row-click', { onclick:(function(ap){ return function(){ editAirport(ap, draw); }; })(a) }, [
+        return el('tr.row-click', { onclick:(function(ap){ return function(){ airportDetail(ap, draw); }; })(a) }, [
           td('<span class="badge mono">'+ui.escapeHtml(a.iata)+'</span>'),
           td('<span class="strong">'+ui.escapeHtml(a.name)+'</span>'),
           td(ui.escapeHtml(a.city||'—')), td(ui.escapeHtml(a.country||'—')) ]);
       });
-      host.appendChild(tableCard(null, ['IATA','Airport','City','Country'], rows, 'No airports. Add your first station.'));
+      host.appendChild(tableCard(null, ['IATA','Airport','City','Country'], rows, 'No airports. Add your first station.', { chipCol: 3 }));
     }
     draw();
+  }
+  // rich airport profile — station stats + tickets routed through it
+  function airportDetail(a, refresh) {
+    var body = el('div');
+    ui.modal({ title: a.name + ' · ' + a.iata, icon: 'geo-alt-fill', size: 'lg', body: body, footer: false });
+    var tks = tickets().filter(function (t) { return String(t.route || '').indexOf(a.iata) >= 0; });
+    var revenue = tks.reduce(function (s, t) { return s + (t.sale || 0); }, 0);
+    var actions = el('div.flex.gap-1.items-center', { style: { marginLeft: 'auto' } });
+    actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { editAirport(a, refresh || function () { EPAL.router.render(); }); } }));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div.flex.items-center.gap-2.flex-wrap', null, [
+      ui.frag('<span class="notif-ico notif-info">' + ui.icon('geo-alt-fill') + '</span>'),
+      el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: a.name }),
+        el('div.flex.items-center.gap-2', null, [ el('span.badge.mono', { text: a.iata }), el('div.text-mute.sm', { text: (a.city || '—') + ' · ' + (a.country || '—') }) ]) ]),
+      actions ]) ]) ]));
+    body.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Tickets Routed', tks.length, 'ticket-perforated'), kpi('Sales Value', ui.money(revenue, { compact: true }), 'cash-coin'),
+      kpi('City', a.city || '—', 'buildings'), kpi('Country', a.country || '—', 'globe')
+    ]));
+    if (tks.length) {
+      var trs = tks.slice().sort(function (x, y) { return x.created < y.created ? 1 : -1; }).slice(0, 10).map(function (x) {
+        return el('tr.row-click', { onclick: (function (tk) { return function () { ticketDetail(tk); }; })(x) }, [
+          td('<span class="strong">' + x.id + '</span>'), td(ui.escapeHtml(x.passenger)), td('<span class="mono">' + x.route + '</span>'), td(x.airlineCode + ' · ' + x.pnr), td(statusBadge(x.status).outerHTML) ]);
+      });
+      body.appendChild(el('div.section-label', { text: 'Tickets routed through ' + a.iata }));
+      body.appendChild(tableCard(null, ['Ticket', 'Passenger', 'Route', 'Airline · PNR', 'Status'], trs, ''));
+    } else body.appendChild(el('div.empty-state', null, [ ui.frag(ui.icon('airplane')), el('h3', { text: 'No tickets through this station yet' }) ]));
   }
   function editAirport(a, done) {
     var isNew = !a;
@@ -1136,8 +1216,8 @@
       ],
       rows: rows,
       searchKeys:['emdNo','passenger','serviceType','ticketRef','vendor'],
-      filters:[{ key:'serviceType', label:'Service' }, { key:'payStatus', label:'Payment' }],
-      pageSize:10, exportName:'emd-ancillary.csv',
+      quickFilter:'serviceType', filterPanel:true, filters:[{ key:'payStatus', label:'Payment' }],
+      pageSize:10, exportName:'emd-ancillary.csv', pdfTitle:'EMD & Ancillary',
       onRow:function(r){ emdDetail(r); },
       actions: ui.actions({
         print: function(r){ emdReceipt([r], r.emdNo, r.passenger, r.sale||0, r.cost||0); },
@@ -1361,7 +1441,7 @@
     });
     page.appendChild(el('div.section-label',{text:'Deadline Queue — sorted by urgency'}));
     page.appendChild(tableCard(null,
-      ['PNR','Passenger','Airline','Route','Deadline','Countdown','Value','Status',''], trs, 'No held PNRs in the queue.'));
+      ['PNR','Passenger','Airline','Route','Deadline','Countdown','Value','Status',''], trs, 'No held PNRs in the queue.', { chipCol: 7 }));
   }
 
   function hoursLeft(ttl) {
