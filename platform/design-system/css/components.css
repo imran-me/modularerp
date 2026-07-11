@@ -37,6 +37,12 @@
 /* compact variant — ~20% smaller cards + roomier gap, SAME text size (ageing, tiers) */
 .kpi-grid.kpi-compact { gap: 18px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
 .kpi-grid.kpi-compact .kpi-card { padding: 17px 18px; min-height: 132px; }
+/* Slim KPI cards — ~30% smaller footprint (padding + height + column width) while
+   the label & value TYPE SIZES, the jewel icon and every colour stay identical.
+   Used where a screen wants a denser row of many KPIs (e.g. Air Ticketing overview). */
+.kpi-grid.kpi-slim { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); margin-bottom: 16px; }
+.kpi-grid.kpi-slim .kpi-card { padding: 15px 16px; min-height: 118px; }
+.kpi-grid.kpi-slim .kpi-top { margin-bottom: 10px; }
 /* clickable slab-tier cards (commission) — filter the ledger on tap */
 .grid-auto.kpi-compact { gap: 18px; }
 .tier-card { cursor: pointer; text-align: left; width: 100%; background: var(--surface);

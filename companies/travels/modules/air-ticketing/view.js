@@ -176,12 +176,23 @@
     var t = tickets();
     var revenue = t.reduce(function (s,x){ return s + (x.sale||0); }, 0);
     var profit  = t.reduce(function (s,x){ return s + netProfitOf(x); }, 0);
-    var issued  = t.filter(function (x){ return x.status==='Issued'; }).length;
-    page.appendChild(el('div.kpi-grid.stagger', null, [
-      kpi('Tickets Sold', t.length, 'ticket-perforated'),
-      kpi('Issued', issued, 'check2-circle'),
-      kpi('Sales Value', ui.money(revenue,{compact:true}), 'cash-coin'),
-      kpi('Net Profit', ui.money(profit,{compact:true}), 'graph-up-arrow')
+    var issued  = t.filter(function (x){ return x.status==='Issued'; });
+    var held    = t.filter(function (x){ return x.status==='Hold'; });
+    var unpaid  = t.filter(function (x){ return x.payStatus && x.payStatus!=='Paid'; });
+    var outstanding = unpaid.reduce(function (s,x){ return s + outstandingOf(x); }, 0);
+    var margin  = revenue ? Math.round(profit/revenue*100) : 0;
+    // 7 KPIs — slim cards (~30% smaller, same text size/colour); click any for a full breakdown.
+    page.appendChild(el('div.kpi-grid.kpi-slim.stagger', null, [
+      kpi('Tickets Sold', t.length, 'ticket-perforated', function(){ kpiTickets(t); }),
+      kpi('Issued', issued.length, 'check2-circle', function(){ kpiList('Issued Tickets — '+issued.length, 'check2-circle', issued,
+        [['Issued', issued.length], ['Issue rate', t.length?Math.round(issued.length/t.length*100)+'%':'—'], ['Value', ui.money(issued.reduce(function(s,x){ return s+(x.sale||0); },0))]]); }),
+      kpi('Held', held.length, 'hourglass-split', function(){ kpiList('Held — awaiting issue', 'hourglass-split', held,
+        [['Held', held.length], ['At-risk value', ui.money(held.reduce(function(s,x){ return s+(x.sale||0); },0))]]); }),
+      kpi('Sales Value', ui.money(revenue,{compact:true}), 'cash-coin', function(){ kpiSales(t); }),
+      kpi('Net Profit', ui.money(profit,{compact:true}), 'graph-up-arrow', function(){ kpiProfit(t); }),
+      kpi('Avg Margin', margin+'%', 'percent', function(){ kpiMargin(t); }),
+      kpi('Outstanding', ui.money(outstanding,{compact:true}), 'wallet2', function(){ kpiList('Outstanding Payment', 'wallet2', unpaid,
+        [['Unpaid tickets', unpaid.length], ['Total outstanding', ui.money(outstanding)]]); })
     ]));
 
     // --- Action Center: what needs attention (each row navigates) ---
@@ -1518,9 +1529,102 @@
   function svcBadgeEl(t) { var s=el('span'); s.innerHTML = svcChip(t); return s.firstChild; }
 
   /* ---------------------------------------------------- shared helpers */
-  function kpi(label, value, icon) {
-    return el('div.kpi-card', null, [ el('div.kpi-top',null,[ el('span.kpi-label',{text:label}), el('span.kpi-ico',{html:'<i class="bi bi-'+icon+'"></i>'}) ]),
-      el('div.kpi-value',{text:String(value)}) ]);
+  function kpi(label, value, icon, onClick) {
+    return el('div.kpi-card' + (onClick ? '.drill' : ''), onClick ? { onclick: onClick } : null,
+      [ el('div.kpi-top',null,[ el('span.kpi-label',{text:label}), el('span.kpi-ico',{html:'<i class="bi bi-'+icon+'"></i>'}) ]),
+        el('div.kpi-value',{text:String(value)}) ]);
+  }
+
+  /* ---- KPI drill-downs: click a card on the overview for the full breakdown --*/
+  function st2(l, v) { return el('div.stat', null, [ el('div.stat-label',{text:l}), el('div.stat-value',{text:String(v)}) ]); }
+  function outstandingOf(x){ return (x.receivable && +x.receivable.amount) ? +x.receivable.amount : (x.sale||0); }
+  function byAirlineStats(list){
+    var m = {}; list.forEach(function(x){ var k=x.airlineCode||'—'; if(!m[k]) m[k]={ code:k, tickets:0, sale:0, cost:0, comm:0, profit:0 };
+      var a=m[k]; a.tickets++; a.sale+=(x.sale||0); a.cost+=(x.cost||0); a.comm+=(x.commission||0); a.profit+=netProfitOf(x); });
+    return Object.keys(m).map(function(k){ return m[k]; }).sort(function(a,b){ return b.sale-a.sale; });
+  }
+  function kpiShell(title, icon, stats){
+    var body = el('div');
+    ui.modal({ title:title, icon:icon, size:'lg', body:body, footer:false });
+    if (stats && stats.length) body.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null, [ el('div.stat-row', null, stats.map(function(s){ return st2(s[0], s[1]); })) ]) ]));
+    return body;
+  }
+  function ticketsTable(list){
+    return EPAL.table({
+      columns:[
+        { key:'id', label:'Ticket', render:function(x){ return '<span class="mono xs text-mute">'+ui.escapeHtml(x.id||'')+'</span>'; } },
+        { key:'passenger', label:'Passenger', render:function(x){ return '<span class="strong">'+ui.escapeHtml(x.passenger||'—')+'</span>'; } },
+        { key:'route', label:'Route' }, { key:'airlineCode', label:'Airline', badge:{} },
+        { key:'sale', label:'Sale', num:true, money:true },
+        { key:'profit', label:'Net Profit', num:true, sortVal:function(x){ return netProfitOf(x); }, render:function(x){ var p=netProfitOf(x); return '<span class="num '+(p>=0?'text-good':'text-bad')+'">'+ui.money(p)+'</span>'; } },
+        { key:'status', label:'Status', render:function(x){ return statusBadge(x.status).outerHTML; }, sortVal:function(x){ return x.status; } }
+      ],
+      rows:list, searchKeys:['id','passenger','route','airlineCode'], quickFilter:'status', filterPanel:true, pageSize:8,
+      exportName:'air-tickets.csv', pdfTitle:'Air Tickets', onRow:function(x){ ticketDetail(x, function(){}); },
+      empty:{ icon:'ticket-perforated', title:'No tickets here' }
+    }).el;
+  }
+  function airlineStatsTable(list){
+    return EPAL.table({
+      columns:[
+        { key:'code', label:'Airline', render:function(r){ return '<span class="strong">'+ui.escapeHtml(r.code)+'</span>'; } },
+        { key:'tickets', label:'Tickets', num:true },
+        { key:'sale', label:'Sales', num:true, money:true }, { key:'cost', label:'Cost', num:true, money:true },
+        { key:'profit', label:'Net Profit', num:true, sortVal:function(r){ return r.profit; }, render:function(r){ return '<span class="num '+(r.profit>=0?'text-good':'text-bad')+'">'+ui.money(r.profit)+'</span>'; } },
+        { key:'margin', label:'Margin', num:true, sortVal:function(r){ return r.sale? r.profit/r.sale*100 : 0; }, render:function(r){ var m=r.sale?Math.round(r.profit/r.sale*100):0; return '<span class="num '+(m>=0?'':'text-bad')+'">'+m+'%</span>'; } }
+      ],
+      rows:byAirlineStats(list), pageSize:12, exportName:'air-by-airline.csv', pdfTitle:'By Airline', empty:{ icon:'airplane', title:'No data' }
+    }).el;
+  }
+  function airlineChart(body, list, key, title){
+    var cid = ui.uid('kpc');
+    body.appendChild(el('div.card.mb-2', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('bar-chart')+' '+title }) ]),
+      el('div.card-body', null, [ el('div',{ style:{ height:'240px', position:'relative' } }, [ el('canvas',{ id:cid }) ]) ]) ]));
+    requestAnimationFrame(function(){ var c=document.getElementById(cid); if(!c) return;
+      var rows = byAirlineStats(list).slice().sort(function(a,b){ return b[key]-a[key]; }).slice(0,8);
+      EPAL.charts.bar(c, { labels:rows.map(function(r){ return r.code; }), horizontal:true, money:true,
+        datasets:[{ label:title, data:rows.map(function(r){ return r[key]; }), colors: key==='profit' ? rows.map(function(r){ return r.profit>=0?'#23c17e':'#f0506e'; }) : null }] }); });
+  }
+  // one builder per KPI card
+  function kpiTickets(t){
+    var byStatus={}; t.forEach(function(x){ byStatus[x.status||'—']=(byStatus[x.status||'—']||0)+1; });
+    var stats = STATUSES.filter(function(s){ return byStatus[s.id]; }).map(function(s){ return [s.id, byStatus[s.id]]; });
+    if(!stats.length) stats=[['Tickets', t.length]];
+    var body = kpiShell('Tickets Sold — '+t.length, 'ticket-perforated', stats);
+    body.appendChild(el('div.section-label',{text:'By Airline'}));
+    body.appendChild(el('div.card.mb-2',null,[ el('div.card-body',null,[ airlineStatsTable(t) ]) ]));
+    body.appendChild(el('div.section-label',{text:'All Tickets'}));
+    body.appendChild(el('div.card',null,[ el('div.card-body',null,[ ticketsTable(t) ]) ]));
+  }
+  function kpiList(title, icon, list, stats){
+    var body = kpiShell(title, icon, stats);
+    body.appendChild(el('div.card',null,[ el('div.card-body',null,[ ticketsTable(list) ]) ]));
+  }
+  function kpiSales(t){
+    var total=t.reduce(function(s,x){ return s+(x.sale||0); },0), avg=t.length?Math.round(total/t.length):0;
+    var body = kpiShell('Sales Value — '+ui.money(total), 'cash-coin', [['Total sales', ui.money(total)], ['Tickets', t.length], ['Avg / ticket', ui.money(avg)]]);
+    airlineChart(body, t, 'sale', 'Sales by Airline');
+    body.appendChild(el('div.card',null,[ el('div.card-body',null,[ airlineStatsTable(t) ]) ]));
+  }
+  function kpiProfit(t){
+    var revenue=t.reduce(function(s,x){ return s+(x.sale||0); },0), cost=t.reduce(function(s,x){ return s+(x.cost||0); },0);
+    var comm=t.reduce(function(s,x){ return s+(x.commission||0); },0), net=t.reduce(function(s,x){ return s+netProfitOf(x); },0);
+    var body = kpiShell('Net Profit — '+ui.money(net), 'graph-up-arrow', [['Sales', ui.money(revenue)], ['Cost', ui.money(cost)], ['Gross', ui.money(revenue-cost)], ['Commission', ui.money(comm)], ['Net', ui.money(net)]]);
+    airlineChart(body, t, 'profit', 'Net Profit by Airline');
+    body.appendChild(el('div.card',null,[ el('div.card-body',null,[ airlineStatsTable(t) ]) ]));
+  }
+  function kpiMargin(t){
+    var revenue=t.reduce(function(s,x){ return s+(x.sale||0); },0), net=t.reduce(function(s,x){ return s+netProfitOf(x); },0);
+    var withSale = byAirlineStats(t).filter(function(r){ return r.sale; });
+    var best=withSale.slice().sort(function(a,b){ return (b.profit/b.sale)-(a.profit/a.sale); })[0];
+    var worst=withSale.slice().sort(function(a,b){ return (a.profit/a.sale)-(b.profit/b.sale); })[0];
+    var body = kpiShell('Average Margin — '+(revenue?Math.round(net/revenue*100):0)+'%', 'percent', [
+      ['Overall', (revenue?Math.round(net/revenue*100):0)+'%'],
+      ['Best airline', best? best.code+' · '+Math.round(best.profit/best.sale*100)+'%':'—'],
+      ['Weakest', worst? worst.code+' · '+Math.round(worst.profit/worst.sale*100)+'%':'—']
+    ]);
+    body.appendChild(el('div.section-label',{text:'Margin by Airline'}));
+    body.appendChild(el('div.card',null,[ el('div.card-body',null,[ airlineStatsTable(t) ]) ]));
   }
   function tableCard(title, headers, rows, emptyMsg, opts) {
     var card = el('div.card');
