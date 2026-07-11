@@ -175,6 +175,31 @@
       kpi('Sales Value', ui.money(revenue,{compact:true}), 'cash-coin'),
       kpi('Profit', ui.money(profit,{compact:true}), 'graph-up-arrow')
     ]));
+
+    // --- Action Center: what needs attention (each row navigates) ---
+    var cats2 = cats();
+    function catDays(x){ var c=cats2.filter(function(c2){return c2.id===x.catId;})[0]||{days:14}; return c.days||14; }
+    var overdue    = a.filter(function(x){ return x.stage==='Under Process' && new Date(new Date(x.created).getTime()+catDays(x)*86400000) < new Date(); });
+    var needsAction = a.filter(function(x){ return ['New','Documents'].indexOf(x.stage)>=0; });
+    var unpaid     = a.filter(function(x){ return x.payStatus && x.payStatus!=='Paid'; });
+    var submitted  = a.filter(function(x){ return x.stage==='Submitted'; });
+    var acAlerts = [
+      overdue.length    ? { icon:'hourglass-bottom',    tone:'error',   n:overdue.length,    text:'visa decisions overdue',                      route:'travels/visa-processing/embassy-tracking' } : null,
+      needsAction.length ? { icon:'file-earmark-plus',  tone:'warning', n:needsAction.length, text:'applications awaiting documents / submission', route:'travels/visa-processing/application-board' } : null,
+      unpaid.length     ? { icon:'cash-coin',           tone:'warning', n:unpaid.length,     text:'applications with outstanding payment',       route:'travels/visa-processing/manage-sales' } : null,
+      submitted.length  ? { icon:'send-fill',           tone:'info',    n:submitted.length,  text:'submitted — awaiting embassy decision',       route:'travels/visa-processing/embassy-tracking' } : null
+    ].filter(Boolean);
+    if (acAlerts.length) {
+      page.appendChild(el('div.section-label',{text:'Action Center — needs attention'}));
+      page.appendChild(el('div.card', null, [ el('div.card-body', null, acAlerts.map(function(al){
+        return el('div.data-row', { style:{cursor:'pointer'}, onclick:(function(rt){ return function(){ EPAL.router.navigate(rt); }; })(al.route) }, [
+          ui.frag('<span class="notif-ico notif-'+al.tone+'">'+ui.icon(al.icon)+'</span>'),
+          el('div.flex-1', null, [ el('span.strong',{text:al.n+' '}), el('span.text-dim',{text:al.text}) ]),
+          ui.frag('<span class="text-mute">'+ui.icon('chevron-right')+'</span>')
+        ]);
+      })) ]));
+    }
+
     var sections = [
       ['categories','Visa Categories','tags-fill','Destinations, types & pricing'],
       ['new-application','New Application','file-earmark-plus-fill','Capture a fresh application'],
@@ -202,7 +227,7 @@
       host.innerHTML = '';
       var rows = cats().map(function (c) {
         var margin = c.sale ? Math.round((c.sale-c.cost)/c.sale*100) : 0;
-        return el('tr.row-click', { onclick: function () { editCategory(c, draw); } }, [
+        return el('tr.row-click', { onclick: (function(cc){ return function () { categoryDetail(cc, draw); }; })(c) }, [
           td('<span style="font-size:18px">'+c.flag+'</span> <span class="strong">'+ui.escapeHtml(c.country)+'</span>'),
           td(c.type), tdN(ui.money(c.cost)), tdN(ui.money(c.sale)),
           td('<span class="badge badge-good">'+margin+'%</span>'), tdN(c.days+' days'),
@@ -210,9 +235,37 @@
         ]);
       });
       host.appendChild(tableCard(null, ['Destination','Type','Cost','Sale','Margin','Processing','Status'], rows,
-        'No visa categories. Add your first destination.'));
+        'No visa categories. Add your first destination.', { chipCol: 1 }));
     }
     draw();
+  }
+  // rich category profile — destination stats + the applications filed under it
+  function categoryDetail(c, refresh) {
+    var body = el('div');
+    ui.modal({ title: c.flag + ' ' + c.country + ' · ' + c.type, icon: 'tags-fill', size: 'lg', body: body, footer: false });
+    var appsFor = apps().filter(function (a) { return a.catId === c.id || (a.country === c.country && a.visaType === c.type); });
+    var revenue = appsFor.reduce(function (s, a) { return s + fees(a).customerTotal; }, 0);
+    var approved = appsFor.filter(function (a) { return a.stage === 'Approved'; }).length;
+    var margin = c.sale ? Math.round((c.sale - c.cost) / c.sale * 100) : 0;
+    var actions = el('div.flex.gap-1.items-center', { style: { marginLeft: 'auto' } });
+    actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { editCategory(c, refresh || function () { EPAL.router.render(); }); } }));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div.flex.items-center.gap-2.flex-wrap', null, [
+      ui.frag('<span class="notif-ico notif-info" style="font-size:20px">' + c.flag + '</span>'),
+      el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: c.country + ' — ' + c.type }),
+        el('div.flex.items-center.gap-2', null, [ el('span.badge.badge-good', { text: margin + '% margin' }), el('div.text-mute.sm', { text: c.days + ' days processing' }), el('span.badge' + (c.status === 'active' ? '.badge-good' : ''), { text: c.status }) ]) ]),
+      actions ]) ]) ]));
+    body.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Applications', appsFor.length, 'passport'), kpi('Approved', approved, 'patch-check'),
+      kpi('Revenue', ui.money(revenue, { compact: true }), 'cash-coin'), kpi('Sale / Cost', ui.money(c.sale) + ' / ' + ui.money(c.cost), 'tags')
+    ]));
+    if (appsFor.length) {
+      var trs = appsFor.slice().sort(function (x, y) { return (x.created < y.created) ? 1 : -1; }).slice(0, 10).map(function (x) {
+        return el('tr.row-click', { onclick: (function (ap) { return function () { appDetail(ap); }; })(x) }, [
+          td('<span class="strong">' + x.id + '</span>'), td((x.flag || '') + ' ' + ui.escapeHtml(x.applicant)), td(stBadge(x.stage).outerHTML), tdN(ui.money(fees(x).customerTotal)) ]);
+      });
+      body.appendChild(el('div.section-label', { text: 'Applications — ' + c.country + ' ' + c.type }));
+      body.appendChild(tableCard(null, ['App', 'Applicant', 'Stage', 'Total'], trs, ''));
+    } else body.appendChild(el('div.empty-state', null, [ ui.frag(ui.icon('passport')), el('h3', { text: 'No applications under this category yet' }) ]));
   }
   function editCategory(c, done) {
     var isNew = !c;
