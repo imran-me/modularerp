@@ -66,7 +66,24 @@
     S.seedOnce('air_stock', seedStock());
     S.seedOnce('air_countries', seedCountries());
     S.seedOnce('air_states', seedStates());
+    S.seedOnce('air_purchases', seedPurchases());
   }});
+
+  /* Ticket Purchase — the passport-holder PURCHASE register (buying a ticket for a
+     passenger; paid / due / total). Mirrors the legacy "Ticket Purchase". */
+  function seedPurchases() {
+    var data = [
+      { ticketNo:'09PPXW', purchaseDate:'2026-07-10', passenger:'HOSSAIN AHMED',              passport:'A1234567', vendor:'',                  fromCode:'KTM', toCode:'DAC', via:'',    airlineCode:'BG', tripType:'One-way', total:15800, paid:15800 },
+      { ticketNo:'SLRSTN', purchaseDate:'2026-07-08', passenger:'HASAN/MD MEHEDI MR',          passport:'B7654321', vendor:'GDS Aggregator BD', fromCode:'DAC', toCode:'KUL', via:'BKK', airlineCode:'MH', tripType:'Two-way', total:78927, paid:0 },
+      { ticketNo:'SLRSTN', purchaseDate:'2026-07-08', passenger:'MONDAL/MD ASHRAFUL ALAM MR',  passport:'B7654322', vendor:'GDS Aggregator BD', fromCode:'DAC', toCode:'KUL', via:'BKK', airlineCode:'MH', tripType:'Two-way', total:78927, paid:40000 },
+      { ticketNo:'RKPQ21', purchaseDate:'2026-07-04', passenger:'RAHIM UDDIN',                 passport:'A9988776', vendor:'Emirates GSA',      fromCode:'DAC', toCode:'DXB', via:'',    airlineCode:'EK', tripType:'One-way', total:62000, paid:62000 },
+      { ticketNo:'BGAA74', purchaseDate:'2026-07-02', passenger:'SHIRIN SULTANA',              passport:'A5544332', vendor:'Galaxy GSA',        fromCode:'DAC', toCode:'JED', via:'',    airlineCode:'SV', tripType:'Two-way', total:58000, paid:0 }
+    ];
+    return data.map(function (p, i) { p.id='PUR-'+(4001+i); p.due=Math.max(0, (p.total||0)-(p.paid||0));
+      p.payStatus = p.due<=0 ? 'Confirm' : (p.paid>0 ? 'Partial' : 'Pending');
+      p.route = p.via ? (p.fromCode+' → '+p.via+' → '+p.toCode) : (p.fromCode+' → '+p.toCode);
+      p.status='Confirm'; p.created=Date.now()-(i*5400000); return p; });
+  }
 
   /* Country + States masters (geography used across ticketing & business services).
      A representative set — the Laravel backend ships the full ISO dataset. */
@@ -199,7 +216,7 @@
         ]
       }));
 
-      ({ overview:overview, stock:stockView, ticketing:directSale, 'manage-sales':manageSales,
+      ({ overview:overview, stock:stockView, purchase:purchaseView, ticketing:directSale, 'manage-sales':manageSales,
          emd:emdView, ttl:ttlView,
          airlines:airlinesView, airports:airportsView, countries:countriesView, states:statesView,
          bsp:bspView, refunds:refundsView }[sub] || overview)(page, ctx);
@@ -211,6 +228,7 @@
   function subDesc(sub) {
     return ({ overview:'Issue, re-issue, refund and void air tickets — with BSP/ADM reconciliation.',
       stock:'Ticket routes, pricing and stock — pre-loaded inventory with remaining vs sold quantity.',
+      purchase:'Passenger ticket purchases — passport holder, route, trip type and paid / due / total.',
       ticketing:'Multi-passenger fare model with markup, agent commission, live profit and a branded invoice.',
       'manage-sales':'Costing, sale, commission and net profit for every ticket — plus per-airline/agent reports.',
       emd:'Sell ancillary services (baggage, seats, meals, insurance, lounge) as EMDs with a branded receipt.',
@@ -435,6 +453,127 @@
       bodyHtml:'<table>'+row('Route', s.route)+row('Sector', s.fromCode+' ⇄ '+s.toCode)+row('Airline', airlineNameOf(s.airlineCode))+row('Vendor', s.vendor)+row('Portal', s.portal)+
         row('Cost / seat', ui.money(s.cost||0))+row('Price', ui.money(s.price||0))+row('Total qty', s.qty||0)+row('Sold', s.sold||0)+row('Remaining', remOf(s))+
         '<tr><th>Total Sales</th><th>'+ui.money((+s.sold||0)*(+s.price||0))+'</th></tr></table>' });
+  }
+
+  /* ======================================================= TICKET PURCHASE */
+  function purchases() { return S.list('air_purchases'); }
+  var TRIP_TYPES = ['One-way', 'Two-way', 'Multi-City'];
+  function purchaseView(page) {
+    page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost', { html: ui.icon('cart-plus')+' Add New Ticket Purchase', onclick:function(){ purchaseForm(null); } }));
+    var host = el('div'); page.appendChild(host); drawPurchases(host);
+  }
+  function drawPurchases(host) {
+    host.innerHTML='';
+    var list = purchases();
+    var total=0, paid=0, due=0, confirmed=0, pending=0;
+    list.forEach(function(p){ total+=(+p.total||0); paid+=(+p.paid||0); due+=(+p.due||0); if(p.due<=0) confirmed++; else pending++; });
+    host.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
+      kpi('Purchases', list.length, 'cart-check', function(){ purchaseList('All Purchases', list); }),
+      kpi('Total Value', ui.money(total,{compact:true}), 'cash-stack', function(){ purchaseList('All Purchases', list); }),
+      kpi('Paid', ui.money(paid,{compact:true}), 'check2-circle', function(){ purchaseList('Fully paid', list.filter(function(p){ return p.due<=0; })); }),
+      kpi('Due', ui.money(due,{compact:true}), 'wallet2', function(){ purchaseList('With outstanding', list.filter(function(p){ return p.due>0; })); }),
+      kpi('Settled', confirmed, 'patch-check-fill', function(){ purchaseList('Settled', list.filter(function(p){ return p.due<=0; })); }),
+      kpi('Outstanding', pending, 'hourglass-split', function(){ purchaseList('Outstanding', list.filter(function(p){ return p.due>0; })); }),
+      kpi('Passengers', list.length, 'people', function(){ purchaseList('Passengers', list); })
+    ]));
+    var t = purchaseTable(list, function(){ drawPurchases(host); });
+    host.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('cart-check-fill')+' Ticket Purchase List' }), el('span.card-sub', { text: list.length+' purchase'+(list.length===1?'':'s') }) ]),
+      el('div.card-body', null, [ t.el ])
+    ]));
+  }
+  function purchaseTable(rows, refresh) {
+    return EPAL.table({
+      columns:[
+        { key:'ticketNo', label:'Ticket No', render:function(p){ return '<div class="strong">'+ui.escapeHtml(p.ticketNo||'—')+'</div><div class="text-mute xs">'+ui.date(p.purchaseDate)+'</div>'; }, sortVal:function(p){ return p.ticketNo; } },
+        { key:'passenger', label:'Passport Holder', render:function(p){ return '<span class="strong">'+ui.escapeHtml(p.passenger||'—')+'</span>'; } },
+        { key:'vendor', label:'Vendor', render:function(p){ return ui.escapeHtml(p.vendor||'—'); } },
+        { key:'route', label:'Ticket', render:function(p){ return '<span class="badge badge-accent">By Air</span> <span class="badge">'+ui.escapeHtml(p.route||'')+'</span>'; }, sortVal:function(p){ return p.route; } },
+        { key:'tripType', label:'Trip Type', badge:{} },
+        { key:'amount', label:'Amount Info', num:true, sortVal:function(p){ return +p.total||0; }, render:function(p){ return '<div class="num"><div class="xs text-good">Paid: '+ui.money(p.paid||0)+'</div><div class="xs '+((p.due||0)>0?'text-bad':'text-mute')+'">Due: '+ui.money(p.due||0)+'</div><div class="strong">Total: '+ui.money(p.total||0)+'</div></div>'; } },
+        { key:'payStatus', label:'Status', badge:{ Confirm:'good', Partial:'warn', Pending:'bad' } }
+      ],
+      rows:rows, searchKeys:['ticketNo','passenger','passport','vendor','route'],
+      quickFilter:'tripType', filterPanel:true, filters:[{ key:'payStatus', label:'Status' }, { key:'vendor', label:'Vendor' }],
+      dateKey:'purchaseDate', pageSize:12, exportName:'ticket-purchases.csv', pdfTitle:'Ticket Purchases',
+      onRow:function(p){ purchaseDetail(p, refresh); },
+      actions: ui.actions({
+        edit:  function(p){ purchaseForm(p, refresh); },
+        del:   function(p){ ui.confirm({ title:'Delete purchase "'+p.ticketNo+'"?', danger:true, confirmLabel:'Delete' }).then(function(ok){ if(ok){ S.removeFrom('air_purchases', p.id); ui.toast('Deleted','success'); if(refresh)refresh(); }}); },
+        print: function(p){ purchasePrint(p); }
+      }),
+      empty:{ icon:'cart', title:'No ticket purchases yet', hint:'Record your first passenger ticket purchase.' }
+    });
+  }
+  function purchaseList(title, rows) { var body=kpiShell(title+' — '+rows.length, 'cart-check', [['Purchases', rows.length], ['Total', ui.money(rows.reduce(function(a,p){return a+(+p.total||0);},0))], ['Paid', ui.money(rows.reduce(function(a,p){return a+(+p.paid||0);},0))], ['Due', ui.money(rows.reduce(function(a,p){return a+(+p.due||0);},0))]]); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ purchaseTable(rows, null).el ]) ])); }
+  function purchaseDetail(p, refresh) {
+    var body = el('div');
+    var m = ui.modal({ title: p.passenger+' · '+p.ticketNo, icon:'cart-check', size:'lg', body:body, footer:false });
+    var actions = el('div.flex.gap-1.items-center.flex-wrap', { style:{ marginLeft:'auto' } });
+    actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil')+' Edit', onclick:function(){ m.close(); purchaseForm(p, refresh); } }));
+    actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer')+' Print', onclick:function(){ purchasePrint(p); } }));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+        ui.frag('<span class="notif-ico notif-info">'+ui.icon('person-vcard')+'</span>'),
+        el('div.flex-1', { style:{ minWidth:'180px' } }, [ el('div.fw-700', { style:{ fontSize:'17px' }, text: p.passenger }),
+          el('div.flex.items-center.gap-2.flex-wrap', null, [ el('span.badge.badge-accent', { text:'By Air' }), el('span.badge', { text: p.route }), el('span.badge', { text: p.tripType }), el('span.badge.badge-'+(p.due<=0?'good':p.paid>0?'warn':'bad'), { text: p.payStatus }) ]) ]),
+        actions
+      ]),
+      el('div.stat-row', null, [ st2('Total', ui.money(p.total||0)), st2('Paid', ui.money(p.paid||0)), st2('Due', ui.money(p.due||0)), st2('Airline', airlineNameOf(p.airlineCode)) ])
+    ]) ]));
+    body.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('info-circle')+' Purchase Details' }) ]),
+      el('div.card-body', null, [ el('div.data-list', null, [
+        drow('Ticket No', p.ticketNo), drow('Purchase date', p.purchaseDate?ui.date(p.purchaseDate):'—'), drow('Passport No', p.passport),
+        drow('Route', p.route), drow('Trip type', p.tripType), drow('Airline', airlineNameOf(p.airlineCode)), drow('Vendor', p.vendor)
+      ]) ]) ]));
+    if (EPAL.comments && EPAL.comments.widget) { body.appendChild(el('div.section-label', { text:'Notes' })); body.appendChild(EPAL.comments.widget('air-purchase', p.id)); }
+  }
+  function purchaseForm(p, refresh) {
+    var isNew = !p;
+    var apOpts = (airports()||[]).map(function(a){ return [a.iata, a.iata+' · '+a.city]; });
+    var alOpts = (airlines()||[]).map(function(a){ return [a.iata, a.name+' ('+a.iata+')']; });
+    var vnOpts = [['','— none —']].concat((db.vendors?db.vendors():[]).map(function(v){ return [v.name, v.name]; }));
+    EPAL.formModal({
+      title: isNew ? 'Add New Ticket Purchase' : 'Edit Ticket Purchase', icon:'cart-plus', size:'lg', record: p || { tripType:'One-way', purchaseDate:'2026-07-05' },
+      fields:[
+        { type:'section', label:'Passenger & Ticket' },
+        { key:'passenger', label:'Passport holder', type:'text', required:true, col2:true, placeholder:'e.g. HOSSAIN AHMED' },
+        { key:'passport', label:'Passport No', type:'text', placeholder:'e.g. A1234567' },
+        { key:'ticketNo', label:'Ticket No / PNR', type:'text', required:true, placeholder:'e.g. 09PPXW' },
+        { key:'purchaseDate', label:'Purchase date', type:'date', default:'2026-07-05' },
+        { type:'section', label:'Route' },
+        { key:'fromCode', label:'From', type:'select', options:apOpts, required:true },
+        { key:'via', label:'Via (optional)', type:'select', options:[['','— direct —']].concat(apOpts) },
+        { key:'toCode', label:'To', type:'select', options:apOpts, required:true },
+        { key:'airlineCode', label:'Airline', type:'select', options:alOpts },
+        { key:'tripType', label:'Trip type', type:'select', options:TRIP_TYPES, default:'One-way' },
+        { key:'vendor', label:'Vendor', type:'select', options:vnOpts },
+        { type:'section', label:'Amount' },
+        { key:'total', label:'Total (৳)', type:'money', required:true, min:0 },
+        { key:'paid', label:'Paid (৳)', type:'money', default:0, min:0 }
+      ],
+      saveLabel: isNew ? 'Add Purchase' : 'Save',
+      onSave: function(val){
+        if (val.fromCode === val.toCode) { ui.toast('From and To must differ','error'); return false; }
+        var r = p || { id:'PUR-'+ui.uid('').slice(-4).toUpperCase(), created:Date.now(), status:'Confirm' };
+        r.passenger=(val.passenger||'').trim(); r.passport=val.passport; r.ticketNo=(val.ticketNo||'').trim(); r.purchaseDate=val.purchaseDate;
+        r.fromCode=val.fromCode; r.toCode=val.toCode; r.via=val.via||''; r.airlineCode=val.airlineCode; r.tripType=val.tripType||'One-way'; r.vendor=val.vendor||'';
+        r.total=+val.total||0; r.paid=Math.min(+val.paid||0, +val.total||0); r.due=Math.max(0, r.total-r.paid);
+        r.payStatus = r.due<=0 ? 'Confirm' : (r.paid>0 ? 'Partial' : 'Pending');
+        r.route = r.via ? (r.fromCode+' → '+r.via+' → '+r.toCode) : (r.fromCode+' → '+r.toCode);
+        S.upsert('air_purchases', r);
+        ui.toast('Ticket purchase for "'+r.passenger+'" saved','success');
+        if (refresh) refresh(); else EPAL.router.render();
+        return true;
+      }
+    });
+  }
+  function purchasePrint(p) {
+    function row(k,v){ return '<tr><td>'+ui.escapeHtml(k)+'</td><td>'+ui.escapeHtml(String(v==null||v===''?'—':v))+'</td></tr>'; }
+    ui.printDoc({ title:'Ticket Purchase · '+p.ticketNo, subtitle:'Epal Travels & Consultancy', meta:p.passenger+' · '+p.route, footer:'Ticketing Desk',
+      bodyHtml:'<table>'+row('Passport holder', p.passenger)+row('Passport No', p.passport)+row('Ticket No', p.ticketNo)+row('Purchase date', p.purchaseDate)+
+        row('Route', p.route)+row('Trip type', p.tripType)+row('Airline', airlineNameOf(p.airlineCode))+row('Vendor', p.vendor)+
+        row('Paid', ui.money(p.paid||0))+row('Due', ui.money(p.due||0))+'<tr><th>Total</th><th>'+ui.money(p.total||0)+'</th></tr></table>' });
   }
 
   /* ======================================================= COUNTRY master */
