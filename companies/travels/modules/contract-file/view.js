@@ -128,11 +128,33 @@
   /* ---- contract row actions (view / print / share / delete) --------------*/
   function cfRow(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v || '—' }) ]); }
   function cfView(c) {
-    ui.modal({ title: c.ref + ' · ' + c.counterparty, icon: 'file-earmark-medical', size: 'md', body: el('div.data-list', null, [
-      cfRow('Type', c.kind), cfRow('Route', c.route), cfRow('Seats', c.seats ? ui.num(c.seats) : '—'),
-      cfRow('Buy / seat', c.buyPrice ? ui.money(c.buyPrice) : '—'), cfRow('Sell / seat', c.sellPrice ? ui.money(c.sellPrice) : '—'),
-      cfRow('Validity', c.validFrom + ' → ' + c.validTo), cfRow('Status', statusOf(c)), cfRow('Document', c.doc)
-    ]) });
+    var body = el('div');
+    ui.modal({ title: c.ref + ' · ' + c.counterparty, icon: 'file-earmark-medical', size: 'lg', body: body, footer: false });
+    var margin = c.sellPrice && c.buyPrice ? Math.round((1 - c.buyPrice / c.sellPrice) * 100) : null;
+    var value = (c.sellPrice || 0) * (c.seats || 0);
+    var st = statusOf(c);
+    var actions = el('div.flex.gap-1.items-center', { style: { marginLeft: 'auto' } });
+    actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { cfPrint(c); } }));
+    actions.appendChild(ui.rowActions(ui.actions({
+      wa: { phone: '', text: cfMsg(c) }, gmail: { to: '', subject: 'Contract ' + c.ref + ' — ' + c.counterparty, body: cfMsg(c) },
+      profile: { name: c.ref, card: { title: c.ref + ' — ' + c.counterparty, subtitle: c.kind + ' · ' + c.route, lines: [
+        ['Seats', c.seats || '—'], ['Buy / seat', ui.money(c.buyPrice || 0)], ['Sell / seat', ui.money(c.sellPrice || 0)], ['Validity', c.validFrom + ' → ' + c.validTo] ] }, pdf: function () { cfPrint(c); } }
+    })));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div.flex.items-center.gap-2.flex-wrap', null, [
+      ui.frag('<span class="notif-ico notif-info">' + ui.icon('file-earmark-medical') + '</span>'),
+      el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: c.counterparty }),
+        el('div.flex.items-center.gap-2.flex-wrap', null, [ el('span.badge.mono', { text: c.ref }), el('span.badge', { text: c.kind }), badge(st) ]) ]),
+      actions ]) ]) ]));
+    body.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Seats', c.seats ? ui.num(c.seats) : '—', 'airplane'),
+      kpi('Margin', margin === null ? '—' : margin + '%', 'graph-up-arrow'),
+      kpi('Contract Value', ui.money(value, { compact: true }), 'cash-stack'),
+      kpi('Sell / Buy', ui.money(c.sellPrice || 0) + ' / ' + ui.money(c.buyPrice || 0), 'tags')
+    ]));
+    body.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('info-circle') + ' Contract Details' }) ]),
+      el('div.card-body', null, [ el('div.data-list', null, [
+        cfRow('Route', c.route), cfRow('Validity', c.validFrom + ' → ' + c.validTo), cfRow('Status', st), cfRow('Document', c.doc)
+      ]) ]) ]));
   }
   function cfPrint(c) {
     function pr(k, v) { return '<tr><td>' + k + '</td><td>' + ui.escapeHtml(String(v == null ? '—' : v)) + '</td></tr>'; }
