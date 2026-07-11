@@ -86,6 +86,10 @@
 
   <!-- ===================== VENDOR (CDN) ===================== -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- three.js (deferred, non-blocking) + the ambient 3D flight backdrop. Both
+       degrade gracefully: if three.js can't load, ambient3d.js simply no-ops. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script defer src="platform/atmosphere/ambient3d.js"></script>
 
   <!-- ===================== CORE RUNTIME ===================== -->
   <!-- config MUST load first (ui/db/auth read from it at load time). -->
