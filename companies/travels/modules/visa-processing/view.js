@@ -167,13 +167,23 @@
     var a = apps();
     var revenue = a.reduce(function (s,x){ return s+fees(x).customerTotal; }, 0);
     var profit = a.reduce(function (s,x){ return s+fees(x).profit; }, 0);
-    var approved = a.filter(function (x){ return x.stage==='Approved'; }).length;
-    var rate = a.length ? Math.round(approved / a.length * 100) : 0;
-    page.appendChild(el('div.kpi-grid.stagger', null, [
-      kpi('Total Applications', a.length, 'passport'),
-      kpi('Approval Rate', rate + '%', 'patch-check-fill'),
-      kpi('Sales Value', ui.money(revenue,{compact:true}), 'cash-coin'),
-      kpi('Profit', ui.money(profit,{compact:true}), 'graph-up-arrow')
+    var approved = a.filter(function (x){ return x.stage==='Approved'; });
+    var rejected = a.filter(function (x){ return x.stage==='Rejected'; });
+    var decided = approved.length + rejected.length;
+    var rate = decided ? Math.round(approved.length / decided * 100) : 0;
+    var inProcess = a.filter(function (x){ return ['Submitted','Under Process'].indexOf(x.stage)>=0; });
+    var unpaid = a.filter(function (x){ return x.payStatus && x.payStatus!=='Paid'; });
+    var outstanding = unpaid.reduce(function (s,x){ return s+fees(x).customerTotal; }, 0);
+    var margin = revenue ? Math.round(profit/revenue*100) : 0;
+    // 7 KPIs — slim cards, one row (~30% smaller, same text); click any for a breakdown.
+    page.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
+      kpi('Applications', a.length, 'passport', function(){ kpiApps(a); }),
+      kpi('Approval Rate', rate + '%', 'patch-check-fill', function(){ kpiApproval(a); }),
+      kpi('In Process', inProcess.length, 'hourglass-split', function(){ kpiList('In Process — '+inProcess.length, 'hourglass-split', inProcess, [['Submitted', a.filter(function(x){return x.stage==='Submitted';}).length], ['Under Process', a.filter(function(x){return x.stage==='Under Process';}).length]]); }),
+      kpi('Sales Value', ui.money(revenue,{compact:true}), 'cash-coin', function(){ kpiSales(a); }),
+      kpi('Profit', ui.money(profit,{compact:true}), 'graph-up-arrow', function(){ kpiProfit(a); }),
+      kpi('Avg Margin', margin + '%', 'percent', function(){ kpiMargin(a); }),
+      kpi('Outstanding', ui.money(outstanding,{compact:true}), 'wallet2', function(){ kpiList('Outstanding Payment', 'wallet2', unpaid, [['Unpaid apps', unpaid.length], ['Total outstanding', ui.money(outstanding)]]); })
     ]));
 
     // --- Action Center: what needs attention (each row navigates) ---
@@ -199,6 +209,11 @@
         ]);
       })) ]));
     }
+
+    // Visa Destinations map + Destination League + Embassy Stage funnel
+    visaMap(page, a);
+    countryLeague(page, a);
+    stageFunnel(page, a);
 
     var sections = [
       ['categories','Visa Categories','tags-fill','Destinations, types & pricing'],
@@ -713,9 +728,188 @@
   }
 
   /* ---------------------------------------------------- shared helpers */
-  function kpi(label, value, icon) {
-    return el('div.kpi-card', null, [ el('div.kpi-top',null,[ el('span.kpi-label',{text:label}), el('span.kpi-ico',{html:'<i class="bi bi-'+icon+'"></i>'}) ]),
-      el('div.kpi-value',{text:String(value)}) ]);
+  function kpi(label, value, icon, onClick) {
+    return el('div.kpi-card' + (onClick ? '.drill' : ''), onClick ? { onclick: onClick } : null,
+      [ el('div.kpi-top',null,[ el('span.kpi-label',{text:label}), el('span.kpi-ico',{html:'<i class="bi bi-'+icon+'"></i>'}) ]),
+        el('div.kpi-value',{text:String(value)}) ]);
+  }
+
+  /* ==========================================================================
+   * COCKPIT — KPI drill-downs, Visa Destinations map, Destination League,
+   * Embassy-Stage funnel. (Mirrors the Air Ticketing cockpit for Visa.)
+   * ========================================================================*/
+  function kpiShell(title, icon, stats){
+    var body = el('div');
+    ui.modal({ title:title, icon:icon, size:'lg', body:body, footer:false });
+    if (stats && stats.length) body.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null, [ el('div.stat-row', null, stats.map(function(s){ return st2(s[0], String(s[1])); })) ]) ]));
+    return body;
+  }
+  function countryStats(list){
+    var m={}; list.forEach(function(x){ var c=x.country||'—'; if(!m[c]) m[c]={ country:c, flag:x.flag||'🌍', apps:0, revenue:0, profit:0, approved:0, decided:0 };
+      var o=m[c], f=fees(x); o.apps++; o.revenue+=f.customerTotal; o.profit+=f.profit;
+      if(x.stage==='Approved'){ o.approved++; o.decided++; } else if(x.stage==='Rejected'){ o.decided++; } });
+    return Object.keys(m).map(function(k){ return m[k]; }).sort(function(a,b){ return b.apps-a.apps; });
+  }
+  function appsTable(list){
+    return EPAL.table({
+      columns:[
+        { key:'id', label:'App', render:function(x){ return '<span class="mono xs text-mute">'+ui.escapeHtml(x.id||'')+'</span>'; } },
+        { key:'applicant', label:'Applicant', render:function(x){ return '<span class="strong">'+(x.flag||'')+' '+ui.escapeHtml(x.applicant||'—')+'</span>'; } },
+        { key:'country', label:'Destination' }, { key:'visaType', label:'Type', badge:{} },
+        { key:'stage', label:'Stage', render:function(x){ return stBadge(x.stage).outerHTML; }, sortVal:function(x){ return x.stage; } },
+        { key:'total', label:'Sale', num:true, sortVal:function(x){ return fees(x).customerTotal; }, render:function(x){ return ui.money(fees(x).customerTotal); } },
+        { key:'profit', label:'Profit', num:true, sortVal:function(x){ return fees(x).profit; }, render:function(x){ var p=fees(x).profit; return '<span class="num '+(p>=0?'text-good':'text-bad')+'">'+ui.money(p)+'</span>'; } },
+        { key:'payStatus', label:'Pay', render:function(x){ return x.payStatus? payBadge(x.payStatus).outerHTML : '—'; }, sortVal:function(x){ return x.payStatus||''; } }
+      ],
+      rows:list, searchKeys:['id','applicant','country','visaType'], quickFilter:'stage', filterPanel:true, pageSize:8,
+      exportName:'visa-apps.csv', pdfTitle:'Visa Applications', onRow:function(x){ appDetail(x, function(){}); },
+      empty:{ icon:'passport', title:'No applications here' }
+    }).el;
+  }
+  function countryTable(rows){
+    return EPAL.table({
+      columns:[
+        { key:'country', label:'Destination', render:function(r){ return '<span class="strong">'+(r.flag||'')+' '+ui.escapeHtml(r.country)+'</span>'; } },
+        { key:'apps', label:'Apps', num:true }, { key:'revenue', label:'Sales', num:true, money:true },
+        { key:'profit', label:'Profit', num:true, sortVal:function(r){ return r.profit; }, render:function(r){ return '<span class="num '+(r.profit>=0?'text-good':'text-bad')+'">'+ui.money(r.profit)+'</span>'; } },
+        { key:'approval', label:'Approval', num:true, sortVal:function(r){ return r.decided? r.approved/r.decided*100 : 0; }, render:function(r){ return '<span class="num">'+(r.decided?Math.round(r.approved/r.decided*100):0)+'%</span>'; } }
+      ],
+      rows:rows, pageSize:12, exportName:'visa-by-country.csv', pdfTitle:'By Destination', empty:{ icon:'geo-alt', title:'No data' }
+    }).el;
+  }
+  function countryChart(body, rows, key, title){
+    var cid=ui.uid('vcc');
+    body.appendChild(el('div.card.mb-2', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('bar-chart')+' '+title }) ]),
+      el('div.card-body', null, [ el('div',{ style:{ height:'240px', position:'relative' } }, [ el('canvas',{ id:cid }) ]) ]) ]));
+    requestAnimationFrame(function(){ var c=document.getElementById(cid); if(!c) return;
+      var rr=rows.slice().sort(function(a,b){ return b[key]-a[key]; }).slice(0,8);
+      EPAL.charts.bar(c, { labels:rr.map(function(r){ return r.country; }), horizontal:true, money:true, datasets:[{ label:title, data:rr.map(function(r){ return r[key]; }) }] }); });
+  }
+  function kpiList(title, icon, list, stats){ var body=kpiShell(title, icon, stats); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ appsTable(list) ]) ])); }
+  function kpiApps(a){
+    var byStage={}; a.forEach(function(x){ byStage[x.stage||'—']=(byStage[x.stage||'—']||0)+1; });
+    var stats=STAGES.filter(function(s){ return byStage[s.id]; }).map(function(s){ return [s.id, byStage[s.id]]; });
+    if(!stats.length) stats=[['Applications', a.length]];
+    var body=kpiShell('Applications — '+a.length, 'passport', stats);
+    body.appendChild(el('div.section-label',{text:'By Destination'}));
+    body.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null, [ countryTable(countryStats(a)) ]) ]));
+    body.appendChild(el('div.section-label',{text:'All Applications'}));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ appsTable(a) ]) ]));
+  }
+  function kpiApproval(a){
+    var app=a.filter(function(x){ return x.stage==='Approved'; }), rej=a.filter(function(x){ return x.stage==='Rejected'; });
+    var pend=a.filter(function(x){ return ['Approved','Rejected'].indexOf(x.stage)<0; });
+    var decided=app.length+rej.length, rate=decided?Math.round(app.length/decided*100):0;
+    var body=kpiShell('Approval Rate — '+rate+'%', 'patch-check-fill', [['Approved',app.length],['Rejected',rej.length],['Pending',pend.length],['Decided',decided]]);
+    body.appendChild(el('div.section-label',{text:'Approval by Destination'}));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ countryTable(countryStats(a)) ]) ]));
+  }
+  function kpiSales(a){
+    var total=a.reduce(function(s,x){ return s+fees(x).customerTotal; },0), avg=a.length?Math.round(total/a.length):0;
+    var body=kpiShell('Sales Value — '+ui.money(total), 'cash-coin', [['Total',ui.money(total)],['Applications',a.length],['Avg / app',ui.money(avg)]]);
+    countryChart(body, countryStats(a), 'revenue', 'Sales by Destination');
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ countryTable(countryStats(a)) ]) ]));
+  }
+  function kpiProfit(a){
+    var revenue=a.reduce(function(s,x){ return s+fees(x).customerTotal; },0);
+    var embassy=a.reduce(function(s,x){ return s+fees(x).embassy; },0), vfs=a.reduce(function(s,x){ return s+fees(x).vfs; },0);
+    var profit=a.reduce(function(s,x){ return s+fees(x).profit; },0);
+    var body=kpiShell('Profit — '+ui.money(profit), 'graph-up-arrow', [['Sales',ui.money(revenue)],['Embassy',ui.money(embassy)],['VFS',ui.money(vfs)],['Profit',ui.money(profit)]]);
+    var wid=ui.uid('vwf');
+    body.appendChild(el('div.card.mb-2', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('bar-chart-steps')+' Profit Waterfall' }), el('span.card-sub',{ text:'sales → embassy → vfs → profit' }) ]),
+      el('div.card-body', null, [ el('div',{ style:{ height:'240px', position:'relative' } }, [ el('canvas',{ id:wid }) ]) ]) ]));
+    requestAnimationFrame(function(){ var c=document.getElementById(wid); if(!c) return;
+      EPAL.charts.bar(c, { labels:['Sales','− Embassy','− VFS','Profit'], datasets:[{ label:'৳', data:[[0,revenue],[revenue-embassy,revenue],[profit,revenue-embassy],[0,profit]], colors:['#2f6bff','#f0506e','#e2721b','#23c17e'] }] }); });
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ countryTable(countryStats(a)) ]) ]));
+  }
+  function kpiMargin(a){
+    var revenue=a.reduce(function(s,x){ return s+fees(x).customerTotal; },0), profit=a.reduce(function(s,x){ return s+fees(x).profit; },0);
+    var cs=countryStats(a).filter(function(r){ return r.revenue; });
+    var best=cs.slice().sort(function(x,y){ return (y.profit/y.revenue)-(x.profit/x.revenue); })[0];
+    var worst=cs.slice().sort(function(x,y){ return (x.profit/x.revenue)-(y.profit/y.revenue); })[0];
+    var body=kpiShell('Average Margin — '+(revenue?Math.round(profit/revenue*100):0)+'%', 'percent', [
+      ['Overall', (revenue?Math.round(profit/revenue*100):0)+'%'],
+      ['Best', best? best.country+' · '+Math.round(best.profit/best.revenue*100)+'%':'—'],
+      ['Weakest', worst? worst.country+' · '+Math.round(worst.profit/worst.revenue*100)+'%':'—'] ]);
+    body.appendChild(el('div.section-label',{text:'Margin by Destination'}));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ countryTable(countryStats(a)) ]) ]));
+  }
+
+  /* ---- VISA DESTINATIONS MAP — arcs from Dhaka to each destination country,
+     bubbles sized by application volume. Click a destination for its stats. */
+  var COUNTRY_XY = { 'Malaysia':[3.14,101.69],'Thailand':[13.75,100.5],'UAE':[24.0,54.0],'Saudi Arabia':[24.7,46.7],
+    'Schengen':[48.5,9.0],'Singapore':[1.35,103.82],'Canada':[45.42,-75.7],'UK':[51.5,-0.13],'USA':[38.9,-77.0],
+    'Qatar':[25.28,51.53],'Turkey':[39.0,35.0],'India':[28.6,77.2],'Australia':[-33.87,151.2] };
+  var VISA_ORIGIN=[23.84,90.40], VMAP_W=1000, VMAP_H=440, VLNG0=-92, VLNG1=116, VLAT0=-40, VLAT1=62;
+  function vproj(ll){ if(!ll) return null; return [ (ll[1]-VLNG0)/(VLNG1-VLNG0)*VMAP_W, (VLAT1-ll[0])/(VLAT1-VLAT0)*VMAP_H ]; }
+  function vr1(n){ return Math.round(n*10)/10; }
+  function varc(a, b){ var mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,dx=b[0]-a[0],dy=b[1]-a[1],d=Math.hypot(dx,dy)||1,nx=-dy/d,ny=dx/d,k=Math.min(0.3,40/d+0.13);
+    var cx=mx+nx*d*k,cy=my+ny*d*k; if(cy>my){ cx=mx-nx*d*k; cy=my-ny*d*k; } return 'M'+vr1(a[0])+' '+vr1(a[1])+' Q '+vr1(cx)+' '+vr1(cy)+' '+vr1(b[0])+' '+vr1(b[1]); }
+
+  function visaMap(page, a){
+    var list=countryStats(a).filter(function(r){ return vproj(COUNTRY_XY[r.country]); });
+    if(!list.length) return;
+    var maxA=list[0].apps||1, op=vproj(VISA_ORIGIN);
+    var svg='<svg viewBox="0 0 '+VMAP_W+' '+VMAP_H+'" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="width:100%;height:auto;display:block">';
+    for (var gx=0; gx<=VMAP_W; gx+=50) svg+='<line x1="'+gx+'" y1="0" x2="'+gx+'" y2="'+VMAP_H+'" stroke="currentColor" stroke-width="0.5" opacity="0.05"/>';
+    for (var gy=0; gy<=VMAP_H; gy+=50) svg+='<line x1="0" y1="'+gy+'" x2="'+VMAP_W+'" y2="'+gy+'" stroke="currentColor" stroke-width="0.5" opacity="0.05"/>';
+    list.forEach(function(r,i){ var p=vproj(COUNTRY_XY[r.country]), path=varc(op,p), w=(1+ (r.apps/maxA)*4).toFixed(1), o=(0.30+0.5*(r.apps/maxA)).toFixed(2), dur=(7+i*0.5).toFixed(1);
+      svg+='<path id="varc-'+i+'" d="'+path+'" fill="none" stroke="#7b5cff" stroke-opacity="'+o+'" stroke-width="'+w+'" stroke-linecap="round"/>'
+        +'<circle r="'+(1.8+(r.apps/maxA)*2).toFixed(1)+'" fill="#c9b8ff"><animateMotion dur="'+dur+'s" repeatCount="indefinite" rotate="auto"><mpath href="#varc-'+i+'"/></animateMotion></circle>'
+        +'<path class="visa-hit" data-idx="'+i+'" d="'+path+'" fill="none" stroke="transparent" stroke-width="16" style="cursor:pointer"/>'; });
+    list.forEach(function(r){ var p=vproj(COUNTRY_XY[r.country]), rad=(5+Math.sqrt(r.apps)*2.3).toFixed(1);
+      svg+='<circle cx="'+vr1(p[0])+'" cy="'+vr1(p[1])+'" r="'+rad+'" fill="#7b5cff" fill-opacity="0.85" stroke="#ffffff" stroke-width="1" stroke-opacity="0.5"/>'
+        +'<text x="'+vr1(p[0])+'" y="'+vr1(p[1]-rad-4)+'" font-size="15" text-anchor="middle">'+(r.flag||'')+'</text>'
+        +'<text x="'+vr1(p[0])+'" y="'+vr1(p[1]+3.5)+'" font-size="10" font-weight="700" text-anchor="middle" fill="#ffffff">'+r.apps+'</text>'; });
+    // origin (Dhaka) with pulse
+    svg+='<circle cx="'+vr1(op[0])+'" cy="'+vr1(op[1])+'" r="10" fill="#1A43BF" opacity="0.22"><animate attributeName="r" values="8;18;8" dur="3s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.28;0;0.28" dur="3s" repeatCount="indefinite"/></circle>'
+      +'<circle cx="'+vr1(op[0])+'" cy="'+vr1(op[1])+'" r="6" fill="#1A43BF" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.6"/>'
+      +'<text x="'+vr1(op[0])+'" y="'+vr1(op[1]-12)+'" font-size="12.5" font-weight="700" fill="currentColor" opacity="0.85" text-anchor="middle">Dhaka</text>';
+    svg+='</svg>';
+    page.appendChild(el('div.section-label',{ html: ui.icon('globe-americas')+' Visa Destinations' }));
+    var card=el('div.card', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('geo-alt-fill')+' Where We Send Travellers' }),
+      el('span.card-sub',{ text: list.length+' destinations · click one for details' }) ]),
+      el('div.card-body', null, [ el('div.route-map', { style:{ color:'var(--text-mute)' }, html: svg }) ]) ]);
+    page.appendChild(card);
+    var svgEl=card.querySelector('.route-map svg');
+    if(svgEl) Array.prototype.forEach.call(svgEl.querySelectorAll('.visa-hit'), function(hit){ hit.addEventListener('click', function(){ countryModal(list[+hit.getAttribute('data-idx')], a); }); });
+  }
+  function countryModal(r, all){
+    var list=all.filter(function(x){ return x.country===r.country; });
+    var rate=r.decided?Math.round(r.approved/r.decided*100):0, avg=r.apps?Math.round(r.revenue/r.apps):0;
+    var body=kpiShell((r.flag||'🌍')+' '+r.country, 'geo-alt-fill', [['Applications',r.apps],['Sales',ui.money(r.revenue)],['Profit',ui.money(r.profit)],['Approval',rate+'%'],['Avg / app',ui.money(avg)]]);
+    body.appendChild(el('div.section-label',{ text:'Applications' }));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ appsTable(list) ]) ]));
+  }
+  function countryLeague(page, a){
+    var rows=countryStats(a).slice(0,10); if(!rows.length) return;
+    var maxR=rows[0].revenue||rows[0].apps||1, medals=['#f4c542','#c9ccd3','#cd7f32'], list=el('div');
+    rows.forEach(function(r,i){ var rate=r.decided?Math.round(r.approved/r.decided*100):0, barW=Math.max(4,Math.round((r.revenue/maxR)*100));
+      var rank=i<3? '<span style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:'+medals[i]+';color:#1b2438;font-weight:800;font-size:11px">'+(i+1)+'</span>'
+        : '<span class="text-mute" style="width:22px;display:inline-block;text-align:center">'+(i+1)+'</span>';
+      list.appendChild(el('div.data-row', { style:{ cursor:'pointer' }, onclick:(function(rr){ return function(){ countryModal(rr, a); }; })(r) }, [
+        ui.frag(rank), ui.frag('<span style="font-size:20px;line-height:1">'+(r.flag||'🌍')+'</span>'),
+        el('div.flex-1', { style:{ minWidth:'120px' } }, [ el('div.strong',{ text:r.country }),
+          el('div', { style:{ height:'6px', borderRadius:'6px', background:'var(--surface-3,#2a3350)', overflow:'hidden', marginTop:'5px', maxWidth:'240px' } }, [ el('div',{ style:{ height:'100%', width:barW+'%', background:'#7b5cff' } }) ]) ]),
+        el('div', { style:{ textAlign:'right', minWidth:'150px' } }, [ el('div.num.strong',{ text: ui.money(r.revenue,{compact:true}) }),
+          el('div.num.xs.text-mute',{ text: r.apps+' apps · '+rate+'%' }) ]) ]));
+    });
+    page.appendChild(el('div.section-label',{ html: ui.icon('trophy')+' Destination League' }));
+    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ list ]) ]));
+  }
+  function stageFunnel(page, a){
+    var by={}; a.forEach(function(x){ by[x.stage||'—']=(by[x.stage||'—']||0)+1; });
+    var labels=STAGES.map(function(s){ return s.id; }).filter(function(s){ return by[s]; }); if(labels.length<2) return;
+    var colors=labels.map(function(s){ return (STAGES.filter(function(x){ return x.id===s; })[0]||{}).color||'#8b93a7'; });
+    var cid=ui.uid('vsf'), chips=el('div.flex.gap-1.flex-wrap.mt-2');
+    labels.forEach(function(s){ var m=STAGES.filter(function(x){ return x.id===s; })[0]||{};
+      chips.appendChild(el('button.badge', { style:{ cursor:'pointer', background:(m.color||'#888')+'22', color:m.color||'#888', border:'0' },
+        onclick:(function(st, mm){ return function(){ kpiList(st+' applications', mm.icon||'passport', a.filter(function(x){ return x.stage===st; }), [['Count', by[st]]]); }; })(s, m) },
+        [ ui.frag((m.icon? ui.icon(m.icon)+' ':'')+s+' · '+by[s]) ])); });
+    page.appendChild(el('div.section-label',{ html: ui.icon('funnel-fill')+' Embassy Stage Funnel' }));
+    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div',{ style:{ height:'240px', position:'relative' } }, [ el('canvas',{ id:cid }) ]), chips ]) ]));
+    requestAnimationFrame(function(){ var c=document.getElementById(cid); if(!c) return;
+      EPAL.charts.bar(c, { labels:labels, horizontal:true, money:false, datasets:[{ label:'Applications', data:labels.map(function(s){ return by[s]; }), colors:colors }] }); });
   }
   function tableCard(title, headers, rows, emptyMsg, opts) {
     var card = el('div.card');
