@@ -23,6 +23,36 @@
 - Numeric columns use tabular figures with right-aligned headers. `elevation.css`
   MUST stay linked in `index.html` (it holds the datatable/POS chrome).
 
+## ✅ Done (2026-07-11) — the "Others" modules, at Vendor/Agent gold standard
+
+The remaining Travels modules that fell back to the shared `*/…` wildcards (or the
+placeholder) are now **deep, Travels-specific `companies/travels/modules/<id>/`
+views** that override the shared ones (router prefers specific → other companies
+untouched). Each: module.json (`built:true`) + `<script>` in index.html +
+`backend/LARAVEL-BLUEPRINT.md`; boot-swept 0-errors; committed + pushed one-by-one.
+
+- **Accounts** — cockpit (income/expense/net/cash/overdue KPIs + Action Center),
+  Income/Expenses registers with head chips, double-entry Journal poster (→ GL),
+  Payment-Schedule tracker (ageing, mark-paid). Quick entries mirror to the ledger.
+- **HRM** — Directory + rich employee profile, Attendance board, Leaves (seeded
+  `tv_leaves`, apply/approve/reject), Payroll (payslips + Run Payroll → GL, once/mo),
+  Performance.
+- **CRM** — Overview cockpit, drag-drop Pipeline (Won → `postSale`), Leads + rich
+  lead detail (stage stepper, activity timeline), Follow-ups, Comm Hub.
+- **Ledgers** — cockpit + drillable GL / Trial Balance / Party Ledger / AR-AP
+  Ageing / Balance Sheet / P&L; row-click drill-downs + branded statement PDFs.
+- **Reports** — categorised report centre (16 reports) with preview + CSV/PDF/print.
+- **Analytics** — revenue forecast, Profit-Leak scanner, Fraud Sentinel (5
+  heuristics), Travel-DNA (customer RFM + service mix + seasonality).
+- **Automation** — Rules & Bots (6 bots wired to live matchers), Doc-Expiry Radar
+  (passports + contracts), Markup Engine (rates + live calculator). New stores
+  `tv_automation`, `tv_markup`.
+- **Settings** — tabbed Profile / Financial / Documents / Notifications / Data;
+  preserves the `settings.travels` store key; per-tab `store.patch` saves.
+
+House pattern throughout (chips · Filter card · CSV+PDF · row-click rich detail ·
+edit·delete│print·WhatsApp·Gmail · Notes threads · Action-Center cockpits).
+
 ## ✅ Done (2026-07-09)
 
 **Vendor / Agent module — COMPLETE & signed off** (vendors, sub-agents, customers,
