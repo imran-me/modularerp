@@ -1,0 +1,21 @@
+{
+  "key": "hrm",
+  "company": "travels",
+  "title": "HRM",
+  "icon": "people-fill",
+  "desc": "Team directory, attendance, leaves, payroll & performance.",
+  "route": "#/travels/hrm",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "attendance", "label": "Attendance", "route": "#/travels/hrm/attendance", "enabled": true },
+    { "id": "leaves", "label": "Leaves", "route": "#/travels/hrm/leaves", "enabled": true },
+    { "id": "payroll", "label": "Payroll", "route": "#/travels/hrm/payroll", "enabled": true },
+    { "id": "performance", "label": "Performance", "route": "#/travels/hrm/performance", "enabled": true }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Travels-specific override of the shared star-slash-hrm view (router prefers specific)."
+}
