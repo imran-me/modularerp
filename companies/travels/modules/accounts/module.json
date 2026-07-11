@@ -1,0 +1,21 @@
+{
+  "key": "accounts",
+  "company": "travels",
+  "title": "Accounts",
+  "icon": "cash-stack",
+  "desc": "Income, expenses, double-entry journals & payment schedules.",
+  "route": "#/travels/accounts",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "income", "label": "Income", "route": "#/travels/accounts/income", "enabled": true },
+    { "id": "expenses", "label": "Expenses", "route": "#/travels/accounts/expenses", "enabled": true },
+    { "id": "journals", "label": "Journals", "route": "#/travels/accounts/journals", "enabled": true },
+    { "id": "schedules", "label": "Payment Schedules", "route": "#/travels/accounts/schedules", "enabled": true }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Travels-specific override of the shared star-slash-accounts view (router prefers specific)."
+}

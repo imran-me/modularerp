@@ -1,0 +1,622 @@
+/* ============================================================================
+ * EPAL GROUP ERP  ·  companies/travels/modules/accounts/view.js
+ * ----------------------------------------------------------------------------
+ * TRAVELS — ACCOUNTS. The money desk of the travel house: day-to-day income &
+ * expense journal, the double-entry journal poster (into the real GL), and the
+ * payable / receivable payment-schedule tracker. ONE registered view branches on
+ * ctx.subId (pill-tabs), and — because the router prefers a specific view over the
+ * shared "star-slash-accounts" wildcard — this Travels-only screen supersedes the
+ * generic one WITHOUT touching any other company.
+ *
+ *   (overview)  → cockpit: Income / Expense / Net / Cash KPIs, an Action Center
+ *                 (overdue + due-soon schedules, top expense head, low cash),
+ *                 monthly Income-vs-Expense trend, expense-by-head & method mix,
+ *                 and the recent-entries register.
+ *   income      → Income register (chips by head) + KPIs + top heads.
+ *   expenses    → Expense register (chips by head) + KPIs + top heads.
+ *   journals    → post a BALANCED double-entry journal via EPAL.ledger + recent GL.
+ *   schedules   → payable / receivable schedule tracker (chips, mark-paid, ageing).
+ *
+ * DATA (localStorage, seeded in platform/data/seed-bd.js):
+ *   acc_entries    { id, companyId, date, kind:'Income'|'Expense', category,
+ *                    method, desc, amount, party?, ref?, created }
+ *   acc_schedules  { id, companyId, party, kind:'Payable'|'Receivable',
+ *                    amount, due, status:'Paid'|'Partial'|'Pending', desc? }
+ *   gl_entries     the double-entry ledger (EPAL.ledger) — quick entries mirror here.
+ *
+ * Every quick entry mirrors into the double-entry ledger (upsert by a stable GL id)
+ * so Travels + Group finance stay reconciled. Never write a literal star-slash in
+ * this comment block — it would close the comment.
+ * ==> LARAVEL: AccountEntry + PaymentSchedule Eloquent models; JournalController
+ *     posting through the LedgerService; a Blade view per tab.
+ * ==========================================================================*/
+
+(function (EPAL) {
+  'use strict';
+  var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
+
+  var CID = 'travels';
+  var TODAY = new Date(2026, 6, 5);                 // demo "today" = 2026-07-05
+  var TODAY_STR = '2026-07-05';
+  var METHODS = ['Bank', 'Cash', 'bKash', 'Nagad', 'Card', 'Cheque'];
+  // Common Bangladeshi travel-agency posting heads — offered on the form, but the
+  // field stays free-text so bookkeepers can add their own.
+  var INCOME_HEADS = ['Air Ticket', 'Visa Service', 'Package Tour', 'Umrah / Hajj', 'Hotel Booking',
+    'Insurance', 'Service Charge', 'Commission', 'Other Income'];
+  var EXPENSE_HEADS = ['Office Rent', 'Staff Salary', 'Utilities', 'Marketing', 'Airline / GSA Payment',
+    'Bank Charge', 'ADM / Penalty', 'Travel & Conveyance', 'Printing & Stationery', 'Software / GDS', 'Other Expense'];
+  var SCHEDULE_KINDS = ['Payable', 'Receivable'];
+  var SCHEDULE_STATUS = ['Pending', 'Partial', 'Paid'];
+
+  /* ==========================================================================
+   * DATA ACCESSORS
+   * ========================================================================*/
+  function entries() { return db.col('acc_entries').filter(function (e) { return e.companyId === CID; }); }
+  function schedules() { return db.col('acc_schedules').filter(function (s) { return s.companyId === CID; }); }
+
+  function sum(list, pred) { return list.reduce(function (a, e) { return a + (pred ? (pred(e) ? (+e.amount || 0) : 0) : (+e.amount || 0)); }, 0); }
+  function incomeTotal() { return sum(entries(), function (e) { return e.kind === 'Income'; }); }
+  function expenseTotal() { return sum(entries(), function (e) { return e.kind === 'Expense'; }); }
+
+  // Cash / bank position straight from the double-entry ledger (account 1010,
+  // an asset → balance() returns Dr − Cr on its normal side), falling back to
+  // income − expense if the ledger engine is unavailable.
+  function cashPosition() {
+    try { if (EPAL.ledger && EPAL.ledger.balance) return EPAL.ledger.balance('1010', { companyId: CID }); } catch (e) {}
+    return incomeTotal() - expenseTotal();
+  }
+
+  // Group a list of entries by a key → [{ label, value, pct }] sorted desc.
+  function groupBy(list, key) {
+    var map = {}, total = 0;
+    list.forEach(function (e) { var k = e[key] || '—'; map[k] = (map[k] || 0) + (+e.amount || 0); total += (+e.amount || 0); });
+    return Object.keys(map).map(function (k) { return { label: k, value: map[k], pct: total ? Math.round(map[k] / total * 100) : 0 }; })
+      .sort(function (a, b) { return b.value - a.value; });
+  }
+
+  function daysTo(str) { var d = new Date(str); if (isNaN(d)) return 0; return Math.floor((d.getTime() - TODAY.getTime()) / 86400000); }
+  function openSchedules() { return schedules().filter(function (s) { return s.status !== 'Paid'; }); }
+  function overdueSchedules() { return openSchedules().filter(function (s) { return daysTo(s.due) < 0; }); }
+  function dueSoon(n) { return openSchedules().filter(function (s) { var d = daysTo(s.due); return d >= 0 && d <= (n || 7); }); }
+
+  /* ==========================================================================
+   * VIEW ENTRY — one registered view, branches on the sub (pill-tab).
+   * ========================================================================*/
+  EPAL.view('travels/accounts', {
+    render: function (ctx) {
+      var sub = ctx.subId || 'overview';
+      if (['overview', 'income', 'expenses', 'journals', 'schedules'].indexOf(sub) < 0) sub = 'overview';
+      var page = el('div.page');
+
+      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', journals: 'Journals', schedules: 'Payment Schedules' };
+      var subs = { overview: 'Income, expenses, journals and payment schedules for Epal Travels.',
+        income: 'Every rupee earned — by head, method and month.', expenses: 'Every rupee spent — controlled by head and method.',
+        journals: 'Post balanced double-entry journals straight into the general ledger.',
+        schedules: 'Payables and receivables with due dates, ageing and settlement.' };
+
+      page.appendChild(EPAL.pageHead({
+        eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
+        icon: 'cash-stack', title: titles[sub], sub: subs[sub],
+        actions: [
+          canCreate() && sub !== 'journals' && sub !== 'schedules'
+            ? el('button.btn.btn-ghost', { html: ui.icon('journal-plus') + ' New Entry', onclick: function () { entryForm(null); } }) : null,
+          canCreate() && sub === 'schedules'
+            ? el('button.btn.btn-ghost', { html: ui.icon('calendar2-plus') + ' New Schedule', onclick: function () { scheduleForm(null); } }) : null,
+          el('a.btn.btn-primary', { href: '#/travels/ledgers', html: ui.icon('journal-text') + ' Ledgers' })
+        ]
+      }));
+
+      // pill-tab navigation across the accounts sub-screens
+      var pills = el('div.pill-tab.mb-3');
+      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
+        pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
+          onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
+      });
+      page.appendChild(pills);
+
+      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView }[sub] || overview)(page);
+      ctx.mount.appendChild(page);
+    }
+  });
+
+  /* ======================================================= OVERVIEW (cockpit) */
+  function overview(page) {
+    var inc = incomeTotal(), exp = expenseTotal(), net = inc - exp;
+    var cash = cashPosition();
+    var open = openSchedules(), overdue = overdueSchedules();
+    var outstanding = open.reduce(function (a, s) { return a + (+s.amount || 0); }, 0);
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpiDrill('Income', ui.money(inc, { compact: true }), 'arrow-down-left-circle', 'travels/accounts/income'),
+      kpiDrill('Expenses', ui.money(exp, { compact: true }), 'arrow-up-right-circle', 'travels/accounts/expenses'),
+      kpi('Net Result', ui.money(net, { compact: true }), net >= 0 ? 'graph-up-arrow' : 'graph-down-arrow', net >= 0 ? 'text-good' : 'text-bad'),
+      kpi('Cash & Bank', ui.money(cash, { compact: true }), 'bank2'),
+      kpiDrill('Open Schedules', String(open.length), 'calendar2-week', 'travels/accounts/schedules', ui.money(outstanding, { compact: true }) + ' outstanding'),
+      kpi('Overdue', ui.money(overdue.reduce(function (a, s) { return a + (+s.amount || 0); }, 0), { compact: true }), 'exclamation-triangle', overdue.length ? 'text-bad' : '')
+    ]));
+
+    // ---- Action Center — what the money desk must act on TODAY -------------
+    var actions = [];
+    overdue.slice(0, 4).forEach(function (s) {
+      actions.push({ tone: 'error', icon: 'exclamation-octagon-fill',
+        text: '<strong>' + esc(s.party) + '</strong> ' + (s.kind === 'Payable' ? 'payable' : 'receivable') + ' ' + ui.money(s.amount) + ' overdue by ' + Math.abs(daysTo(s.due)) + 'd',
+        go: 'travels/accounts/schedules' });
+    });
+    dueSoon(7).slice(0, 3).forEach(function (s) {
+      actions.push({ tone: 'warning', icon: 'clock-history',
+        text: '<strong>' + esc(s.party) + '</strong> ' + s.kind.toLowerCase() + ' ' + ui.money(s.amount) + ' due in ' + daysTo(s.due) + 'd',
+        go: 'travels/accounts/schedules' });
+    });
+    var topExp = groupBy(monthEntries(entries(), curYm()).filter(function (e) { return e.kind === 'Expense'; }), 'category')[0];
+    if (topExp) actions.push({ tone: 'info', icon: 'pie-chart-fill',
+      text: 'Biggest expense head this month: <strong>' + esc(topExp.label) + '</strong> · ' + ui.money(topExp.value),
+      go: 'travels/accounts/expenses' });
+    if (cash < 100000) actions.push({ tone: 'error', icon: 'wallet2',
+      text: '<strong>Low cash.</strong> Cash & bank position is ' + ui.money(cash) + ' — review upcoming payables.', go: 'travels/accounts/schedules' });
+
+    page.appendChild(el('div.section-label', { text: 'Action Center — needs attention' }));
+    if (actions.length) {
+      page.appendChild(el('div.card', null, [ el('div.card-body', null, actions.map(function (a) {
+        return el('div.data-row', { style: { cursor: 'pointer' }, onclick: (function (go) { return function () { EPAL.router.navigate(go); }; })(a.go) }, [
+          ui.frag('<span class="notif-ico notif-' + a.tone + '">' + ui.icon(a.icon) + '</span>'),
+          el('div.flex-1', { html: a.text }),
+          ui.frag('<span class="text-mute">' + ui.icon('chevron-right') + '</span>')
+        ]);
+      })) ]));
+    } else {
+      page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('check-circle-fill')),
+        el('div', { html: '<strong>All clear.</strong> No overdue or imminent settlements — the books are current.' }) ]));
+    }
+
+    // ---- charts: monthly income vs expense + expense mix + method mix ------
+    page.appendChild(el('div.section-label', { text: 'Cash Movement' }));
+    var trendId = ui.uid('acc-trend'), mixId = ui.uid('acc-mix'), methId = ui.uid('acc-meth');
+    page.appendChild(el('div.grid-auto', null, [
+      chartCard('Income vs Expense — monthly', 'activity', trendId, 'last 8 months', 250),
+      chartCard('Expense by Head', 'pie-chart', mixId, 'where the money goes', 250)
+    ]));
+    var methods = groupBy(entries(), 'method');
+    page.appendChild(chartCard('Payment Method Mix', 'credit-card', methId, 'income + expense by channel', 220));
+
+    requestAnimationFrame(function () {
+      var months = lastYm(8);
+      var incS = months.map(function (ym) { return monthSum(entries(), ym, 'Income'); });
+      var expS = months.map(function (ym) { return monthSum(entries(), ym, 'Expense'); });
+      var c1 = document.getElementById(trendId);
+      if (c1) EPAL.charts.bar(c1, { labels: months.map(mLabel), legend: true,
+        datasets: [{ label: 'Income', data: incS, color: '#23c17e' }, { label: 'Expense', data: expS, color: '#f0506e' }] });
+      var mix = groupBy(entries().filter(function (e) { return e.kind === 'Expense'; }), 'category').slice(0, 7);
+      var c2 = document.getElementById(mixId);
+      if (c2 && mix.length) EPAL.charts.doughnut(c2, { labels: mix.map(function (m) { return m.label; }), data: mix.map(function (m) { return m.value; }) });
+      var c3 = document.getElementById(methId);
+      if (c3 && methods.length) EPAL.charts.bar(c3, { labels: methods.map(function (m) { return m.label; }), horizontal: true, money: true,
+        datasets: [{ label: 'Volume', data: methods.map(function (m) { return m.value; }) }] });
+    });
+
+    // ---- recent entries register ------------------------------------------
+    page.appendChild(el('div.section-label', { text: 'Recent Entries' }));
+    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ entriesTable(entries(), null) ]) ]));
+  }
+
+  /* ======================================================= INCOME / EXPENSES */
+  function incomeView(page) { kindRegister(page, 'Income', INCOME_HEADS, '#23c17e'); }
+  function expenseView(page) { kindRegister(page, 'Expense', EXPENSE_HEADS, '#f0506e'); }
+
+  function kindRegister(page, kind, heads, color) {
+    var list = entries().filter(function (e) { return e.kind === kind; });
+    var total = list.reduce(function (a, e) { return a + (+e.amount || 0); }, 0);
+    var thisMonth = monthSum(list, curYm(), kind);
+    var heads2 = groupBy(list, 'category');
+    var avg = list.length ? Math.round(total / list.length) : 0;
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Total ' + kind, ui.money(total, { compact: true }), kind === 'Income' ? 'arrow-down-left-circle' : 'arrow-up-right-circle', kind === 'Income' ? 'text-good' : 'text-bad'),
+      kpi('This Month', ui.money(thisMonth, { compact: true }), 'calendar3'),
+      kpi('Entries', String(list.length), 'card-list'),
+      kpi('Average', ui.money(avg, { compact: true }), 'graph-up'),
+      kpi('Top Head', heads2[0] ? heads2[0].label : '—', 'trophy')
+    ]));
+
+    // clickable head chips — biggest posting heads, tap to filter the register
+    if (heads2.length) {
+      page.appendChild(el('div.section-label.mt-0', { text: kind + ' Heads — tap to filter' }));
+      var chipWrap = el('div.grid-auto.kpi-compact.stagger.mb-3');
+      var selected = null, tableRef = null;
+      heads2.slice(0, 8).forEach(function (h) {
+        chipWrap.appendChild(el('button.card.tier-card', { type: 'button', onclick: function () {
+          selected = selected === h.label ? null : h.label;
+          if (tableRef) { tableRef.state.filters.category = selected || '__all'; tableRef.state.page = 0; tableRef.refresh(); }
+          Array.prototype.forEach.call(chipWrap.children, function (c) { c.classList.remove('active'); });
+          if (selected) this.classList.add('active');
+        } }, [ el('div.card-pad', null, [
+          el('div.flex.items-center.gap-2', null, [
+            el('span', { style: { width: '10px', height: '10px', borderRadius: '99px', background: color, display: 'inline-block' } }),
+            el('div.flex-1', null, [ el('div.fw-700', { text: h.label }), el('div.text-mute.sm', { text: h.pct + '% of ' + kind.toLowerCase() }) ]),
+            el('span.badge', { text: ui.money(h.value, { compact: true }) }) ])
+        ]) ]));
+      });
+      page.appendChild(chipWrap);
+      page.appendChild(el('div.card', null, [ el('div.card-body', null, [ (tableRef = entriesTable(list, kind)) && tableRef.el ]) ]));
+    } else {
+      page.appendChild(el('div.card', null, [ el('div.card-body', null, [ entriesTable(list, kind).el ]) ]));
+    }
+  }
+
+  // The entries datatable — chips by head, filter card, PDF, row-click rich detail,
+  // canonical row actions (edit · delete │ print). Returns the table instance.
+  function entriesTable(rows, kind) {
+    var t = EPAL.table({
+      columns: [
+        { key: 'id', label: 'JV', render: function (e) { return '<span class="mono xs text-mute">' + esc(e.id) + '</span>'; } },
+        { key: 'date', label: 'Date', date: true },
+        { key: 'kind', label: 'Kind', badge: { Income: 'good', Expense: 'bad' } },
+        { key: 'category', label: 'Head', render: function (e) { return '<span class="strong">' + esc(e.category || '—') + '</span>'; } },
+        { key: 'desc', label: 'Description', render: function (e) { return esc(e.desc || '—'); } },
+        { key: 'method', label: 'Method', badge: {} },
+        { key: 'amount', label: 'Amount', num: true, render: function (e) {
+            return '<span class="num ' + (e.kind === 'Income' ? 'text-good' : 'text-bad') + '">' + ui.money(e.amount) + '</span>'; }, sortVal: function (e) { return +e.amount || 0; } }
+      ],
+      rows: rows, dateKey: 'date',
+      quickFilter: 'category', filterPanel: true,
+      filters: kind ? [{ key: 'method', label: 'Method' }] : [{ key: 'kind', label: 'Kind' }, { key: 'method', label: 'Method' }],
+      searchKeys: ['id', 'category', 'desc', 'method', 'party'],
+      pageSize: 12, exportName: 'travels-' + (kind ? kind.toLowerCase() : 'accounts') + '.csv', pdfTitle: 'Travels ' + (kind || 'Accounts') + ' Register',
+      onRow: function (e) { entryDetail(e); },
+      actions: ui.actions({
+        edit:  canCreate() ? function (e) { entryForm(e); } : null,
+        del:   canDelete() ? function (e) { deleteEntry(e); } : null,
+        print: function (e) { printEntry(e); }
+      }),
+      empty: { icon: 'journal', title: 'No entries yet', hint: 'Record income or an expense to start the register.' }
+    });
+    return t;
+  }
+
+  /* ---- rich entry detail (row-click) ------------------------------------*/
+  function entryDetail(e) {
+    var body = el('div');
+    ui.modal({ title: (e.category || 'Entry') + ' · ' + e.id, icon: e.kind === 'Income' ? 'arrow-down-left-circle' : 'arrow-up-right-circle', size: 'lg', body: body, footer: false });
+    var actions = el('div.flex.gap-1.items-center.flex-wrap', { style: { marginLeft: 'auto' } });
+    if (canCreate()) actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { entryForm(e); } }));
+    actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Voucher', onclick: function () { printEntry(e); } }));
+
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+        ui.frag('<span class="notif-ico notif-' + (e.kind === 'Income' ? 'success' : 'error') + '">' + ui.icon(e.kind === 'Income' ? 'cash-coin' : 'cart-dash') + '</span>'),
+        el('div.flex-1', { style: { minWidth: '180px' } }, [
+          el('div.fw-700', { style: { fontSize: '17px' }, text: e.category || 'Entry' }),
+          el('div.flex.items-center.gap-2.flex-wrap', null, [
+            el('span.badge.badge-' + (e.kind === 'Income' ? 'good' : 'bad'), { text: e.kind }),
+            el('span.badge', { text: e.method || '—' }),
+            el('div.text-mute.sm', { text: ui.date(e.date) })
+          ]) ]),
+        actions
+      ]),
+      el('div.stat-row', null, [
+        st2('Amount', ui.money(e.amount)), st2('Kind', e.kind), st2('Method', e.method || '—'), st2('Date', ui.date(e.date))
+      ]),
+      e.party ? el('div.data-list.mt-2', null, [ drow('Party', e.party), drow('Reference', e.ref) ]) : null,
+      e.desc ? el('p.text-mute.mt-2', { text: e.desc }) : null
+    ]) ]));
+
+    // the double-entry posting this quick entry mirrored into the GL
+    var gl = glFor(e);
+    if (gl) {
+      var lt = EPAL.table({
+        columns: [ { key: 'account', label: 'Account' }, { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true } ],
+        rows: (gl.lines || []).map(function (l) { var a = EPAL.ledger.account ? EPAL.ledger.account(l.account) : null; return { account: l.account + (a ? ' · ' + a.name : ''), debit: +l.dr || 0, credit: +l.cr || 0 }; }),
+        empty: { icon: 'journal', title: 'No ledger lines' }
+      });
+      body.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('journal-text') + ' Ledger Posting' }), el('span.card-sub', { text: gl.id }) ]), el('div.card-body', null, [ lt.el ]) ]));
+    }
+    if (EPAL.comments && EPAL.comments.widget) { body.appendChild(el('div.section-label', { text: 'Notes & Discussion' })); body.appendChild(EPAL.comments.widget('acc-entry', e.id)); }
+  }
+  function glFor(e) {
+    try { if (EPAL.ledger && EPAL.ledger.entries) return EPAL.ledger.entries({ companyId: CID }).filter(function (g) { return g.id === 'GL-ACC-' + e.id || g.ref === e.id; })[0]; } catch (x) {}
+    return null;
+  }
+
+  /* ---- rich add / edit entry form ---------------------------------------*/
+  function entryForm(rec) {
+    var isNew = !rec;
+    var kind = (rec && rec.kind) || 'Expense';
+    EPAL.formModal({
+      title: isNew ? 'New Journal Entry' : 'Edit Entry', icon: 'journal-plus', size: 'md', record: rec || { kind: kind, date: TODAY_STR },
+      fields: [
+        { type: 'section', label: 'Entry' },
+        { key: 'kind', label: 'Kind', type: 'select', options: ['Income', 'Expense'], default: kind, required: true },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+        { key: 'category', label: 'Head / Category', type: 'text', required: true, placeholder: 'e.g. Air Ticket, Office Rent',
+          hint: 'Income: ' + INCOME_HEADS.slice(0, 4).join(', ') + '… · Expense: ' + EXPENSE_HEADS.slice(0, 4).join(', ') + '…' },
+        { key: 'method', label: 'Method', type: 'select', options: METHODS, default: 'Bank', required: true },
+        { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
+        { type: 'section', label: 'Reference' },
+        { key: 'party', label: 'Party (optional)', type: 'text', placeholder: 'Customer / vendor / staff' },
+        { key: 'ref', label: 'Reference / voucher no', type: 'text', placeholder: 'e.g. INV-2201, cheque no' },
+        { key: 'desc', label: 'Description', type: 'textarea', col2: true, placeholder: 'What is this entry for?' }
+      ],
+      saveLabel: isNew ? 'Post Entry' : 'Save',
+      onSave: function (val) {
+        var amt = +val.amount || 0;
+        if (amt <= 0) { ui.toast('Enter a valid amount', 'error'); return false; }
+        var r = rec || { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: CID, created: TODAY_STR };
+        r.kind = val.kind; r.amount = amt; r.category = (val.category || '').trim(); r.method = val.method;
+        r.date = val.date || TODAY_STR; r.party = val.party; r.ref = val.ref; r.desc = val.desc;
+        db.save('acc_entries', r);
+        mirrorToLedger(r);
+        ui.toast('Entry ' + r.id + ' saved & posted to the ledger', 'success');
+        EPAL.router.render();
+        return true;
+      }
+    });
+  }
+  function deleteEntry(e) {
+    ui.confirm({ title: 'Delete entry ' + e.id + '?', text: 'Removes the entry and its mirrored ledger posting.', danger: true, confirmLabel: 'Delete' })
+      .then(function (ok) { if (!ok) return;
+        db.remove('acc_entries', e.id);
+        try { if (EPAL.ledger && EPAL.ledger.remove) EPAL.ledger.remove('GL-ACC-' + e.id); } catch (x) {}
+        ui.toast('Entry deleted', 'success'); EPAL.router.render(); });
+  }
+  function printEntry(e) {
+    function r(k, v) { return '<tr><td>' + esc(k) + '</td><td>' + esc(String(v == null || v === '' ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: (e.kind === 'Income' ? 'Receipt Voucher' : 'Payment Voucher') + ' · ' + e.id,
+      subtitle: 'Epal Travels & Consultancy', meta: e.kind + ' entry · ' + ui.date(e.date), footer: 'Accounts Department · Confidential',
+      bodyHtml: '<table>' + r('Voucher No', e.id) + r('Date', ui.date(e.date)) + r('Kind', e.kind) + r('Head', e.category) +
+        r('Method', e.method) + r('Party', e.party) + r('Reference', e.ref) + r('Description', e.desc) +
+        '<tr><th>Amount</th><th>' + ui.money(e.amount) + '</th></tr></table>' });
+  }
+
+  /* --- mirror a single quick entry into the double-entry ledger -----------
+   * Income  → DR 1010 Cash/Bank      / CR 4000 Revenue
+   * Expense → DR 5xxx (by head)      / CR 1010 Cash/Bank
+   * A stable GL id (GL-ACC-<id>) makes an edit re-post (upsert), never duplicate. */
+  function mirrorToLedger(rec) {
+    if (!EPAL.ledger || !EPAL.ledger.post) return;
+    var amt = +rec.amount || 0; if (amt <= 0) return;
+    var lines = rec.kind === 'Income'
+      ? [ { account: '1010', dr: amt, cr: 0 }, { account: '4000', dr: 0, cr: amt } ]
+      : [ { account: expenseAccountFor(rec.category), dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt } ];
+    try {
+      EPAL.ledger.post({ id: 'GL-ACC-' + rec.id, date: rec.date, companyId: CID, ref: rec.id,
+        memo: rec.desc || rec.category || (rec.kind + ' entry'), source: 'manual', party: rec.party || '', lines: lines });
+    } catch (e) { /* mirror is best-effort — never block the quick entry */ }
+  }
+  function expenseAccountFor(cat) {
+    var c = String(cat || '').toLowerCase();
+    if (/rent|lease/.test(c)) return '5200';
+    if (/salary|payroll|wage|staff/.test(c)) return '5100';
+    if (/utility|electric|internet|wifi|gas|water|bill/.test(c)) return '5300';
+    if (/market|ad\b|promo|campaign/.test(c)) return '5400';
+    if (/bank|charge|fee/.test(c)) return '6000';
+    if (/adm|penalt|fine/.test(c)) return '5900';
+    return '5300';
+  }
+
+  /* ======================================================= JOURNALS (GL) */
+  function journalsView(page) {
+    var accts = (EPAL.ledger && EPAL.ledger.accounts) ? EPAL.ledger.accounts() : [];
+    var acctOpts = accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; });
+
+    var balStrip = el('div.flex.gap-2.items-center');
+    var postBtn = el('button.btn.btn-primary', { disabled: true, html: ui.icon('journal-plus') + ' Post Journal' });
+
+    function tally(rows) { var dr = 0, cr = 0; (rows || []).forEach(function (r) { dr += +r.debit || 0; cr += +r.credit || 0; }); return { dr: dr, cr: cr, diff: dr - cr }; }
+    function refreshBalance(rows) {
+      var t = tally(rows), ok = t.dr > 0.5 && Math.abs(t.diff) < 0.5;
+      postBtn.disabled = !ok;
+      balStrip.innerHTML = '';
+      balStrip.appendChild(el('span.badge', { html: 'Dr ' + ui.money(t.dr) }));
+      balStrip.appendChild(el('span.badge', { html: 'Cr ' + ui.money(t.cr) }));
+      balStrip.appendChild(el('span.badge', { style: { color: ok ? '#23c17e' : '#f0506e' }, html: ok ? (ui.icon('check-circle-fill') + ' Balanced') : ('Δ ' + ui.money(Math.abs(t.diff))) }));
+    }
+
+    var form = EPAL.form([
+      { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
+      { key: 'ref', label: 'Reference', type: 'text', placeholder: 'e.g. JV/ADJ-001' },
+      { key: 'party', label: 'Party (optional)', type: 'text', placeholder: 'Customer / vendor name' },
+      { key: 'memo', label: 'Narration', type: 'text', col2: true, placeholder: 'What is this entry for?' },
+      { key: 'lines', type: 'items', label: 'Journal Lines', required: true, min: 2, addLabel: 'Add line',
+        columns: [
+          { key: 'account', label: 'Account', type: 'select', width: '2.4fr', options: acctOpts },
+          { key: 'debit', label: 'Debit', type: 'money', width: '1fr' },
+          { key: 'credit', label: 'Credit', type: 'money', width: '1fr' }
+        ],
+        footer: function (rows) { var t = tally(rows); return 'Dr ' + ui.money(t.dr) + '  ·  Cr ' + ui.money(t.cr) + (t.dr > 0.5 && Math.abs(t.diff) < 0.5 ? '  ✓' : '  Δ ' + ui.money(Math.abs(t.diff))); },
+        onChange: function (rows) { refreshBalance(rows); }
+      }
+    ], { lines: [{}, {}] });
+
+    postBtn.addEventListener('click', function () {
+      if (!EPAL.ledger || !EPAL.ledger.post) { ui.toast('Ledger engine unavailable', 'error'); return; }
+      if (!form.validate()) { ui.toast('Please complete the journal', 'error'); return; }
+      var v = form.values();
+      var lines = (v.lines || []).filter(function (r) { return r.account && ((+r.debit || 0) > 0 || (+r.credit || 0) > 0); })
+        .map(function (r) { return { account: r.account, dr: +r.debit || 0, cr: +r.credit || 0 }; });
+      if (lines.length < 2) { ui.toast('A journal needs at least two lines', 'error'); return; }
+      try {
+        EPAL.ledger.post({ date: v.date, companyId: CID, ref: v.ref || '', memo: v.memo || 'Manual journal', source: 'manual', party: v.party || '', lines: lines });
+        ui.toast('Journal posted to the ledger', 'success'); EPAL.router.render();
+      } catch (e) { ui.toast(e.message || 'Entry does not balance', 'error'); }
+    });
+    refreshBalance([]);
+
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('journal-plus') + ' New Double-Entry Journal' }), el('span.card-sub', { text: 'Debits must equal credits' }) ]),
+      el('div.card-body', null, [ form.el, el('div.flex.justify-between.items-center.mt-2', null, [ balStrip, postBtn ]) ])
+    ]));
+
+    // recent GL entries for Travels (newest first)
+    var glRows = (EPAL.ledger && EPAL.ledger.entries) ? EPAL.ledger.entries({ companyId: CID }).slice().reverse() : [];
+    function glTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.dr || 0; }); return t; }
+    var glTable = EPAL.table({
+      columns: [
+        { key: 'date', label: 'Date', date: true }, { key: 'id', label: 'JV' }, { key: 'ref', label: 'Reference' }, { key: 'memo', label: 'Narration' },
+        { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', opening: 'accent', payroll: 'warn', refund: 'bad' } },
+        { key: 'party', label: 'Party' },
+        { key: 'amount', label: 'Amount', num: true, render: function (e) { return '<span class="num">' + ui.money(glTotal(e)) + '</span>'; }, exportVal: function (e) { return glTotal(e); } }
+      ],
+      rows: glRows, searchKeys: ['id', 'ref', 'memo', 'party', 'source'], quickFilter: 'source', filterPanel: true, dateKey: 'date',
+      exportName: 'travels-gl-entries.csv', pdfTitle: 'Travels Ledger Entries',
+      onRow: function (e) { showEntry(e); },
+      empty: { icon: 'journal-text', title: 'No ledger entries yet — post one above' }
+    });
+    page.appendChild(el('div.section-label', { text: 'Recent Ledger Entries' }));
+    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ glTable.el ]) ]));
+
+    function showEntry(e) {
+      var lines = (e.lines || []).map(function (l) { var a = EPAL.ledger.account(l.account); return { account: l.account + ' · ' + (a ? a.name : ''), debit: +l.dr || 0, credit: +l.cr || 0 }; });
+      var lt = EPAL.table({
+        columns: [ { key: 'account', label: 'Account' }, { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true } ],
+        rows: lines, empty: { icon: 'journal', title: 'No lines' }
+      });
+      ui.modal({ title: 'Journal ' + e.id, icon: 'journal-text', size: 'lg',
+        body: el('div', null, [ el('div.text-mute.sm.mb-2', { text: ui.date(e.date) + ' · ' + (e.memo || '') + (e.party ? ' · ' + e.party : '') }), lt.el ]),
+        actions: [{ label: 'Close', variant: 'ghost' }] });
+    }
+  }
+
+  /* ======================================================= SCHEDULES */
+  function schedulesView(page) {
+    var list = schedules();
+    var payable = list.filter(function (s) { return s.kind === 'Payable' && s.status !== 'Paid'; }).reduce(function (a, s) { return a + (+s.amount || 0); }, 0);
+    var receivable = list.filter(function (s) { return s.kind === 'Receivable' && s.status !== 'Paid'; }).reduce(function (a, s) { return a + (+s.amount || 0); }, 0);
+    var overdue = overdueSchedules();
+    var soon = dueSoon(7);
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Payable', ui.money(payable, { compact: true }), 'arrow-up-right-circle', payable ? 'text-bad' : ''),
+      kpi('Receivable', ui.money(receivable, { compact: true }), 'arrow-down-left-circle', receivable ? 'text-good' : ''),
+      kpi('Overdue', String(overdue.length), 'exclamation-triangle', overdue.length ? 'text-bad' : ''),
+      kpi('Due ≤7 days', String(soon.length), 'clock-history', soon.length ? 'text-warn' : ''),
+      kpi('Open Items', String(openSchedules().length), 'calendar2-week')
+    ]));
+
+    if (overdue.length) page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('exclamation-octagon-fill')),
+      el('div', { html: '<strong>' + overdue.length + ' overdue settlement' + (overdue.length === 1 ? '' : 's') + '.</strong> ' +
+        overdue.slice(0, 6).map(function (s) { return esc(s.party) + ' (' + ui.money(s.amount) + ')'; }).join(', ') + (overdue.length > 6 ? ' …' : '') }) ]));
+
+    var t = EPAL.table({
+      columns: [
+        { key: 'id', label: 'Ref', render: function (s) { return '<span class="mono xs text-mute">' + esc(s.id) + '</span>'; } },
+        { key: 'party', label: 'Party', render: function (s) { return '<span class="strong">' + esc(s.party) + '</span>'; } },
+        { key: 'kind', label: 'Type', badge: { Payable: 'bad', Receivable: 'good' } },
+        { key: 'amount', label: 'Amount', num: true, money: true },
+        { key: 'due', label: 'Due', sortVal: function (s) { return new Date(s.due).getTime() || 0; }, render: function (s) {
+            var d = daysTo(s.due), tone = s.status === 'Paid' ? '' : d < 0 ? 'text-bad' : d <= 7 ? 'text-warn' : '';
+            return '<span class="' + tone + '">' + ui.date(s.due) + (s.status !== 'Paid' && d < 0 ? ' · ' + Math.abs(d) + 'd late' : '') + '</span>'; } },
+        { key: 'status', label: 'Status', badge: { Paid: 'good', Partial: 'warn', Pending: 'bad' } }
+      ],
+      rows: list, dateKey: 'due',
+      quickFilter: 'kind', filterPanel: true, filters: [{ key: 'status', label: 'Status' }],
+      searchKeys: ['id', 'party', 'desc'], pageSize: 12, exportName: 'travels-schedules.csv', pdfTitle: 'Travels Payment Schedules',
+      onRow: function (s) { scheduleDetail(s); },
+      actions: ui.actions({
+        edit:  canCreate() ? function (s) { scheduleForm(s); } : null,
+        del:   canDelete() ? function (s) { ui.confirm({ title: 'Delete schedule?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { db.remove('acc_schedules', s.id); ui.toast('Deleted', 'success'); EPAL.router.render(); } }); } : null,
+        print: function (s) { printSchedule(s); },
+        wa:    function (s) { return { phone: s.phone, text: scheduleMsg(s) }; },
+        gmail: function (s) { return { to: s.email, subject: 'Payment reminder — Epal Travels', body: scheduleMsg(s) }; }
+      }),
+      empty: { icon: 'calendar2-week', title: 'No schedules yet', hint: 'Add a payable or receivable to track it.' }
+    });
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('calendar2-week') + ' Payment Schedules' }), el('span.card-sub', { text: list.length + ' items · click for detail' }) ]),
+      el('div.card-body', null, [ t.el ])
+    ]));
+  }
+
+  function scheduleDetail(s) {
+    var body = el('div');
+    var m = ui.modal({ title: s.party + ' · ' + s.id, icon: s.kind === 'Payable' ? 'arrow-up-right-circle' : 'arrow-down-left-circle', size: 'md', body: body, footer: false });
+    var d = daysTo(s.due);
+    var actions = el('div.flex.gap-1.items-center.flex-wrap', { style: { marginLeft: 'auto' } });
+    if (canCreate() && s.status !== 'Paid') actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('check2-circle') + ' Mark Paid', onclick: function () {
+      s.status = 'Paid'; db.save('acc_schedules', s); ui.toast('Marked paid', 'success'); m.close(); EPAL.router.render(); } }));
+    if (canCreate()) actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { m.close(); scheduleForm(s); } }));
+    actions.appendChild(ui.rowActions(ui.actions({
+      wa: { phone: s.phone, text: scheduleMsg(s) }, gmail: { to: s.email, subject: 'Payment reminder — Epal Travels', body: scheduleMsg(s) }
+    })));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+        ui.frag('<span class="notif-ico notif-' + (s.kind === 'Payable' ? 'error' : 'success') + '">' + ui.icon('calendar2-week') + '</span>'),
+        el('div.flex-1', { style: { minWidth: '160px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: s.party }),
+          el('div.flex.items-center.gap-2.flex-wrap', null, [ el('span.badge.badge-' + (s.kind === 'Payable' ? 'bad' : 'good'), { text: s.kind }),
+            el('span.badge.badge-' + (s.status === 'Paid' ? 'good' : s.status === 'Partial' ? 'warn' : 'bad'), { text: s.status }) ]) ]),
+        actions
+      ]),
+      el('div.stat-row', null, [ st2('Amount', ui.money(s.amount)), st2('Due', ui.date(s.due)),
+        st2('Status', s.status), st2('Ageing', s.status === 'Paid' ? 'Settled' : d < 0 ? Math.abs(d) + 'd late' : 'in ' + d + 'd') ]),
+      s.desc ? el('p.text-mute.mt-2', { text: s.desc }) : null
+    ]) ]));
+    if (EPAL.comments && EPAL.comments.widget) { body.appendChild(el('div.section-label', { text: 'Notes' })); body.appendChild(EPAL.comments.widget('acc-schedule', s.id)); }
+  }
+  function scheduleForm(rec) {
+    var isNew = !rec;
+    EPAL.formModal({
+      title: isNew ? 'New Payment Schedule' : 'Edit Schedule', icon: 'calendar2-plus', size: 'md', record: rec || { status: 'Pending', due: TODAY_STR },
+      fields: [
+        { key: 'party', label: 'Party', type: 'text', required: true, col2: true, placeholder: 'Vendor / customer / staff' },
+        { key: 'kind', label: 'Type', type: 'select', options: SCHEDULE_KINDS, default: 'Payable', required: true },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+        { key: 'due', label: 'Due date', type: 'date', required: true, default: TODAY_STR },
+        { key: 'status', label: 'Status', type: 'select', options: SCHEDULE_STATUS, default: 'Pending' },
+        { key: 'phone', label: 'Contact phone', type: 'phone' },
+        { key: 'email', label: 'Contact email', type: 'email' },
+        { key: 'desc', label: 'Note', type: 'textarea', col2: true }
+      ],
+      saveLabel: isNew ? 'Add Schedule' : 'Save',
+      onSave: function (val) {
+        var r = rec || { id: 'SCH-' + ui.uid('').slice(-5).toUpperCase(), companyId: CID };
+        r.party = (val.party || '').trim(); r.kind = val.kind; r.amount = +val.amount || 0; r.due = val.due;
+        r.status = val.status || 'Pending'; r.phone = val.phone; r.email = val.email; r.desc = val.desc;
+        db.save('acc_schedules', r);
+        ui.toast('Schedule saved', 'success'); EPAL.router.render();
+        return true;
+      }
+    });
+  }
+  function printSchedule(s) {
+    function r(k, v) { return '<tr><td>' + esc(k) + '</td><td>' + esc(String(v == null || v === '' ? '—' : v)) + '</td></tr>'; }
+    ui.printDoc({ title: 'Payment Schedule · ' + s.id, subtitle: 'Epal Travels & Consultancy', meta: s.kind + ' · ' + s.status, footer: 'Accounts Department',
+      bodyHtml: '<table>' + r('Party', s.party) + r('Type', s.kind) + r('Due', ui.date(s.due)) + r('Status', s.status) + r('Note', s.desc) +
+        '<tr><th>Amount</th><th>' + ui.money(s.amount) + '</th></tr></table>' });
+  }
+  function scheduleMsg(s) {
+    return 'Dear ' + s.party + ',\n\n' + (s.kind === 'Payable' ? 'This is regarding our payable of ' : 'This is a gentle reminder for the receivable of ') +
+      ui.money(s.amount) + ' due on ' + ui.date(s.due) + '.\n\nWarm regards,\nAccounts, Epal Travels & Consultancy';
+  }
+
+  /* ---------------------------------------------------- month / date helpers */
+  function curYm() { return TODAY.getFullYear() + '-' + String(TODAY.getMonth() + 1).padStart(2, '0'); }
+  function lastYm(n) { var out = []; for (var i = n - 1; i >= 0; i--) { var d = new Date(TODAY.getFullYear(), TODAY.getMonth() - i, 1); out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); } return out; }
+  function mLabel(ym) { var p = ym.split('-'); return new Date(p[0], p[1] - 1, 1).toLocaleString('en', { month: 'short' }); }
+  function monthEntries(list, ym) { return list.filter(function (e) { return String(e.date || '').indexOf(ym) === 0; }); }
+  function monthSum(list, ym, kind) { return list.filter(function (e) { return String(e.date || '').indexOf(ym) === 0 && (!kind || e.kind === kind); }).reduce(function (a, e) { return a + (+e.amount || 0); }, 0); }
+
+  /* ---------------------------------------------------- shared UI helpers */
+  function canCreate() { return !EPAL.perm || EPAL.perm.can('travels', 'accounts', 'create'); }
+  function canDelete() { return !EPAL.perm || EPAL.perm.can('travels', 'accounts', 'delete'); }
+  function esc(s) { return ui.escapeHtml(String(s == null ? '' : s)); }
+  function kpi(label, value, icon, tone) {
+    return el('div.kpi-card', null, [
+      el('div.kpi-top', null, [ el('span.kpi-label', { text: label }), el('span.kpi-ico', { html: '<i class="bi bi-' + icon + '"></i>' }) ]),
+      el('div.kpi-value' + (tone ? '.' + tone : ''), { text: String(value) })
+    ]);
+  }
+  function kpiDrill(label, value, icon, route, foot) {
+    return el('div.kpi-card.drill', { onclick: function () { EPAL.router.navigate(route); } }, [
+      el('div.kpi-top', null, [ el('span.kpi-label', { text: label }), el('span.kpi-ico', { html: '<i class="bi bi-' + icon + '"></i>' }) ]),
+      el('div.kpi-value', { text: String(value) }),
+      foot ? el('div.kpi-foot', null, [ el('span.text-muted', { text: foot }) ]) : null
+    ]);
+  }
+  function st2(l, v) { return el('div.stat', null, [ el('div.stat-label', { text: l }), el('div.stat-value', { text: v }) ]); }
+  function drow(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v == null || v === '' ? '—' : String(v) }) ]); }
+  function chartCard(title, icon, canvasId, subLabel, height) {
+    return el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon(icon) + ' ' + title }), subLabel ? el('span.card-sub', { text: subLabel }) : null ]),
+      el('div.card-body', null, [ el('div', { style: { height: (height || 260) + 'px', position: 'relative' } }, [ el('canvas', { id: canvasId }) ]) ])
+    ]);
+  }
+
+})(window.EPAL = window.EPAL || {});
