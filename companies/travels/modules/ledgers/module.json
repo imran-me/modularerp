@@ -1,0 +1,16 @@
+{
+  "key": "ledgers",
+  "company": "travels",
+  "title": "Ledgers",
+  "icon": "journal-text",
+  "desc": "General ledger, trial balance, party subledgers, ageing & statements.",
+  "route": "#/travels/ledgers",
+  "enabled": true,
+  "built": true,
+  "menu": [],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Travels override of the shared star-slash-ledgers view; tabs via ?tab= (overview/general/trial/party/ar/ap/bs/pnl)."
+}
