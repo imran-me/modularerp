@@ -37,6 +37,10 @@
    always paints crisply on top and the motif only breathes through the header
    whitespace. It scrolls up with the page (atmosphere, not a fixed sticker). */
 #view { position: relative; }
+/* When the 3D ambient scene (ambient3d.js) is active, hide the 2D SVG airfield
+   scene — it's kept in the codebase and re-appears when `ui.atmos` is set back to
+   '2d'. (The faint #view::before emblem watermark stays; it never fights the 3D.) */
+html.atmos-3d .ascene { display: none !important; }
 #view::before {
   content: ''; position: absolute; z-index: 0; pointer-events: none;
   top: 0; right: 0;                               /* stays inside the scroll box */
