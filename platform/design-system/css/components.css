@@ -33,16 +33,13 @@
 
 /* --------------------------------------------------------------- KPI tiles */
 .grid-auto { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-.kpi-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 22px; }
-/* compact variant — ~20% smaller cards + roomier gap, SAME text size (ageing, tiers) */
-.kpi-grid.kpi-compact { gap: 18px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
-.kpi-grid.kpi-compact .kpi-card { padding: 17px 18px; min-height: 132px; }
-/* Slim KPI cards — ~30% smaller footprint (padding + height + column width) while
-   the label & value TYPE SIZES, the jewel icon and every colour stay identical.
-   Used where a screen wants a denser row of many KPIs (e.g. Air Ticketing overview). */
-.kpi-grid.kpi-slim { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); margin-bottom: 16px; }
-.kpi-grid.kpi-slim .kpi-card { padding: 15px 16px; min-height: 118px; }
-.kpi-grid.kpi-slim .kpi-top { margin-bottom: 10px; }
+/* HOUSE RULE: KPI cards are the SAME (slim) size everywhere — ~30% smaller than
+   the old cards — and fit as many as possible on one row, wrapping to a second row
+   only when they'd get too narrow. Achieved by shrinking the base .kpi-card (below)
+   and using a tight auto-fit column here. Label & value type sizes are unchanged. */
+.kpi-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
+/* compact + slim are kept as aliases (same size as the base now) for back-compat. */
+.kpi-grid.kpi-compact, .kpi-grid.kpi-slim { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
 /* Force every KPI onto ONE row (equal widths), whatever the count — falls back to
    the wrapping slim grid on narrow screens so it never squeezes on mobile. */
 .kpi-grid.kpi-onerow { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
@@ -62,7 +59,7 @@
     radial-gradient(130% 90% at 90% -30%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 55%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 30%, var(--surface)), var(--surface));
   border: 1px solid var(--border); border-radius: var(--r-lg);
-  padding: 22px; min-height: 170px; position: relative; overflow: hidden;
+  padding: 15px 16px; min-height: 118px; position: relative; overflow: hidden;   /* house rule: ~30% smaller, uniform everywhere */
   box-shadow: var(--shadow-card), inset 0 1px 0 var(--hairline);
   transition: transform var(--t) var(--e-out), box-shadow var(--t) var(--e-out), border-color var(--t);
 }
@@ -76,7 +73,7 @@
 }
 .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); border-color: var(--border-strong); }
 .kpi-card:hover::before { opacity: .95; }
-.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .kpi-label { font-size: 10.5px; color: var(--text-mute); font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
 /* Jewel chip: deep royal→abyss gradient with a light "ink" icon, an inset top
    highlight and a soft coloured cast — reads as enamel/metal, not a flat pastel. */
