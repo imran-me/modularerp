@@ -1075,20 +1075,45 @@
 
   /* ======================================================= AIRPORTS master */
   function airportsView(page) {
-    page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost',{html:ui.icon('plus')+' Add Airport',onclick:function(){ editAirport(null, draw); }}));
-    var host = el('div'); page.appendChild(host);
-    function draw() {
-      host.innerHTML='';
-      var rows = airports().map(function (a) {
-        return el('tr.row-click', { onclick:(function(ap){ return function(){ airportDetail(ap, draw); }; })(a) }, [
-          td('<span class="badge mono">'+ui.escapeHtml(a.iata)+'</span>'),
-          td('<span class="strong">'+ui.escapeHtml(a.name)+'</span>'),
-          td(ui.escapeHtml(a.city||'—')), td(ui.escapeHtml(a.country||'—')) ]);
-      });
-      host.appendChild(tableCard(null, ['IATA','Airport','City','Country'], rows, 'No airports. Add your first station.', { chipCol: 3 }));
-    }
-    draw();
+    page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost',{html:ui.icon('plus-lg')+' Add Airport',onclick:function(){ editAirport(null, function(){ drawAirports(host); }); }}));
+    var host = el('div'); page.appendChild(host); drawAirports(host);
   }
+  function drawAirports(host) {
+    host.innerHTML='';
+    var list = airports();
+    var cc={}, sc={}, ct={};
+    list.forEach(function(a){ if(a.country) cc[a.country]=1; if(a.state) sc[a.country+'/'+a.state]=1; if(a.city) ct[a.city]=1; });
+    host.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
+      kpi('Total Airports', ui.num(list.length), 'airplane-fill', function(){ airportModalList('All Airports', list); }),
+      kpi('Countries Covered', Object.keys(cc).length, 'globe-americas', function(){ airportModalList('Airports by Country', list); }),
+      kpi('States Covered', Object.keys(sc).length, 'geo-alt-fill', function(){ airportModalList('Airports by State', list); }),
+      kpi('Cities Covered', Object.keys(ct).length, 'buildings', function(){ airportModalList('Airports by City', list); })
+    ]));
+    host.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('geo-alt-fill')+' Airports' }), el('span.card-sub', { text: list.length+' stations' }) ]),
+      el('div.card-body', null, [ airportTable(list, function(){ drawAirports(host); }).el ])
+    ]));
+  }
+  function airportTable(rows, refresh) {
+    return EPAL.table({
+      columns:[
+        { key:'iata', label:'IATA', render:function(a){ return '<span class="badge mono">'+ui.escapeHtml(a.iata||'—')+'</span>'; } },
+        { key:'name', label:'Airport', render:function(a){ return '<span class="strong">'+ui.icon('airplane')+' '+ui.escapeHtml(a.name||'')+'</span>'; } },
+        { key:'city', label:'City', render:function(a){ return ui.escapeHtml(a.city||'—'); } },
+        { key:'state', label:'State', render:function(a){ return ui.escapeHtml(a.state||'—'); } },
+        { key:'country', label:'Country', render:function(a){ return ui.escapeHtml(a.country||'—'); } }
+      ],
+      rows:rows, searchKeys:['iata','name','city','state','country'], quickFilter:'country', filterPanel:true, filters:[{ key:'state', label:'State' }], pageSize:15,
+      exportName:'airports.csv', pdfTitle:'Airports',
+      onRow:function(a){ airportDetail(a, refresh); },
+      actions: ui.actions({
+        edit:  function(a){ editAirport(a, refresh); },
+        del:   function(a){ ui.confirm({ title:'Delete "'+a.name+'"?', danger:true, confirmLabel:'Delete' }).then(function(ok){ if(ok){ try{ db.remove('airports', a.id); }catch(e){ S.removeFrom('airports', a.id); } ui.toast('Deleted','success'); if(refresh)refresh(); }}); }
+      }),
+      empty:{ icon:'airplane', title:'No airports', hint:'Add your first station.' }
+    });
+  }
+  function airportModalList(title, rows) { var body=kpiShell(title+' — '+rows.length, 'geo-alt-fill', null); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ airportTable(rows, null).el ]) ])); }
   // rich airport profile — station stats + tickets routed through it
   function airportDetail(a, refresh) {
     var body = el('div');
@@ -1117,19 +1142,24 @@
   }
   function editAirport(a, done) {
     var isNew = !a;
-    a = a || { id:'AP-'+Date.now().toString().slice(-4), name:'', iata:'', city:'', country:'' };
-    var body = el('div.form-grid', null, [
-      inp('Airport name','name',a.name,'col-2'),
-      inp('IATA code','iata',a.iata), inp('City','city',a.city), inp('Country','country',a.country)
-    ]);
-    ui.modal({ title:isNew?'Add Airport':'Edit Airport', icon:'geo-alt', body:body,
-      actions:[{label:'Cancel',variant:'ghost'},{label:isNew?'Add':'Save',variant:'primary',onClick:function(box){
-        var g=function(i){return (box.querySelector('#f-'+i)||{}).value;};
-        if(!g('name').trim()){ ui.toast('Airport name required','error'); return false; }
-        if(!g('iata').trim()){ ui.toast('IATA code required','error'); return false; }
-        a.name=g('name').trim(); a.iata=(g('iata')||'').toUpperCase().trim(); a.city=g('city').trim(); a.country=g('country').trim();
-        db.saveAirport(a); done&&done(); ui.toast('Airport saved','success');
-      }}] });
+    var cOpts = [['','— select —']].concat(countries().map(function(c){ return [c.name, c.name]; }));
+    EPAL.formModal({
+      title: isNew ? 'Add Airport' : 'Edit Airport', icon:'geo-alt-fill', size:'md', record: a || {},
+      fields:[
+        { key:'name', label:'Airport name', type:'text', required:true, col2:true, placeholder:'e.g. Hazrat Shahjalal Intl' },
+        { key:'iata', label:'IATA code', type:'text', required:true, placeholder:'e.g. DAC' },
+        { key:'city', label:'City', type:'text', placeholder:'e.g. Dhaka' },
+        { key:'country', label:'Country', type:'select', options:cOpts },
+        { key:'state', label:'State', type:'text', placeholder:'e.g. Dhaka' }
+      ],
+      saveLabel: isNew ? 'Add Airport' : 'Save',
+      onSave: function(val){
+        var r = a || { id:'AP-'+ui.uid('').slice(-4).toUpperCase() };
+        r.name=(val.name||'').trim(); r.iata=(val.iata||'').toUpperCase().trim(); r.city=(val.city||'').trim(); r.country=val.country||''; r.state=(val.state||'').trim();
+        if (db.saveAirport) db.saveAirport(r); else db.save('airports', r);
+        ui.toast('Airport "'+r.name+'" saved','success'); if(done)done(); else EPAL.router.render(); return true;
+      }
+    });
   }
 
   /* ======================================================= BSP / ADM RECON */
