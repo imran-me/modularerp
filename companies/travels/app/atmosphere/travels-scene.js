@@ -435,9 +435,13 @@
       scene.classList.toggle('paused', document.hidden);
     });
 
-    /* --- fighter show loop: fly one random scenario per pass, with a short gap
-       between passes, but only while the Travels scene is actually on-screen
-       (and never under reduced-motion, which shows a single static formation). */
+    /* --- fighter show loop: a CONTINUOUS 30-SECOND LOOP. Each pass is normalised
+       to fill the whole 30s window (a new formation begins exactly as the last one
+       fades out at the far seam) so a squadron is gracefully crossing essentially
+       all the time — no dead sky — while the formation / path / rolls still vary
+       every lap. Only runs while the Travels scene is on-screen (and never under
+       reduced-motion, which shows a single static formation). */
+    var LOOP = 30;                                            // seconds — the fighter-show loop period (owner request)
     var stage = document.getElementById('jet-stage');
     if (stage && !REDUCED) {
       var timer, last = -1;
@@ -446,10 +450,11 @@
         var i = Math.floor(Math.random() * JET_SCENARIOS.length);
         if (i === last) i = (i + 1) % JET_SCENARIOS.length;   // avoid immediate repeats
         last = i;
-        var scn = JET_SCENARIOS[i];
+        // clone the scenario and stretch its flight to the full 30s loop (keeps the
+        // source table's speeds untouched; a slow, premium cross that never gaps).
+        var scn = Object.assign({}, JET_SCENARIOS[i], { dur: LOOP });
         stage.innerHTML = fighterGroup(scn);
-        var gap = 2200 + Math.random() * 4200;                // 2.2–6.4s between passes
-        timer = setTimeout(spawn, scn.dur * 1000 + gap);
+        timer = setTimeout(spawn, LOOP * 1000);               // steady 30-second loop
       };
       setTimeout(spawn, 1500);                                // first pass shortly after mount
     }
