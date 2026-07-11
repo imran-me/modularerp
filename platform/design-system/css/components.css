@@ -43,6 +43,10 @@
 .kpi-grid.kpi-slim { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(158px, 1fr)); margin-bottom: 16px; }
 .kpi-grid.kpi-slim .kpi-card { padding: 15px 16px; min-height: 118px; }
 .kpi-grid.kpi-slim .kpi-top { margin-bottom: 10px; }
+/* Force every KPI onto ONE row (equal widths), whatever the count — falls back to
+   the wrapping slim grid on narrow screens so it never squeezes on mobile. */
+.kpi-grid.kpi-onerow { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+@media (max-width: 880px) { .kpi-grid.kpi-onerow { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
 /* clickable slab-tier cards (commission) — filter the ledger on tap */
 .grid-auto.kpi-compact { gap: 18px; }
 .tier-card { cursor: pointer; text-align: left; width: 100%; background: var(--surface);

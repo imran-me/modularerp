@@ -181,8 +181,9 @@
     var unpaid  = t.filter(function (x){ return x.payStatus && x.payStatus!=='Paid'; });
     var outstanding = unpaid.reduce(function (s,x){ return s + outstandingOf(x); }, 0);
     var margin  = revenue ? Math.round(profit/revenue*100) : 0;
-    // 7 KPIs — slim cards (~30% smaller, same text size/colour); click any for a full breakdown.
-    page.appendChild(el('div.kpi-grid.kpi-slim.stagger', null, [
+    // 7 KPIs — slim cards (~30% smaller, same text size/colour), all on ONE row;
+    // click any for a full breakdown.
+    page.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
       kpi('Tickets Sold', t.length, 'ticket-perforated', function(){ kpiTickets(t); }),
       kpi('Issued', issued.length, 'check2-circle', function(){ kpiList('Issued Tickets — '+issued.length, 'check2-circle', issued,
         [['Issued', issued.length], ['Issue rate', t.length?Math.round(issued.length/t.length*100)+'%':'—'], ['Value', ui.money(issued.reduce(function(s,x){ return s+(x.sale||0); },0))]]); }),
@@ -220,6 +221,9 @@
         ]);
       })) ]));
     }
+
+    // Route Network map + Top Routes league table
+    routeNetwork(page, t);
 
     var sections = [
       ['ticketing','Direct Sale','ticket-detailed-fill','Issue a new ticket'],
@@ -1625,6 +1629,107 @@
     ]);
     body.appendChild(el('div.section-label',{text:'Margin by Airline'}));
     body.appendChild(el('div.card',null,[ el('div.card-body',null,[ airlineStatsTable(t) ]) ]));
+  }
+
+  /* ---- ROUTE NETWORK MAP — a live, geo-projected arc map of the sectors we fly.
+     Airport nodes sit at real (equirectangular) coordinates; arcs bow between them
+     with a bright flight-dot tracking each one and a pulse on the Dhaka hub. Arc
+     thickness ∝ ticket volume. Click any sector (arc or table row) for its stats. */
+  var AIRPORTS = {
+    DAC:[23.84,90.40], CGP:[22.25,91.81], ZYL:[24.96,91.87], CXB:[21.45,91.96],
+    DXB:[25.25,55.36], DOH:[25.27,51.61], AUH:[24.43,54.65], JED:[21.68,39.16],
+    MED:[24.55,39.70], RUH:[24.96,46.70], MCT:[23.59,58.28], KUL:[2.75,101.71],
+    SIN:[1.36,103.99], BKK:[13.69,100.75], IST:[41.26,28.74], LHR:[51.47,-0.46],
+    CCU:[22.65,88.45], DEL:[28.56,77.10], KTM:[27.70,85.36], JFK:[40.64,-73.78]
+  };
+  var MAP_W = 1000, MAP_H = 430, LNG0 = -18, LNG1 = 116, LAT0 = -6, LAT1 = 56;
+  function proj(iata){ var c = AIRPORTS[iata]; if(!c) return null;
+    return [ (c[1]-LNG0)/(LNG1-LNG0)*MAP_W, (LAT1-c[0])/(LAT1-LAT0)*MAP_H ]; }
+  function arcPath(a, b){
+    var mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, dx=b[0]-a[0], dy=b[1]-a[1], d=Math.hypot(dx,dy)||1;
+    var nx=-dy/d, ny=dx/d, k=Math.min(0.32, 40/d+0.14);
+    var cx=mx+nx*d*k, cy=my+ny*d*k; if(cy>my){ cx=mx-nx*d*k; cy=my-ny*d*k; }   // bow upward
+    return 'M'+r1(a[0])+' '+r1(a[1])+' Q '+r1(cx)+' '+r1(cy)+' '+r1(b[0])+' '+r1(b[1]);
+  }
+  function r1(n){ return Math.round(n*10)/10; }
+  function parseRoute(s){ var m = String(s||'').split(/→|-&gt;|->|—|-/).map(function(x){ return x.trim().toUpperCase(); }).filter(Boolean);
+    if(m.length<2) return null; var o=m[0], d=m[m.length-1];
+    return (/^[A-Z]{3}$/.test(o) && /^[A-Z]{3}$/.test(d)) ? [o,d] : null; }
+  function apCity(iata){ var a=(db.airports?db.airports():[]).filter(function(x){ return x.iata===iata; })[0]; return a ? a.city : iata; }
+
+  function routeNetwork(page, t){
+    var routes = {}, traffic = {};
+    t.forEach(function(x){ var pr=parseRoute(x.route); if(!pr) return; var key=pr[0]+'-'+pr[1];
+      if(!routes[key]) routes[key]={ o:pr[0], d:pr[1], key:key, tickets:0, sale:0, profit:0 };
+      var r=routes[key]; r.tickets++; r.sale+=(x.sale||0); r.profit+=netProfitOf(x);
+      traffic[pr[0]]=(traffic[pr[0]]||0)+1; traffic[pr[1]]=(traffic[pr[1]]||0)+1; });
+    var list = Object.keys(routes).map(function(k){ return routes[k]; })
+      .filter(function(r){ return proj(r.o) && proj(r.d); }).sort(function(a,b){ return b.tickets-a.tickets; });
+    if(!list.length) return;
+    var top = list.slice(0, 14), maxT = top[0].tickets || 1;
+
+    // grid
+    var svg = '<svg viewBox="0 0 '+MAP_W+' '+MAP_H+'" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="width:100%;height:auto;display:block">';
+    var g = '';
+    for (var gx=0; gx<=MAP_W; gx+=50) g += '<line x1="'+gx+'" y1="0" x2="'+gx+'" y2="'+MAP_H+'" stroke="currentColor" stroke-width="0.5" opacity="0.05"/>';
+    for (var gy=0; gy<=MAP_H; gy+=50) g += '<line x1="0" y1="'+gy+'" x2="'+MAP_W+'" y2="'+gy+'" stroke="currentColor" stroke-width="0.5" opacity="0.05"/>';
+    svg += g;
+    // arcs + flight dots + wide transparent hit paths
+    top.forEach(function(r, i){ var a=proj(r.o), b=proj(r.d), path=arcPath(a,b);
+      var w=1.1 + (r.tickets/maxT)*4.6, op=0.30 + 0.5*(r.tickets/maxT), dur=(6.5 + i*0.55).toFixed(1);
+      svg += '<path id="arc-'+i+'" d="'+path+'" fill="none" stroke="#2f6bff" stroke-opacity="'+op.toFixed(2)+'" stroke-width="'+w.toFixed(1)+'" stroke-linecap="round"/>'
+        + '<circle r="'+(1.8 + (r.tickets/maxT)*2.4).toFixed(1)+'" fill="#8fd4ff"><animateMotion dur="'+dur+'s" repeatCount="indefinite" rotate="auto"><mpath href="#arc-'+i+'"/></animateMotion></circle>'
+        + '<path class="route-hit" data-idx="'+i+'" d="'+path+'" fill="none" stroke="transparent" stroke-width="16" style="cursor:pointer"/>';
+    });
+    // nodes + labels
+    Object.keys(traffic).forEach(function(k){ var p=proj(k); if(!p) return; var rad=3 + Math.sqrt(traffic[k])*1.5; var hub = (k==='DAC');
+      if (hub) svg += '<circle cx="'+r1(p[0])+'" cy="'+r1(p[1])+'" r="'+(rad+4)+'" fill="#2f6bff" opacity="0.22">'
+        + '<animate attributeName="r" values="'+(rad+3)+';'+(rad+13)+';'+(rad+3)+'" dur="3s" repeatCount="indefinite"/>'
+        + '<animate attributeName="opacity" values="0.28;0;0.28" dur="3s" repeatCount="indefinite"/></circle>';
+      svg += '<circle cx="'+r1(p[0])+'" cy="'+r1(p[1])+'" r="'+rad.toFixed(1)+'" fill="'+(hub?'#1A43BF':'#2f6bff')+'" stroke="#ffffff" stroke-width="1" stroke-opacity="0.45"/>';
+      var right = p[0] > MAP_W-90;
+      svg += '<text x="'+r1(p[0] + (right?-7:7))+'" y="'+r1(p[1]-7)+'" font-size="12.5" font-weight="700" fill="currentColor" opacity="0.8" text-anchor="'+(right?'end':'start')+'">'+k+'</text>';
+    });
+    svg += '</svg>';
+
+    page.appendChild(el('div.section-label', { html: ui.icon('globe-americas') + ' Route Network' }));
+    var mapCard = el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('globe-americas') + ' Sectors We Fly' }),
+        el('span.card-sub', { text: list.length + ' sectors · click any route for details' }) ]),
+      el('div.card-body', null, [ el('div.route-map', { style:{ color:'var(--text-mute)', position:'relative' }, html: svg }) ])
+    ]);
+    page.appendChild(mapCard);
+    var svgEl = mapCard.querySelector('.route-map svg');
+    if (svgEl) Array.prototype.forEach.call(svgEl.querySelectorAll('.route-hit'), function(hit){
+      hit.addEventListener('click', function(){ routeModal(top[+hit.getAttribute('data-idx')], t); }); });
+
+    // Top Routes league table
+    var tbl = EPAL.table({
+      columns:[
+        { key:'sector', label:'Sector', render:function(r){ return '<span class="mono strong">'+r.o+' → '+r.d+'</span>'; }, sortVal:function(r){ return r.key; } },
+        { key:'cities', label:'Route', render:function(r){ return ui.escapeHtml(apCity(r.o)+' → '+apCity(r.d)); }, sortVal:function(r){ return apCity(r.o); } },
+        { key:'tickets', label:'Tickets', num:true },
+        { key:'sale', label:'Sales', num:true, money:true },
+        { key:'profit', label:'Net Profit', num:true, sortVal:function(r){ return r.profit; }, render:function(r){ return '<span class="num '+(r.profit>=0?'text-good':'text-bad')+'">'+ui.money(r.profit)+'</span>'; } },
+        { key:'avg', label:'Avg Fare', num:true, sortVal:function(r){ return r.tickets? r.sale/r.tickets : 0; }, render:function(r){ return '<span class="num">'+ui.money(Math.round(r.tickets? r.sale/r.tickets : 0))+'</span>'; } }
+      ],
+      rows:list, searchKeys:['o','d'], pageSize:8, exportName:'air-routes.csv', pdfTitle:'Route Performance',
+      onRow:function(r){ routeModal(r, t); }, empty:{ icon:'globe', title:'No routes yet' }
+    });
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('signpost-split') + ' Top Routes' }), el('span.card-sub', { text:'by ticket volume' }) ]),
+      el('div.card-body', null, [ tbl.el ]) ]));
+  }
+
+  function routeModal(r, allT){
+    var onRoute = allT.filter(function(x){ var pr=parseRoute(x.route); return pr && pr[0]===r.o && pr[1]===r.d; });
+    var avg = r.tickets ? Math.round(r.sale/r.tickets) : 0;
+    var body = kpiShell(r.o+' → '+r.d+'  ·  '+apCity(r.o)+' → '+apCity(r.d), 'globe-americas',
+      [['Tickets', r.tickets], ['Sales', ui.money(r.sale)], ['Net Profit', ui.money(r.profit)], ['Avg Fare', ui.money(avg)]]);
+    body.appendChild(el('div.section-label',{ text:'Airlines on this sector' }));
+    body.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null, [ airlineStatsTable(onRoute) ]) ]));
+    body.appendChild(el('div.section-label',{ text:'Tickets on this sector' }));
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ ticketsTable(onRoute) ]) ]));
   }
   function tableCard(title, headers, rows, emptyMsg, opts) {
     var card = el('div.card');
