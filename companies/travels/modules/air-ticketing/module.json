@@ -50,6 +50,18 @@
       "enabled": true
     },
     {
+      "id": "countries",
+      "label": "Country",
+      "route": "#/travels/air-ticketing/countries",
+      "enabled": true
+    },
+    {
+      "id": "states",
+      "label": "States",
+      "route": "#/travels/air-ticketing/states",
+      "enabled": true
+    },
+    {
       "id": "bsp",
       "label": "BSP / ADM Recon",
       "route": "#/travels/air-ticketing/bsp",

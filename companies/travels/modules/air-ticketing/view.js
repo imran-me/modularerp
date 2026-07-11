@@ -64,7 +64,35 @@
     S.seedOnce('air_emd', seedEmd());
     S.seedOnce('air_ttl', seedTtl());
     S.seedOnce('air_stock', seedStock());
+    S.seedOnce('air_countries', seedCountries());
+    S.seedOnce('air_states', seedStates());
   }});
+
+  /* Country + States masters (geography used across ticketing & business services).
+     A representative set — the Laravel backend ships the full ISO dataset. */
+  function seedCountries() {
+    var C = 'Afghanistan AF, Albania AL, Algeria DZ, American Samoa AS, Australia AU, Bahrain BH, Bangladesh BD, Belgium BE, Bhutan BT, Brazil BR, Canada CA, China CN, Cyprus CY, Denmark DK, Egypt EG, France FR, Germany DE, Greece GR, India IN, Indonesia ID, Iran IR, Iraq IQ, Italy IT, Japan JP, Jordan JO, Kuwait KW, Malaysia MY, Maldives MV, Nepal NP, Netherlands NL, Oman OM, Pakistan PK, Philippines PH, Qatar QA, Romania RO, Russia RU, Saudi Arabia SA, Singapore SG, South Korea KR, Spain ES, Sri Lanka LK, Sweden SE, Switzerland CH, Thailand TH, Turkey TR, United Arab Emirates AE, United Kingdom GB, United States US, Vietnam VN';
+    return C.split(', ').map(function (pair, i) { var m=pair.split(' '); var code=m.pop(), name=m.join(' ');
+      return { id:'CTY-'+(1001+i), name:name, code:code, status:'Active', created:'2025-12-08' }; });
+  }
+  function seedStates() {
+    var map = {
+      'Bangladesh':['Dhaka','Chattogram','Khulna','Rajshahi','Sylhet','Barishal','Rangpur','Mymensingh'],
+      'India':['West Bengal','Delhi','Maharashtra','Tamil Nadu','Karnataka'],
+      'Saudi Arabia':['Makkah','Madinah','Riyadh','Eastern Province'],
+      'United Arab Emirates':['Dubai','Abu Dhabi','Sharjah'],
+      'Malaysia':['Kuala Lumpur','Selangor','Penang'],
+      'Thailand':['Bangkok','Phuket','Chiang Mai'],
+      'United Kingdom':['England','Scotland','Wales'],
+      'Canada':['Ontario','Quebec','British Columbia'],
+      'United States':['California','New York','Texas'],
+      'Afghanistan':['Balkh','Herat','Kabul','Kandahar']
+    };
+    var out=[], n=2001;
+    Object.keys(map).forEach(function (country) { map[country].forEach(function (st) {
+      out.push({ id:'STA-'+(n++), country:country, state:st, status:'Active', created:'2025-12-08' }); }); });
+    return out;
+  }
 
   /* Ticket Manage — route STOCK / inventory (pre-loaded ticket routes with price
      + quantity; remaining = qty − sold). Mirrors the legacy "Ticket Manage". */
@@ -173,7 +201,8 @@
 
       ({ overview:overview, stock:stockView, ticketing:directSale, 'manage-sales':manageSales,
          emd:emdView, ttl:ttlView,
-         airlines:airlinesView, airports:airportsView, bsp:bspView, refunds:refundsView }[sub] || overview)(page, ctx);
+         airlines:airlinesView, airports:airportsView, countries:countriesView, states:statesView,
+         bsp:bspView, refunds:refundsView }[sub] || overview)(page, ctx);
 
       ctx.mount.appendChild(page);
     }
@@ -188,6 +217,8 @@
       ttl:'Held-PNR ticketing-deadline queue — countdowns by urgency, ticket-now and extend actions.',
       airlines:'Airline master — carriers, IATA designators and status.',
       airports:'Airport master — stations, IATA codes and cities.',
+      countries:'Country master — used across ticketing and business services.',
+      states:'Country-wise states master — used across ticketing and business services.',
       bsp:'Import the BSP billing file, auto-match against issued tickets and clear reconciliation exceptions; track ADMs with a dispute-deadline countdown.',
       refunds:'Every refund request from filing to payout, with airline-penalty math.' }[sub]) || '';
   }
@@ -405,6 +436,120 @@
         row('Cost / seat', ui.money(s.cost||0))+row('Price', ui.money(s.price||0))+row('Total qty', s.qty||0)+row('Sold', s.sold||0)+row('Remaining', remOf(s))+
         '<tr><th>Total Sales</th><th>'+ui.money((+s.sold||0)*(+s.price||0))+'</th></tr></table>' });
   }
+
+  /* ======================================================= COUNTRY master */
+  function countries() { return S.list('air_countries'); }
+  function countriesView(page) {
+    page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost', { html: ui.icon('plus-lg')+' Add Country', onclick:function(){ countryForm(null); } }));
+    var host = el('div'); page.appendChild(host); drawCountries(host);
+  }
+  function drawCountries(host) {
+    host.innerHTML='';
+    var list = countries();
+    var active=list.filter(function(c){ return c.status==='Active'; }).length;
+    var inactive=list.filter(function(c){ return c.status==='Inactive'; }).length;
+    var archived=list.filter(function(c){ return c.status==='Archived'; }).length;
+    host.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
+      kpi('Total Countries', list.length, 'globe-americas', function(){ masterList('All Countries', 'globe', list, countryTable); }),
+      kpi('Active', active, 'check2-circle', function(){ masterList('Active Countries', 'check2-circle', list.filter(function(c){ return c.status==='Active'; }), countryTable); }),
+      kpi('Inactive', inactive, 'pause-circle', function(){ masterList('Inactive Countries', 'pause-circle', list.filter(function(c){ return c.status==='Inactive'; }), countryTable); }),
+      kpi('Archived', archived, 'archive', function(){ masterList('Archived Countries', 'archive', list.filter(function(c){ return c.status==='Archived'; }), countryTable); })
+    ]));
+    host.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('flag-fill')+' Countries' }), el('span.card-sub', { text: list.length+' countries' }) ]),
+      el('div.card-body', null, [ countryTable(list, function(){ drawCountries(host); }).el ])
+    ]));
+  }
+  function countryTable(rows, refresh) {
+    return EPAL.table({
+      columns:[
+        { key:'name', label:'Country', render:function(c){ return '<span class="strong">'+ui.icon('flag')+' '+ui.escapeHtml(c.name)+'</span>'; } },
+        { key:'code', label:'Code', render:function(c){ return '<span class="mono">'+ui.escapeHtml(c.code||'—')+'</span>'; } },
+        { key:'status', label:'Status', badge:{ Active:'good', Inactive:'warn', Archived:'' } },
+        { key:'created', label:'Created', date:true }
+      ],
+      rows:rows, searchKeys:['name','code'], quickFilter:'status', filterPanel:true, pageSize:15,
+      exportName:'countries.csv', pdfTitle:'Countries',
+      actions: ui.actions({
+        edit:  function(c){ countryForm(c, refresh); },
+        del:   function(c){ ui.confirm({ title:'Delete "'+c.name+'"?', danger:true, confirmLabel:'Delete' }).then(function(ok){ if(ok){ S.removeFrom('air_countries', c.id); ui.toast('Deleted','success'); if(refresh)refresh(); }}); }
+      }),
+      empty:{ icon:'globe', title:'No countries' }
+    });
+  }
+  function countryForm(c, refresh) {
+    var isNew = !c;
+    EPAL.formModal({
+      title: isNew ? 'Add Country' : 'Edit Country', icon:'flag-fill', size:'md', record: c || { status:'Active' },
+      fields:[
+        { key:'name', label:'Country name', type:'text', required:true, col2:true, placeholder:'e.g. Bangladesh' },
+        { key:'code', label:'ISO code', type:'text', placeholder:'e.g. BD' },
+        { key:'status', label:'Status', type:'select', options:['Active','Inactive','Archived'], default:'Active' }
+      ],
+      saveLabel: isNew ? 'Add Country' : 'Save',
+      onSave: function(val){ var r=c||{ id:'CTY-'+ui.uid('').slice(-4).toUpperCase(), created:new Date().toISOString().slice(0,10) };
+        r.name=(val.name||'').trim(); r.code=(val.code||'').trim().toUpperCase(); r.status=val.status||'Active';
+        S.upsert('air_countries', r); ui.toast('Country "'+r.name+'" saved','success'); if(refresh)refresh(); else EPAL.router.render(); return true; }
+    });
+  }
+
+  /* ======================================================= STATES master */
+  function statesList() { return S.list('air_states'); }
+  function statesView(page) {
+    page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost', { html: ui.icon('plus-lg')+' Add State', onclick:function(){ stateForm(null); } }));
+    var host = el('div'); page.appendChild(host); drawStates(host);
+  }
+  function drawStates(host) {
+    host.innerHTML='';
+    var list = statesList();
+    var active=list.filter(function(s){ return s.status==='Active'; }).length;
+    var cover={}; list.forEach(function(s){ cover[s.country]=1; });
+    host.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
+      kpi('Total States', list.length, 'geo-alt-fill', function(){ masterList('All States', 'geo-alt', list, stateTable); }),
+      kpi('Active', active, 'check2-circle', function(){ masterList('Active States', 'check2-circle', list.filter(function(s){ return s.status==='Active'; }), stateTable); }),
+      kpi('Inactive', list.length-active, 'pause-circle', function(){ masterList('Inactive States', 'pause-circle', list.filter(function(s){ return s.status!=='Active'; }), stateTable); }),
+      kpi('Countries Covered', Object.keys(cover).length, 'globe-americas', function(){ masterList('States', 'geo-alt', list, stateTable); })
+    ]));
+    host.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('geo-alt-fill')+' States' }), el('span.card-sub', { text: list.length+' states · '+Object.keys(cover).length+' countries' }) ]),
+      el('div.card-body', null, [ stateTable(list, function(){ drawStates(host); }).el ])
+    ]));
+  }
+  function stateTable(rows, refresh) {
+    return EPAL.table({
+      columns:[
+        { key:'country', label:'Country', render:function(s){ return '<span class="strong">'+ui.icon('flag')+' '+ui.escapeHtml(s.country)+'</span>'; } },
+        { key:'state', label:'State', render:function(s){ return '<span class="strong">'+ui.escapeHtml(s.state)+'</span>'; } },
+        { key:'status', label:'Status', badge:{ Active:'good', Inactive:'warn' } },
+        { key:'created', label:'Created', date:true }
+      ],
+      rows:rows, searchKeys:['country','state'], quickFilter:'country', filterPanel:true, filters:[{ key:'status', label:'Status' }], pageSize:15,
+      exportName:'states.csv', pdfTitle:'States',
+      actions: ui.actions({
+        edit:  function(s){ stateForm(s, refresh); },
+        del:   function(s){ ui.confirm({ title:'Delete "'+s.state+'"?', danger:true, confirmLabel:'Delete' }).then(function(ok){ if(ok){ S.removeFrom('air_states', s.id); ui.toast('Deleted','success'); if(refresh)refresh(); }}); }
+      }),
+      empty:{ icon:'geo-alt', title:'No states' }
+    });
+  }
+  function stateForm(s, refresh) {
+    var isNew = !s;
+    var cOpts = countries().map(function(c){ return [c.name, c.name]; });
+    EPAL.formModal({
+      title: isNew ? 'Add State' : 'Edit State', icon:'geo-alt-fill', size:'md', record: s || { status:'Active' },
+      fields:[
+        { key:'country', label:'Country', type:'select', options:cOpts, required:true, col2:true },
+        { key:'state', label:'State / division', type:'text', required:true, col2:true, placeholder:'e.g. Dhaka' },
+        { key:'status', label:'Status', type:'select', options:['Active','Inactive'], default:'Active' }
+      ],
+      saveLabel: isNew ? 'Add State' : 'Save',
+      onSave: function(val){ var r=s||{ id:'STA-'+ui.uid('').slice(-4).toUpperCase(), created:new Date().toISOString().slice(0,10) };
+        r.country=val.country; r.state=(val.state||'').trim(); r.status=val.status||'Active';
+        S.upsert('air_states', r); ui.toast('State "'+r.state+'" saved','success'); if(refresh)refresh(); else EPAL.router.render(); return true; }
+    });
+  }
+  // shared "open a filtered list in a modal" helper for the master KPIs
+  function masterList(title, icon, rows, tableFn) { var body=kpiShell(title+' — '+rows.length, icon, null); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ tableFn(rows, null).el ]) ])); }
 
   /* ======================================================= DIRECT SALE (issue) */
   function directSale(page) {
