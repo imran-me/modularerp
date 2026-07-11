@@ -1,0 +1,16 @@
+{
+  "key": "reports",
+  "company": "travels",
+  "title": "Reports",
+  "icon": "file-earmark-spreadsheet",
+  "desc": "Documentation-grade financial, sales, CRM & people reports.",
+  "route": "#/travels/reports",
+  "enabled": true,
+  "built": true,
+  "menu": [],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Travels override of the shared star-slash-reports view — a categorised report centre with preview + CSV/PDF/print."
+}
