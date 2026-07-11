@@ -21,7 +21,7 @@
     },
     {
       "id": "ticketing",
-      "label": "Direct Sale",
+      "label": "Ticketing",
       "route": "#/travels/air-ticketing/ticketing",
       "enabled": true
     },

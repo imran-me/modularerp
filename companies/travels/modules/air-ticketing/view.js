@@ -202,9 +202,11 @@
       var sub = ctx.subId || 'overview';
       var page = el('div.page');
       var map = {
-        overview:'Air Ticketing', ticketing:'Direct Sale', 'manage-sales':'Manage Sales',
+        overview:'Air Ticketing', stock:'Ticket Manage', purchase:'Ticket Purchase',
+        ticketing:'Ticket Operations', 'manage-sales':'Manage Sales',
         emd:'EMD & Ancillary', ttl:'Ticketing Deadlines',
-        airlines:'Airlines', airports:'Airports', bsp:'BSP / ADM Recon', refunds:'Refund Tracker'
+        airlines:'Airlines', airports:'Airports', countries:'Country', states:'States',
+        bsp:'BSP / ADM Recon', refunds:'Refund Tracker'
       };
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Air Ticketing',
@@ -216,7 +218,7 @@
         ]
       }));
 
-      ({ overview:overview, stock:stockView, purchase:purchaseView, ticketing:directSale, 'manage-sales':manageSales,
+      ({ overview:overview, stock:stockView, purchase:purchaseView, ticketing:ticketOps, 'manage-sales':manageSales,
          emd:emdView, ttl:ttlView,
          airlines:airlinesView, airports:airportsView, countries:countriesView, states:statesView,
          bsp:bspView, refunds:refundsView }[sub] || overview)(page, ctx);
@@ -229,7 +231,7 @@
     return ({ overview:'Issue, re-issue, refund and void air tickets — with BSP/ADM reconciliation.',
       stock:'Ticket routes, pricing and stock — pre-loaded inventory with remaining vs sold quantity.',
       purchase:'Passenger ticket purchases — passport holder, route, trip type and paid / due / total.',
-      ticketing:'Multi-passenger fare model with markup, agent commission, live profit and a branded invoice.',
+      ticketing:'Every ticketing operation in one place — Direct Sale · Refund · Re-Issue · Void · EMD / Ancillary.',
       'manage-sales':'Costing, sale, commission and net profit for every ticket — plus per-airline/agent reports.',
       emd:'Sell ancillary services (baggage, seats, meals, insurance, lounge) as EMDs with a branded receipt.',
       ttl:'Held-PNR ticketing-deadline queue — countdowns by urgency, ticket-now and extend actions.',
@@ -689,6 +691,202 @@
   }
   // shared "open a filtered list in a modal" helper for the master KPIs
   function masterList(title, icon, rows, tableFn) { var body=kpiShell(title+' — '+rows.length, icon, null); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ tableFn(rows, null).el ]) ])); }
+
+  /* ======================================================= TICKET OPERATIONS hub
+     One screen, five tabs — record EVERY ticketing operation: Direct Sale,
+     Refund, Re-Issue, Void, EMD / Ancillary. Mirrors the legacy Ticketing screen. */
+  function ticketOps(page, ctx) {
+    var op = (ctx && ctx.params && ctx.params.op) || 'direct';
+    var TABS = [ ['direct','Direct Sale','cart-plus'], ['refund','Refund','arrow-counterclockwise'],
+      ['reissue','Re-Issue','arrow-repeat'], ['void','Void','x-octagon'], ['emd','EMD / Ancillary','bag-plus'] ];
+    var bar = el('div.pill-tab.mb-3');
+    var host = el('div');
+    TABS.forEach(function (tb) {
+      bar.appendChild(el('button' + (op===tb[0]?'.active':''), { html: ui.icon(tb[2])+' '+tb[1], onclick: function () {
+        op = tb[0]; Array.prototype.forEach.call(bar.children, function (b) { b.classList.remove('active'); }); this.classList.add('active'); paint();
+      } }));
+    });
+    page.appendChild(bar); page.appendChild(host);
+    function paint() { host.innerHTML=''; ({ direct:directSale, refund:refundForm, reissue:reissueForm, void:voidForm, emd:emdOpForm }[op] || directSale)(host); }
+    paint();
+  }
+
+  /* ---- shared bits for the operation forms -------------------------------*/
+  var EMD_SERVICES = ['Excess Baggage','Seat Upgrade','Meal','Airport Tax','Visa Fee','Travel Insurance','Lounge Access','Date Change','Other'];
+  function opAgents(){ return [['','— Select agent —']].concat(subAgents().map(function(a){ return [a.id, a.name+(a.agency?' · '+a.agency:'')]; })); }
+  function opVendors(){ return [['','— Select vendor —']].concat((db.vendors?db.vendors():[]).map(function(v){ return [v.name, v.name]; })); }
+  function opPortals(){ return [['','— Select portal —']].concat((db.col('tv_portals')||[]).map(function(p){ return [p.name, p.name]; })); }
+  function opTickets(){ return [['','— Select ticket / invoice —']].concat(tickets().map(function(t){ return [t.id, t.id+' · '+t.passenger+' · '+t.route]; })); }
+  function opAirports(){ return (airports()||[]).map(function(a){ return [a.iata, a.iata+' · '+a.city]; }); }
+  function num(form,k){ var v=form.values(); return +v[k]||0; }
+  function setInp(form,k,v){ if(form.ctrls&&form.ctrls[k]&&form.ctrls[k].input) form.ctrls[k].input.value=v; }
+  function opBanner(html){ return el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('exclamation-triangle-fill')), el('div',{html:html}) ]); }
+  function opTotals(rows){ var box=el('div',{style:{maxWidth:'380px',marginLeft:'auto'}});
+    rows.forEach(function(r,i){ box.appendChild(el('div.flex.justify-between.items-center'+(r[2]?'.strong':''),{style:{padding:'7px 2px',borderTop:(r[2]||i)?'1px solid var(--border)':'none'}},
+      [ el('span'+(r[2]?'':'.text-mute'),{text:r[0]}), el('span.num',{style:(r[1]<0?{color:'#f0506e'}:null),text:ui.money(r[1])}) ])); });
+    return box; }
+  function opFooter(label, fn){ return el('div.flex.justify-end.gap-1.mt-3', null, [
+    el('a.btn.btn-ghost',{ href:'#/travels/air-ticketing/manage-sales', html:ui.icon('arrow-left')+' Cancel' }),
+    el('button.btn.btn-primary.btn-lg',{ html:ui.icon('check-lg')+' '+label, onclick:fn }) ]); }
+  function opCard(title, icon, formEl){ return el('div.card', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon(icon)+' '+title }) ]), el('div.card-body', null, [ formEl ]) ]); }
+  function opSummary(title, sumEl){ return el('div.card', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('calculator')+' '+title }) ]), el('div.card-body', null, [ sumEl ]) ]); }
+  function stepper(steps, active){ return el('div.flex.gap-1.flex-wrap.mb-3', null, steps.map(function(s,i){ return el('span.badge'+(i===active?'.badge-accent':''), { text:(i+1)+' — '+s }); })); }
+
+  /* ---- REFUND ------------------------------------------------------------*/
+  function refundForm(page) {
+    var sum = el('div');
+    var form = EPAL.form([
+      { type:'section', label:'Refund Header' },
+      { key:'agent', label:'Agent', type:'select', options:opAgents() },
+      { key:'refundDate', label:'Refund date', type:'date', required:true, default:'2026-07-05' },
+      { key:'ticketId', label:'Original ticket / invoice', type:'select', options:opTickets(), required:true },
+      { key:'refundStatus', label:'Refund status', type:'select', options:['Requested','Confirm','Filed','Paid'], default:'Confirm' },
+      { type:'section', label:'Original Ticket Info' },
+      { key:'vendor', label:'Vendor', type:'select', options:opVendors() },
+      { key:'portal', label:'Portal', type:'select', options:opPortals() },
+      { key:'refundRef', label:'Refund PNR / Ref No', type:'text' },
+      { type:'section', label:'Refund Calculation (per ticket)' },
+      { key:'ticketCost', label:'Original ticket cost', type:'money', default:0 },
+      { key:'salePrice', label:'Original sale price', type:'money', default:0 },
+      { key:'airlineRefund', label:'Airline refund amount', type:'money', required:true, default:0 },
+      { key:'penalty', label:'Airline penalty / fee', type:'money', default:0 },
+      { key:'serviceCharge', label:'Agent service charge', type:'money', default:0 },
+      { key:'method', label:'Refund method', type:'select', options:['Bank','bKash','Cash','Card Reversal'], default:'Bank' }
+    ], {});
+    function recalc(){ var net = num(form,'airlineRefund') - num(form,'penalty') - num(form,'serviceCharge');
+      sum.innerHTML=''; sum.appendChild(opTotals([ ['Airline refund', num(form,'airlineRefund')], ['Airline penalty', -num(form,'penalty')], ['Agent service charge', -num(form,'serviceCharge')], ['Net refund to customer', net, true] ])); }
+    ['airlineRefund','penalty','serviceCharge'].forEach(function(k){ if(form.ctrls[k]) form.ctrls[k].input.addEventListener('input', recalc); });
+    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var t=tickets().filter(function(x){ return x.id===this.value; })[0]; if(t){ setInp(form,'ticketCost',t.cost||0); setInp(form,'salePrice',t.sale||0); setInp(form,'airlineRefund',t.cost||0); } recalc(); });
+    recalc();
+    page.appendChild(opBanner('<strong>Refund reverses the original sale.</strong> Ensure the airline has confirmed the refund amount before proceeding.'));
+    page.appendChild(opCard('Ticket Refund', 'arrow-counterclockwise', form.el));
+    page.appendChild(opSummary('Refund Summary', sum));
+    page.appendChild(opFooter('Process Refund', function(){
+      if(!form.validate()){ ui.toast('Complete the highlighted fields','error'); return; }
+      var v=form.values(), t=tickets().filter(function(x){ return x.id===v.ticketId; })[0]||{}, net=num(form,'airlineRefund')-num(form,'penalty')-num(form,'serviceCharge');
+      var rec={ id:ui.uid('RF'), date:v.refundDate, pnr:t.pnr||v.refundRef||'', passenger:t.passenger||'', airline:airlineNameOf(t.airlineCode||''), ticketNo:t.ticketNo||'',
+        gross:num(form,'ticketCost'), airlineRefund:num(form,'airlineRefund'), penalty:num(form,'penalty'), fee:num(form,'serviceCharge'), netRefund:net, method:v.method, status:v.refundStatus||'Confirm', created:Date.now() };
+      if(db.saveAirRefund) db.saveAirRefund(rec); else S.upsert('airRefunds', rec);
+      if(t.id){ t.status='Refunded'; if(db.saveAirTicket) db.saveAirTicket(t); }
+      ui.toast('Refund '+rec.id+' processed · net '+ui.money(net),'success'); EPAL.router.navigate('travels/air-ticketing/refunds');
+    }));
+  }
+
+  /* ---- RE-ISSUE ----------------------------------------------------------*/
+  function reissueForm(page) {
+    var sum = el('div');
+    var form = EPAL.form([
+      { type:'section', label:'Original Ticket Reference' },
+      { key:'agent', label:'Agent', type:'select', options:opAgents() },
+      { key:'reissueDate', label:'Re-issue date', type:'date', required:true, default:'2026-07-05' },
+      { key:'ticketId', label:'Original ticket / invoice', type:'select', options:opTickets(), required:true },
+      { type:'section', label:'New Ticket Details' },
+      { key:'newFrom', label:'New route — From', type:'select', options:opAirports() },
+      { key:'newTo', label:'New route — To', type:'select', options:opAirports() },
+      { key:'newTrip', label:'New trip type', type:'select', options:TRIP_TYPES, default:'One-way' },
+      { key:'newPnr', label:'New PNR / Ticket No', type:'text' },
+      { key:'newVendor', label:'New vendor', type:'select', options:opVendors() },
+      { key:'newTravelDate', label:'New travel date', type:'date' },
+      { type:'section', label:'Re-Issue Charges & Pricing' },
+      { key:'origCost', label:'Original cost price', type:'money', default:0 },
+      { key:'origSale', label:'Original sale price', type:'money', default:0 },
+      { key:'penalty', label:'Airline re-issue penalty', type:'money', default:0 },
+      { key:'fareDiff', label:'Fare difference (new − old)', type:'money', default:0 },
+      { key:'serviceCharge', label:'Agent service charge', type:'money', default:0 }
+    ], {});
+    function recalc(){ var newCost=num(form,'origCost')+num(form,'penalty')+num(form,'fareDiff'); var addl=num(form,'penalty')+num(form,'fareDiff')+num(form,'serviceCharge');
+      sum.innerHTML=''; sum.appendChild(opTotals([ ['Airline penalty', num(form,'penalty')], ['Fare difference', num(form,'fareDiff')], ['Agent service charge', num(form,'serviceCharge')], ['New total cost', newCost], ['Additional charge to customer', addl, true] ])); }
+    ['origCost','penalty','fareDiff','serviceCharge'].forEach(function(k){ if(form.ctrls[k]) form.ctrls[k].input.addEventListener('input', recalc); });
+    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var t=tickets().filter(function(x){ return x.id===this.value; })[0]; if(t){ setInp(form,'origCost',t.cost||0); setInp(form,'origSale',t.sale||0); } recalc(); });
+    recalc();
+    page.appendChild(stepper(['Original Ticket','New Ticket Details','Charges & Pricing','Payment'], 1));
+    page.appendChild(opBanner('<strong>Re-issue changes the flight / date / route.</strong> Both old and new ticket details are recorded for a full audit trail.'));
+    page.appendChild(opCard('Ticket Re-Issue', 'arrow-repeat', form.el));
+    page.appendChild(opSummary('Re-Issue Summary', sum));
+    page.appendChild(opFooter('Process Re-Issue', function(){
+      if(!form.validate()){ ui.toast('Complete the highlighted fields','error'); return; }
+      var v=form.values(), t=tickets().filter(function(x){ return x.id===v.ticketId; })[0]||{};
+      var newCost=num(form,'origCost')+num(form,'penalty')+num(form,'fareDiff'), addl=num(form,'penalty')+num(form,'fareDiff')+num(form,'serviceCharge');
+      var rec={ id:ui.uid('RI'), date:v.reissueDate, ticketId:v.ticketId, passenger:t.passenger||'', oldRoute:t.route||'',
+        newRoute:(v.newFrom&&v.newTo)?(v.newFrom+' → '+v.newTo):(t.route||''), newPnr:v.newPnr, penalty:num(form,'penalty'), fareDiff:num(form,'fareDiff'), serviceCharge:num(form,'serviceCharge'), newCost:newCost, addlCharge:addl, created:Date.now() };
+      S.upsert('air_reissues', rec);
+      if(t.id){ t.status='Re-issued'; if(v.newFrom&&v.newTo){ t.route=v.newFrom+' → '+v.newTo; t.fromCode=v.newFrom; t.toCode=v.newTo; } if(v.newPnr) t.pnr=v.newPnr; t.cost=newCost; if(db.saveAirTicket) db.saveAirTicket(t); }
+      ui.toast('Ticket re-issued · new cost '+ui.money(newCost),'success'); EPAL.router.navigate('travels/air-ticketing/manage-sales');
+    }));
+  }
+
+  /* ---- VOID --------------------------------------------------------------*/
+  function voidForm(page) {
+    var sum = el('div');
+    var form = EPAL.form([
+      { type:'section', label:'Void Header' },
+      { key:'agent', label:'Agent', type:'select', options:opAgents() },
+      { key:'voidDate', label:'Void date', type:'date', required:true, default:'2026-07-05' },
+      { key:'ticketId', label:'Ticket to void', type:'select', options:opTickets(), required:true },
+      { key:'voidReason', label:'Void reason', type:'select', options:['Duplicate booking','Wrong fare','Customer cancelled','Schedule change','Other'] },
+      { key:'confirmNo', label:'Airline confirmation No', type:'text' },
+      { type:'section', label:'Void Charges & Reversal' },
+      { key:'origCost', label:'Original cost price', type:'money', default:0 },
+      { key:'origSale', label:'Original sale price', type:'money', default:0 },
+      { key:'voidPenalty', label:'Void penalty / fee', type:'money', default:0 },
+      { key:'agentVoidFee', label:'Agent void fee', type:'money', default:0 }
+    ], {});
+    function recalc(){ var refund=num(form,'origSale')-num(form,'voidPenalty')-num(form,'agentVoidFee');
+      sum.innerHTML=''; sum.appendChild(opTotals([ ['Original sale price', num(form,'origSale')], ['Void penalty', -num(form,'voidPenalty')], ['Agent void fee', -num(form,'agentVoidFee')], ['Refund to agent / customer', refund, true] ])); }
+    ['origSale','voidPenalty','agentVoidFee'].forEach(function(k){ if(form.ctrls[k]) form.ctrls[k].input.addEventListener('input', recalc); });
+    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var t=tickets().filter(function(x){ return x.id===this.value; })[0]; if(t){ setInp(form,'origCost',t.cost||0); setInp(form,'origSale',t.sale||0); } recalc(); });
+    recalc();
+    page.appendChild(opBanner('<strong>Void is only allowed within the airline’s void window (usually same day / 24 hrs).</strong> A late void may incur full penalty. This action cannot be undone.'));
+    page.appendChild(opCard('Ticket Void', 'x-octagon', form.el));
+    page.appendChild(opSummary('Void Summary', sum));
+    page.appendChild(opFooter('Process Void', function(){
+      if(!form.validate()){ ui.toast('Complete the highlighted fields','error'); return; }
+      var v=form.values(), t=tickets().filter(function(x){ return x.id===v.ticketId; })[0]||{}, refund=num(form,'origSale')-num(form,'voidPenalty')-num(form,'agentVoidFee');
+      var rec={ id:ui.uid('VD'), date:v.voidDate, ticketId:v.ticketId, passenger:t.passenger||'', reason:v.voidReason, confirmNo:v.confirmNo, penalty:num(form,'voidPenalty'), agentFee:num(form,'agentVoidFee'), refund:refund, created:Date.now() };
+      S.upsert('air_voids', rec);
+      if(t.id){ t.status='Void'; if(db.saveAirTicket) db.saveAirTicket(t); }
+      ui.toast('Ticket voided · refund '+ui.money(refund),'success'); EPAL.router.navigate('travels/air-ticketing/manage-sales');
+    }));
+  }
+
+  /* ---- EMD / ANCILLARY ---------------------------------------------------*/
+  function emdOpForm(page) {
+    var sum = el('div');
+    var form;
+    function recalc(){ if(!form) return; var v=form.values(), c=0, s=0; (v.items||[]).forEach(function(r){ c+=(+r.cost||0); s+=(+r.sale||0); });
+      sum.innerHTML=''; sum.appendChild(opTotals([ ['Total cost', c], ['Total sale', s], ['Gross profit', s-c, true] ])); }
+    form = EPAL.form([
+      { type:'section', label:'EMD / Ancillary Header' },
+      { key:'agent', label:'Agent', type:'select', options:opAgents() },
+      { key:'issueDate', label:'Issue date', type:'date', required:true, default:'2026-07-05' },
+      { key:'items', type:'items', label:'Ancillary / EMD Items (one row per service)', required:true, min:1, addLabel:'Add Item',
+        columns:[
+          { key:'passenger', label:'Passenger / Customer', type:'text', width:'2fr' },
+          { key:'serviceType', label:'Service Type', type:'select', options:EMD_SERVICES, width:'1.4fr' },
+          { key:'emdNo', label:'EMD / Ref No', type:'text', width:'1.4fr' },
+          { key:'vendor', label:'Vendor / Airline', type:'text', width:'1.4fr' },
+          { key:'cost', label:'Cost', type:'money' },
+          { key:'sale', label:'Sale', type:'money' }
+        ],
+        footer:function(rows){ var c=0,s=0; (rows||[]).forEach(function(r){ c+=(+r.cost||0); s+=(+r.sale||0); }); return 'Cost: <strong>'+ui.money(c)+'</strong> · Sale: <strong>'+ui.money(s)+'</strong> · Profit: <strong>'+ui.money(s-c)+'</strong>'; },
+        onChange:function(){ recalc(); } },
+      { type:'section', label:'Payment from Agent' },
+      { key:'received', label:'Amount received', type:'money', default:0 },
+      { key:'payStatus', label:'Payment status', type:'select', options:['Paid','Partial','Due'], default:'Due' }
+    ], { items:[{}] });
+    recalc();
+    page.appendChild(opBanner('<strong>EMD</strong> is used for ancillary charges: excess baggage, seat upgrade, meals, airport tax, visa fee, travel insurance and other services.'));
+    page.appendChild(opCard('EMD / Ancillary', 'bag-plus', form.el));
+    page.appendChild(opSummary('EMD Summary', sum));
+    page.appendChild(opFooter('Save EMD', function(){
+      if(!form.validate()){ ui.toast('Add at least one item','error'); return; }
+      var v=form.values(), items=(v.items||[]).filter(function(r){ return (r.passenger||'').trim() || (+r.sale||0)>0; });
+      if(!items.length){ ui.toast('Add at least one item','error'); return; }
+      var n=130450090000+Date.now()%900000;
+      items.forEach(function(r,i){ S.upsert('air_emd', { id:ui.uid('EMD'), emdNo:r.emdNo||String(n+i), date:v.issueDate, passenger:r.passenger, ticketRef:r.emdNo||'', serviceType:r.serviceType, vendor:r.vendor, description:r.serviceType, cost:+r.cost||0, sale:+r.sale||0, payStatus:v.payStatus||'Due', created:Date.now() }); });
+      ui.toast(items.length+' EMD item'+(items.length===1?'':'s')+' saved','success'); EPAL.router.navigate('travels/air-ticketing/emd');
+    }));
+  }
 
   /* ======================================================= DIRECT SALE (issue) */
   function directSale(page) {
