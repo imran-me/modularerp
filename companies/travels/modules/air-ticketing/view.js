@@ -205,7 +205,7 @@
         overview:'Air Ticketing', stock:'Ticket Manage', purchase:'Ticket Purchase',
         ticketing:'Ticket Operations', 'manage-sales':'Manage Sales',
         emd:'EMD & Ancillary', ttl:'Ticketing Deadlines',
-        airlines:'Airlines', airports:'Airports', countries:'Country', states:'States',
+        masters:'Masters', airlines:'Airlines', airports:'Airports', countries:'Country', states:'States',
         bsp:'BSP / ADM Recon', refunds:'Refund Tracker'
       };
       page.appendChild(EPAL.pageHead({
@@ -220,7 +220,7 @@
 
       ({ overview:overview, stock:stockView, purchase:purchaseView, ticketing:ticketOps, 'manage-sales':manageSales,
          emd:emdView, ttl:ttlView,
-         airlines:airlinesView, airports:airportsView, countries:countriesView, states:statesView,
+         masters:mastersView, airlines:airlinesView, airports:airportsView, countries:countriesView, states:statesView,
          bsp:bspView, refunds:refundsView }[sub] || overview)(page, ctx);
 
       ctx.mount.appendChild(page);
@@ -235,6 +235,7 @@
       'manage-sales':'Costing, sale, commission and net profit for every ticket — plus per-airline/agent reports.',
       emd:'Sell ancillary services (baggage, seats, meals, insurance, lounge) as EMDs with a branded receipt.',
       ttl:'Held-PNR ticketing-deadline queue — countdowns by urgency, ticket-now and extend actions.',
+      masters:'Airlines, Airports, Country & States — all reference masters in one place.',
       airlines:'Airline master — carriers, IATA designators and status.',
       airports:'Airport master — stations, IATA codes and cities.',
       countries:'Country master — used across ticketing and business services.',
@@ -1351,20 +1352,42 @@
 
   /* ======================================================= AIRLINES master */
   function airlinesView(page) {
-    page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost',{html:ui.icon('plus')+' Add Airline',onclick:function(){ editAirline(null, draw); }}));
-    var host = el('div'); page.appendChild(host);
-    function draw() {
-      host.innerHTML='';
-      var rows = airlines().map(function (a) {
-        return el('tr.row-click', { onclick:(function(al){ return function(){ airlineDetail(al, draw); }; })(a) }, [
-          td('<span class="badge mono">'+ui.escapeHtml(a.iata)+'</span>'),
-          td('<span class="strong">'+ui.escapeHtml(a.name)+'</span>'),
-          td(ui.escapeHtml(a.country||'—')),
-          td('<span class="badge '+(a.status==='active'?'badge-good':'')+'">'+a.status+'</span>') ]);
-      });
-      host.appendChild(tableCard(null, ['IATA','Airline','Country','Status'], rows, 'No airlines. Add your first carrier.', { chipCol: 3 }));
-    }
-    draw();
+    var pa = page.querySelector('.page-actions'); if (pa) pa.prepend(el('button.btn.btn-ghost',{html:ui.icon('plus-lg')+' Add Airline',onclick:function(){ editAirline(null, function(){ drawAirlines(host); }); }}));
+    var host = el('div'); page.appendChild(host); drawAirlines(host);
+  }
+  function drawAirlines(host) {
+    host.innerHTML='';
+    var rows = airlines().map(function (a) {
+      return el('tr.row-click', { onclick:(function(al){ return function(){ airlineDetail(al, function(){ drawAirlines(host); }); }; })(a) }, [
+        td('<span class="badge mono">'+ui.escapeHtml(a.iata)+'</span>'),
+        td('<span class="strong">'+ui.escapeHtml(a.name)+'</span>'),
+        td(ui.escapeHtml(a.country||'—')),
+        td('<span class="badge '+(a.status==='active'?'badge-good':'')+'">'+a.status+'</span>') ]);
+    });
+    host.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('airplane-engines-fill')+' Airlines' }), el('span.card-sub', { text: airlines().length+' carriers' }) ]),
+      el('div.card-body', null, [ tableCard(null, ['IATA','Airline','Country','Status'], rows, 'No airlines. Add your first carrier.', { chipCol: 3 }) ])
+    ]));
+  }
+
+  /* ======================================================= MASTERS (consolidated)
+     One nav item, four tabs — Airlines · Airports · Country · States — instead of
+     four separate sidebar entries. The Add button adapts to the active tab. */
+  function mastersView(page, ctx) {
+    var tab = (ctx && ctx.params && ctx.params.tab) || 'airlines';
+    var TABS = [ ['airlines','Airlines','airplane-engines-fill'], ['airports','Airports','geo-alt-fill'], ['countries','Country','flag-fill'], ['states','States','geo-alt'] ];
+    var ADD = { airlines:'Add Airline', airports:'Add Airport', countries:'Add Country', states:'Add State' };
+    var DRAW = { airlines:drawAirlines, airports:drawAirports, countries:drawCountries, states:drawStates };
+    var pa = page.querySelector('.page-actions');
+    var addBtn = el('button.btn.btn-ghost'); if (pa) pa.prepend(addBtn);
+    var bar = el('div.pill-tab.mb-3'); var host = el('div');
+    TABS.forEach(function (tb) { bar.appendChild(el('button' + (tab===tb[0]?'.active':''), { html: ui.icon(tb[2])+' '+tb[1], onclick: function () {
+      tab = tb[0]; Array.prototype.forEach.call(bar.children, function (b) { b.classList.remove('active'); }); this.classList.add('active'); paint();
+    } })); });
+    page.appendChild(bar); page.appendChild(host);
+    function addFn(){ ({ airlines:function(){ editAirline(null, paint); }, airports:function(){ editAirport(null, paint); }, countries:function(){ countryForm(null, paint); }, states:function(){ stateForm(null, paint); } }[tab])(); }
+    function paint(){ if(addBtn){ addBtn.innerHTML = ui.icon('plus-lg')+' '+ADD[tab]; addBtn.onclick = addFn; } host.innerHTML=''; (DRAW[tab]||drawAirlines)(host); }
+    paint();
   }
   // rich airline profile — carrier stats + the tickets sold on it (row-click opens it)
   function airlineDetail(a, refresh) {

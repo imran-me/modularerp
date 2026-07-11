@@ -44,27 +44,9 @@
       "enabled": true
     },
     {
-      "id": "airlines",
-      "label": "Airlines",
-      "route": "#/travels/air-ticketing/airlines",
-      "enabled": true
-    },
-    {
-      "id": "airports",
-      "label": "Airports",
-      "route": "#/travels/air-ticketing/airports",
-      "enabled": true
-    },
-    {
-      "id": "countries",
-      "label": "Country",
-      "route": "#/travels/air-ticketing/countries",
-      "enabled": true
-    },
-    {
-      "id": "states",
-      "label": "States",
-      "route": "#/travels/air-ticketing/states",
+      "id": "masters",
+      "label": "Masters",
+      "route": "#/travels/air-ticketing/masters",
       "enabled": true
     },
     {
