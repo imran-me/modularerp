@@ -222,8 +222,10 @@
       })) ]));
     }
 
-    // Route Network map + Top Routes league table
+    // Route Network map + Top Routes, Airline League, Forward Bookings
     routeNetwork(page, t);
+    airlineLeague(page, t);
+    forwardBookings(page, t);
 
     var sections = [
       ['ticketing','Direct Sale','ticket-detailed-fill','Issue a new ticket'],
@@ -1614,6 +1616,13 @@
     var revenue=t.reduce(function(s,x){ return s+(x.sale||0); },0), cost=t.reduce(function(s,x){ return s+(x.cost||0); },0);
     var comm=t.reduce(function(s,x){ return s+(x.commission||0); },0), net=t.reduce(function(s,x){ return s+netProfitOf(x); },0);
     var body = kpiShell('Net Profit — '+ui.money(net), 'graph-up-arrow', [['Sales', ui.money(revenue)], ['Cost', ui.money(cost)], ['Gross', ui.money(revenue-cost)], ['Commission', ui.money(comm)], ['Net', ui.money(net)]]);
+    // profit waterfall: Sales → − Cost → − Commission → Net (floating bars)
+    var gross = revenue - cost, wid = ui.uid('wf');
+    body.appendChild(el('div.card.mb-2', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('bar-chart-steps')+' Profit Waterfall' }), el('span.card-sub',{ text:'sales → cost → commission → net' }) ]),
+      el('div.card-body', null, [ el('div',{ style:{ height:'240px', position:'relative' } }, [ el('canvas',{ id:wid }) ]) ]) ]));
+    requestAnimationFrame(function(){ var c=document.getElementById(wid); if(!c) return;
+      EPAL.charts.bar(c, { labels:['Sales','− Cost','− Commission','Net Profit'],
+        datasets:[{ label:'৳', data:[[0,revenue],[gross,revenue],[net,gross],[0,net]], colors:['#2f6bff','#f0506e','#f4b740','#23c17e'] }] }); });
     airlineChart(body, t, 'profit', 'Net Profit by Airline');
     body.appendChild(el('div.card',null,[ el('div.card-body',null,[ airlineStatsTable(t) ]) ]));
   }
@@ -1730,6 +1739,48 @@
     body.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null, [ airlineStatsTable(onRoute) ]) ]));
     body.appendChild(el('div.section-label',{ text:'Tickets on this sector' }));
     body.appendChild(el('div.card', null, [ el('div.card-body', null, [ ticketsTable(onRoute) ]) ]));
+  }
+
+  /* ---- AIRLINE LEAGUE — a ranked carrier table with medals, IATA "logo" chips
+     and a volume bar; click a carrier for its tickets & stats. */
+  function airlineName(code){ var a=(airlines()||[]).filter(function(x){ return x.iata===code; })[0]; return a? a.name : code; }
+  function airlineLeague(page, t){
+    var rows = byAirlineStats(t).slice(0, 10);
+    if(!rows.length) return;
+    var maxSale = rows[0].sale || 1, medals = ['#f4c542','#c9ccd3','#cd7f32'];
+    var list = el('div');
+    rows.forEach(function(r, i){
+      var margin = r.sale ? Math.round(r.profit/r.sale*100) : 0, barW = Math.max(4, Math.round(r.sale/maxSale*100));
+      var rank = i<3
+        ? '<span style="display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:'+medals[i]+';color:#1b2438;font-weight:800;font-size:11px">'+(i+1)+'</span>'
+        : '<span class="text-mute" style="width:22px;display:inline-block;text-align:center">'+(i+1)+'</span>';
+      var chip = '<span class="mono" style="display:inline-grid;place-items:center;min-width:34px;height:24px;padding:0 6px;border-radius:7px;background:'+ui.colorFor(r.code)+';color:#fff;font-weight:700;font-size:11px">'+r.code+'</span>';
+      list.appendChild(el('div.data-row', { style:{ cursor:'pointer' }, onclick:(function(rr){ return function(){
+          kpiList(airlineName(rr.code)+' · '+rr.code, 'airplane', t.filter(function(x){ return x.airlineCode===rr.code; }),
+            [['Tickets', rr.tickets], ['Sales', ui.money(rr.sale)], ['Net Profit', ui.money(rr.profit)], ['Margin', (rr.sale?Math.round(rr.profit/rr.sale*100):0)+'%']]);
+        }; })(r) }, [
+        ui.frag(rank), ui.frag(chip),
+        el('div.flex-1', { style:{ minWidth:'120px' } }, [ el('div.strong',{ text: airlineName(r.code) }),
+          el('div', { style:{ height:'6px', borderRadius:'6px', background:'var(--surface-3,#2a3350)', overflow:'hidden', marginTop:'5px', maxWidth:'240px' } },
+            [ el('div', { style:{ height:'100%', width:barW+'%', background:'#2f6bff' } }) ]) ]),
+        el('div', { style:{ textAlign:'right', minWidth:'150px' } }, [ el('div.num.strong',{ text: ui.money(r.sale,{compact:true}) }),
+          el('div.num.xs' + (r.profit>=0?'.text-good':'.text-bad'), { text: ui.money(r.profit,{compact:true})+' · '+margin+'%' }) ])
+      ]));
+    });
+    page.appendChild(el('div.section-label',{ html: ui.icon('trophy') + ' Airline League' }));
+    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ list ]) ]));
+  }
+
+  /* ---- FORWARD BOOKINGS — departures ahead by travel month (the load to come). */
+  function mLabelYM(ym){ var p=String(ym).split('-'); if(p.length<2) return ym; return new Date(p[0], p[1]-1, 1).toLocaleString('en',{ month:'short' }); }
+  function forwardBookings(page, t){
+    var byMonth={}, val={}; t.forEach(function(x){ var m=String(x.travelDate||'').slice(0,7); if(!m) return; byMonth[m]=(byMonth[m]||0)+1; val[m]=(val[m]||0)+(x.sale||0); });
+    var months=Object.keys(byMonth).sort(); if(months.length<2) return;
+    var cid=ui.uid('fwd');
+    page.appendChild(el('div.section-label',{ html: ui.icon('calendar3') + ' Forward Bookings — departures ahead' }));
+    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div',{ style:{ height:'220px', position:'relative' } }, [ el('canvas',{ id:cid }) ]) ]) ]));
+    requestAnimationFrame(function(){ var c=document.getElementById(cid); if(!c) return;
+      EPAL.charts.bar(c, { labels:months.map(mLabelYM), money:false, datasets:[{ label:'Departures', data:months.map(function(m){ return byMonth[m]; }), color:'#1A43BF' }] }); });
   }
   function tableCard(title, headers, rows, emptyMsg, opts) {
     var card = el('div.card');
