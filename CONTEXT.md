@@ -12,6 +12,44 @@
 > Data model: `docs/DATA_MODEL.md`. Backend path: `docs/MIGRATION_ROADMAP.md`. See the
 > CHANGELOG v0.3.0 entry for the full list.
 
+> 🛠️ **WORKING SESSION 2026-07-11 — RESUME HERE.** Large Travels feature push,
+> all committed + pushed to `imran-me/modularerp` (main tip `0093862`). Delivered:
+> - **8 "Others" modules** built deep to the Vendor/Agent gold standard: Accounts,
+>   HRM, CRM, Ledgers, Reports, Analytics, Automation, Settings — each is its own
+>   `companies/travels/modules/<id>/{view.js, module.json, backend/LARAVEL-BLUEPRINT.md}`.
+> - **Revenue-module cockpits** (Air Ticketing, Visa Processing, Contract Flight):
+>   7 slim one-row drill-down KPIs + a geo map / seat-occupancy gauges + a league
+>   table + a funnel/status donut; plus momentum deltas, BSP countdown, refund %.
+> - **Air Ticketing parity** with the owner's legacy ERP: **Ticket Manage** (route
+>   stock), **Ticket Purchase**, **Country + States** masters, **Airport** upgrade
+>   (KPIs + geo), and a tabbed **Ticket Operations** (Direct Sale / Refund / Re-Issue
+>   / Void / EMD). The four reference masters were merged into ONE nav item
+>   "**Setup**" (tabs).
+> - **House rules (global):** KPI cards are uniform ~30% smaller, ONE row everywhere
+>   (`.kpi-slim` base + `.kpi-onerow`). **Tables WRAP-TO-FIT** — text/headers wrap,
+>   numbers/badges/actions stay one line — so every column incl. Actions is visible
+>   with **NO horizontal scrollbar** at 90–100% zoom (reversed the old nowrap+scroll
+>   rule; see `base.css`). Grid overflow fix: `.app` main track `minmax(0,1fr)`.
+> - **3D atmosphere** (`platform/atmosphere/ambient3d.js`, three.js): a full 3D
+>   AIRFIELD — runway/taxiway/tower/terminal/hangar/skyline + take-off, landing,
+>   taxi, cruise, cargo, helicopter (spinning rotors) + a re-forming **fighter-jet
+>   show** — replaces the flat 2D SVG airfield, which is KEPT and toggleable at
+>   **Travels ▸ Settings ▸ Data ▸ Appearance** (`ui.atmos` = `3d` | `2d` | `off`).
+>   three.js is loaded `defer` from a CDN in `index.html`; ambient3d no-ops
+>   gracefully if three.js is unavailable (2D stays).
+>
+> **⏭️ DUE TOMORROW / caveats:**
+> 1. **The 3D scene can only be tuned by LOOKING at it live** — WebGL doesn't render
+>    in the headless boot-sweep, so verify on the deployed site: aircraft
+>    size/colour/positions, camera framing, that craft don't merge into the pale sky.
+>    Tweak `ambient3d.js` (materials `M.white`/`M.blue`, camera, per-craft path fns).
+> 2. **GitHub Pages builds get CANCELLED by rapid pushes** (why the live site lagged
+>    all session). Batch commits, push once, wait ~2 min. Verify live by: sidebar
+>    shows "**Setup**", tables have no bottom scrollbar, background is the 3D airfield.
+> 3. Optional upgrade: swap the procedural airliner for a real glTF (CesiumGS
+>    `Cesium_Air.glb`, CC-BY, jsDelivr-verified 200+CORS) — needs a live orientation
+>    check. Loader: `three@0.128.0/examples/js/loaders/GLTFLoader.js`.
+
 ---
 
 ## 1. The Vision (the owner's words, distilled)
