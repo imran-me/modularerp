@@ -106,12 +106,18 @@
         if (atRisk(f)) riskCount++;
       });
       var totUnsold = totSeats - totSold;
-      host.appendChild(el('div.kpi-grid.stagger', null, [
-        kpi('Total Seats', ui.num(totSeats), 'grid-3x3-gap-fill'),
-        kpi('Seats Sold', ui.num(totSold), 'check2-circle'),
-        kpi('Unsold Seats', ui.num(totUnsold), 'exclamation-diamond'),
-        kpi('Blocked Capital', ui.money(blocked, { compact:true }), 'lock-fill'),
-        kpi('Deadline Risk', String(riskCount), 'alarm-fill')
+      var lf = totSeats ? Math.round(totSold / totSeats * 100) : 0;
+      var revenue = fl.reduce(function (s, f){ return s + revOf(f); }, 0);
+      var netPnl = fl.reduce(function (s, f){ return s + pnlOf(f); }, 0);
+      // 7 KPIs — slim cards, one row (~30% smaller, same text); click any for a breakdown.
+      host.appendChild(el('div.kpi-grid.kpi-slim.kpi-onerow.stagger', null, [
+        kpi('Total Seats', ui.num(totSeats), 'grid-3x3-gap-fill', function(){ flightsModal('Seat Blocks — '+ui.num(totSeats)+' seats', 'grid-3x3-gap-fill', [['Seats', ui.num(totSeats)], ['Sold', ui.num(totSold)], ['Unsold', ui.num(totUnsold)], ['Blocks', fl.length]], fl); }),
+        kpi('Seats Sold', ui.num(totSold), 'check2-circle', function(){ flightsModal('Seats Sold — '+ui.num(totSold), 'check2-circle', [['Sold', ui.num(totSold)], ['Load factor', lf+'%'], ['Revenue', ui.money(revenue)]], fl); }),
+        kpi('Load Factor', lf + '%', 'speedometer2', function(){ var byL=fl.slice().filter(function(f){return f.seats;}).sort(function(a,b){ return loadPct(b)-loadPct(a); }); flightsModal('Load Factor — '+lf+'%', 'speedometer2', [['Overall', lf+'%'], ['Best', byL[0]? byL[0].airline+' '+loadPct(byL[0])+'%':'—'], ['Weakest', byL.length? byL[byL.length-1].airline+' '+loadPct(byL[byL.length-1])+'%':'—']], fl); }),
+        kpi('Unsold Seats', ui.num(totUnsold), 'exclamation-diamond', function(){ flightsModal('Unsold Seats — '+ui.num(totUnsold), 'exclamation-diamond', [['Unsold', ui.num(totUnsold)], ['At-risk blocks', riskCount]], fl.filter(function(f){ return unsoldOf(f)>0; })); }),
+        kpi('Blocked Capital', ui.money(blocked, { compact:true }), 'lock-fill', function(){ flightsModal('Blocked Capital — '+ui.money(blocked), 'lock-fill', [['Trapped capital', ui.money(blocked)], ['Unsold seats', ui.num(totUnsold)]], fl.filter(function(f){ return unsoldOf(f)>0; })); }),
+        kpi('Revenue', ui.money(revenue, { compact:true }), 'cash-coin', function(){ flightsModal('Seat-Sale Revenue — '+ui.money(revenue), 'cash-coin', [['Revenue', ui.money(revenue)], ['Seats sold', ui.num(totSold)], ['Avg / seat', ui.money(totSold?Math.round(revenue/totSold):0)]], fl); }),
+        kpi('Net P&L', ui.money(netPnl, { compact:true }), netPnl>=0?'graph-up-arrow':'graph-down-arrow', function(){ pnlModal(fl); })
       ]));
 
       // --- deadline-risk alerts ------------------------------------------
@@ -138,6 +144,10 @@
         });
         host.appendChild(alertBox);
       }
+
+      // --- Seat-Block Occupancy gauges + Category Mix --------------------
+      occupancyBoard(host, fl);
+      categoryMix(host, fl);
 
       // --- table ----------------------------------------------------------
       var tbl = EPAL.table({
@@ -563,11 +573,99 @@
   }
 
   /* ---------------------------------------------------- shared helpers */
-  function kpi(label, value, icon) {
-    return el('div.kpi-card', null, [
+  function kpi(label, value, icon, onClick) {
+    return el('div.kpi-card' + (onClick ? '.drill' : ''), onClick ? { onclick: onClick } : null, [
       el('div.kpi-top', null, [ el('span.kpi-label', { text:label }), el('span.kpi-ico', { html:'<i class="bi bi-' + icon + '"></i>' }) ]),
       el('div.kpi-value', { text:String(value) })
     ]);
+  }
+
+  /* ==========================================================================
+   * COCKPIT — KPI drill-downs, seat-block Occupancy Board (load-factor gauges),
+   * Category Mix. (Mirrors the Air Ticketing / Visa cockpits for Contract Flight.)
+   * ========================================================================*/
+  function loadPct(f){ return f.seats ? Math.round((+f.sold||0)/f.seats*100) : 0; }
+  function kpiShell(title, icon, stats){
+    var body = el('div');
+    ui.modal({ title:title, icon:icon, size:'lg', body:body, footer:false });
+    if (stats && stats.length) body.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null, [ el('div.stat-row', null, stats.map(function(s){ return st2(s[0], String(s[1])); })) ]) ]));
+    return body;
+  }
+  function flightTable(rows){
+    return EPAL.table({
+      columns:[
+        { key:'airline', label:'Flight', render:function(f){ return '<div class="strong">'+ui.escapeHtml(f.airline||'')+'</div><div class="text-mute xs">'+ui.escapeHtml((f.flightNo||'')+' · '+(f.route||''))+'</div>'; } },
+        { key:'category', label:'Category', render:function(f){ return catBadge(f.category).outerHTML; }, sortVal:function(f){ return f.category; } },
+        { key:'depDate', label:'Departure', date:true, sortVal:function(f){ return new Date(f.depDate).getTime()||0; } },
+        { key:'seats', label:'Seats', num:true }, { key:'sold', label:'Sold', num:true },
+        { key:'unsold', label:'Unsold', num:true, sortVal:function(f){ return unsoldOf(f); }, render:function(f){ var u=unsoldOf(f); return '<span class="num '+(u===0?'text-good':atRisk(f)?'text-bad':'')+'">'+u+'</span>'; } },
+        { key:'load', label:'Load', num:true, sortVal:function(f){ return loadPct(f); }, render:function(f){ var p=loadPct(f); return '<span class="num '+(p>=90?'text-good':p<50?'text-bad':'')+'">'+p+'%</span>'; } },
+        { key:'revenue', label:'Revenue', num:true, sortVal:function(f){ return revOf(f); }, render:function(f){ return ui.money(revOf(f)); } },
+        { key:'pnl', label:'P&L', num:true, sortVal:function(f){ return pnlOf(f); }, render:function(f){ var p=pnlOf(f); return '<span class="num '+(p>=0?'text-good':'text-bad')+'">'+ui.money(p)+'</span>'; } }
+      ],
+      rows:rows, searchKeys:['airline','flightNo','route','category'], quickFilter:'category', filterPanel:true, pageSize:10,
+      exportName:'contract-flights.csv', pdfTitle:'Contract Flights', onRow:function(f){ drawer(f.id, function(){ EPAL.router.render(); }); },
+      empty:{ icon:'airplane', title:'No flights here' }
+    }).el;
+  }
+  function catStats(fl){
+    var m={}; fl.forEach(function(f){ var c=f.category||'—'; if(!m[c]) m[c]={ cat:c, seats:0, sold:0, unsold:0, revenue:0, pnl:0, blocked:0 };
+      var o=m[c]; o.seats+=(+f.seats||0); o.sold+=(+f.sold||0); o.unsold+=unsoldOf(f); o.revenue+=revOf(f); o.pnl+=pnlOf(f); o.blocked+=unsoldOf(f)*(+f.costSeat||0); });
+    return Object.keys(m).map(function(k){ return m[k]; }).sort(function(a,b){ return b.seats-a.seats; });
+  }
+  function flightsModal(title, icon, stats, rows){ var body=kpiShell(title, icon, stats); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ flightTable(rows) ]) ])); }
+  function pnlModal(fl){
+    var rev=fl.reduce(function(s,f){ return s+revOf(f); },0), cost=fl.reduce(function(s,f){ return s+(+f.seats||0)*(+f.costSeat||0); },0), pnl=rev-cost;
+    var body=kpiShell('Block P&L — '+ui.money(pnl), 'graph-up-arrow', [['Revenue', ui.money(rev)], ['Block Cost', ui.money(cost)], ['Net P&L', ui.money(pnl)]]);
+    var cid=ui.uid('cfp'), cs=catStats(fl);
+    body.appendChild(el('div.card.mb-2', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('bar-chart')+' P&L by Category' }) ]),
+      el('div.card-body', null, [ el('div',{ style:{ height:'240px', position:'relative' } }, [ el('canvas',{ id:cid }) ]) ]) ]));
+    requestAnimationFrame(function(){ var c=document.getElementById(cid); if(!c) return;
+      EPAL.charts.bar(c, { labels:cs.map(function(r){ return r.cat; }), horizontal:true, money:true, datasets:[{ label:'P&L', data:cs.map(function(r){ return r.pnl; }), colors:cs.map(function(r){ return r.pnl>=0?'#23c17e':'#f0506e'; }) }] }); });
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [ flightTable(fl) ]) ]));
+  }
+
+  /* ---- SEAT-BLOCK OCCUPANCY BOARD — one ring-gauge per flight (load factor),
+     coloured by category, red when a deadline is at risk. Click for the drawer. */
+  function ringGauge(pct, color, size){
+    var r=size/2-5, c=2*Math.PI*r, off=c*(1-Math.min(100,pct)/100);
+    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'
+      +'<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="currentColor" stroke-opacity="0.12" stroke-width="6"/>'
+      +'<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="6" stroke-linecap="round" stroke-dasharray="'+c.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 '+size/2+' '+size/2+')"/>'
+      +'<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-size="'+(size*0.24).toFixed(0)+'" font-weight="800" fill="currentColor">'+pct+'%</text></svg>';
+  }
+  function occupancyBoard(page, fl){
+    var active = fl.filter(function(f){ return f.status!=='Departed'; });
+    if(!active.length) active=fl; if(!active.length) return;
+    active = active.slice().sort(function(a,b){ return daysLeft(a.depDate)-daysLeft(b.depDate); });
+    var grid = el('div.grid-auto');
+    active.forEach(function(f){
+      var pct=loadPct(f), col=CAT_COLOR[f.category]||'#2f6bff', dl=daysLeft(f.depDate), risk=atRisk(f), gc=risk?'#f0506e':col;
+      grid.appendChild(el('div.card.hover', { style:{ cursor:'pointer', color:'var(--text)' }, onclick:(function(id){ return function(){ drawer(id, function(){ EPAL.router.render(); }); }; })(f.id) }, [
+        el('div.card-body', null, [ el('div.flex.items-center.gap-2', null, [
+          el('div', { style:{ color:gc, flex:'none' }, html: ringGauge(pct, gc, 60) }),
+          el('div.flex-1', { style:{ minWidth:'120px' } }, [
+            el('div.strong', { text: f.airline }), el('div.text-mute.xs', { text: (f.flightNo||'')+' · '+(f.route||'') }),
+            el('div.flex.items-center.gap-1.mt-1', null, [ catBadge(f.category), el('span.badge'+(risk?'.badge-bad':''), { text: f.status==='Departed'?'departed':(isNaN(dl)?'—':dl<0?Math.abs(dl)+'d ago':dl+'d left') }) ]),
+            el('div.text-mute.xs.mt-1', { text: (f.sold||0)+' / '+(f.seats||0)+' seats · '+unsoldOf(f)+' unsold' })
+          ]) ]) ])
+      ]));
+    });
+    page.appendChild(el('div.section-label',{ html: ui.icon('speedometer2')+' Seat-Block Occupancy' }));
+    page.appendChild(grid);
+  }
+  /* ---- CATEGORY MIX — seats by travel category (where the inventory sits). */
+  function categoryMix(page, fl){
+    var cs=catStats(fl).filter(function(r){ return r.seats; }); if(cs.length<2) return;
+    var cid=ui.uid('cmix'), chips=el('div.flex.gap-1.flex-wrap.mt-2');
+    cs.forEach(function(r){ var col=CAT_COLOR[r.cat]||'#8b93a7';
+      chips.appendChild(el('button.badge', { style:{ cursor:'pointer', background:col+'22', color:col, border:'0' },
+        onclick:(function(cat){ return function(){ flightsModal(cat+' blocks', 'airplane-engines', [['Seats', catStats(fl).filter(function(x){return x.cat===cat;})[0].seats]], fl.filter(function(f){ return f.category===cat; })); }; })(r.cat) },
+        [ ui.frag(r.cat+' · '+r.seats) ])); });
+    page.appendChild(el('div.section-label',{ html: ui.icon('pie-chart-fill')+' Seats by Category' }));
+    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div',{ style:{ height:'220px', position:'relative' } }, [ el('canvas',{ id:cid }) ]), chips ]) ]));
+    requestAnimationFrame(function(){ var c=document.getElementById(cid); if(!c) return;
+      EPAL.charts.doughnut(c, { labels:cs.map(function(r){ return r.cat; }), data:cs.map(function(r){ return r.seats; }), colors:cs.map(function(r){ return CAT_COLOR[r.cat]||'#8b93a7'; }) }); });
   }
   function kv(k, v) { return el('div.field', null, [ el('label', { text:k }), el('div.fw-600', { text:String(v) }) ]); }
   function st2(l, v) { return el('div.stat', null, [ el('div.stat-label', { text:l }), el('div.stat-value', { text:v }) ]); }
