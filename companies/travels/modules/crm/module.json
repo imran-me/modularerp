@@ -1,0 +1,21 @@
+{
+  "key": "crm",
+  "company": "travels",
+  "title": "CRM",
+  "icon": "person-lines-fill",
+  "desc": "Leads, pipeline, follow-ups & communication hub.",
+  "route": "#/travels/crm",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "pipeline", "label": "Sales Pipeline", "route": "#/travels/crm/pipeline", "enabled": true },
+    { "id": "leads", "label": "Leads", "route": "#/travels/crm/leads", "enabled": true },
+    { "id": "follow-ups", "label": "Follow-ups", "route": "#/travels/crm/follow-ups", "enabled": true },
+    { "id": "comm-hub", "label": "Communication Hub", "route": "#/travels/crm/comm-hub", "enabled": true }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Travels-specific override of the shared star-slash-crm view (router prefers specific)."
+}
