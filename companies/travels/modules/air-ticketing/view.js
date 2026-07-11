@@ -225,7 +225,7 @@
     // Route Network map + Top Routes, Airline League, Forward Bookings
     routeNetwork(page, t);
     airlineLeague(page, t);
-    forwardBookings(page, t);
+    demandRow(page, t);
 
     var sections = [
       ['ticketing','Direct Sale','ticket-detailed-fill','Issue a new ticket'],
@@ -1771,16 +1771,38 @@
     page.appendChild(el('div.card', null, [ el('div.card-body', null, [ list ]) ]));
   }
 
-  /* ---- FORWARD BOOKINGS — departures ahead by travel month (the load to come). */
+  /* ---- DEMAND & PIPELINE — Forward Bookings (departures ahead) + Status Mix
+     (pipeline health), shown side-by-side. Status chips open that status's list. */
   function mLabelYM(ym){ var p=String(ym).split('-'); if(p.length<2) return ym; return new Date(p[0], p[1]-1, 1).toLocaleString('en',{ month:'short' }); }
-  function forwardBookings(page, t){
-    var byMonth={}, val={}; t.forEach(function(x){ var m=String(x.travelDate||'').slice(0,7); if(!m) return; byMonth[m]=(byMonth[m]||0)+1; val[m]=(val[m]||0)+(x.sale||0); });
-    var months=Object.keys(byMonth).sort(); if(months.length<2) return;
+  function fwdCard(t){
+    var byMonth={}; t.forEach(function(x){ var m=String(x.travelDate||'').slice(0,7); if(!m) return; byMonth[m]=(byMonth[m]||0)+1; });
+    var months=Object.keys(byMonth).sort(); if(months.length<2) return null;
     var cid=ui.uid('fwd');
-    page.appendChild(el('div.section-label',{ html: ui.icon('calendar3') + ' Forward Bookings — departures ahead' }));
-    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div',{ style:{ height:'220px', position:'relative' } }, [ el('canvas',{ id:cid }) ]) ]) ]));
+    var card = el('div.card', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('calendar3')+' Forward Bookings' }), el('span.card-sub',{ text:'departures ahead' }) ]),
+      el('div.card-body', null, [ el('div',{ style:{ height:'220px', position:'relative' } }, [ el('canvas',{ id:cid }) ]) ]) ]);
     requestAnimationFrame(function(){ var c=document.getElementById(cid); if(!c) return;
       EPAL.charts.bar(c, { labels:months.map(mLabelYM), money:false, datasets:[{ label:'Departures', data:months.map(function(m){ return byMonth[m]; }), color:'#1A43BF' }] }); });
+    return card;
+  }
+  function statusCard(t){
+    var by={}; t.forEach(function(x){ by[x.status||'—']=(by[x.status||'—']||0)+1; });
+    var labels=STATUSES.map(function(s){ return s.id; }).filter(function(s){ return by[s]; }); if(labels.length<2) return null;
+    var colors=labels.map(function(s){ var m=STATUSES.filter(function(x){ return x.id===s; })[0]; return m? m.color : '#8b93a7'; });
+    var cid=ui.uid('sm'), chips=el('div.flex.gap-1.flex-wrap.mt-2');
+    labels.forEach(function(s){ var m=STATUSES.filter(function(x){ return x.id===s; })[0]||{};
+      chips.appendChild(el('button.badge', { style:{ cursor:'pointer', background:(m.color||'#888')+'22', color:m.color||'#888', border:'0' },
+        onclick:(function(st, mm){ return function(){ kpiList(st+' tickets', mm.icon||'ticket-perforated', t.filter(function(x){ return x.status===st; }), [['Count', by[st]]]); }; })(s, m) },
+        [ ui.frag((m.icon? ui.icon(m.icon)+' ':'')+s+' · '+by[s]) ])); });
+    var card = el('div.card', null, [ el('div.card-head', null, [ el('h3',{ html: ui.icon('pie-chart-fill')+' Ticket Status Mix' }), el('span.card-sub',{ text:'pipeline health' }) ]),
+      el('div.card-body', null, [ el('div',{ style:{ height:'220px', position:'relative' } }, [ el('canvas',{ id:cid }) ]), chips ]) ]);
+    requestAnimationFrame(function(){ var c=document.getElementById(cid); if(!c) return;
+      EPAL.charts.doughnut(c, { labels:labels, data:labels.map(function(s){ return by[s]; }), colors:colors }); });
+    return card;
+  }
+  function demandRow(page, t){
+    var host=el('div.grid-auto'), f=fwdCard(t), s=statusCard(t);
+    if(f) host.appendChild(f); if(s) host.appendChild(s);
+    if(host.children.length){ page.appendChild(el('div.section-label',{ html: ui.icon('activity')+' Demand & Pipeline' })); page.appendChild(host); }
   }
   function tableCard(title, headers, rows, emptyMsg, opts) {
     var card = el('div.card');
