@@ -37,7 +37,7 @@
     ['balance-sheet', 'Balance Sheet'], ['receivables', 'Receivables'],
     ['payables', 'Payables'], ['banks', 'Banks'],
     ['coa', 'Chart of Accounts'], ['journal', 'Journal'], ['trial-balance', 'Trial Balance'],
-    ['consolidation', 'Consolidation']
+    ['consolidation', 'Consolidation'], ['concern-pnl', 'P&L by Concern']
   ];
 
   /* ---- tiny shared helpers ------------------------------------------------*/
@@ -146,9 +146,103 @@
     else if (sub === 'journal') renderJournal(page);
     else if (sub === 'trial-balance') renderTrialBalance(page);
     else if (sub === 'consolidation') renderConsolidation(page);
+    else if (sub === 'concern-pnl') renderConcernPnl(page);
     else renderOverview(page);
     ctx.mount.appendChild(page);
   } });
+
+  /* ==========================================================================
+   * P&L BY CONCERN — the consolidated income statement pivoted so every income
+   * and expense CATEGORY is shown across each sister concern + a Group total.
+   * Ledger-driven (uses consolidatedTrialBalance so inter-company is eliminated),
+   * so anything posted per company — e.g. the payroll engine's DR 5100 Salaries /
+   * DR 5150 Leave Encashment tagged companyId:'travels' — lands in that concern's
+   * column and rolls into the Group automatically. THIS is the Employee→Company→
+   * Group flow made visible.
+   * ========================================================================*/
+  function renderConcernPnl(page) {
+    page.appendChild(head('P&L by Concern', 'diagram-3',
+      'Consolidated income statement — every category across each sister concern, inter-company eliminated. Driven by the general ledger.',
+      [ can('export') ? el('button.btn.btn-ghost', { html: ui.icon('download') + ' Export CSV', onclick: exportConcernCsv }) : null ].filter(Boolean)));
+    page.appendChild(pills('concern-pnl'));
+    if (!hasLedger()) { page.appendChild(el('div.card', null, [ el('div.card-body', { text: 'Ledger engine unavailable.' }) ])); return; }
+
+    var ctb = LED().consolidatedTrialBalance();
+    var comps = ctb.companies;
+    var income = ctb.rows.filter(function (r) { return r.type === 'income'; }).sort(byCode);
+    var expense = ctb.rows.filter(function (r) { return r.type === 'expense'; }).sort(byCode);
+    function incAmt(r, cid) { return -(r.per[cid] || 0); }          // income is credit-normal → flip to +revenue
+    function incGrp(r) { return -(r.group || 0); }
+    function expAmt(r, cid) { return (r.per[cid] || 0); }            // expense is debit-normal → already +
+    function expGrp(r) { return (r.group || 0); }
+    function sumCol(rows, cid, fn) { return rows.reduce(function (a, r) { return a + fn(r, cid); }, 0); }
+    var revGrp = income.reduce(function (a, r) { return a + incGrp(r); }, 0);
+    var expGrp2 = expense.reduce(function (a, r) { return a + expGrp(r); }, 0);
+    var netGrp = revGrp - expGrp2;
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Group Revenue', ui.money(revGrp, { compact: true }), 'graph-up-arrow'),
+      kpi('Group Expense', ui.money(expGrp2, { compact: true }), 'graph-down-arrow'),
+      kpi('Group Net', ui.money(netGrp, { compact: true }), 'wallet2'),
+      kpi('Group Margin', (revGrp ? (netGrp / revGrp * 100).toFixed(1) : '0.0') + '%', 'percent'),
+      kpi('Concerns', String(comps.length), 'diagram-3')
+    ]));
+
+    // ---- the pivot table ----
+    var thr = el('tr'); thr.appendChild(el('th', { text: 'Category' }));
+    comps.forEach(function (c) { thr.appendChild(el('th.num', { text: c.short })); });
+    thr.appendChild(el('th.num', { text: 'Group' }));
+    var tbody = el('tbody');
+    function money(v) { return v ? ui.money(v) : '—'; }
+    function sectionRow(label) { var tr = el('tr', { style: { background: 'var(--surface-2)' } }); var td = el('td.strong', { text: label }); td.setAttribute('colspan', String(comps.length + 2)); tr.appendChild(td); tbody.appendChild(tr); }
+    function acctRow(name, fn, grp, strong) {
+      var tr = el('tr'); tr.appendChild(el('td' + (strong ? '.strong' : ''), { text: name }));
+      comps.forEach(function (c) { tr.appendChild(el('td.num' + (strong ? '.strong' : ''), { text: money(fn(c.id)) })); });
+      tr.appendChild(el('td.num.strong', { text: money(grp) })); tbody.appendChild(tr);
+    }
+    sectionRow('Revenue');
+    income.forEach(function (r) { acctRow(r.name, function (cid) { return incAmt(r, cid); }, incGrp(r)); });
+    acctRow('Total Revenue', function (cid) { return sumCol(income, cid, incAmt); }, revGrp, true);
+    sectionRow('Expenses');
+    expense.forEach(function (r) { acctRow(r.name, function (cid) { return expAmt(r, cid); }, expGrp(r)); });
+    acctRow('Total Expenses', function (cid) { return sumCol(expense, cid, expAmt); }, expGrp2, true);
+    var netTr = el('tr', { style: { borderTop: '2px solid var(--border-strong, var(--border))' } });
+    netTr.appendChild(el('td.strong', { text: 'Net Profit' }));
+    comps.forEach(function (c) { var n = sumCol(income, c.id, incAmt) - sumCol(expense, c.id, expAmt); netTr.appendChild(el('td.num.strong' + (n >= 0 ? '.text-good' : '.text-bad'), { text: money(n) })); });
+    netTr.appendChild(el('td.num.strong' + (netGrp >= 0 ? '.text-good' : '.text-bad'), { text: money(netGrp) }));
+    tbody.appendChild(netTr);
+
+    var table = el('table.tbl', null, [ el('thead', null, [thr]), tbody ]);
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('table') + ' Consolidated Income Statement' }), el('span.card-sub', { text: comps.length + ' concerns · inter-company eliminated' }) ]),
+      el('div.card-body', null, [ el('div.table-wrap', null, [table]) ])
+    ]));
+
+    // ---- expense mix by concern (stacked) ----
+    var expHeads = expense.filter(function (r) { return expGrp(r) > 0; });
+    if (expHeads.length) {
+      var chartId = ui.uid('cpnl');
+      page.appendChild(chartCard('Expense by Concern', 'bar-chart', chartId, 'each expense head split across the concerns', 280));
+      requestAnimationFrame(function () {
+        var c = document.getElementById(chartId); if (!c) return;
+        EPAL.charts.bar(c, { labels: comps.map(function (co) { return co.short; }), stacked: true, legend: true,
+          datasets: expHeads.map(function (r, i) { return { label: r.name, data: comps.map(function (co) { return expAmt(r, co.id); }), color: ['#1A43BF', '#23c17e', '#f4b740', '#e2721b', '#f0506e', '#7b5cff', '#12b5c9', '#a0522d'][i % 8] }; }) });
+      });
+    }
+  }
+  function byCode(a, b) { return String(a.code) < String(b.code) ? -1 : 1; }
+  function exportConcernCsv() {
+    var ctb = LED().consolidatedTrialBalance(), comps = ctb.companies;
+    var head = ['Category'].concat(comps.map(function (c) { return c.short; })).concat(['Group']);
+    var lines = [head];
+    function push(name, type, r) {
+      var flip = type === 'income' ? -1 : 1;
+      lines.push([name].concat(comps.map(function (c) { return Math.round((r.per[c.id] || 0) * flip); })).concat([Math.round((r.group || 0) * flip)]));
+    }
+    lines.push(['REVENUE']); ctb.rows.filter(function (r) { return r.type === 'income'; }).sort(byCode).forEach(function (r) { push(r.name, 'income', r); });
+    lines.push(['EXPENSES']); ctb.rows.filter(function (r) { return r.type === 'expense'; }).sort(byCode).forEach(function (r) { push(r.name, 'expense', r); });
+    dl('group-pnl-by-concern.csv', lines.map(function (l) { return l.join(','); }).join('\n'));
+  }
 
   /* ==========================================================================
    * OVERVIEW — the consolidated cockpit
