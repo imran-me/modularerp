@@ -620,6 +620,8 @@
         drow('Basic', ui.money(s.slip.basic)), drow('House rent', ui.money(s.slip.house)), drow('Medical', ui.money(s.slip.medical)), drow('Transport', ui.money(s.slip.transport)),
         s.slip.leaveDeductDays ? drow('Unpaid leave', s.slip.leaveDeductDays + ' day(s) prorated') : null,
         el('div.data-row', null, [ el('div.strong.flex-1', { text: 'Gross earned' }), el('div.strong', { text: ui.money(s.grossEarned) }) ]),
+        s.slip.overtime ? drow('Overtime (' + (s.slip.overtimeHours || 0) + 'h)', ui.money(s.slip.overtime)) : null,
+        s.slip.bonus ? drow('Bonus / allowance', ui.money(s.slip.bonus)) : null,
         el('div.section-label', { text: 'Deductions' }),
         drow('Income tax', '−' + ui.money(s.slip.tax)), drow('Provident fund', '−' + ui.money(s.slip.pf)),
         s.slip.otherDeduction ? drow('Other deduction', '−' + ui.money(s.slip.otherDeduction)) : null,

@@ -83,6 +83,7 @@
       basicPct: 0.60, housePct: 0.25, medicalPct: 0.10,   // transport = remainder
       taxThreshold: 50000, taxPct: 0.05,                  // 5% income tax above threshold
       pfPct: 0.10,                                        // provident fund = 10% of basic
+      overtimeRate: 0,                                    // ৳/hour; 0 = auto (1.5× the hourly rate)
       leaveDaysPerYear: 23, workingDays: 30, payByDay: 10, correctionDay: 3
     };
   }
@@ -112,17 +113,24 @@
     var pf = round(basic * t.pfPct);
     var otherDeduction = round(+adj.otherDeduction || 0);
     var bonus = round(+adj.bonus || 0);
-    var net = earnedGross - tax - pf - otherDeduction + bonus;   // owed to the employee
+    var otHours = Math.max(0, +adj.overtimeHours || 0);
+    var otRate = (t.overtimeRate > 0) ? t.overtimeRate : Math.round((gross / wd / 8) * 1.5);   // default 1.5× the hourly rate
+    var overtime = round(otHours * otRate);
+    var net = earnedGross + overtime + bonus - tax - pf - otherDeduction;   // owed to the employee
     var encashDays = (t.leaveDaysPerYear || 23) / 12;           // 1.92
     var perDay = gross / wd;
     var encashAmt = round(encashDays * perDay);
     return {
       gross: gross, earnedGross: earnedGross, workedDays: workedDays, leaveDeductDays: leaveDeduct,
       basic: basic, house: house, medical: medical, transport: transport,
-      tax: tax, pf: pf, otherDeduction: otherDeduction, bonus: bonus,
+      tax: tax, pf: pf, otherDeduction: otherDeduction, bonus: bonus, overtimeHours: otHours, overtime: overtime,
       net: net, encashDays: encashDays, perDay: round(perDay), encashAmt: encashAmt
     };
   }
+  // The single source of truth for the net owed to an employee for a month:
+  // earned salary + overtime + bonus − income-tax − PF − other deduction. Every accrual,
+  // payment, status check and report reads through this so they can never disagree.
+  function slipPayable(s) { return round((s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) - (s.tax || 0) - (s.pf || 0) - (s.otherDeduction || 0)); }
 
   /* --------------------------------------------------------------- runs */
   function runId(cid, ym) { return 'PR-' + cid + '-' + ym; }
@@ -147,13 +155,13 @@
     }
     activeTeam(cid).forEach(function (e) {
       var existing = slip(e.id, ym);
-      var adj = existing ? { leaveDeductDays: existing.leaveDeductDays, otherDeduction: existing.otherDeduction, bonus: existing.bonus } : {};
+      var adj = existing ? { leaveDeductDays: existing.leaveDeductDays, otherDeduction: existing.otherDeduction, bonus: existing.bonus, overtimeHours: existing.overtimeHours } : {};
       var c = computeSlip(e, ym, adj);
       var s = existing || { id: slipId(e.id, ym), runId: run.id, empId: e.id, companyId: cid, ym: ym, paid: 0, advanceRecovered: 0, status: 'draft' };
       s.empName = e.name; s.dept = e.dept;
       // copy computed figures onto the slip
       ['gross', 'earnedGross', 'workedDays', 'leaveDeductDays', 'basic', 'house', 'medical', 'transport',
-        'tax', 'pf', 'otherDeduction', 'bonus', 'net', 'encashDays', 'perDay', 'encashAmt'].forEach(function (k) { s[k] = c[k]; });
+        'tax', 'pf', 'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'net', 'encashDays', 'perDay', 'encashAmt'].forEach(function (k) { s[k] = c[k]; });
       S.upsert('pay_slips', s);
     });
     bus.emit('data:changed', { store: 'pay_slips' });
@@ -171,7 +179,7 @@
     if (run && run.status !== 'draft') throw new Error('Payroll for ' + ym + ' is finalized — corrections are closed.');
     var emp = db().employee ? db().employee(empId) : { id: empId, salary: s.gross, companyId: s.companyId };
     var c = computeSlip(emp, ym, adj);
-    ['leaveDeductDays', 'otherDeduction', 'bonus', 'earnedGross', 'workedDays', 'basic', 'house', 'medical', 'transport', 'tax', 'pf', 'net'].forEach(function (k) { s[k] = c[k]; });
+    ['leaveDeductDays', 'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'earnedGross', 'workedDays', 'basic', 'house', 'medical', 'transport', 'tax', 'pf', 'net'].forEach(function (k) { s[k] = c[k]; });
     S.upsert('pay_slips', s); bus.emit('data:changed', { store: 'pay_slips' });
     return s;
   }
@@ -181,11 +189,14 @@
     var run = generate(cid, ym);
     if (run.status !== 'draft') return run;
     slipsFor(cid, ym).forEach(function (s) {
-      // salary accrual — DR 5100 / CR 2120 tax, 2110 pf, 2100 net
-      var lines = [{ account: '5100', dr: s.earnedGross, cr: 0 }];
+      // salary accrual — DR 5100 (earned + OT + bonus) / CR 2120 tax, 2110 pf,
+      // 4900 (deduction recovered as other income), 2100 net payable. Always balances.
+      var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0);
+      var payable = slipPayable(s);
+      var lines = [{ account: '5100', dr: expense, cr: 0 }];
       if (s.tax) lines.push({ account: '2120', dr: 0, cr: s.tax });
       if (s.pf) lines.push({ account: '2110', dr: 0, cr: s.pf });
-      var payable = s.earnedGross - s.tax - s.pf;
+      if (s.otherDeduction) lines.push({ account: '4900', dr: 0, cr: s.otherDeduction });
       lines.push({ account: '2100', dr: 0, cr: payable });
       glPost('GL-PAYA-' + s.empId + '-' + ym, ym + '-01', cid, 'PAY-' + ym, 'Salary accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
       // leave-encashment accrual — DR 5150 / CR 2150
@@ -204,7 +215,7 @@
     var s = slip(empId, ym); if (!s) throw new Error('No payslip for ' + empId + ' ' + ym);
     var run = getRun(s.companyId, ym);
     if (!run || run.status === 'draft') throw new Error('Finalize the payroll before paying.');
-    var payable = s.earnedGross - s.tax - s.pf;
+    var payable = slipPayable(s);
     var outstanding = payable - (s.paid || 0);
     var amt = amount == null ? outstanding : clamp(round(amount), 0, outstanding);
     if (amt <= 0) return s;
@@ -302,7 +313,7 @@
   // Salary currently owed to the employee (accrued but unpaid across all months).
   function salaryDue(empId) {
     return S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; })
-      .reduce(function (a, s) { var payable = s.earnedGross - s.tax - s.pf; return a + Math.max(0, payable - (s.paid || 0)); }, 0);
+      .reduce(function (a, s) { var payable = slipPayable(s); return a + Math.max(0, payable - (s.paid || 0)); }, 0);
   }
 
   /* --------------------------------------------------------- leave state */
@@ -367,7 +378,7 @@
     txn({ type: 'settlement', empId: empId, empName: emp.name, companyId: cid, date: today(), amount: p.net,
       advanceCleared: p.advanceOutstanding, loanCleared: p.loanOutstanding, memo: 'Final settlement' });
     // mark any accrued-unpaid slips paid, and the employee resigned
-    S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; }).forEach(function (s) { s.paid = s.earnedGross - s.tax - s.pf; s.status = 'paid'; s.paidDate = today(); S.upsert('pay_slips', s); });
+    S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; }).forEach(function (s) { s.paid = slipPayable(s); s.status = 'paid'; s.paidDate = today(); S.upsert('pay_slips', s); });
     emp.status = 'resigned'; emp.resignedDate = today();
     if (db().saveEmployee) db().saveEmployee(emp); else db().save('employees', emp);
     bus.emit('data:changed', { store: 'pay_slips' });
@@ -408,7 +419,7 @@
   function empLedger(empId) {
     var rows = [];
     S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; }).forEach(function (s) {
-      var payable = s.earnedGross - s.tax - s.pf;
+      var payable = slipPayable(s);
       rows.push({ date: s.ym + '-01', ref: s.id, kind: 'Salary earned', memo: mLabel(s.ym) + ' salary (net of tax/PF)', credit: payable, debit: 0 });
       if (s.encashAmt) rows.push({ date: s.ym + '-01', ref: s.id, kind: 'Leave encashment', memo: mLabel(s.ym) + ' leave accrual', credit: s.encashAmt, debit: 0 });
       if (s.paid) rows.push({ date: s.paidDate || (s.ym + '-10'), ref: s.id, kind: 'Salary paid', memo: mLabel(s.ym) + ' salary paid', credit: 0, debit: s.paid });
@@ -430,7 +441,7 @@
   function statement(emp, ym) {
     var s = slip(emp.id, ym) || Object.assign({ empName: emp.name }, computeSlip(emp, ym, {}));
     var ls = leaveState(emp);
-    var payable = s.earnedGross - s.tax - s.pf;
+    var payable = slipPayable(s);
     return {
       ym: ym, emp: emp, slip: s,
       earnings: [
@@ -494,7 +505,7 @@
 
   /* --------------------------------------------------------------- API */
   EPAL.payroll = {
-    template: template, saveTemplate: saveTemplate, computeSlip: computeSlip,
+    template: template, saveTemplate: saveTemplate, computeSlip: computeSlip, slipPayable: slipPayable,
     generate: generate, getRun: getRun, run: getRun, slipsFor: slipsFor, slip: slip,
     inCorrectionWindow: inCorrectionWindow, adjustSlip: adjustSlip,
     finalize: finalize, pay: pay, autoDue: autoDue, refreshRunStatus: refreshRunStatus,

@@ -435,7 +435,7 @@
     // 1) overdue salaries — payslips still unpaid after the 10th (auto-Due)
     var dueSlips = EPAL.store.list('pay_slips').filter(function (s) { return s.status === 'due'; });
     if (dueSlips.length) {
-      var amt = dueSlips.reduce(function (a, s) { return a + Math.max(0, (s.earnedGross - s.tax - s.pf) - (s.paid || 0)); }, 0);
+      var amt = dueSlips.reduce(function (a, s) { var pay = (EPAL.payroll && EPAL.payroll.slipPayable) ? EPAL.payroll.slipPayable(s) : (s.earnedGross - s.tax - s.pf); return a + Math.max(0, pay - (s.paid || 0)); }, 0);
       flags.push({ sev: 'bad', icon: 'cash-stack', title: dueSlips.length + ' salar' + (dueSlips.length === 1 ? 'y' : 'ies') + ' overdue', detail: ui.money(amt) + ' unpaid past the 10th', route: 'travels/payroll/manage' });
     }
     // 2) negative cash in any entity
