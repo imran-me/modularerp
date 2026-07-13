@@ -1,33 +1,38 @@
 /* ============================================================================
  * EPAL GROUP ERP  ·  platform/atmosphere/ambient3d.js
  * ----------------------------------------------------------------------------
- * AMBIENT 3D AIRFIELD — the full travels scene, rebuilt in real three.js as a
- * believable daytime airport:
- *   · a graduated BLUE SKY dome + a warm SUN (with glow) + drifting white CLOUDS
- *   · GREEN grass airfield with a dark weathered-asphalt RUNWAY (piano-key
- *     thresholds, centreline dashes, touchdown-zone bars) and a YELLOW-centreline
- *     TAXIWAY + gate apron
- *   · full AIRPORT LIGHTING — runway edge lights (green threshold / red end),
- *     centreline approach lights, blue taxiway edge lights
- *   · a control tower, terminal, hangar, city skyline, a ROTATING RADAR and
- *     blinking red obstruction BEACONS
- *   · LIVE TRAFFIC — a jet taking off, one landing, one taxiing, cruise airliners,
- *     a high cargo freighter, a helicopter (spinning rotors) and a FIGHTER-JET
- *     show (a formation flying banked passes, re-forming each pass). Every craft
- *     wears a coloured LIVERY and carries NAV LIGHTS (red port / green starboard /
- *     white tail + a blinking anti-collision beacon).
- * Soft studio + sky-tinted light; plausible physics (each craft orients along its
- * velocity and banks into turns — nothing upside-down, nothing colliding).
+ * AMBIENT 3D AIRFIELD — a believable daytime airport rebuilt in real three.js:
+ *   · graduated BLUE SKY dome + warm SUN (glow) + drifting white CLOUDS
+ *   · GREEN grass airfield · dark weathered-asphalt RUNWAY (piano-key thresholds,
+ *     centreline dashes, touchdown-zone bars) + YELLOW-centreline TAXIWAY + apron
+ *   · realistic AIRPORT LIGHTING — tiny steady edge lights (green threshold / red
+ *     end) + centreline lights, a SEQUENCED FLASHING approach system ("the rabbit"
+ *     running toward the runway), REIL threshold strobes, blue taxiway lights
+ *   · control tower · terminal · hangar · skyline · ROTATING radar · blinking red
+ *     obstruction BEACONS
+ *   · LIVE TRAFFIC — take-off, landing, taxiing, cruise pair, high cargo, a
+ *     helicopter (spinning rotors) and a FIGHTER-JET show (re-forming banked
+ *     passes). Detailed airliners (tapered fuselage, swept + dihedral wings,
+ *     under-wing engine nacelles, window band, swept tail) each in a coloured
+ *     LIVERY and carrying a full LIGHT SET: steady red-port / green-starboard /
+ *     white-tail nav lights, white wingtip STROBES (double-flash) and red
+ *     anti-collision BEACONS (top + belly), phase-randomised per craft.
+ *   · physics: each craft orients along its velocity, pitches with climb/descent
+ *     and BANKS INTO ITS TURNS (roll from heading-change) — nothing upside-down.
+ *   · a 1px charcoal silhouette OUTLINE over every solid object.
  *
  * Renders on a canvas INSIDE .main (behind #view content), replacing the flat 2D
- * SVG airfield — which is KEPT and re-enabled via the `ui.atmos` setting:
- * '3d' (default) | '2d' airfield | 'off'. Fully graceful: if three.js can't load
- * it no-ops and the 2D scene stays. Reduced-motion → static frame; pauses on tab
- * hide; resizes with .main; wrapped so WebGL can never break the app.
+ * SVG airfield — which is KEPT and re-enabled via `ui.atmos`: '3d' (default) |
+ * '2d' | 'off'. Fully graceful: no three.js → no-op, 2D stays. Reduced-motion →
+ * static; pauses on tab hide; resizes with .main; wrapped so WebGL can't break app.
  * ==========================================================================*/
 
 (function () {
   'use strict';
+
+  // roll direction through turns. If a banking craft ever leans the WRONG way
+  // (outside of the turn), flip this to -1.  (Most airliners fly straight → 0 bank.)
+  var BANK_SIGN = -1, BANK_K = 15;
 
   function atmosMode() { try { if (window.EPAL && EPAL.store && EPAL.store.get) return EPAL.store.get('ui.atmos', '3d'); } catch (e) {} return '3d'; }
 
@@ -55,18 +60,16 @@
       renderer.toneMappingExposure = 1.02;
       if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
 
-      var HORIZON = 0xd6e6f4;                              // hazy horizon — sky + fog both fade to this
+      var HORIZON = 0xd6e6f4;
       var scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(HORIZON, 620, 2100);       // distant ground/skyline dissolve into the haze
+      scene.fog = new THREE.Fog(HORIZON, 620, 2100);
       var camera = new THREE.PerspectiveCamera(44, 1, 1, 8000);
       camera.position.set(0, 40, 150); camera.lookAt(0, 20, -150);
 
-      // the sun's world direction drives BOTH the sky/sun sprite and the key light
       var SUN = new THREE.Vector3(-320, 260, -420);
       scene.add(buildSky(THREE));
       scene.add(buildSun(THREE, SUN));
 
-      // sky-tinted ambient (blue from above, grass-green bounce from below) + a warm sun key
       scene.add(new THREE.HemisphereLight(0xbcd6f5, 0x6b7d4c, 0.95));
       var key = new THREE.DirectionalLight(0xfff2d2, 1.5); key.position.copy(SUN); scene.add(key);
       var fill = new THREE.DirectionalLight(0xcfe0ff, 0.3); fill.position.set(140, 50, 60); scene.add(fill);
@@ -91,21 +94,35 @@
   function makeMaterials(THREE) {
     var cache = {};
     function S(c, r, m) { return new THREE.MeshStandardMaterial({ color: c, roughness: r == null ? 0.6 : r, metalness: m == null ? 0.12 : m }); }
-    // cached factory so per-aircraft livery colours don't allocate duplicate materials
     function mat(c, r, m) { var k = c + '|' + r + '|' + m; return cache[k] || (cache[k] = S(c, r, m)); }
     return {
       grass: new THREE.MeshStandardMaterial({ map: grassTex(THREE), roughness: 1, metalness: 0 }),
       asphalt: new THREE.MeshStandardMaterial({ color: 0x41454e, roughness: 0.95, metalness: 0.05 }),
       apron: new THREE.MeshStandardMaterial({ color: 0x565b66, roughness: 0.92, metalness: 0.05 }),
       bldg: S(0xcdd7e8, 0.82, 0.06), bldg2: S(0xe2e9f4, 0.8, 0.06), glass: S(0x8fb0dd, 0.25, 0.55),
-      /* aircraft base tones. Airliners get a per-craft LIVERY (mid-tone body +
-         saturated accent, see LIVERIES). Kept: heli/fighter reuse blue+gun; cargo grey+dark+red. */
       white: S(0xa9bae0, 0.48, 0.22), blue: S(0x1c53b8, 0.4, 0.32), soft: S(0x5f7ac9, 0.5, 0.22),
       grey: S(0x8996b4, 0.5, 0.25), gun: S(0x566078, 0.5, 0.34), dark: S(0x232d47, 0.5, 0.4), cockpit: S(0x14203a, 0.22, 0.6),
+      nacelle: S(0x3c4658, 0.45, 0.5), fan: S(0xaebbd6, 0.35, 0.65), win: S(0x0e1830, 0.2, 0.5),
       accent: S(0xf4b740, 0.5, 0.2), red: S(0xf0506e, 0.5, 0.2),
       lightTex: lightSprite(THREE), mat: mat, THREE: THREE
     };
   }
+
+  /* ------------------------------------------------- animated point-lights */
+  // a small additive glow sprite with a blink PATTERN: 'steady' | 'beacon' | 'strobe'
+  function light(THREE, M, color, size, pat, rate, phase) {
+    var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: color, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    s.scale.set(size, size, 1); s.userData.light = { pat: pat || 'steady', rate: rate || 1, phase: phase || 0 };
+    return s;
+  }
+  // 0..1 brightness for a blinking light at time t (steady lights are never collected)
+  function lightLevel(L, t) {
+    var x = t * L.rate + L.phase;
+    if (L.pat === 'beacon') { var s = 0.5 + 0.5 * Math.sin(x * 6.28318); return 0.05 + 0.95 * s * s * s; }   // sharp rotating-beacon pulse
+    if (L.pat === 'strobe') { var f = x - Math.floor(x); return (f < 0.035 || (f > 0.07 && f < 0.105)) ? 1 : 0.03; }  // quick double-flash
+    return 1;
+  }
+  function at(o, x, y, z) { o.position.set(x, y, z); return o; }
 
   /* ------------------------------------------------------- scene assembly */
   function buildAirfield(THREE, M, scene) {
@@ -118,26 +135,25 @@
     var taxi = new THREE.Mesh(new THREE.PlaneGeometry(18, 360), new THREE.MeshStandardMaterial({ map: taxiTex(THREE), roughness: 0.94, metalness: 0.04 })); taxi.rotation.x = -Math.PI / 2; taxi.position.set(52, 0.01, -150); scene.add(taxi);
     var apron = new THREE.Mesh(new THREE.PlaneGeometry(120, 70), M.apron); apron.rotation.x = -Math.PI / 2; apron.position.set(-66, 0.01, -66); scene.add(apron);
 
-    // ---- airport lighting: runway edge/threshold/approach + taxiway ------
-    scene.add(buildRunwayLights(THREE, M));
+    // ---- airport lighting: tiny steady edge + sequenced approach + taxiway
+    scene.add(buildEdgeLights(THREE, M));
     scene.add(buildTaxiLights(THREE, M));
+    var appr = buildApproach(THREE, M); scene.add(appr.g); updaters.push(appr.update);
 
-    // ---- buildings: terminal + hangar + control tower + skyline ----------
+    // ---- buildings + radar + beacons -------------------------------------
     scene.add(buildTerminal(THREE, M, V(-96, 0, -70)));
     scene.add(buildHangar(THREE, M, V(-150, 0, -150)));
     scene.add(buildTower(THREE, M, V(120, 0, -120)));
     scene.add(buildSkyline(THREE, M, V(150, 0, -240)));
     var radar = buildRadar(THREE, M, V(158, 0, -150)); scene.add(radar.g);
     updaters.push(function (t) { radar.head.rotation.y = t * 1.1; });
-    // red obstruction beacons (blink) on the tallest structures
-    scene.add(redBeacon(THREE, M, 120, 53, -120, 2.4));
-    scene.add(redBeacon(THREE, M, 150, 50, -232, 2.6));
-    // parked airliner at the gate + service trucks
-    var parked = buildAirliner(THREE, M, 2.0, false, LIVERIES[0]); parked.position.set(-70, 3.2, -66); parked.rotation.y = Math.PI / 2; scene.add(parked);
+    scene.add(at(light(THREE, M, 0xff2a2a, 2.4, 'beacon', 0.7, 0.0), 120, 53, -120));   // tower obstruction beacon
+    scene.add(at(light(THREE, M, 0xff2a2a, 2.6, 'beacon', 0.6, 1.7), 150, 50, -232));    // skyline obstruction beacon
+    var parked = buildAirliner(THREE, M, 2.0, false, LIVERIES[0]); parked.position.set(-70, 3.4, -66); parked.rotation.y = Math.PI / 2; scene.add(parked);
     scene.add(buildTruck(THREE, M, V(-52, 0, -60)));
     scene.add(buildTruck(THREE, M, V(40, 0, -120)));
 
-    // ---- helpers to place a craft along its velocity (nose = +Z) ----------
+    // ---- place a craft along its velocity (nose = +Z), banking into turns -
     var UP = V(0, 1, 0), rt = new THREE.Vector3(), up = new THREE.Vector3(), fw = new THREE.Vector3(), mtx = new THREE.Matrix4();
     function place(obj, p, p2, bank) {
       fw.copy(p2).sub(p); if (fw.lengthSq() < 1e-8) fw.set(0, 0, -1); fw.normalize();
@@ -145,39 +161,45 @@
       up.copy(fw).cross(rt).normalize(); mtx.makeBasis(rt, up, fw);
       obj.position.copy(p); obj.quaternion.setFromRotationMatrix(mtx); if (bank) obj.rotateZ(bank);
     }
-    function mover(obj, cy, path, bank) { scene.add(obj); updaters.push(function (t) { var u = (t % cy) / cy; var p = path(u), p2 = path(Math.min(0.9999, u + 0.004)); place(obj, p, p2, bank || 0); }); }
+    function heading(a, b) { return Math.atan2(b.x - a.x, -(b.z - a.z)); }
+    function bankOf(p0, p, p2) { var d = heading(p, p2) - heading(p0, p); while (d > Math.PI) d -= 6.28318; while (d < -Math.PI) d += 6.28318; return Math.max(-0.7, Math.min(0.7, BANK_SIGN * d * BANK_K)); }
+    function mover(obj, cy, path, extraBank) {
+      scene.add(obj);
+      updaters.push(function (t) {
+        var u = (t % cy) / cy, du = 0.006;
+        var p = path(u), p2 = path(Math.min(0.9999, u + du)), p0 = path(Math.max(0, u - du));
+        place(obj, p, p2, bankOf(p0, p, p2) + (extraBank || 0));
+      });
+    }
 
-    // ---- TAKE-OFF: roll down the runway, rotate, climb away up-right ------
+    // ---- TAKE-OFF: roll, rotate, climb away up-right ---------------------
     mover(buildAirliner(THREE, M, 1.9, false, LIVERIES[0]), 21, function (u) {
-      if (u < 0.42) return V(4, 1.6, 40 - (u / 0.42) * 190);
-      var k = (u - 0.42) / 0.58, e = k * k; return V(4 + e * 60, 1.6 + e * 110, -150 - e * 340);
-    }, 0.05);
-
-    // ---- LANDING: descend from far, touch down, roll out toward viewer ----
+      if (u < 0.42) return V(4, 1.9, 40 - (u / 0.42) * 190);
+      var k = (u - 0.42) / 0.58, e = k * k; return V(4 + e * 60, 1.9 + e * 110, -150 - e * 340);
+    });
+    // ---- LANDING: descend, touch down, roll out toward viewer ------------
     mover(buildAirliner(THREE, M, 1.9, false, LIVERIES[1]), 24, function (u) {
       if (u < 0.62) { var e = u / 0.62; return V(-4, 78 - e * e * 76, -360 + e * 320); }
-      var k = (u - 0.62) / 0.38; return V(-4, 1.6, -40 + k * 74);
+      var k = (u - 0.62) / 0.38; return V(-4, 1.9, -40 + k * 74);
     });
-
-    // ---- TAXIING airliner on the taxiway ---------------------------------
-    mover(buildAirliner(THREE, M, 1.7, false, LIVERIES[2]), 40, function (u) { return V(52, 1.6, -230 + u * 200); });
-
-    // ---- CRUISE traffic overhead (both directions) -----------------------
+    // ---- TAXIING airliner ------------------------------------------------
+    mover(buildAirliner(THREE, M, 1.7, false, LIVERIES[2]), 40, function (u) { return V(52, 1.9, -230 + u * 200); });
+    // ---- CRUISE pair overhead --------------------------------------------
     mover(buildAirliner(THREE, M, 1.5, false, LIVERIES[3]), 30, function (u) { return V(-420 + u * 840, 108, -200); });
     mover(buildAirliner(THREE, M, 1.5, false, LIVERIES[4]), 34, function (u) { return V(430 - u * 860, 138, -300); });
-    // ---- high CARGO freighter, slow R→L ----------------------------------
+    // ---- high CARGO freighter --------------------------------------------
     mover(buildAirliner(THREE, M, 2.4, true), 52, function (u) { return V(460 - u * 920, 186, -420); });
 
-    // ---- HELICOPTER crossing (with spinning rotors) ----------------------
+    // ---- HELICOPTER crossing ---------------------------------------------
     var heli = buildHeli(THREE, M); scene.add(heli.g);
     updaters.push(function (t) { var cy = 26, u = (t % cy) / cy; var p = V(-360 + u * 720, 66, -120), p2 = V(-360 + (u + 0.004) * 720, 66, -120); place(heli.g, p, p2, 0); heli.rotor.rotation.y = t * 22; heli.tail.rotation.x = t * 30; });
 
-    // ---- FIGHTER-JET show: a formation flying banked passes, re-forming ---
+    // ---- FIGHTER-JET show: banked passes, re-forming ---------------------
     var LAYOUTS = [
-      [[0, 0, 0], [-9, -1.5, -9], [9, -1.5, -9], [-18, -3, -18], [18, -3, -18]],       // arrow / V (5)
-      [[0, 0, 0], [-9, 0, -9], [9, 0, -9], [0, 0, -18]],                                 // diamond (4)
-      [[0, 0, 0], [10, -1.5, -8], [20, -3, -16], [30, -4.5, -24]],                       // echelon (4)
-      [[0, 0, 0], [-12, 0, 0], [12, 0, 0], [-24, 0, 0], [24, 0, 0]]                       // line abreast (5)
+      [[0, 0, 0], [-9, -1.5, -9], [9, -1.5, -9], [-18, -3, -18], [18, -3, -18]],
+      [[0, 0, 0], [-9, 0, -9], [9, 0, -9], [0, 0, -18]],
+      [[0, 0, 0], [10, -1.5, -8], [20, -3, -16], [30, -4.5, -24]],
+      [[0, 0, 0], [-12, 0, 0], [12, 0, 0], [-24, 0, 0], [24, 0, 0]]
     ];
     var fteam = new THREE.Group(); scene.add(fteam);
     var jets = []; for (var j = 0; j < 5; j++) { var jt = buildFighter(THREE, M); fteam.add(jt); jets.push(jt); }
@@ -185,22 +207,19 @@
     var lastPass = -1;
     updaters.push(function (t) {
       var cy = 15, pass = Math.floor(t / cy), u = (t % cy) / cy;
-      if (pass !== lastPass) {   // new pass → new formation
-        lastPass = pass; var L = LAYOUTS[pass % LAYOUTS.length];
-        for (var i = 0; i < jets.length; i++) { var s = L[i]; if (s) { jets[i].visible = true; jets[i].position.set(s[0], s[1], s[2]); } else jets[i].visible = false; }
-      }
-      var p = fpath(u), p2 = fpath(Math.min(0.9999, u + 0.004));
-      place(fteam, p, p2, 0.4 + Math.sin(t * 1.7) * 0.06);
+      if (pass !== lastPass) { lastPass = pass; var L = LAYOUTS[pass % LAYOUTS.length]; for (var i = 0; i < jets.length; i++) { var s = L[i]; if (s) { jets[i].visible = true; jets[i].position.set(s[0], s[1], s[2]); } else jets[i].visible = false; } }
+      var du = 0.006, p = fpath(u), p2 = fpath(Math.min(0.9999, u + du)), p0 = fpath(Math.max(0, u - du));
+      place(fteam, p, p2, bankOf(p0, p, p2));
     });
 
-    // ---- puffy white clouds drifting across the sky ----------------------
+    // ---- puffy white clouds ----------------------------------------------
     var cloudTex = softSprite(THREE), clouds = [];
     for (var c = 0; c < 11; c++) { var mm = new THREE.SpriteMaterial({ map: cloudTex, color: [0xffffff, 0xfbfdff, 0xeef4ff][c % 3], transparent: true, opacity: 0.5 + Math.random() * 0.32, depthWrite: false, fog: false }); var sp = new THREE.Sprite(mm); var sz = 180 + Math.random() * 240; sp.scale.set(sz, sz * 0.58, 1); sp.position.set((Math.random() - 0.5) * 1000, 150 + Math.random() * 180, -420 - Math.random() * 520); sp.userData = { vx: (0.05 + Math.random() * 0.07) * (Math.random() < 0.5 ? -1 : 1) }; scene.add(sp); clouds.push(sp); }
     updaters.push(function () { for (var k = 0; k < clouds.length; k++) { var s = clouds[k]; s.position.x += s.userData.vx; if (s.position.x > 560) s.position.x = -560; else if (s.position.x < -560) s.position.x = 560; } });
 
-    // ---- collect every blinking beacon (plane + tower) and pulse them -----
-    var blinkers = []; scene.traverse(function (o) { if (o.userData && o.userData.blink && o.material) { o.userData.base = o.material.opacity; blinkers.push(o); } });
-    updaters.push(function (t) { for (var i = 0; i < blinkers.length; i++) { var o = blinkers[i], r = o.userData.rate || 3; o.material.opacity = o.userData.base * (0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * r + i))); } });
+    // ---- drive every blinking light (plane strobes/beacons, obstruction) --
+    var lights = []; scene.traverse(function (o) { if (o.userData && o.userData.light && o.userData.light.pat !== 'steady' && o.material) lights.push(o); });
+    updaters.push(function (t) { for (var i = 0; i < lights.length; i++) lights[i].material.opacity = lightLevel(lights[i].userData.light, t); });
 
     // ---- 1px charcoal silhouette outline over every solid object ----------
     addOutlines(THREE, scene, new THREE.LineBasicMaterial({ color: 0x24282f, transparent: true, opacity: 0.75, fog: true }));
@@ -208,75 +227,76 @@
     return updaters;
   }
 
-  // Draws a thin charcoal edge outline (1px — WebGL line width is fixed) on every
-  // solid Mesh, inheriting each mesh's transform so it tracks moving craft. Skips
-  // the sky dome + ground (userData.noOutline) and all Sprites/Points (glows, sun,
-  // clouds, runway lights — outlining those would look wrong). A 30° edge threshold
-  // keeps it to silhouette/crease lines, not a busy full wireframe.
-  function addOutlines(THREE, scene, edgeMat) {
-    var targets = [];
-    scene.traverse(function (o) { if (o.isMesh && o.geometry && !(o.userData && o.userData.noOutline)) targets.push(o); });
-    for (var i = 0; i < targets.length; i++) { var m = targets[i]; m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30), edgeMat)); }
-  }
-
   /* ------------------------------------------------------------- builders */
 
-  /* A small fleet of tasteful airline LIVERIES: a muted MID-TONE body (clearly
-     darker than the pale sky, so the jet never merges into it) + ONE saturated
-     accent used on the cheatline, wings, winglets and tail fin. "Coloured, just
-     not over-coloured." ── tweak these hexes live to taste. */
+  /* Tasteful airline LIVERIES: muted mid-tone body + one saturated tail/cheatline
+     accent (wings stay body-coloured, like real jets). Tweak hexes live to taste. */
   var LIVERIES = [
-    { body: 0x8fa2d4, accent: 0x14357f, tail: 0x1a43bf },  // brand blue
-    { body: 0x7fb0b0, accent: 0x0d6f74, tail: 0x0e8a86 },  // teal
-    { body: 0xbf9fb1, accent: 0x8e2f57, tail: 0xc23c66 },  // rose
-    { body: 0xa59fcb, accent: 0x3a2f8f, tail: 0x4a3fb0 },  // indigo
-    { body: 0xc7b083, accent: 0xa9741c, tail: 0xe0a020 }   // sand / amber
+    { body: 0xa9bcdf, accent: 0x14357f, tail: 0x1a43bf },  // brand blue
+    { body: 0x9fc4c4, accent: 0x0d6f74, tail: 0x0e8a86 },  // teal
+    { body: 0xceb2c2, accent: 0x8e2f57, tail: 0xc23c66 },  // rose
+    { body: 0xb7b1d6, accent: 0x3a2f8f, tail: 0x4a3fb0 },  // indigo
+    { body: 0xd6c39a, accent: 0xa9741c, tail: 0xe0a020 }   // sand / amber
   ];
 
-  // a small additive glow sprite, tinted per light (nav lights, beacons, sun-lit dots)
-  function glow(THREE, M, color, size, blink, rate) {
-    var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: color, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
-    s.scale.set(size, size, 1); if (blink) { s.userData.blink = true; s.userData.rate = rate || 3; } return s;
-  }
-
+  // a detailed low-poly airliner: tapered fuselage, swept+dihedral wings, under-wing
+  // nacelles, window band, swept tail — plus a full aircraft light set.
   function buildAirliner(THREE, M, scale, cargo, livery) {
     var g = new THREE.Group();
     var lv = livery || LIVERIES[0];
-    var body = cargo ? M.grey : M.mat(lv.body, 0.5, 0.2);       // fuselage / nose / tail-cone
-    var ac   = cargo ? M.dark : M.mat(lv.accent, 0.42, 0.3);    // cheatline / wings / stabiliser
-    var tl   = cargo ? M.red  : M.mat(lv.tail, 0.42, 0.3);      // fin + winglets — the colour pop
-    var fus = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 10, 20), body); fus.rotation.x = Math.PI / 2; g.add(fus);
-    var nose = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), body); nose.scale.set(1, 1, 1.9); nose.position.z = 5.6; g.add(nose);
-    var tail = new THREE.Mesh(new THREE.ConeGeometry(1, 3, 20), body); tail.rotation.x = -Math.PI / 2; tail.position.z = -6.4; g.add(tail);
-    var stripe = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1.02, 9.4, 20, 1, true), ac); stripe.rotation.x = Math.PI / 2; stripe.scale.y = 0.14; stripe.position.y = 0.16; g.add(stripe);
-    var cock = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.46, 1.05), M.cockpit); cock.position.set(0, 0.52, 4.4); g.add(cock);
+    var body = cargo ? M.grey : M.mat(lv.body, 0.5, 0.2);      // fuselage / wings / stabs
+    var ac   = cargo ? M.dark : M.mat(lv.accent, 0.42, 0.3);   // cheatline
+    var tl   = cargo ? M.red  : M.mat(lv.tail, 0.42, 0.3);     // fin + winglets — colour pop
+
+    var fus = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.9, 11, 24), body); fus.rotation.x = Math.PI / 2; g.add(fus);
+    var nose = new THREE.Mesh(new THREE.SphereGeometry(1.0, 22, 16), body); nose.scale.set(1, 1, 1.7); nose.position.z = 6.0; g.add(nose);
+    var tcone = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.6, 24), body); tcone.rotation.x = -Math.PI / 2 + 0.16; tcone.position.set(0, 0.42, -6.6); g.add(tcone);   // upswept tail
+    // window band + cheatline
+    var win = new THREE.Mesh(new THREE.CylinderGeometry(1.005, 0.905, 9.4, 24, 1, true), M.win); win.rotation.x = Math.PI / 2; win.scale.y = 0.11; win.position.y = 0.34; g.add(win);
+    var stripe = new THREE.Mesh(new THREE.CylinderGeometry(1.01, 0.91, 9.4, 24, 1, true), ac); stripe.rotation.x = Math.PI / 2; stripe.scale.y = 0.08; stripe.position.y = 0.02; g.add(stripe);
+    var cock = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.42, 1.1), M.cockpit); cock.position.set(0, 0.5, 4.7); g.add(cock);
+
     [-1, 1].forEach(function (d) {
-      var w = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.24, 2.6), ac); w.position.set(d * 3.9, -0.15, 0.3); w.rotation.y = d * 0.3; w.rotation.z = d * -0.05; g.add(w);
-      var tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.95, 0.95), tl); tip.position.set(d * 7.2, 0.22, -0.7); g.add(tip);
-      var e = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 2.2, 14), M.dark); e.rotation.x = Math.PI / 2; e.position.set(d * 3.3, -0.75, 0.9); g.add(e);
+      // swept + dihedral tapered wing (root box + narrower tip box)
+      var wroot = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.22, 2.9), body); wroot.position.set(d * 2.6, -0.08, 0.2); wroot.rotation.y = d * 0.36; wroot.rotation.z = d * -0.05; g.add(wroot);
+      var wtip = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 1.5), body); wtip.position.set(d * 6.2, 0.12, -1.0); wtip.rotation.y = d * 0.36; wtip.rotation.z = d * -0.05; g.add(wtip);
+      var wl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.0, 0.9), tl); wl.position.set(d * 7.7, 0.55, -1.55); wl.rotation.z = d * -0.18; g.add(wl);                        // winglet
+      // engine nacelle under + forward of the wing, with a dark intake + pale fan
+      var nac = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.56, 2.7, 16), M.nacelle); nac.rotation.x = Math.PI / 2; nac.position.set(d * 3.1, -0.85, 1.5); g.add(nac);
+      var lip = new THREE.Mesh(new THREE.CylinderGeometry(0.64, 0.64, 0.35, 16), M.dark); lip.rotation.x = Math.PI / 2; lip.position.set(d * 3.1, -0.85, 2.85); g.add(lip);
+      var fan = new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), M.fan); fan.position.set(d * 3.1, -0.85, 2.9); g.add(fan);
     });
-    var fin = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.9, 2.1), tl); fin.position.set(0, 1.3, -5.2); fin.rotation.x = -0.12; g.add(fin);
-    var stab = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.22, 1.4), ac); stab.position.set(0, 0.22, -5.6); g.add(stab);
-    // nav lights: RED port (−X) · GREEN starboard (+X) · WHITE tail · blinking belly beacon
-    var lp = glow(THREE, M, 0xff2a2a, 1.15); lp.position.set(-7.3, 0.3, -0.7); g.add(lp);
-    var sb = glow(THREE, M, 0x35ff55, 1.15); sb.position.set(7.3, 0.3, -0.7); g.add(sb);
-    var tw = glow(THREE, M, 0xffffff, 1.0); tw.position.set(0, 0.55, -6.7); g.add(tw);
-    var bc = glow(THREE, M, 0xff3524, 1.3, true, 3.6); bc.position.set(0, -1.0, 0.4); g.add(bc);
+    // swept vertical fin + horizontal stabilisers
+    var fin = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.2, 2.4), tl); fin.position.set(0, 1.7, -5.4); fin.rotation.x = -0.22; g.add(fin);
+    [-1, 1].forEach(function (d) { var hs = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.16, 1.2), body); hs.position.set(d * 1.5, 0.55, -5.9); hs.rotation.y = d * 0.34; g.add(hs); });
+
+    // ---- aircraft light set (phase-randomised per craft) -----------------
+    var ph = Math.random() * 3;
+    g.add(at(light(THREE, M, 0xff2a2a, 0.95, 'steady'), -7.9, 0.3, -1.5));   // port nav (red, steady)
+    g.add(at(light(THREE, M, 0x30ff58, 0.95, 'steady'), 7.9, 0.3, -1.5));    // starboard nav (green, steady)
+    g.add(at(light(THREE, M, 0xffffff, 0.85, 'steady'), 0, 1.9, -6.2));      // tail nav (white, steady)
+    g.add(at(light(THREE, M, 0xffffff, 1.25, 'strobe', 1.0, ph), -7.95, 0.35, -1.6));  // left wingtip strobe
+    g.add(at(light(THREE, M, 0xffffff, 1.25, 'strobe', 1.0, ph), 7.95, 0.35, -1.6));   // right wingtip strobe
+    g.add(at(light(THREE, M, 0xff3020, 1.05, 'beacon', 0.85, ph), 0, 1.15, 0.5));      // upper anti-collision beacon
+    g.add(at(light(THREE, M, 0xff3020, 1.05, 'beacon', 0.85, ph), 0, -1.05, 0.3));     // lower anti-collision beacon
+
     g.scale.setScalar(scale || 1); return g;
   }
 
   function buildFighter(THREE, M) {
     var g = new THREE.Group();
-    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 6, 14), M.gun); body.rotation.x = Math.PI / 2; g.add(body);
-    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.4, 14), M.gun); nose.rotation.x = Math.PI / 2; nose.position.z = 4.1; g.add(nose);
+    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 6.4, 14), M.gun); body.rotation.x = Math.PI / 2; g.add(body);
+    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.6, 14), M.gun); nose.rotation.x = Math.PI / 2; nose.position.z = 4.4; g.add(nose);
     var canopy = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), M.cockpit); canopy.scale.set(1, 0.7, 1.6); canopy.position.set(0, 0.42, 1.4); g.add(canopy);
-    // delta wings
-    [-1, 1].forEach(function (d) { var w = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 2.4), M.gun); w.position.set(d * 1.9, -0.1, -1.4); w.rotation.y = d * 0.5; g.add(w); });
-    // twin tail fins
-    [-1, 1].forEach(function (d) { var f = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 1.1), M.gun); f.position.set(d * 0.6, 0.6, -2.6); f.rotation.z = d * 0.25; g.add(f); });
-    var burner = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.22, 0.7, 12), M.accent); burner.rotation.x = Math.PI / 2; burner.position.z = -3.2; g.add(burner);
-    var flame = glow(THREE, M, 0xffb24a, 1.5); flame.position.set(0, 0, -3.7); g.add(flame);      // afterburner glow
+    [-1, 1].forEach(function (d) { var w = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 2.4), M.gun); w.position.set(d * 1.9, -0.1, -1.4); w.rotation.y = d * 0.5; g.add(w); });   // delta wings
+    [-1, 1].forEach(function (d) { var f = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 1.1), M.gun); f.position.set(d * 0.6, 0.6, -2.6); f.rotation.z = d * 0.25; g.add(f); });   // twin fins
+    var burner = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.22, 0.7, 12), M.accent); burner.rotation.x = Math.PI / 2; burner.position.z = -3.4; g.add(burner);
     var stripe = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 4), M.blue); stripe.position.set(0, 0.5, 0.4); g.add(stripe);
+    // lights: afterburner glow + nav + top strobe
+    g.add(at(light(THREE, M, 0xffb24a, 1.6, 'steady'), 0, 0, -3.9));
+    g.add(at(light(THREE, M, 0xff2a2a, 0.6, 'steady'), -3.4, -0.05, -2.2));
+    g.add(at(light(THREE, M, 0x30ff58, 0.6, 'steady'), 3.4, -0.05, -2.2));
+    g.add(at(light(THREE, M, 0xffffff, 0.75, 'strobe', 1.3, Math.random() * 3), 0, 0.75, -2.7));
     g.scale.setScalar(1.5); return g;
   }
 
@@ -290,7 +310,8 @@
     [0, 1].forEach(function (i) { var b = new THREE.Mesh(new THREE.BoxGeometry(7, 0.05, 0.35), M.dark); b.rotation.y = i * Math.PI / 2; rotor.add(b); });
     rotor.position.y = 1.4; g.add(rotor);
     var tail = new THREE.Group(); [0, 1].forEach(function (i) { var b = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.16), M.dark); b.rotation.z = i * Math.PI / 2; tail.add(b); }); tail.position.set(0.25, 0, -4); g.add(tail);
-    var bc = glow(THREE, M, 0xff3524, 1.2, true, 3.4); bc.position.set(0, -0.9, 0); g.add(bc);   // belly beacon
+    g.add(at(light(THREE, M, 0xff3020, 1.1, 'beacon', 0.9, Math.random() * 3), 0, -0.9, 0));    // belly beacon
+    g.add(at(light(THREE, M, 0xffffff, 0.8, 'strobe', 1.1, Math.random() * 3), 0, 0, -4));      // tail strobe
     g.scale.setScalar(1.6); return { g: g, rotor: rotor, tail: tail };
   }
 
@@ -316,7 +337,6 @@
     var roof = new THREE.Mesh(new THREE.BoxGeometry(72, 1.4, 28), M.bldg2); roof.position.y = 14.4; g.add(roof);
     var flag = new THREE.Mesh(new THREE.BoxGeometry(0.3, 8, 0.3), M.dark); flag.position.set(30, 18, 0); g.add(flag);
     var cloth = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.4, 4), M.accent); cloth.position.set(30, 20.5, 2.2); g.add(cloth);
-    // jet bridge reaching toward the parked plane
     var bridge = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 20), M.bldg2); bridge.position.set(24, 5, 18); g.add(bridge);
     return g;
   }
@@ -331,7 +351,6 @@
     var cab = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2.8), M.bldg2); cab.position.set(2.6, 1.4, 0); g.add(cab);
     g.scale.setScalar(1.2); return g;
   }
-  // rotating surveillance radar on a pole
   function buildRadar(THREE, M, pos) {
     var g = new THREE.Group(); g.position.copy(pos);
     var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 15, 8), M.dark); pole.position.y = 7.5; g.add(pole);
@@ -341,10 +360,8 @@
     g.add(head);
     return { g: g, head: head };
   }
-  // blinking red obstruction beacon (aviation warning light) on tall structures
-  function redBeacon(THREE, M, x, y, z, size) { var s = glow(THREE, M, 0xff2a2a, size, true, 2.2); s.position.set(x, y, z); return s; }
 
-  // graduated sky dome: deep blue at the zenith → hazy pale toward the horizon
+  // graduated sky dome: deep blue zenith → hazy pale horizon
   function buildSky(THREE) {
     var mat = new THREE.ShaderMaterial({
       uniforms: { top: { value: new THREE.Color(0x4f8bd6) }, mid: { value: new THREE.Color(0x9cc0ea) }, bottom: { value: new THREE.Color(0xdcebf8) } },
@@ -354,33 +371,40 @@
     });
     var dome = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 20), mat); dome.renderOrder = -1; dome.userData.noOutline = true; return dome;
   }
-  // the sun: a bright disc + a warm additive glow, placed on the sky in the key-light direction
   function buildSun(THREE, SUN) {
-    var g = new THREE.Group(); var at = SUN.clone().normalize().multiplyScalar(2500);
+    var g = new THREE.Group(); var to = SUN.clone().normalize().multiplyScalar(2500);
     var glowS = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTex(THREE, 'rgba(255,247,214,0.9)', 'rgba(255,236,180,0)'), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
-    glowS.scale.set(1000, 1000, 1); glowS.position.copy(at); g.add(glowS);
+    glowS.scale.set(1000, 1000, 1); glowS.position.copy(to); g.add(glowS);
     var disc = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTex(THREE, 'rgba(255,253,240,1)', 'rgba(255,248,224,0)', 0.55), transparent: true, opacity: 1, depthWrite: false, fog: false }));
-    disc.scale.set(260, 260, 1); disc.position.copy(at); g.add(disc);
+    disc.scale.set(260, 260, 1); disc.position.copy(to); g.add(disc);
     g.renderOrder = -1; return g;
   }
 
-  // runway edge lights (white) with green threshold + red end + centreline approach lights
-  function buildRunwayLights(THREE, M) {
-    var pos = [], col = [], zEnd = -560, zThr = 60;
-    var white = [1, 0.96, 0.82], green = [0.2, 1, 0.4], red = [1, 0.22, 0.22];
-    for (var z = zThr; z >= zEnd; z -= 20) {
-      var c = (z > zThr - 8) ? green : (z < zEnd + 8) ? red : white;
-      pos.push(-25, 0.7, z); col.push(c[0], c[1], c[2]); pos.push(25, 0.7, z); col.push(c[0], c[1], c[2]);
-    }
-    for (var xx = -20; xx <= 20; xx += 8) { pos.push(xx, 0.7, zThr); col.push(green[0], green[1], green[2]); pos.push(xx, 0.7, zEnd); col.push(red[0], red[1], red[2]); }   // threshold + end bars
-    for (var az = zThr + 16; az <= zThr + 130; az += 16) { pos.push(0, 0.7, az); col.push(white[0], white[1], white[2]); }   // approach centreline
-    return pointCloud(THREE, M, pos, col, 5.5);
+  // tiny STEADY runway edge lights (green threshold / red end) + centreline
+  function buildEdgeLights(THREE, M) {
+    var pos = [], col = [], zEnd = -560, zThr = 60, white = [1, 0.95, 0.8], green = [0.2, 1, 0.4], red = [1, 0.2, 0.2];
+    for (var z = zThr; z >= zEnd; z -= 14) { var c = (z > zThr - 6) ? green : (z < zEnd + 6) ? red : white; pos.push(-24, 0.5, z); col.push(c[0], c[1], c[2]); pos.push(24, 0.5, z); col.push(c[0], c[1], c[2]); }
+    for (var z2 = zThr - 10; z2 >= zEnd + 10; z2 -= 16) { pos.push(0, 0.45, z2); col.push(1, 0.95, 0.85); }   // centreline
+    return pointCloud(THREE, M, pos, col, 2.6);
   }
-  // blue taxiway edge lights
+  // tiny STEADY blue taxiway edge lights
   function buildTaxiLights(THREE, M) {
     var pos = [], col = [], blue = [0.3, 0.55, 1];
-    for (var z = -322; z <= 24; z += 22) { pos.push(44, 0.7, z); col.push(blue[0], blue[1], blue[2]); pos.push(60, 0.7, z); col.push(blue[0], blue[1], blue[2]); }
-    return pointCloud(THREE, M, pos, col, 4.6);
+    for (var z = -322; z <= 24; z += 16) { pos.push(45, 0.5, z); col.push(blue[0], blue[1], blue[2]); pos.push(59, 0.5, z); col.push(blue[0], blue[1], blue[2]); }
+    return pointCloud(THREE, M, pos, col, 2.2);
+  }
+  // SEQUENCED FLASHING approach lights ("the rabbit") + REIL threshold strobes
+  function buildApproach(THREE, M) {
+    var g = new THREE.Group(), zThr = 60, N = 16, fl = [];
+    for (var i = 0; i < N; i++) { var s = light(THREE, M, 0xffffff, 3.4, 'steady'); s.position.set(0, 0.8, zThr + 16 + i * 10); s.material.opacity = 0; g.add(s); fl.push(s); }   // i=0 nearest threshold
+    var rA = at(light(THREE, M, 0xffffff, 3.6, 'steady'), -28, 0.9, zThr); rA.material.opacity = 0; g.add(rA);
+    var rB = at(light(THREE, M, 0xffffff, 3.6, 'steady'), 28, 0.9, zThr); rB.material.opacity = 0; g.add(rB);
+    var update = function (t) {
+      var lead = ((t * 2.0) % 1) * N;                                   // pulse sweeps far → threshold, 2×/sec
+      for (var i = 0; i < N; i++) { var d = lead - (N - 1 - i); fl[i].material.opacity = (d >= 0 && d < 1.4) ? (1 - d / 1.4) : 0; }
+      var on = ((t * 1.0) % 1) < 0.06 ? 1 : 0; rA.material.opacity = on; rB.material.opacity = on;   // REIL synced flash
+    };
+    return { g: g, update: update };
   }
   function pointCloud(THREE, M, pos, col, size) {
     var geo = new THREE.BufferGeometry();
@@ -389,29 +413,36 @@
     return new THREE.Points(geo, new THREE.PointsMaterial({ size: size, map: M.lightTex, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true, blending: THREE.AdditiveBlending }));
   }
 
+  // 1px charcoal silhouette outline on every solid Mesh (skips sky/ground + sprites/points)
+  function addOutlines(THREE, scene, edgeMat) {
+    var targets = [];
+    scene.traverse(function (o) { if (o.isMesh && o.geometry && !(o.userData && o.userData.noOutline)) targets.push(o); });
+    for (var i = 0; i < targets.length; i++) { var m = targets[i]; m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30), edgeMat)); }
+  }
+
   /* ------------------------------------------------------------- textures */
   function runwayTex(THREE) {
     var c = document.createElement('canvas'); c.width = 128; c.height = 1024; var g = c.getContext('2d');
-    g.fillStyle = '#3a3d45'; g.fillRect(0, 0, 128, 1024);                                          // dark weathered asphalt
+    g.fillStyle = '#3a3d45'; g.fillRect(0, 0, 128, 1024);
     for (var k = 0; k < 2400; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (40 + v * 30 | 0) + ',' + (42 + v * 30 | 0) + ',' + (48 + v * 30 | 0) + ',0.5)'; g.fillRect(Math.random() * 128, Math.random() * 1024, 2, 2); }
-    g.fillStyle = 'rgba(18,18,22,0.45)'; g.fillRect(22, 118, 84, 66); g.fillRect(22, 840, 84, 66); // rubber touchdown smears
-    g.fillStyle = '#e9edf5'; g.fillRect(12, 0, 5, 1024); g.fillRect(111, 0, 5, 1024);              // edge lines
-    g.fillStyle = '#f2f5fc'; for (var y = 40; y < 984; y += 70) g.fillRect(60, y, 7, 44);          // centreline dashes
-    g.fillStyle = '#eef2fa'; for (var i = 0; i < 7; i++) { g.fillRect(20 + i * 13, 16, 8, 64); g.fillRect(20 + i * 13, 944, 8, 64); }  // piano-key thresholds
-    g.fillStyle = '#e9edf5'; [150, 848].forEach(function (yy) { g.fillRect(30, yy, 14, 26); g.fillRect(84, yy, 14, 26); });            // touchdown-zone bars
+    g.fillStyle = 'rgba(18,18,22,0.45)'; g.fillRect(22, 118, 84, 66); g.fillRect(22, 840, 84, 66);
+    g.fillStyle = '#e9edf5'; g.fillRect(12, 0, 5, 1024); g.fillRect(111, 0, 5, 1024);
+    g.fillStyle = '#f2f5fc'; for (var y = 40; y < 984; y += 70) g.fillRect(60, y, 7, 44);
+    g.fillStyle = '#eef2fa'; for (var i = 0; i < 7; i++) { g.fillRect(20 + i * 13, 16, 8, 64); g.fillRect(20 + i * 13, 944, 8, 64); }
+    g.fillStyle = '#e9edf5';[150, 848].forEach(function (yy) { g.fillRect(30, yy, 14, 26); g.fillRect(84, yy, 14, 26); });
     var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
   }
   function taxiTex(THREE) {
     var c = document.createElement('canvas'); c.width = 64; c.height = 512; var g = c.getContext('2d');
     g.fillStyle = '#41454e'; g.fillRect(0, 0, 64, 512);
     for (var k = 0; k < 700; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (46 + v * 26 | 0) + ',' + (50 + v * 26 | 0) + ',' + (56 + v * 26 | 0) + ',0.5)'; g.fillRect(Math.random() * 64, Math.random() * 512, 2, 2); }
-    g.fillStyle = '#e8b73e'; g.fillRect(29, 0, 6, 512);                                             // yellow centreline
+    g.fillStyle = '#e8b73e'; g.fillRect(29, 0, 6, 512);
     var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 3); t.anisotropy = 6; return t;
   }
   function grassTex(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 512; var g = c.getContext('2d');
     g.fillStyle = '#6f8a49'; g.fillRect(0, 0, 512, 512);
-    for (var i = 0; i < 512; i += 32) { g.fillStyle = (i / 32) % 2 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.05)'; g.fillRect(0, i, 512, 32); }   // mown stripes
+    for (var i = 0; i < 512; i += 32) { g.fillStyle = (i / 32) % 2 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.05)'; g.fillRect(0, i, 512, 32); }
     for (var k = 0; k < 1600; k++) { g.fillStyle = 'rgba(' + (58 + Math.random() * 40 | 0) + ',' + (108 + Math.random() * 44 | 0) + ',' + (48 + Math.random() * 30 | 0) + ',0.5)'; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
     var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(22, 22); t.anisotropy = 4; return t;
   }
