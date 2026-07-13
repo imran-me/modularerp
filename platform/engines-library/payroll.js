@@ -309,6 +309,31 @@
     return s;
   }
 
+  // Undo a month's payment(s): posts an exact REVERSAL of every payment journal
+  // (cash back, payable restored, advance/loan recoveries un-recovered — the GL
+  // keeps the full audit trail), resets the slip to unpaid and recomputes status.
+  function unpay(empId, ym) {
+    var s = slip(empId, ym); if (!s || !(s.paid > 0)) return s;
+    for (var n = 1; n <= (s.payCount || 0); n++) {
+      var pid = 'GL-PAYP-' + empId + '-' + ym + '-' + n;
+      var entry = S.list('gl_entries').filter(function (e) { return e.id === pid; })[0];
+      if (!entry) continue;
+      glPost('GL-UNPAY-' + empId + '-' + ym + '-' + n, today(), s.companyId, 'UNPAY-' + ym,
+        'Payment reversal · ' + s.empName + ' · ' + mLabel(ym), 'payroll', empId,
+        entry.lines.map(function (l) { return { account: l.account, dr: l.cr, cr: l.dr }; }));
+    }
+    // drop the auto-EMI txns this month's payments recorded (loan balance restores)
+    S.set('pay_txns', S.list('pay_txns').filter(function (x) {
+      return !(x.empId === empId && x.type === 'loan-repay' && String(x.memo || '').indexOf('EMI auto-deducted from ' + mLabel(ym)) === 0);
+    }));
+    s.paid = 0; s.advanceRecovered = 0; s.loanRecovered = 0; s.paidDate = null;   // payCount stays — reversal ids stay unique
+    s.status = 'accrued';
+    S.upsert('pay_slips', s);
+    refreshRunStatus(s.companyId, ym);
+    bus.emit('data:changed', { store: 'pay_slips' });
+    return s;
+  }
+
   // After the pay-by day (10th), any finalized-but-unpaid slip is auto-flagged Due.
   function refreshRunStatus(cid, ym) {
     var run = getRun(cid, ym); if (!run || run.status === 'draft') return;
@@ -625,7 +650,7 @@
     amountInWords: amountInWords, attendanceFor: attendanceFor, saveAttendance: saveAttendance,
     generate: generate, getRun: getRun, run: getRun, slipsFor: slipsFor, slip: slip,
     inCorrectionWindow: inCorrectionWindow, adjustSlip: adjustSlip,
-    finalize: finalize, pay: pay, autoDue: autoDue, refreshRunStatus: refreshRunStatus,
+    finalize: finalize, pay: pay, unpay: unpay, autoDue: autoDue, refreshRunStatus: refreshRunStatus,
     advance: advance, loan: loan, repayLoan: repayLoan, bonus: bonus,
     advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, emiInstallment: emiInstallment, salaryDue: salaryDue,
     leaveState: leaveState, settlementPreview: settlementPreview, settle: settle,

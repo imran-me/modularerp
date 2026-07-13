@@ -158,6 +158,7 @@
     var sel = el('select.input', { style: { maxWidth: '230px' }, onchange: function () { payYm = this.value; EPAL.router.render(); } });
     runs.forEach(function (r) { var o = el('option', { value: r.ym, text: PR().mLabel(r.ym) + '  ·  ' + cap(r.status) }); if (r.ym === ym) o.selected = true; sel.appendChild(o); });
     var actions = el('div.flex.gap-1.flex-wrap');
+    actions.appendChild(el('button.btn.btn-ghost', { html: ui.icon('printer') + ' Print Sheet', onclick: function () { printSheetForm(slips, ym); } }));
     if (canCreate()) {
       if (st === 'draft') actions.appendChild(el('button.btn.btn-primary', { html: ui.icon('lock') + ' Finalize & Accrue', onclick: function () { finalizeRun(ym, net); } }));
       if (st !== 'draft' && due > 0) actions.appendChild(el('button.btn.btn-primary', { html: ui.icon('cash-coin') + ' Pay All', onclick: function () { payAll(ym); } }));
@@ -196,13 +197,15 @@
       totalKey: 'net',
       exportName: 'salary-sheet-' + ym + '.csv', pdfTitle: 'Salary Sheet — ' + PR().mLabel(ym),
       onRow: function (s) { var e = empById(s.empId); if (e) statement(e, ym); },
-      actions: ui.actions({
-        edit: (canCreate() && st === 'draft' && inWin) ? function (s) { correctionForm(s, ym); } : null,
+      actions: (canCreate() ? [{ icon: 'wallet2', title: 'Manage salary — pay / partial / due / advance / status', onClick: function (s) { manageSalary(s, ym); } }] : []).concat(ui.actions({
+        // corrections stay open through the whole DRAFT stage for the owner (MD
+        // unlock) — the 1st–3rd window is the staff cutoff, not the owner's.
+        edit: (canCreate() && st === 'draft') ? function (s) { correctionForm(s, ym); } : null,
         print: function (s) { var e = empById(s.empId); if (e) statementPrint(e, ym); }
-      }),
+      })),
       empty: { icon: 'cash-stack', title: 'No employees to pay' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash-stack') + ' Salary Sheet — ' + PR().mLabel(ym) }), el('span.card-sub', { text: 'click a row for the payslip · ✎ to correct' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash-stack') + ' Salary Sheet — ' + PR().mLabel(ym) }), el('span.card-sub', { text: 'click a row = payslip · 💰 manage pay/due/status · ✎ adjust' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
 
     if (st !== 'draft' && due > 0 && canCreate()) {
       var grid = el('div.grid-auto.kpi-compact');
@@ -222,9 +225,95 @@
   function payForm(s, ym) {
     var payable = PR().slipPayable(s), out = payable - (s.paid || 0);
     EPAL.formModal({ title: 'Pay — ' + s.empName, icon: 'cash-coin', size: 'sm', record: { amount: out, method: 'Bank' },
-      fields: [ { key: 'amount', label: 'Amount (৳)', type: 'money', default: out, min: 0, max: out, hint: 'Outstanding ' + ui.money(out) + ' — pay less for a partial.' },
-        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Cheque'], default: 'Bank' } ],
+      fields: [ { key: 'amount', label: 'Amount (৳)', type: 'money', default: out, min: 0, max: out, hint: 'Outstanding ' + ui.money(out) + ' — pay less for a partial (rest becomes Due, shown on next month\'s payslip).' },
+        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Nagad', 'Rocket', 'Upay', 'Card', 'Cheque'], default: 'Bank' } ],
       saveLabel: 'Post Payment', onSave: function (v) { try { PR().pay(s.empId, ym, +v.amount, v.method); ui.toast('Payment posted', 'success'); EPAL.router.render(); return true; } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; } } });
+  }
+
+  /* ---- MANAGE SALARY — the one modal that answers "how do I pay / set the due /
+   * handle the advance / flip Paid-Unpaid for this person this month". ------*/
+  function manageSalary(s, ym) {
+    var e = empById(s.empId); if (!e) { ui.toast('Employee not found', 'error'); return; }
+    var run = PR().getRun(CID, ym), st = run ? run.status : 'draft';
+    var payable = PR().slipPayable(s), out = Math.max(0, payable - (s.paid || 0));
+    var advOut = PR().advanceOutstanding(e.id), arrears = PR().previousDue(e.id, ym);
+    var body = el('div');
+    var m = ui.modal({ title: 'Manage Salary — ' + s.empName + ' · ' + PR().mLabel(ym), icon: 'wallet2', size: 'md', body: body, footer: false });
+    function act(label, icon2, kind, fn, hint) {
+      return el('button.btn' + (kind || '.btn-outline'), { html: ui.icon(icon2) + ' ' + label, title: hint || '', onclick: fn });
+    }
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-2', null, [
+        el('div.flex-1', null, [ el('div.fw-700', { html: EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : esc(s.empName) }),
+          el('div.text-mute.sm', { text: PR().mLabel(ym) + ' · run ' + cap(st) }) ]),
+        el('span.badge.badge-' + (s.status === 'paid' ? 'good' : s.status === 'due' ? 'bad' : s.status === 'partial' ? 'warn' : 'info'), { text: cap(s.status) })
+      ]),
+      el('div.stat-row.mb-3', null, [
+        el('div.stat', null, [el('div.stat-label', { text: 'Net payable' }), el('div.stat-value', { text: ui.money(payable) })]),
+        el('div.stat', null, [el('div.stat-label', { text: 'Paid' }), el('div.stat-value', { text: ui.money(s.paid || 0) })]),
+        el('div.stat', null, [el('div.stat-label', { text: 'Due (this month)' }), el('div.stat-value', { text: ui.money(out) })]),
+        el('div.stat', null, [el('div.stat-label', { text: 'Advance out' }), el('div.stat-value', { text: ui.money(advOut) })]),
+        arrears ? el('div.stat', null, [el('div.stat-label', { text: 'Past-months due' }), el('div.stat-value', { text: ui.money(arrears) })]) : null
+      ].filter(Boolean)),
+      st === 'draft' ? el('div.text-mute.sm.mb-2', { html: ui.icon('info-circle') + ' This month is still a <b>draft</b> — adjust freely, then <b>Finalize & Accrue</b> (top of the sheet) to unlock payment.' }) : null,
+      el('div.flex.gap-1.flex-wrap', null, [
+        (st !== 'draft' && out > 0) ? act('Pay… (partial allowed)', 'cash-coin', '.btn-primary', function () { m.close(); payForm(s, ym); }, 'Choose how much to pay now — the rest stays Due') : null,
+        (st !== 'draft' && out > 0) ? act('Pay Full (' + ui.money(out) + ')', 'check2-circle', null, function () { try { PR().pay(s.empId, ym); ui.toast('Paid in full', 'success'); m.close(); EPAL.router.render(); } catch (x) { ui.toast(x.message || 'Failed', 'error'); } }) : null,
+        (s.paid > 0) ? act('Mark Unpaid (undo payment)', 'arrow-counterclockwise', null, function () {
+          ui.confirm({ title: 'Undo this month\'s payment?', text: ui.money(s.paid) + ' will be reversed in the books (cash restored, salary payable + advance/loan balances restored).', danger: true, confirmLabel: 'Mark Unpaid' })
+            .then(function (ok) { if (!ok) return; PR().unpay(s.empId, ym); ui.toast('Payment reversed — status back to unpaid', 'success'); m.close(); EPAL.router.render(); }); }, 'Flips Paid → Unpaid with a clean reversal') : null,
+        (st === 'draft') ? act('Adjust (absent/late/OT/bonus/deduction)', 'sliders', null, function () { m.close(); correctionForm(s, ym); }) : null,
+        act('Give Advance', 'cash', null, function () { m.close(); moneyForm(e, 'advance'); }, 'Auto-deducts from the next payslip'),
+        arrears > 0 && canCreate() ? act('Pay Arrears (' + ui.money(arrears) + ')', 'hourglass-split', null, function () {
+          ui.confirm({ title: 'Pay all past-month dues?', text: ui.money(arrears) + ' across earlier months.', confirmLabel: 'Pay Arrears' })
+            .then(function (ok) { if (!ok) return; PR().payArrears(e.id); ui.toast('Arrears paid', 'success'); m.close(); EPAL.router.render(); }); }) : null,
+        act('Payslip', 'receipt', null, function () { m.close(); statement(e, ym); })
+      ].filter(Boolean))
+    ]) ]));
+  }
+
+  /* ---- PRINT SHEET with column MARKS — tick exactly what to print (e.g. untick
+   * Leave Encashment) and the printed salary sheet shows only those columns. --*/
+  function printSheetForm(slips, ym) {
+    var COLS = [
+      ['gross', 'Gross', function (s) { return s.gross; }],
+      ['overtime', 'Overtime', function (s) { return s.overtime || 0; }],
+      ['bonus', 'Bonus', function (s) { return s.bonus || 0; }],
+      ['encash', 'Leave Encashment', function (s) { return s.encashAmt || 0; }],
+      ['advance', 'Advance', function (s) { return (s.paid > 0) ? (s.advanceRecovered || 0) : Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); }],
+      ['emi', 'Loan EMI', function (s) { return (s.paid > 0) ? (s.loanRecovered || 0) : PR().emiInstallment(s.empId); }],
+      ['absent', 'Absent', function (s) { return s.absentDeduction || 0; }],
+      ['other', 'Other Ded.', function (s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.otherDeduction || 0); }],
+      ['net', 'Net Payable', function (s) { return PR().slipPayable(s); }],
+      ['paid', 'Paid', function (s) { return s.paid || 0; }],
+      ['due', 'Due', function (s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }],
+      ['status', 'Status', function (s) { return cap(s.status || ''); }]
+    ];
+    var record = {}; COLS.forEach(function (c) { record['col_' + c[0]] = true; });
+    EPAL.formModal({
+      title: 'Print Salary Sheet — ' + PR().mLabel(ym), icon: 'printer', size: 'md', record: record,
+      fields: [{ type: 'section', label: 'Tick the columns to print' }].concat(COLS.map(function (c) {
+        return { key: 'col_' + c[0], label: c[1], type: 'checkbox', default: true };
+      })),
+      saveLabel: 'Print',
+      onSave: function (v) {
+        var chosen = COLS.filter(function (c) { return v['col_' + c[0]] !== false; });
+        if (!chosen.length) { ui.toast('Tick at least one column', 'error'); return false; }
+        var head2 = '<tr><th>Employee</th>' + chosen.map(function (c) { return '<th style="text-align:right">' + esc(c[1]) + '</th>'; }).join('') + '</tr>';
+        var totals = {};
+        var rows = slips.map(function (s) {
+          return '<tr><td>' + esc(s.empName) + '</td>' + chosen.map(function (c) {
+            var val = c[2](s);
+            if (typeof val === 'number') { totals[c[0]] = (totals[c[0]] || 0) + val; return '<td style="text-align:right">' + ui.money(val) + '</td>'; }
+            return '<td style="text-align:right">' + esc(String(val)) + '</td>';
+          }).join('') + '</tr>';
+        }).join('');
+        var totRow = '<tr><th>Total</th>' + chosen.map(function (c) { return '<th style="text-align:right">' + (totals[c[0]] != null ? ui.money(totals[c[0]]) : '') + '</th>'; }).join('') + '</tr>';
+        ui.printDoc({ title: 'Salary Sheet — ' + PR().mLabel(ym), subtitle: coShort(CID) + ' · Payroll', meta: slips.length + ' employees · generated ' + ui.date(today()), footer: 'System-generated salary sheet — Confidential',
+          bodyHtml: '<table>' + head2 + rows + totRow + '</table>' });
+        return true;
+      }
+    });
   }
   function correctionForm(s, ym) {
     EPAL.formModal({ title: 'Correction — ' + s.empName, icon: 'sliders', size: 'md',

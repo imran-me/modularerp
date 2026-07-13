@@ -166,18 +166,27 @@
         { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
         { key: 'category', label: 'Category', type: 'select', required: true, options: catOpts },
         { key: 'subCategory', label: 'Sub-category', type: 'text', placeholder: 'e.g. ' + (subsOf(catOpts[0]) || []).slice(0, 3).join(', '), hint: 'Pick from the category\'s sub-list or type your own.' },
-        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
         { key: 'date', label: 'Date', type: 'date', default: TODAY_STR },
         { key: 'method', label: 'Paid from / method', type: 'select', options: METHODS, default: 'Bank' },
         { key: 'party', label: 'Paid to', type: 'text' },
         { key: 'ref', label: 'Bill / voucher no', type: 'text' },
-        { key: 'desc', label: 'Description', type: 'textarea', col2: true }
+        // LINE ITEMS (ported from the production ERP's expense_items): several
+        // rows per expense; the header amount is the SUM of the item amounts.
+        { key: 'items', type: 'items', label: 'Expense Items', required: true, min: 1, addLabel: 'Add item',
+          columns: [
+            { key: 'description', label: 'Item / detail', type: 'text', width: '2.4fr' },
+            { key: 'amount', label: 'Amount', type: 'money', width: '1fr' }
+          ] },
+        { key: 'desc', label: 'Notes', type: 'textarea', col2: true }
       ],
       saveLabel: rec ? 'Save' : 'Record Expense',
       onSave: function (v) {
+        var items = (v.items || []).map(function (i) { return { description: (i.description || '').trim(), amount: +i.amount || 0 }; }).filter(function (i) { return i.amount > 0; });
+        var total = items.reduce(function (a, i) { return a + i.amount; }, 0);
+        if (total <= 0) { ui.toast('Add at least one item with an amount', 'error'); return false; }
         var r = rec || { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), kind: 'Expense', created: TODAY_STR };
         r.companyId = v.companyId; r.category = v.category; r.subCategory = (v.subCategory || '').trim();
-        r.amount = +v.amount || 0; r.date = v.date; r.method = v.method; r.party = v.party || ''; r.ref = v.ref || ''; r.desc = v.desc || '';
+        r.items = items; r.amount = total; r.date = v.date; r.method = v.method; r.party = v.party || ''; r.ref = v.ref || ''; r.desc = v.desc || '';
         db.save('acc_entries', r);
         try { EPAL.ledger.post({ id: 'GL-MX-' + r.id, date: r.date, companyId: r.companyId, ref: r.ref || r.id, memo: r.category + (r.subCategory ? ' · ' + r.subCategory : '') + (r.desc ? ' — ' + r.desc : ''), source: 'manual', party: r.party, lines: [{ account: expenseAccountFor(r.category + ' ' + r.subCategory), dr: r.amount, cr: 0 }, { account: '1010', dr: 0, cr: r.amount }] }); } catch (e) { ui.toast(e.message || 'Ledger mirror failed', 'error'); }
         ui.toast('Expense recorded', 'success'); EPAL.router.render(); return true;
@@ -235,19 +244,22 @@
     var body = el('div.card-body');
     if (!budgets.length) body.appendChild(el('div.text-mute.sm', { text: 'No budgets in this scope yet — Set Budget to start.' }));
     var yr = TODAY_STR.slice(0, 4);
+    var PERIOD_X = { Weekly: 52, Monthly: 12, Quarterly: 4, Annual: 1, Yearly: 1 };
     budgets.forEach(function (b) {
       var cid = b.companyId || 'group';
-      var annual = b.period === 'Monthly' ? (b.amount || 0) * 12 : (b.amount || 0);
+      var annual = (b.amount || 0) * (PERIOD_X[b.period] || 1);
+      var threshold = b.threshold > 0 ? b.threshold : 80;      // warn at N% (ported)
       var actual = db.col('acc_entries').filter(function (e) { return e.kind === 'Expense' && e.companyId === cid && e.category === b.category && String(e.date).slice(0, 4) === yr; })
         .reduce(function (a, e) { return a + (+e.amount || 0); }, 0);
       var pct = annual ? Math.min(150, Math.round(actual / annual * 100)) : 0, over = annual && actual > annual;
+      var state = over ? 'Over Budget' : pct >= threshold ? 'Near Limit' : 'Under Budget';
       body.appendChild(el('div', { style: { marginBottom: '12px' } }, [
         el('div.flex.justify-between.items-center', null, [
-          el('div.fw-600', { html: esc(b.category) + ' <span class="badge">' + esc(coName(cid)) + '</span> <span class="text-mute xs">' + esc(b.period || 'Annual') + '</span>' }),
-          el('div.text-mute.sm', { html: ui.money(actual) + ' <span class="text-mute">/ ' + ui.money(annual) + '</span>' })
+          el('div.fw-600', { html: esc(b.category) + ' <span class="badge">' + esc(coName(cid)) + '</span> <span class="text-mute xs">' + esc(b.period || 'Annual') + ' · warn ' + threshold + '%</span> <span class="badge badge-' + (over ? 'bad' : pct >= threshold ? 'warn' : 'good') + '">' + state + '</span>' }),
+          el('div.text-mute.sm', { html: ui.money(actual) + ' <span class="text-mute">/ ' + ui.money(annual) + ' (annualised)</span>' })
         ]),
         el('div', { style: { height: '7px', background: 'var(--surface-3)', borderRadius: '5px', overflow: 'hidden', marginTop: '4px' } }, [
-          el('div', { style: { height: '100%', width: Math.min(100, pct) + '%', background: over ? '#f0506e' : pct > 80 ? '#f4b740' : '#23c17e', borderRadius: '5px' } })
+          el('div', { style: { height: '100%', width: Math.min(100, pct) + '%', background: over ? '#f0506e' : pct >= threshold ? '#f4b740' : '#23c17e', borderRadius: '5px' } })
         ]),
         el('div.text-mute.xs', { style: { marginTop: '2px' }, text: over ? ('Over by ' + ui.money(actual - annual)) : (pct + '% used · ' + ui.money(annual - actual) + ' left') })
       ]));
@@ -260,15 +272,16 @@
       fields: [
         { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
         { key: 'category', label: 'Category', type: 'select', required: true, options: cats().map(function (c) { return c.name; }) },
-        { key: 'period', label: 'Period', type: 'select', options: ['Monthly', 'Annual'], default: 'Monthly' },
-        { key: 'amount', label: 'Budget amount (৳)', type: 'money', required: true, min: 0 }
+        { key: 'period', label: 'Period', type: 'select', options: ['Weekly', 'Monthly', 'Quarterly', 'Annual'], default: 'Monthly' },
+        { key: 'amount', label: 'Budget amount (৳)', type: 'money', required: true, min: 0 },
+        { key: 'threshold', label: 'Warning threshold (%)', type: 'number', min: 1, max: 100, default: 80, hint: 'Flag "Near Limit" once usage passes this.' }
       ],
       saveLabel: 'Save Budget',
       onSave: function (v) {
         var prev = S.list('group_budgets').filter(function (x) { return (x.companyId || 'group') === v.companyId && x.category === v.category; })[0];
         var r = prev || { id: 'BUD-' + v.companyId + '-' + String(v.category).replace(/[^A-Za-z]/g, ''), history: [] };
         if (prev && prev.amount !== +v.amount) (r.history = r.history || []).push({ date: TODAY_STR, from: prev.amount, to: +v.amount });   // revision log
-        r.companyId = v.companyId; r.category = v.category; r.period = v.period; r.amount = +v.amount || 0;
+        r.companyId = v.companyId; r.category = v.category; r.period = v.period; r.amount = +v.amount || 0; r.threshold = Math.min(100, Math.max(1, +v.threshold || 80));
         S.upsert('group_budgets', r);
         ui.toast('Budget saved', 'success'); EPAL.router.render(); return true;
       }
@@ -324,6 +337,36 @@
       empty: { icon: 'graph-down', title: 'No expenses in this range' }
     });
     page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('graph-down-arrow') + ' Expense Report — ' + reportMode.charAt(0).toUpperCase() + reportMode.slice(1) })]), el('div.card-body', null, [tbl.el])]));
+
+    // --- breakdowns (ported from the production report): Category Split · Payment
+    // Modes · Top expenses — all over the same filtered range. -----------------
+    function splitCard(title, icon, keyFn) {
+      var m = {}; list.forEach(function (e) { var k = keyFn(e) || '—'; m[k] = m[k] || { n: 0, amt: 0 }; m[k].n++; m[k].amt += (+e.amount || 0); });
+      var rows2 = Object.keys(m).map(function (k) { return { k: k, n: m[k].n, amt: m[k].amt }; }).sort(function (a, b) { return b.amt - a.amt; });
+      var bodyEl = el('div.card-body');
+      if (!rows2.length) bodyEl.appendChild(el('div.text-mute.sm', { text: 'Nothing in range.' }));
+      rows2.slice(0, 8).forEach(function (r) {
+        var pct = grand ? Math.round(r.amt / grand * 100) : 0;
+        bodyEl.appendChild(el('div', { style: { marginBottom: '9px' } }, [
+          el('div.flex.justify-between.items-center', null, [el('div.fw-600.sm', { text: r.k }), el('div.text-mute.xs', { text: r.n + ' · ' + ui.money(r.amt) + ' · ' + pct + '%' })]),
+          el('div', { style: { height: '6px', background: 'var(--surface-3)', borderRadius: '4px', overflow: 'hidden', marginTop: '3px' } }, [
+            el('div', { style: { height: '100%', width: Math.max(2, pct) + '%', background: 'var(--accent)', borderRadius: '4px' } })])
+        ]));
+      });
+      return el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon(icon) + ' ' + title })]), bodyEl]);
+    }
+    var row2 = el('div.two-col');
+    row2.appendChild(splitCard('Category Split', 'pie-chart', function (e) { return e.category; }));
+    row2.appendChild(splitCard('Payment Modes', 'credit-card', function (e) { return e.method; }));
+    page.appendChild(row2);
+    var top = list.slice().sort(function (a, b) { return (+b.amount || 0) - (+a.amount || 0); }).slice(0, 6);
+    if (top.length) page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [el('h3', { html: ui.icon('trophy') + ' Top Expenses' })]),
+      el('div.card-body', null, [el('div.data-list', null, top.map(function (e) {
+        return el('div.data-row', null, [el('div.flex-1', null, [el('div.fw-600.sm', { text: (e.category || '—') + (e.subCategory ? ' · ' + e.subCategory : '') }), el('div.text-mute.xs', { text: ui.date(e.date) + ' · ' + coName(e.companyId) + (e.party ? ' · ' + e.party : '') })]),
+          el('div.strong', { text: ui.money(e.amount) })]);
+      }))])
+    ]));
   }
 
   /* ======================================================= MANAGE JOURNALS */
@@ -383,22 +426,92 @@
     var cols = [
       { key: 'party', label: 'Party', render: function (s) { return '<span class="strong">' + esc(s.party) + '</span>'; } },
       { key: 'kind', label: 'Type', badge: { Payable: 'bad', Receivable: 'good' } },
-      { key: 'due', label: 'Due', date: true },
+      { key: 'priority', label: 'Priority', render: function (s) { var p = s.priority || 'medium'; return '<span class="badge badge-' + (p === 'high' ? 'bad' : p === 'low' ? '' : 'warn') + '">' + esc(p) + '</span>'; }, exportVal: function (s) { return s.priority || 'medium'; } },
+      { key: 'due', label: 'Due', date: true, render: function (s) { return ui.date(s.due) + (s.rescheduleCount ? ' <span class="badge badge-warn" title="' + esc(s.rescheduleReason || '') + '">↻' + s.rescheduleCount + '</span>' : ''); } },
       { key: 'amount', label: 'Amount', num: true, money: true },
+      { key: 'paidAmount', label: 'Paid', num: true, render: function (s) { return s.paidAmount ? '<span class="text-good">' + ui.money(s.paidAmount) + '</span>' : '—'; }, sortVal: function (s) { return s.paidAmount || 0; } },
       { key: 'status', label: 'Status', badge: { Paid: 'good', Partial: 'warn', Pending: 'bad' } }
     ];
     if (selCo === 'all') cols.splice(1, 0, { key: 'companyId', label: 'Company', render: function (s) { return coCell(s.companyId); }, exportVal: function (s) { return s.companyId; } });
     var tbl = EPAL.table({
       columns: cols, rows: list, searchKeys: ['party', 'desc'], quickFilter: 'status', filterPanel: true,
-      filters: [{ key: 'kind', label: 'Type' }].concat(selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : []),
+      filters: [{ key: 'kind', label: 'Type' }, { key: 'priority', label: 'Priority' }].concat(selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : []),
       dateKey: 'due', totalKey: 'amount', pageSize: 12, exportName: 'master-schedules.csv', pdfTitle: 'Payment Schedules — ' + coName(selCo),
-      actions: ui.actions({
-        edit: canCreate() ? function (s) { masterScheduleForm(s); } : null,
-        del: canCreate() ? function (s) { if (s.status === 'Paid') { ui.toast('Already paid', 'info'); return; } s.status = 'Paid'; db.save('acc_schedules', s); ui.toast('Marked paid', 'success'); EPAL.router.render(); } : null
-      }),
+      onRow: function (s) { masterScheduleDetail(s); },
+      actions: ui.actions({ edit: canCreate() ? function (s) { masterScheduleForm(s); } : null }),
       empty: { icon: 'calendar2-week', title: 'No schedules in this scope' }
     });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('calendar2-week') + ' Payment Schedules — ' + coName(selCo) }), el('span.card-sub', { text: '✎ edit · 🗑 mark paid' })]), el('div.card-body', null, [tbl.el])]));
+    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('calendar2-week') + ' Payment Schedules — ' + coName(selCo) }), el('span.card-sub', { text: 'click a row: pay (partial → auto-remainder) · reschedule · priority' })]), el('div.card-body', null, [tbl.el])]));
+  }
+  // detail with the production ERP's lifecycle: Payment Done (partial pay spawns an
+  // auto-REMAINDER schedule), Reschedule (keeps count + reason), priority setter.
+  function masterScheduleDetail(s) {
+    var body = el('div');
+    var m = ui.modal({ title: s.party + ' · ' + ui.money(s.amount), icon: 'calendar2-week', size: 'md', body: body, footer: false });
+    var acts = el('div.flex.gap-1.flex-wrap', { style: { marginLeft: 'auto' } });
+    if (canCreate() && s.status !== 'Paid') {
+      acts.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('cash-coin') + ' Payment Done', onclick: function () { m.close(); schedulePayForm(s); } }));
+      acts.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('calendar2-plus') + ' Reschedule', onclick: function () { m.close(); rescheduleForm(s); } }));
+    }
+    body.appendChild(el('div.card', null, [el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+        el('div.flex-1', null, [el('div.fw-700', { text: s.party }), el('div.text-mute.sm', { text: (s.kind || '') + ' · ' + coName(s.companyId) + (s.partyType ? ' · ' + s.partyType : '') })]),
+        el('span.badge.badge-' + (s.status === 'Paid' ? 'good' : s.status === 'Partial' ? 'warn' : 'bad'), { text: s.status }), acts]),
+      el('div.data-list', null, [
+        el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Amount / Paid' }), el('div.strong', { text: ui.money(s.amount) + (s.paidAmount ? ' · paid ' + ui.money(s.paidAmount) : '') })]),
+        el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Due' }), el('div.strong', { text: ui.date(s.due) + (s.rescheduleCount ? ' (rescheduled ×' + s.rescheduleCount + (s.rescheduleReason ? ' — ' + s.rescheduleReason : '') + ')' : '') })]),
+        el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Priority' }), el('div', null, [(function () {
+          var sel = el('select.input', { style: { width: 'auto' }, onchange: function () { s.priority = this.value; db.save('acc_schedules', s); ui.toast('Priority set', 'success'); } });
+          ['high', 'medium', 'low'].forEach(function (p) { var o = el('option', { value: p, text: p }); if ((s.priority || 'medium') === p) o.selected = true; sel.appendChild(o); });
+          return canCreate() ? sel : el('span.badge', { text: s.priority || 'medium' });
+        })()])]),
+        s.desc ? el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Note' }), el('div', { text: s.desc })]) : null
+      ].filter(Boolean))
+    ])]));
+  }
+  function schedulePayForm(s) {
+    var outstanding = (+s.amount || 0) - (+s.paidAmount || 0);
+    EPAL.formModal({
+      title: 'Payment Done — ' + s.party, icon: 'cash-coin', size: 'sm', record: { amount: outstanding, date: TODAY_STR, method: 'Bank' },
+      fields: [
+        { key: 'amount', label: 'Paid amount (৳)', type: 'money', required: true, min: 1, max: outstanding, hint: 'Outstanding ' + ui.money(outstanding) + ' — pay less and a REMAINDER schedule is created automatically.' },
+        { key: 'date', label: 'Payment date', type: 'date', default: TODAY_STR },
+        { key: 'method', label: 'Method', type: 'select', options: METHODS, default: 'Bank' },
+        { key: 'remainderDate', label: 'Remainder due date (if partial)', type: 'date' }
+      ],
+      saveLabel: 'Payment Done',
+      onSave: function (v) {
+        var amt = Math.min(+v.amount || 0, outstanding);
+        if (amt <= 0) { ui.toast('Enter the paid amount', 'error'); return false; }
+        var partial = amt < outstanding - 0.001;
+        s.paidAmount = (+s.paidAmount || 0) + amt; s.paidDate = v.date; s.payMethod = v.method;
+        s.status = 'Paid';
+        db.save('acc_schedules', s);
+        if (partial) {
+          db.save('acc_schedules', { id: 'SCH-' + ui.uid('').slice(-5).toUpperCase(), companyId: s.companyId, party: s.party, partyType: s.partyType,
+            kind: s.kind, amount: Math.round(outstanding - amt), due: v.remainderDate || s.due, status: 'Pending', priority: s.priority || 'medium',
+            desc: 'Remainder from partial payment (' + s.id + ')' });
+          ui.toast('Paid ' + ui.money(amt) + ' — remainder schedule created', 'success');
+        } else ui.toast('Payment done', 'success');
+        EPAL.router.render(); return true;
+      }
+    });
+  }
+  function rescheduleForm(s) {
+    EPAL.formModal({
+      title: 'Reschedule — ' + s.party, icon: 'calendar2-plus', size: 'sm', record: { due: s.due },
+      fields: [
+        { key: 'due', label: 'New due date', type: 'date', required: true },
+        { key: 'reason', label: 'Reason', type: 'text', required: true }
+      ],
+      saveLabel: 'Reschedule',
+      onSave: function (v) {
+        if (!s.originalDue) s.originalDue = s.due;
+        s.due = v.due; s.rescheduleCount = (s.rescheduleCount || 0) + 1; s.rescheduleReason = v.reason; s.status = 'Pending';
+        db.save('acc_schedules', s);
+        ui.toast('Rescheduled to ' + ui.date(v.due), 'success'); EPAL.router.render(); return true;
+      }
+    });
   }
   function masterScheduleForm(s) {
     EPAL.formModal({
