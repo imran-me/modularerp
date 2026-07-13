@@ -364,6 +364,33 @@
     return p;
   }
 
+  // total accrued leave-encashment liability across the active team (the future
+  // obligation the MD should see) — sum of each head's current encashable value.
+  function encashmentLiability(cid) {
+    return activeTeam(cid || 'travels').reduce(function (a, e) { return a + leaveState(e).value; }, 0);
+  }
+  // Pay out the accrued leave encashment (annual/anniversary) — DR 2150 Payable /
+  // CR Bank — and reset the accrual by booking the encashed days as taken this year.
+  function payEncashment(empId, opts) {
+    opts = opts || {};
+    var emp = db().employee(empId); if (!emp) throw new Error('Employee not found');
+    var ls = leaveState(emp); if (ls.value <= 0) throw new Error('No leave encashment accrued to pay.');
+    var cid = emp.companyId || 'travels';
+    glPost(null, opts.date || today(), cid, 'ENCP-' + empId, 'Leave encashment payout · ' + emp.name, 'payroll', empId,
+      [{ account: '2150', dr: ls.value, cr: 0 }, { account: '1010', dr: 0, cr: ls.value }]);
+    txn({ type: 'encash-paid', empId: empId, empName: emp.name, companyId: cid, date: opts.date || today(), amount: ls.value, memo: 'Leave encashment payout (' + ls.encashableDays.toFixed(2) + ' days)' });
+    // reset the year's accrual: record the encashed days as consumed leave
+    S.upsert('tv_leaves', { id: 'LV-ENC-' + empId + '-' + today().slice(0, 4), empId: empId, empName: emp.name, type: 'Annual', status: 'Approved', from: today(), to: today(), days: ls.encashableDays, reason: 'Leave encashment paid out', applied: today() });
+    bus.emit('data:changed', { store: 'pay_txns' });
+    return ls.value;
+  }
+  // department-wise monthly salary cost (current month, active team) for reports
+  function departmentCost(cid) {
+    var by = {};
+    activeTeam(cid || 'travels').forEach(function (e) { var d = e.dept || '—'; by[d] = (by[d] || 0) + (+e.salary || 0); });
+    return Object.keys(by).map(function (k) { return { dept: k, cost: by[k] }; }).sort(function (a, b) { return b.cost - a.cost; });
+  }
+
   /* ----------------------------------------------- the employee accounts sheet */
   // A merged, chronological ledger with a running "net due to employee" balance.
   // credit(+) = company owes employee (salary/encash accrued, bonus);
@@ -464,6 +491,7 @@
     advance: advance, loan: loan, repayLoan: repayLoan, bonus: bonus,
     advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, salaryDue: salaryDue,
     leaveState: leaveState, settlementPreview: settlementPreview, settle: settle,
+    encashmentLiability: encashmentLiability, payEncashment: payEncashment, departmentCost: departmentCost,
     empLedger: empLedger, statement: statement, txnsFor: txnsFor,
     curYm: curYm, today: today, mLabel: mLabel
   };

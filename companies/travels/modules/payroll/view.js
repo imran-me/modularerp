@@ -28,7 +28,7 @@
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
   var CID = 'travels';
   function PR() { return EPAL.payroll; }
-  var TABS = [['template', 'Salary Template'], ['manage', 'Salary Manage'], ['loans', 'Loan Management'], ['payslip', 'Payslip'], ['advance', 'Advance Salary']];
+  var TABS = [['template', 'Salary Template'], ['manage', 'Salary Manage'], ['loans', 'Loan Management'], ['payslip', 'Payslip'], ['advance', 'Advance Salary'], ['reports', 'Reports']];
   var payYm = null;
 
   function team() { return (db.employees ? db.employees({ companyId: CID }) : []).slice().sort(function (a, b) { return (a.name || '') < (b.name || '') ? -1 : 1; }); }
@@ -44,16 +44,17 @@
       var sub = ctx.subId || 'manage';
       if (TABS.map(function (t) { return t[0]; }).indexOf(sub) < 0) sub = 'manage';
       var page = el('div.page');
-      var titles = { template: 'Salary Template', manage: 'Salary Manage', loans: 'Loan Management', payslip: 'Payslip', advance: 'Advance Salary' };
+      var titles = { template: 'Salary Template', manage: 'Salary Manage', loans: 'Loan Management', payslip: 'Payslip', advance: 'Advance Salary', reports: 'Payroll Reports' };
       var subs = { template: 'The statutory salary structure — components, tax, provident fund and the leave-encashment rule.',
         manage: 'The monthly payroll run — generate, correct, finalize and pay. Posts to the ledger.', loans: 'Staff loans — disburse, track balances and record repayments.',
-        payslip: 'Salary statements per employee & month, with the annual Leave-Encashment benefit.', advance: 'Advance salary — disburse and recover against future pay.' };
+        payslip: 'Salary statements per employee & month, with the annual Leave-Encashment benefit.', advance: 'Advance salary — disburse and recover against future pay.',
+        reports: 'Leave-encashment liability, salary due, advance & loan registers, department cost.' };
       page.appendChild(EPAL.pageHead({ eyebrow: 'Travels › Payroll', icon: 'cash-coin', title: titles[sub], sub: subs[sub] }));
       var pills = el('div.pill-tab.mb-3');
       TABS.forEach(function (t) { pills.appendChild(el('button' + (sub === t[0] ? '.active' : ''), { text: t[1], onclick: function () { EPAL.router.navigate('travels/payroll/' + t[0]); } })); });
       page.appendChild(pills);
       if (!PR()) { page.appendChild(card('Payroll engine unavailable.')); ctx.mount.appendChild(page); return; }
-      ({ template: tplView, manage: manageView, loans: loansView, payslip: payslipView, advance: advanceView }[sub])(page);
+      ({ template: tplView, manage: manageView, loans: loansView, payslip: payslipView, advance: advanceView, reports: reportsView }[sub])(page);
       ctx.mount.appendChild(page);
     }
   });
@@ -342,6 +343,75 @@
         '<tr><td>Leave Encashment (' + le.days.toFixed(2) + ' d)</td><td>' + ui.money(le.amount) + '</td></tr>' +
         '<tr><td>Leave balance</td><td>' + le.accruedDays.toFixed(2) + ' days' + (le.eligible ? ' (eligible)' : '') + '</td></tr>' +
         '<tr><th>Net Payable</th><th>' + ui.money(s.netPayable) + '</th></tr></table>' });
+  }
+
+  /* =================================================== PAYROLL REPORTS */
+  function reportsView(page) {
+    var t = team();
+    var liability = PR().encashmentLiability(CID);
+    var salaryDue = sum(t, function (e) { return PR().salaryDue(e.id); });
+    var advOut = sum(t, function (e) { return PR().advanceOutstanding(e.id); });
+    var loanOut = sum(t, function (e) { return PR().loanOutstanding(e.id); });
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Leave Encash Liability', ui.money(liability, { compact: true }), 'piggy-bank', 'text-warn'),
+      kpi('Salary Due', ui.money(salaryDue, { compact: true }), 'hourglass-split', salaryDue > 0 ? 'text-bad' : 'text-good'),
+      kpi('Advance Outstanding', ui.money(advOut, { compact: true }), 'cash'),
+      kpi('Loan Outstanding', ui.money(loanOut, { compact: true }), 'bank')
+    ]));
+
+    // Leave Encashment Liability — the future obligation, with a pay-out action
+    var encRows = t.map(function (e) { var ls = PR().leaveState(e); return { e: e, name: e.name, dept: e.dept, days: ls.encashableDays, value: ls.value, eligible: ls.eligibleFullYear }; }).filter(function (r) { return r.value > 0; });
+    var encTbl = EPAL.table({
+      columns: [
+        { key: 'name', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } },
+        { key: 'dept', label: 'Dept', badge: {} },
+        { key: 'days', label: 'Accrued days', num: true, sortVal: function (r) { return r.days; }, render: function (r) { return r.days.toFixed(2); } },
+        { key: 'value', label: 'Value', num: true, money: true },
+        { key: 'eligible', label: 'Eligibility', render: function (r) { return r.eligible ? '<span class="badge badge-good">Eligible</span>' : '<span class="badge badge-warn">Accruing</span>'; } }
+      ],
+      rows: encRows, pageSize: 10, exportName: 'leave-encashment-liability.csv', pdfTitle: 'Leave Encashment Liability',
+      actions: ui.actions({ edit: canCreate() ? function (r) { payEncashFlow(r.e); } : null }),
+      onRow: function (r) { statement(r.e, PR().curYm()); }, empty: { icon: 'piggy-bank', title: 'No accrued encashment' }
+    });
+    page.appendChild(reportCard('Leave Encashment Liability', 'piggy-bank', ui.money(liability) + ' total provision · ✎ to pay out & reset', encTbl.el));
+
+    var dueRows = t.map(function (e) { return { name: e.name, dept: e.dept, amt: PR().salaryDue(e.id) }; }).filter(function (r) { return r.amt > 0; });
+    if (dueRows.length) page.appendChild(reportCard('Salary Due', 'hourglass-split', dueRows.length + ' employees owed', simpleTbl(dueRows, 'Outstanding')));
+    var advRows = t.map(function (e) { return { name: e.name, dept: e.dept, amt: PR().advanceOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
+    if (advRows.length) page.appendChild(reportCard('Advance Register', 'cash', 'who holds advance now', simpleTbl(advRows, 'Advance held')));
+    var loanRows = t.map(function (e) { return { name: e.name, dept: e.dept, amt: PR().loanOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
+    if (loanRows.length) page.appendChild(reportCard('Loan Outstanding', 'bank', 'staff loans in progress', simpleTbl(loanRows, 'Loan balance')));
+
+    var dc = PR().departmentCost(CID);
+    var dcTbl = EPAL.table({
+      columns: [ { key: 'dept', label: 'Department', render: function (r) { return '<span class="strong">' + esc(r.dept) + '</span>'; } },
+        { key: 'heads', label: 'Headcount', num: true, render: function (r) { return String(t.filter(function (e) { return (e.dept || '—') === r.dept; }).length); } },
+        { key: 'cost', label: 'Monthly Cost', num: true, money: true } ],
+      rows: dc, pageSize: 10, exportName: 'department-cost.csv', empty: { icon: 'diagram-3', title: 'No data' }
+    });
+    page.appendChild(reportCard('Department Cost (monthly gross)', 'diagram-3', 'salary cost by department', dcTbl.el));
+
+    var incRows = []; t.forEach(function (e) { (e.salaryHistory || []).forEach(function (h) { incRows.push({ name: e.name, date: h.date, from: h.from, to: h.to, by: h.by || '' }); }); });
+    incRows.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    if (incRows.length) {
+      var incTbl = EPAL.table({
+        columns: [ { key: 'date', label: 'Date', date: true }, { key: 'name', label: 'Employee' },
+          { key: 'from', label: 'From', num: true, money: true }, { key: 'to', label: 'To', num: true, money: true },
+          { key: 'change', label: 'Change', num: true, sortVal: function (r) { return (r.to || 0) - (r.from || 0); }, render: function (r) { var d = (r.to || 0) - (r.from || 0); return '<span class="num ' + (d >= 0 ? 'text-good' : 'text-bad') + '">' + (d >= 0 ? '+' : '') + ui.money(d) + '</span>'; } } ],
+        rows: incRows, pageSize: 10, exportName: 'increment-history.csv', empty: { icon: 'graph-up-arrow', title: 'No increments' }
+      });
+      page.appendChild(reportCard('Increment History', 'graph-up-arrow', incRows.length + ' salary revisions', incTbl.el));
+    }
+  }
+  function reportCard(title, icon, sub, node) { return el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon(icon) + ' ' + title }), el('span.card-sub', { text: sub }) ]), el('div.card-body', null, [ node ]) ]); }
+  function simpleTbl(rows, label) {
+    return EPAL.table({ columns: [ { key: 'name', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'dept', label: 'Dept', badge: {} }, { key: 'amt', label: label, num: true, money: true } ], rows: rows, pageSize: 8, empty: { icon: 'inbox', title: 'Nothing outstanding' } }).el;
+  }
+  function payEncashFlow(e) {
+    var ls = PR().leaveState(e);
+    ui.confirm({ title: 'Pay leave encashment — ' + e.name + '?', text: 'Pays ' + ls.encashableDays.toFixed(2) + ' accrued days = ' + ui.money(ls.value) + ' (DR Leave-Encash Payable / CR Bank) and resets the accrual.', confirmLabel: 'Pay Encashment' })
+      .then(function (ok) { if (!ok) return; try { PR().payEncashment(e.id); ui.toast('Encashment paid', 'success'); EPAL.router.render(); } catch (x) { ui.toast(x.message || 'Failed', 'error'); } });
   }
 
   /* ---- small helpers ----------------------------------------------------*/

@@ -244,9 +244,16 @@
       el('div.card-head', null, [ el('h3', { html: ui.icon('person-vcard') + ' Employee Details' }) ]),
       el('div.card-body', null, [ el('div.data-list', null, [
         drow('Employee ID', e.id), drow('Department', e.dept), drow('Designation', e.designation), drow('Role', cap(e.role || 'employee')),
-        drow('Join date', e.joinDate ? ui.date(e.joinDate) : '—'), drow('Phone', e.phone), drow('Email', e.email),
+        drow('Employment type', e.empType || 'Permanent'), e.reportsTo ? drow('Reports to', e.reportsTo) : null, e.workLocation ? drow('Work location', e.workLocation) : null,
+        drow('Join date', e.joinDate ? ui.date(e.joinDate) : '—'), e.confirmDate ? drow('Confirmed', ui.date(e.confirmDate)) : null,
+        drow('Phone', e.phone), drow('Email', e.email), e.emergency ? drow('Emergency', e.emergency) : null,
+        e.nid ? drow('NID', e.nid) : null, e.passport ? drow('Passport', e.passport) : null,
+        e.dob ? drow('Date of birth', ui.date(e.dob)) : null, e.bloodGroup ? drow('Blood group', e.bloodGroup) : null,
+        e.presentAddress ? drow('Present address', e.presentAddress) : null,
+        drow('Salary via', (e.salaryMethod || 'Bank') + (e.bankAccount ? ' · ' + e.bankAccount : '')),
+        (e.salaryHistory && e.salaryHistory.length) ? drow('Last increment', ui.money(e.salaryHistory[e.salaryHistory.length - 1].from) + ' → ' + ui.money(e.salaryHistory[e.salaryHistory.length - 1].to)) : null,
         drow('Assigned tasks', tasks.length ? String(tasks.length) : '0')
-      ]) ])
+      ].filter(Boolean)) ])
     ]));
 
     // leave history
@@ -278,11 +285,27 @@
         { type: 'section', label: 'Contact' },
         { key: 'email', label: 'Email', type: 'email' },
         { key: 'phone', label: 'Phone', type: 'phone' },
+        { key: 'emergency', label: 'Emergency contact', type: 'text', col2: true, placeholder: 'Name · phone' },
+        { type: 'section', label: 'Personal' },
+        { key: 'nid', label: 'NID no', type: 'text', col2: true },
+        { key: 'passport', label: 'Passport no', type: 'text', col2: true },
+        { key: 'dob', label: 'Date of birth', type: 'date' },
+        { key: 'bloodGroup', label: 'Blood group', type: 'select', options: ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] },
+        { key: 'presentAddress', label: 'Present address', type: 'textarea', col2: true },
+        { key: 'permanentAddress', label: 'Permanent address', type: 'textarea', col2: true },
         { type: 'section', label: 'Employment' },
         { key: 'joinDate', label: 'Join date', type: 'date' },
+        { key: 'confirmDate', label: 'Confirmation date', type: 'date' },
+        { key: 'empType', label: 'Employment type', type: 'select', options: ['Permanent', 'Probation', 'Contract', 'Part-time'], default: 'Permanent' },
+        { key: 'reportsTo', label: 'Reports to', type: 'text' },
+        { key: 'workLocation', label: 'Work location', type: 'text', placeholder: 'e.g. Head Office' },
         { key: 'status', label: 'Status', type: 'select', options: ['active', 'on-leave'], default: 'active' },
         { key: 'salary', label: 'Monthly salary (৳)', type: 'money', default: 40000, min: 0 },
         { key: 'rating', label: 'Rating (0–5)', type: 'number', default: 4, min: 0, max: 5 },
+        { type: 'section', label: 'Salary Bank' },
+        { key: 'salaryMethod', label: 'Salary paid via', type: 'select', options: ['Bank', 'bKash', 'Nagad', 'Cash', 'Cheque'], default: 'Bank' },
+        { key: 'bankName', label: 'Bank / wallet', type: 'text', col2: true },
+        { key: 'bankAccount', label: 'Account / number', type: 'text', col2: true },
         { type: 'section', label: 'ERP Access' },
         { key: 'createLogin', label: 'Give this employee an ERP login', type: 'checkbox', col2: true,
           hint: 'Provisions a role-scoped user (RBAC enforced by the backend later).' },
@@ -292,10 +315,20 @@
       saveLabel: isNew ? 'Add Employee' : 'Save',
       onSave: function (val) {
         var r = e || { id: 'EPL-' + ui.uid('').slice(-4).toUpperCase(), companyId: CID, attendance: { present: 22, absent: 0, late: 0, leave: 0 } };
+        var oldSalary = e ? (+e.salary || 0) : 0;
         r.name = (val.name || '').trim(); r.dept = val.dept; r.designation = val.designation || (DESIGN[val.dept] || ['Executive'])[0];
         r.role = val.role || 'employee'; r.email = val.email; r.phone = val.phone; r.joinDate = val.joinDate;
         r.status = val.status || 'active'; r.salary = +val.salary || 0; r.rating = +val.rating || 0; r.photo = val.photo || '';
+        // personal · employment · salary-bank details (spec E1)
+        r.emergency = val.emergency || ''; r.nid = val.nid || ''; r.passport = val.passport || ''; r.dob = val.dob || '';
+        r.bloodGroup = val.bloodGroup || ''; r.presentAddress = val.presentAddress || ''; r.permanentAddress = val.permanentAddress || '';
+        r.confirmDate = val.confirmDate || ''; r.empType = val.empType || 'Permanent'; r.reportsTo = val.reportsTo || ''; r.workLocation = val.workLocation || '';
+        r.salaryMethod = val.salaryMethod || 'Bank'; r.bankName = val.bankName || ''; r.bankAccount = val.bankAccount || '';
         r.companyId = CID;
+        // increment history — log a salary revision whenever it changes on edit
+        if (e && oldSalary && r.salary !== oldSalary) {
+          r.salaryHistory = (r.salaryHistory || []).concat([{ date: TODAY_STR, from: oldSalary, to: r.salary, by: ((EPAL.auth && EPAL.auth.current && (EPAL.auth.current() || {}).name) || 'HR') }]);
+        }
         if (val.createLogin && (val.loginEmail || r.email)) { r.login = { email: val.loginEmail || r.email, role: r.role, enabled: true }; provisionUser(r, val.loginPassword); }
         if (db.saveEmployee) db.saveEmployee(r); else db.save('employees', r);
         ui.toast('Employee "' + r.name + '" saved', 'success');
