@@ -485,22 +485,27 @@
   }
 
   // Seed a little history so the desk isn't empty: finalize + pay May & June for
-  // Travels, plus one outstanding advance. Deterministic + idempotent (stable ids,
-  // seedOnce guard). Runs after ledger + employees are seeded.
+  // EVERY sister concern (so the group by-concern P&L shows real salaries across the
+  // board), plus one outstanding Travels advance. Idempotent — generate keeps existing
+  // slips, finalize/pay are no-ops once done, the advance is de-duped.
   function seedDemo() {
-    if (S.get('pay_seeded_v1', false)) return;
-    var cid = 'travels';
-    ['2026-05', '2026-06'].forEach(function (ym) {
-      generate(cid, ym);
-      finalize(cid, ym);
-      slipsFor(cid, ym).forEach(function (s) { try { pay(s.empId, ym); } catch (e) {} });   // fully paid
+    if (S.get('pay_seeded_v2', false)) return;
+    var companies = (EPAL.config && EPAL.config.companies)
+      ? EPAL.config.companies.filter(function (c) { return c.type === 'company'; }).map(function (c) { return c.id; })
+      : ['travels', 'woodart', 'it', 'shop', 'construction'];
+    companies.forEach(function (cid) {
+      if (!activeTeam(cid).length) return;
+      ['2026-05', '2026-06'].forEach(function (ym) {
+        generate(cid, ym);
+        finalize(cid, ym);
+        slipsFor(cid, ym).forEach(function (s) { try { pay(s.empId, ym); } catch (e) {} });   // fully paid
+      });
+      generate(cid, curYm());   // current (July) draft run
     });
-    // one live advance against July (unrecovered) for the first employee
-    var team = activeTeam(cid);
-    if (team[0]) advance(team[0].id, 15000, { date: '2026-07-02', memo: 'Advance salary (July)' });
-    // generate the current (July) draft run so the payroll tab opens on a live month
-    generate(cid, curYm());
-    S.set('pay_seeded_v1', true);
+    // one live Travels advance against July (unrecovered), de-duped for re-seed
+    var tt = activeTeam('travels');
+    if (tt[0] && !txnsFor(tt[0].id).some(function (x) { return x.type === 'advance'; })) advance(tt[0].id, 15000, { date: '2026-07-02', memo: 'Advance salary (July)' });
+    S.set('pay_seeded_v2', true);
   }
 
   /* --------------------------------------------------------------- API */
