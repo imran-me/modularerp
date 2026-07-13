@@ -210,11 +210,14 @@
     if (amt <= 0) return s;
     var advOut = advanceOutstanding(empId);
     var recover = clamp(advOut, 0, amt);                 // recover advance out of this pay
-    var cash = amt - recover;
+    var emiRecover = clamp(emiInstallment(empId), 0, amt - recover);   // auto loan EMI installment
+    var cash = amt - recover - emiRecover;
     var lines = [{ account: '2100', dr: amt, cr: 0 }];
     if (recover > 0) lines.push({ account: '1250', dr: 0, cr: recover });
+    if (emiRecover > 0) lines.push({ account: '1260', dr: 0, cr: emiRecover });   // reduce the staff loan
     lines.push({ account: '1010', dr: 0, cr: cash });
     glPost('GL-PAYP-' + s.empId + '-' + ym + '-' + ((s.payCount || 0) + 1), today(), s.companyId, 'PAY-' + ym, 'Salary paid · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
+    if (emiRecover > 0) txn({ type: 'loan-repay', empId: empId, empName: s.empName, companyId: s.companyId, date: today(), amount: emiRecover, memo: 'EMI auto-deducted from ' + mLabel(ym) + ' salary' });
     s.paid = (s.paid || 0) + amt; s.advanceRecovered = (s.advanceRecovered || 0) + recover; s.payCount = (s.payCount || 0) + 1; s.paidDate = today();
     s.status = s.paid >= payable ? 'paid' : 'partial';
     S.upsert('pay_slips', s);
@@ -288,6 +291,13 @@
     var repaid = t.filter(function (x) { return x.type === 'loan-repay'; }).reduce(function (a, x) { return a + x.amount; }, 0);
     var settled = t.filter(function (x) { return x.type === 'settlement'; }).reduce(function (a, x) { return a + (x.loanCleared || 0); }, 0);
     return Math.max(0, given - repaid - settled);
+  }
+  // the monthly EMI to auto-deduct from salary = Σ(loan amount ÷ emiMonths) for loans
+  // set up with an installment plan, capped at what's still owed.
+  function emiInstallment(empId) {
+    var emi = txnsFor(empId).filter(function (x) { return x.type === 'loan' && (+x.emiMonths || 0) > 0; })
+      .reduce(function (a, x) { return a + Math.round(x.amount / x.emiMonths); }, 0);
+    return Math.min(emi, loanOutstanding(empId));
   }
   // Salary currently owed to the employee (accrued but unpaid across all months).
   function salaryDue(empId) {
@@ -489,7 +499,7 @@
     inCorrectionWindow: inCorrectionWindow, adjustSlip: adjustSlip,
     finalize: finalize, pay: pay, autoDue: autoDue, refreshRunStatus: refreshRunStatus,
     advance: advance, loan: loan, repayLoan: repayLoan, bonus: bonus,
-    advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, salaryDue: salaryDue,
+    advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, emiInstallment: emiInstallment, salaryDue: salaryDue,
     leaveState: leaveState, settlementPreview: settlementPreview, settle: settle,
     encashmentLiability: encashmentLiability, payEncashment: payEncashment, departmentCost: departmentCost,
     empLedger: empLedger, statement: statement, txnsFor: txnsFor,
