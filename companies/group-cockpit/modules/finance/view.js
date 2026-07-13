@@ -1160,13 +1160,61 @@
     ['asset', 'Assets', 'safe2'], ['liability', 'Liabilities', 'file-earmark-minus'],
     ['equity', 'Equity', 'gem'], ['income', 'Income', 'graph-up-arrow'], ['expense', 'Expenses', 'wallet2']
   ];
+  /* ---- COA management (spec B2) — add accounts + post opening balances -----*/
+  function addAccountForm() {
+    EPAL.formModal({
+      title: 'Add Ledger Account', icon: 'plus-square', size: 'md', record: { type: 'expense' },
+      fields: [
+        { key: 'code', label: 'Account code', type: 'text', required: true, placeholder: 'e.g. 5450' },
+        { key: 'name', label: 'Account name', type: 'text', required: true },
+        { key: 'type', label: 'Type', type: 'select', required: true, options: ['asset', 'liability', 'equity', 'income', 'expense'] },
+        { key: 'group', label: 'Group / class', type: 'text', placeholder: 'e.g. Operating Expenses' }
+      ],
+      saveLabel: 'Add Account',
+      onSave: function (val) {
+        var code = (val.code || '').trim(); if (!code) { ui.toast('Enter a code', 'error'); return false; }
+        var coa = EPAL.store.list('coa');
+        if (coa.some(function (a) { return a.code === code; })) { ui.toast('Account ' + code + ' already exists', 'error'); return false; }
+        var type = val.type;
+        coa.push({ id: code, code: code, name: (val.name || '').trim() || code, type: type, normal: (type === 'asset' || type === 'expense') ? 'debit' : 'credit', group: val.group || 'Other', intercompany: false });
+        EPAL.store.set('coa', coa);
+        ui.toast('Account ' + code + ' added', 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+  function openingBalanceForm() {
+    var accts = LED().accounts();
+    EPAL.formModal({
+      title: 'Post Opening Balance', icon: 'flag', size: 'md', record: { date: '2026-07-01', companyId: 'group' },
+      fields: [
+        { key: 'companyId', label: 'Company', type: 'select', required: true, options: activeCompanies().map(function (c) { return [c.id, c.short]; }).concat([['group', 'Group HQ']]) },
+        { key: 'account', label: 'Account', type: 'select', required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 0 },
+        { key: 'date', label: 'As-of date', type: 'date', default: '2026-07-01' }
+      ],
+      saveLabel: 'Post Opening',
+      onSave: function (val) {
+        var acct = LED().account(val.account); if (!acct) { ui.toast('Pick an account', 'error'); return false; }
+        var amt = +val.amount || 0; if (amt <= 0) { ui.toast('Enter an amount', 'error'); return false; }
+        // opening entry balances the account against Retained Earnings (3100). A
+        // debit-normal account (asset/expense) → DR account / CR 3100; a credit-normal
+        // account (liability/equity/income) → DR 3100 / CR account.
+        var lines = acct.normal === 'debit' ? [{ account: val.account, dr: amt, cr: 0 }, { account: '3100', dr: 0, cr: amt }]
+          : [{ account: '3100', dr: amt, cr: 0 }, { account: val.account, dr: 0, cr: amt }];
+        try { LED().post({ id: 'GL-OPEN-' + val.companyId + '-' + val.account, date: val.date, companyId: val.companyId, ref: 'OPENING', memo: 'Opening balance · ' + acct.name, source: 'opening', override: true, lines: lines }); ui.toast('Opening balance posted', 'success'); EPAL.router.render(); return true; } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; }
+      }
+    });
+  }
+
   function renderCoa(page) {
     var accts = hasLedger() ? LED().accounts() : [];
     page.appendChild(head('Chart of Accounts', 'diagram-2',
       'The group double-entry chart of accounts — ' + accts.length + ' ledger accounts in ' +
       TYPE_META.length + ' classes. Live balances are computed from the general ledger.', [
+      can('create') ? el('button.btn.btn-ghost', { html: ui.icon('plus-square') + ' Add Account', onclick: addAccountForm }) : null,
+      can('create') ? el('button.btn.btn-ghost', { html: ui.icon('flag') + ' Opening Balance', onclick: openingBalanceForm }) : null,
       el('button.btn.btn-primary', { html: ui.icon('journal-plus') + ' New Journal', onclick: function () { newJournal(); } })
-    ]));
+    ].filter(Boolean)));
     page.appendChild(pills('coa'));
     if (!hasLedger()) { page.appendChild(ledgerMissing()); return; }
 
