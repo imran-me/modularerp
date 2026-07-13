@@ -37,7 +37,7 @@
     ['balance-sheet', 'Balance Sheet'], ['receivables', 'Receivables'],
     ['payables', 'Payables'], ['banks', 'Banks'],
     ['coa', 'Chart of Accounts'], ['journal', 'Journal'], ['trial-balance', 'Trial Balance'],
-    ['consolidation', 'Consolidation'], ['concern-pnl', 'P&L by Concern']
+    ['consolidation', 'Consolidation'], ['concern-pnl', 'P&L by Concern'], ['expenses', 'Group Expenses']
   ];
 
   /* ---- tiny shared helpers ------------------------------------------------*/
@@ -147,6 +147,7 @@
     else if (sub === 'trial-balance') renderTrialBalance(page);
     else if (sub === 'consolidation') renderConsolidation(page);
     else if (sub === 'concern-pnl') renderConcernPnl(page);
+    else if (sub === 'expenses') renderGroupExpenses(page);
     else renderOverview(page);
     ctx.mount.appendChild(page);
   } });
@@ -160,88 +161,241 @@
    * column and rolls into the Group automatically. THIS is the Employee→Company→
    * Group flow made visible.
    * ========================================================================*/
+  // the P&L entities: each present sister concern + the Group HQ (companyId:'group')
+  function pnlEntities() {
+    var comps = LED().consolidatedTrialBalance().companies.map(function (c) { return { id: c.id, short: c.short }; });
+    return comps.concat([{ id: 'group', short: 'Group HQ' }]);
+  }
+  // natural P&L amount for one account at one entity (income credit-side +, expense debit-side +)
+  function pnlAmt(code, eid) { return Math.round(LED().balance(code, { companyId: eid })); }
+
   function renderConcernPnl(page) {
     page.appendChild(head('P&L by Concern', 'diagram-3',
-      'Consolidated income statement — every category across each sister concern, inter-company eliminated. Driven by the general ledger.',
+      'Consolidated income statement — every category across each sister concern plus Group HQ. Driven by the general ledger.',
       [ can('export') ? el('button.btn.btn-ghost', { html: ui.icon('download') + ' Export CSV', onclick: exportConcernCsv }) : null ].filter(Boolean)));
     page.appendChild(pills('concern-pnl'));
     if (!hasLedger()) { page.appendChild(el('div.card', null, [ el('div.card-body', { text: 'Ledger engine unavailable.' }) ])); return; }
 
-    var ctb = LED().consolidatedTrialBalance();
-    var comps = ctb.companies;
-    var income = ctb.rows.filter(function (r) { return r.type === 'income'; }).sort(byCode);
-    var expense = ctb.rows.filter(function (r) { return r.type === 'expense'; }).sort(byCode);
-    function incAmt(r, cid) { return -(r.per[cid] || 0); }          // income is credit-normal → flip to +revenue
-    function incGrp(r) { return -(r.group || 0); }
-    function expAmt(r, cid) { return (r.per[cid] || 0); }            // expense is debit-normal → already +
-    function expGrp(r) { return (r.group || 0); }
-    function sumCol(rows, cid, fn) { return rows.reduce(function (a, r) { return a + fn(r, cid); }, 0); }
-    var revGrp = income.reduce(function (a, r) { return a + incGrp(r); }, 0);
-    var expGrp2 = expense.reduce(function (a, r) { return a + expGrp(r); }, 0);
-    var netGrp = revGrp - expGrp2;
+    var ents = pnlEntities();
+    var accts = LED().accounts();
+    function vals(a) { return ents.map(function (e) { return pnlAmt(a.code, e.id); }); }
+    function nonzero(a) { return vals(a).some(function (v) { return Math.abs(v) >= 1; }); }
+    var income = accts.filter(function (a) { return a.type === 'income'; }).sort(byCode).filter(nonzero);
+    var expense = accts.filter(function (a) { return a.type === 'expense'; }).sort(byCode).filter(nonzero);
+    var revByEnt = ents.map(function (e) { return income.reduce(function (s, a) { return s + pnlAmt(a.code, e.id); }, 0); });
+    var expByEnt = ents.map(function (e) { return expense.reduce(function (s, a) { return s + pnlAmt(a.code, e.id); }, 0); });
+    function tot(arr) { return arr.reduce(function (x, y) { return x + y; }, 0); }
+    var revTotal = tot(revByEnt), expTotal = tot(expByEnt), netTotal = revTotal - expTotal;
 
     page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
-      kpi('Group Revenue', ui.money(revGrp, { compact: true }), 'graph-up-arrow'),
-      kpi('Group Expense', ui.money(expGrp2, { compact: true }), 'graph-down-arrow'),
-      kpi('Group Net', ui.money(netGrp, { compact: true }), 'wallet2'),
-      kpi('Group Margin', (revGrp ? (netGrp / revGrp * 100).toFixed(1) : '0.0') + '%', 'percent'),
-      kpi('Concerns', String(comps.length), 'diagram-3')
+      kpi('Group Revenue', ui.money(revTotal, { compact: true }), 'graph-up-arrow'),
+      kpi('Group Expense', ui.money(expTotal, { compact: true }), 'graph-down-arrow'),
+      kpi('Group Net', ui.money(netTotal, { compact: true }), 'wallet2'),
+      kpi('Group Margin', (revTotal ? (netTotal / revTotal * 100).toFixed(1) : '0.0') + '%', 'percent'),
+      kpi('Entities', String(ents.length), 'diagram-3')
     ]));
 
-    // ---- the pivot table ----
+    // ---- the pivot table (Category | each entity | Total) ----
     var thr = el('tr'); thr.appendChild(el('th', { text: 'Category' }));
-    comps.forEach(function (c) { thr.appendChild(el('th.num', { text: c.short })); });
-    thr.appendChild(el('th.num', { text: 'Group' }));
+    ents.forEach(function (e) { thr.appendChild(el('th.num', { text: e.short })); });
+    thr.appendChild(el('th.num', { text: 'Total' }));
     var tbody = el('tbody');
     function money(v) { return v ? ui.money(v) : '—'; }
-    function sectionRow(label) { var tr = el('tr', { style: { background: 'var(--surface-2)' } }); var td = el('td.strong', { text: label }); td.setAttribute('colspan', String(comps.length + 2)); tr.appendChild(td); tbody.appendChild(tr); }
-    function acctRow(name, fn, grp, strong) {
+    function sectionRow(label) { var tr = el('tr', { style: { background: 'var(--surface-2)' } }); var td = el('td.strong', { text: label }); td.setAttribute('colspan', String(ents.length + 2)); tr.appendChild(td); tbody.appendChild(tr); }
+    function acctRow(name, rowVals, rowTot, strong) {
       var tr = el('tr'); tr.appendChild(el('td' + (strong ? '.strong' : ''), { text: name }));
-      comps.forEach(function (c) { tr.appendChild(el('td.num' + (strong ? '.strong' : ''), { text: money(fn(c.id)) })); });
-      tr.appendChild(el('td.num.strong', { text: money(grp) })); tbody.appendChild(tr);
+      rowVals.forEach(function (v) { tr.appendChild(el('td.num' + (strong ? '.strong' : ''), { text: money(v) })); });
+      tr.appendChild(el('td.num.strong', { text: money(rowTot) })); tbody.appendChild(tr);
     }
     sectionRow('Revenue');
-    income.forEach(function (r) { acctRow(r.name, function (cid) { return incAmt(r, cid); }, incGrp(r)); });
-    acctRow('Total Revenue', function (cid) { return sumCol(income, cid, incAmt); }, revGrp, true);
+    income.forEach(function (a) { var v = vals(a); acctRow(a.name, v, tot(v)); });
+    acctRow('Total Revenue', revByEnt, revTotal, true);
     sectionRow('Expenses');
-    expense.forEach(function (r) { acctRow(r.name, function (cid) { return expAmt(r, cid); }, expGrp(r)); });
-    acctRow('Total Expenses', function (cid) { return sumCol(expense, cid, expAmt); }, expGrp2, true);
+    expense.forEach(function (a) { var v = vals(a); acctRow(a.name, v, tot(v)); });
+    acctRow('Total Expenses', expByEnt, expTotal, true);
     var netTr = el('tr', { style: { borderTop: '2px solid var(--border-strong, var(--border))' } });
     netTr.appendChild(el('td.strong', { text: 'Net Profit' }));
-    comps.forEach(function (c) { var n = sumCol(income, c.id, incAmt) - sumCol(expense, c.id, expAmt); netTr.appendChild(el('td.num.strong' + (n >= 0 ? '.text-good' : '.text-bad'), { text: money(n) })); });
-    netTr.appendChild(el('td.num.strong' + (netGrp >= 0 ? '.text-good' : '.text-bad'), { text: money(netGrp) }));
+    ents.forEach(function (e, i) { var n = revByEnt[i] - expByEnt[i]; netTr.appendChild(el('td.num.strong' + (n >= 0 ? '.text-good' : '.text-bad'), { text: money(n) })); });
+    netTr.appendChild(el('td.num.strong' + (netTotal >= 0 ? '.text-good' : '.text-bad'), { text: money(netTotal) }));
     tbody.appendChild(netTr);
 
     var table = el('table.tbl', null, [ el('thead', null, [thr]), tbody ]);
     page.appendChild(el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('table') + ' Consolidated Income Statement' }), el('span.card-sub', { text: comps.length + ' concerns · inter-company eliminated' }) ]),
+      el('div.card-head', null, [ el('h3', { html: ui.icon('table') + ' Consolidated Income Statement' }), el('span.card-sub', { text: ents.length + ' entities · concerns + Group HQ' }) ]),
       el('div.card-body', null, [ el('div.table-wrap', null, [table]) ])
     ]));
 
-    // ---- expense mix by concern (stacked) ----
-    var expHeads = expense.filter(function (r) { return expGrp(r) > 0; });
+    // ---- expense mix by entity (stacked) ----
+    var expHeads = expense.filter(function (a) { return tot(vals(a)) > 0; });
     if (expHeads.length) {
       var chartId = ui.uid('cpnl');
-      page.appendChild(chartCard('Expense by Concern', 'bar-chart', chartId, 'each expense head split across the concerns', 280));
+      page.appendChild(chartCard('Expense by Entity', 'bar-chart', chartId, 'each expense head across the entities', 280));
       requestAnimationFrame(function () {
         var c = document.getElementById(chartId); if (!c) return;
-        EPAL.charts.bar(c, { labels: comps.map(function (co) { return co.short; }), stacked: true, legend: true,
-          datasets: expHeads.map(function (r, i) { return { label: r.name, data: comps.map(function (co) { return expAmt(r, co.id); }), color: ['#1A43BF', '#23c17e', '#f4b740', '#e2721b', '#f0506e', '#7b5cff', '#12b5c9', '#a0522d'][i % 8] }; }) });
+        EPAL.charts.bar(c, { labels: ents.map(function (e) { return e.short; }), stacked: true, legend: true,
+          datasets: expHeads.map(function (a, i) { return { label: a.name, data: ents.map(function (e) { return pnlAmt(a.code, e.id); }), color: ['#1A43BF', '#23c17e', '#f4b740', '#e2721b', '#f0506e', '#7b5cff', '#12b5c9', '#a0522d'][i % 8] }; }) });
       });
     }
   }
   function byCode(a, b) { return String(a.code) < String(b.code) ? -1 : 1; }
   function exportConcernCsv() {
-    var ctb = LED().consolidatedTrialBalance(), comps = ctb.companies;
-    var head = ['Category'].concat(comps.map(function (c) { return c.short; })).concat(['Group']);
-    var lines = [head];
-    function push(name, type, r) {
-      var flip = type === 'income' ? -1 : 1;
-      lines.push([name].concat(comps.map(function (c) { return Math.round((r.per[c.id] || 0) * flip); })).concat([Math.round((r.group || 0) * flip)]));
-    }
-    lines.push(['REVENUE']); ctb.rows.filter(function (r) { return r.type === 'income'; }).sort(byCode).forEach(function (r) { push(r.name, 'income', r); });
-    lines.push(['EXPENSES']); ctb.rows.filter(function (r) { return r.type === 'expense'; }).sort(byCode).forEach(function (r) { push(r.name, 'expense', r); });
+    var ents = pnlEntities(), accts = LED().accounts();
+    var header = ['Category'].concat(ents.map(function (e) { return e.short; })).concat(['Total']);
+    var lines = [header];
+    function push(a) { var v = ents.map(function (e) { return pnlAmt(a.code, e.id); }); lines.push([a.name].concat(v).concat([v.reduce(function (x, y) { return x + y; }, 0)])); }
+    lines.push(['REVENUE']); accts.filter(function (a) { return a.type === 'income'; }).sort(byCode).forEach(push);
+    lines.push(['EXPENSES']); accts.filter(function (a) { return a.type === 'expense'; }).sort(byCode).forEach(push);
     dl('group-pnl-by-concern.csv', lines.map(function (l) { return l.join(','); }).join('\n'));
+  }
+
+  /* ==========================================================================
+   * GROUP EXPENSES — the Group entity's OWN running costs (office management,
+   * food/canteen, utilities, rent…) with BUDGET vs ACTUAL. Each entry posts to
+   * the ledger tagged companyId:'group' (DR expense head / CR Bank, or CR AP when
+   * unpaid), so it flows into the group P&L exactly like a concern's expenses do.
+   * Budgets live in a small group_budgets store; actuals are read live from the GL.
+   * ========================================================================*/
+  var GROUP_EXP_HEADS = [
+    ['Office Management', '5500'], ['Food & Canteen', '5550'], ['Utilities', '5300'], ['Office Rent', '5200'],
+    ['Salaries (Group)', '5100'], ['Marketing', '5400'], ['IT & Software', '5700'], ['Travel & Conveyance', '5600'],
+    ['Bank Charges', '6000'], ['Miscellaneous', '5800']
+  ];
+  var NEW_GROUP_ACCOUNTS = { '5500': 'Office & Administration', '5550': 'Food & Canteen', '5600': 'Travel & Conveyance', '5700': 'IT & Software', '5800': 'Miscellaneous Expense' };
+  function gToday() { return (EPAL.payroll && EPAL.payroll.today) ? EPAL.payroll.today() : new Date().toISOString().slice(0, 10); }
+  function acctForHead(cat) { for (var i = 0; i < GROUP_EXP_HEADS.length; i++) if (GROUP_EXP_HEADS[i][0] === cat) return GROUP_EXP_HEADS[i][1]; return '5800'; }
+  // register the new expense accounts directly (ledger.ensureAccount upserts by a
+  // non-existent id and collides — see payroll.js); append-by-code, idempotent.
+  function ensureGroupAccounts() {
+    if (!hasLedger()) return;
+    var coa = EPAL.store.list('coa'); if (!coa.length) return;
+    var have = {}; coa.forEach(function (a) { have[a.code] = true; });
+    var add = [];
+    Object.keys(NEW_GROUP_ACCOUNTS).forEach(function (code) { if (!have[code]) add.push({ id: code, code: code, name: NEW_GROUP_ACCOUNTS[code], type: 'expense', normal: 'debit', group: 'Operating Expense', intercompany: false }); });
+    if (add.length) EPAL.store.set('coa', coa.concat(add));
+  }
+  function groupExpenses() { return db().col('acc_entries').filter(function (e) { return e.companyId === 'group' && e.kind === 'Expense'; }); }
+  function postGroupExpense(rec) {
+    db().save('acc_entries', rec);
+    var credit = rec.paid === false ? '2000' : '1010';
+    try { LED().post({ id: 'GL-GX-' + rec.id, date: rec.date, companyId: 'group', ref: rec.ref || rec.id, memo: (rec.category || 'Expense') + ' — Group', source: 'manual', party: rec.party || '', lines: [{ account: rec.account, dr: rec.amount, cr: 0 }, { account: credit, dr: 0, cr: rec.amount }] }); } catch (e) { }
+  }
+
+  function renderGroupExpenses(page) {
+    ensureGroupAccounts();
+    page.appendChild(head('Group Expenses', 'building', 'The Group\'s own running costs — office, food, utilities, rent — with budget vs actual. Posted to the group ledger.',
+      [ can('create') ? el('button.btn.btn-ghost', { html: ui.icon('bullseye') + ' Set Budget', onclick: function () { setBudgetForm(null); } }) : null,
+        can('create') ? el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' Record Expense', onclick: function () { groupExpenseForm(null); } }) : null ].filter(Boolean)));
+    page.appendChild(pills('expenses'));
+    if (!hasLedger()) { page.appendChild(el('div.card', null, [ el('div.card-body', { text: 'Ledger engine unavailable.' }) ])); return; }
+
+    var yr = gToday().slice(0, 4), yStart = yr + '-01-01', yEnd = yr + '-12-31';
+    var budgets = EPAL.store.list('group_budgets');
+    var byHead = {};
+    GROUP_EXP_HEADS.forEach(function (h) { byHead[h[0]] = { head: h[0], account: h[1], budget: 0, period: 'Annual', actual: Math.max(0, Math.round(LED().balance(h[1], { companyId: 'group', from: yStart, to: yEnd }))) }; });
+    budgets.forEach(function (b) { if (byHead[b.category]) { byHead[b.category].budget = b.period === 'Monthly' ? (b.amount || 0) * 12 : (b.amount || 0); byHead[b.category].period = b.period; } });
+    var list = Object.keys(byHead).map(function (k) { return byHead[k]; }).filter(function (x) { return x.budget > 0 || x.actual > 0; });
+    var totalActual = list.reduce(function (a, x) { return a + x.actual; }, 0);
+    var totalBudget = list.reduce(function (a, x) { return a + x.budget; }, 0);
+    var overCount = list.filter(function (x) { return x.budget > 0 && x.actual > x.budget; }).length;
+    var biggest = list.slice().sort(function (a, b) { return b.actual - a.actual; })[0];
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Spent (' + yr + ')', ui.money(totalActual, { compact: true }), 'cash-stack'),
+      kpi('Budget', totalBudget ? ui.money(totalBudget, { compact: true }) : '—', 'bullseye'),
+      kpi('Used', totalBudget ? Math.round(totalActual / totalBudget * 100) + '%' : '—', 'speedometer2', null, totalBudget && totalActual > totalBudget ? 'over budget' : ''),
+      kpi('Biggest Head', biggest ? biggest.head : '—', 'pie-chart'),
+      kpi('Over Budget', String(overCount), 'exclamation-triangle', null, overCount ? 'heads over' : 'all within')
+    ]));
+
+    // ---- budget vs actual ----
+    var bvaBody = el('div.card-body');
+    if (!list.length) bvaBody.appendChild(el('div.text-mute.sm', { text: 'No group expenses yet — record one, or set a budget head.' }));
+    list.slice().sort(function (a, b) { return b.actual - a.actual; }).forEach(function (x) {
+      var pct = x.budget ? Math.min(150, Math.round(x.actual / x.budget * 100)) : 0;
+      var over = x.budget && x.actual > x.budget;
+      bvaBody.appendChild(el('div', { style: { marginBottom: '11px' } }, [
+        el('div.flex.justify-between.items-center', null, [
+          el('div.fw-600', { text: x.head }),
+          el('div.text-mute.sm', { html: ui.money(x.actual) + (x.budget ? ' <span class="text-mute">/ ' + ui.money(x.budget) + '</span>' : ' <span class="text-mute">· no budget</span>') })
+        ]),
+        el('div', { style: { height: '7px', background: 'var(--surface-3)', borderRadius: '5px', overflow: 'hidden', marginTop: '4px' } }, [
+          el('div', { style: { height: '100%', width: (x.budget ? Math.min(100, pct) : 0) + '%', background: over ? RED : pct > 85 ? AMBER : GREEN, borderRadius: '5px', transition: 'width .4s' } })
+        ]),
+        x.budget ? el('div.text-mute.xs', { style: { marginTop: '2px' }, text: over ? ('Over by ' + ui.money(x.actual - x.budget)) : (ui.money(x.budget - x.actual) + ' remaining · ' + pct + '% used') }) : null
+      ].filter(Boolean)));
+    });
+    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('speedometer2') + ' Budget vs Actual — ' + yr } ), el('span.card-sub', { text: 'live from the ledger' }) ]), bvaBody ]));
+
+    // ---- expense register ----
+    var entries = groupExpenses().slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
+    var tbl = EPAL.table({
+      columns: [
+        { key: 'date', label: 'Date', date: true },
+        { key: 'category', label: 'Head', badge: {} },
+        { key: 'desc', label: 'Detail', render: function (e) { return ui.escapeHtml(e.desc || e.category || '—'); } },
+        { key: 'party', label: 'Paid to', render: function (e) { return ui.escapeHtml(e.party || '—'); } },
+        { key: 'method', label: 'Method', badge: {} },
+        { key: 'paid', label: 'Status', render: function (e) { return e.paid === false ? '<span class="badge badge-warn">Payable</span>' : '<span class="badge badge-good">Paid</span>'; } },
+        { key: 'amount', label: 'Amount', num: true, money: true }
+      ],
+      rows: entries, searchKeys: ['category', 'desc', 'party'], quickFilter: 'category', filterPanel: true, dateKey: 'date',
+      exportName: 'group-expenses.csv', pdfTitle: 'Epal Group — Expenses',
+      actions: ui.actions({
+        edit: can('create') ? function (e) { groupExpenseForm(e); } : null,
+        del: can('delete') ? function (e) { deleteGroupExpense(e); } : null
+      }),
+      empty: { icon: 'receipt', title: 'No group expenses', hint: 'Record office, food or utility costs for the group.' }
+    });
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('receipt') + ' Expense Register' }), el('span.card-sub', { text: entries.length + ' entries · posted to the group ledger' }) ]),
+      el('div.card-body', null, [ tbl.el ])
+    ]));
+  }
+  function groupExpenseForm(existing) {
+    EPAL.formModal({
+      title: existing ? 'Edit Group Expense' : 'Record Group Expense', icon: 'receipt', size: 'md',
+      record: existing || { date: gToday(), method: 'Bank', paid: true },
+      fields: [
+        { key: 'category', label: 'Expense head', type: 'select', required: true, options: GROUP_EXP_HEADS.map(function (h) { return h[0]; }) },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 0 },
+        { key: 'date', label: 'Date', type: 'date', default: gToday() },
+        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Cheque', 'Card'], default: 'Bank' },
+        { key: 'party', label: 'Paid to (vendor)', type: 'text', placeholder: 'e.g. City Corp, DESCO' },
+        { key: 'paid', label: 'Paid now (uncheck for a payable)', type: 'checkbox', default: true, col2: true },
+        { key: 'desc', label: 'Note', type: 'textarea', col2: true }
+      ],
+      saveLabel: existing ? 'Save' : 'Record',
+      onSave: function (val) {
+        var r = existing || { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: 'group', kind: 'Expense', created: Date.now() };
+        r.category = val.category; r.account = acctForHead(val.category); r.amount = +val.amount || 0; r.date = val.date;
+        r.method = val.method; r.party = val.party || ''; r.desc = val.desc || ''; r.paid = val.paid !== false;
+        postGroupExpense(r);
+        ui.toast('Group expense recorded', 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+  function deleteGroupExpense(e) {
+    ui.confirm({ title: 'Delete this expense?', text: (e.category || '') + ' · ' + ui.money(e.amount), danger: true, confirmLabel: 'Delete' }).then(function (ok) {
+      if (!ok) return;
+      db().remove('acc_entries', e.id);
+      try { LED().post({ id: 'GL-GXR-' + e.id, date: gToday(), companyId: 'group', ref: 'REV-' + e.id, memo: 'Reversal — ' + (e.category || ''), source: 'adjustment', lines: [{ account: e.paid === false ? '2000' : '1010', dr: e.amount, cr: 0 }, { account: e.account, dr: 0, cr: e.amount }] }); } catch (x) { }
+      ui.toast('Deleted', 'success'); EPAL.router.render();
+    });
+  }
+  function setBudgetForm(existing) {
+    EPAL.formModal({
+      title: 'Set Budget', icon: 'bullseye', size: 'sm', record: existing || { period: 'Annual' },
+      fields: [
+        { key: 'category', label: 'Expense head', type: 'select', required: true, options: GROUP_EXP_HEADS.map(function (h) { return h[0]; }) },
+        { key: 'period', label: 'Period', type: 'select', options: ['Monthly', 'Annual'], default: 'Annual' },
+        { key: 'amount', label: 'Budget amount (৳)', type: 'money', required: true, min: 0 }
+      ],
+      saveLabel: 'Save Budget',
+      onSave: function (val) {
+        EPAL.store.upsert('group_budgets', { id: 'BUD-' + String(val.category).replace(/[^A-Za-z]/g, ''), companyId: 'group', category: val.category, account: acctForHead(val.category), period: val.period, amount: +val.amount || 0 });
+        ui.toast('Budget saved', 'success'); EPAL.router.render(); return true;
+      }
+    });
   }
 
   /* ==========================================================================
