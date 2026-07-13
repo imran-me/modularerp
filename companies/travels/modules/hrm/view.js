@@ -716,10 +716,31 @@
         el('div.divider'),
         el('div.data-row', null, [ el('div.strong.flex-1', { text: 'Net settlement' }), el('div.strong.text-good', { text: ui.money(p.net) }) ])
       ]),
+      el('div.section-label', { text: 'Documents' }),
+      el('div.flex.gap-1.flex-wrap.mb-2', null, [
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('receipt') + ' Settlement Statement', onclick: function () { settlementStatementDoc(e, p); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('patch-check') + ' Clearance Certificate', onclick: function () { clearanceCertificate(e); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('file-earmark-text') + ' Experience Letter', onclick: function () { experienceLetter(e); } })
+      ]),
       el('div.flex.gap-1.justify-between.mt-3', null, [ el('button.btn.btn-ghost', { text: 'Cancel', onclick: function () { m.close(); } }),
         el('button.btn.btn-primary.text-bad', { html: ui.icon('box-arrow-right') + ' Confirm Settlement', onclick: function () {
           try { PR().settle(e.id); ui.toast('Settlement posted · ' + e.name + ' resigned', 'success'); m.close(); EPAL.router.render(); } catch (x) { ui.toast(x.message || 'Failed', 'error'); } } }) ])
     ]) ]));
+  }
+  /* ---- resignation documents (spec E8) ----------------------------------*/
+  function settlementStatementDoc(e, p) {
+    function r(k, v, neg) { return '<tr><td>' + esc(k) + '</td><td>' + (neg ? '−' : '') + ui.money(v) + '</td></tr>'; }
+    ui.printDoc({ title: 'Final Settlement — ' + e.name, subtitle: 'Epal Travels & Consultancy · Human Resources', meta: (e.designation || '') + ' · ' + e.dept + ' · Settled ' + ui.date(e.resignedDate || TODAY_STR), footer: 'Confidential — HR · system-generated',
+      bodyHtml: '<table><tr><th>Component</th><th>Amount</th></tr>' + r('Unpaid salary due', p.salaryDue) + r('Last month salary', p.lastSalary) + r('Leave encashment (' + p.encashDays.toFixed(2) + ' d)', p.encashValue) + r('Less: advance outstanding', p.advanceOutstanding, true) + r('Less: loan outstanding', p.loanOutstanding, true) + '<tr><th>Net Settlement</th><th>' + ui.money(p.net) + '</th></tr></table>' });
+  }
+  function clearanceCertificate(e) {
+    ui.printDoc({ title: 'Clearance Certificate', subtitle: 'Epal Travels & Consultancy', meta: e.name + ' · ' + (e.designation || '') + ' · ' + e.dept, footer: 'System-generated clearance certificate.',
+      bodyHtml: '<p>This is to certify that <strong>' + esc(e.name) + '</strong> (Employee ID: ' + esc(e.id) + '), serving as ' + esc(e.designation || '') + ' in the ' + esc(e.dept) + ' department, has cleared all dues and responsibilities with Epal Travels &amp; Consultancy as of ' + ui.date(e.resignedDate || TODAY_STR) + '.</p><p>All company property, advances and financial obligations have been duly settled. We wish them success in their future endeavours.</p><br><br><p>_______________________<br>Authorised Signature · Human Resources</p>' });
+  }
+  function experienceLetter(e) {
+    var join = e.joinDate ? ui.date(e.joinDate) : '—', end = ui.date(e.resignedDate || TODAY_STR);
+    ui.printDoc({ title: 'Experience Certificate', subtitle: 'Epal Travels & Consultancy', meta: e.name, footer: 'System-generated experience certificate.',
+      bodyHtml: '<p>This is to certify that <strong>' + esc(e.name) + '</strong> was employed with Epal Travels &amp; Consultancy as <strong>' + esc(e.designation || '') + '</strong> in the ' + esc(e.dept) + ' department from <strong>' + join + '</strong> to <strong>' + end + '</strong>.</p><p>Throughout the tenure we found them sincere, hardworking and professional in conduct. We wish them all the best in their future career.</p><br><br><p>_______________________<br>Authorised Signature · Human Resources</p>' });
   }
   function empById(id) { return team().filter(function (e) { return e.id === id; })[0] || (db().employee ? db().employee(id) : null); }
   function sum(arr, f) { return arr.reduce(function (a, x) { return a + (f(x) || 0); }, 0); }

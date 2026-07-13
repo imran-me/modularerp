@@ -7,13 +7,8 @@
   "route": "#/travels/payroll",
   "enabled": true,
   "built": true,
-  "menu": [
-    { "id": "template", "label": "Salary Template", "route": "#/travels/payroll/template", "enabled": true },
-    { "id": "manage", "label": "Salary Manage", "route": "#/travels/payroll/manage", "enabled": true },
-    { "id": "loans", "label": "Loan Management", "route": "#/travels/payroll/loans", "enabled": true },
-    { "id": "payslip", "label": "Payslip", "route": "#/travels/payroll/payslip", "enabled": true },
-    { "id": "advance", "label": "Advance Salary", "route": "#/travels/payroll/advance", "enabled": true }
-  ],
+  "menu": [],
+  "menuNote": "No sidebar sub-menu by design — the 5 sections (Template/Manage/Loans/Payslip/Advance/Reports) are pill-buttons at the top of the payroll view.",
   "files": {
     "view": "view.js",
     "backend": "backend/LARAVEL-BLUEPRINT.md"
