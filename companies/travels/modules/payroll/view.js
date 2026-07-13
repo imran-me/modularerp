@@ -46,7 +46,8 @@
   ['travels', 'woodart', 'it', 'shop', 'construction'].forEach(function (cid) {
     EPAL.view(cid + '/payroll', {
       render: function (ctx) {
-        CID = cid; payYm = null;
+        if (CID !== cid) payYm = null;          // reset month only when switching company
+        CID = cid;
         var sub = ctx.subId || 'manage';
         if (TABS.map(function (t) { return t[0]; }).indexOf(sub) < 0) sub = 'manage';
         var page = el('div.page');
@@ -65,6 +66,28 @@
       }
     });
   });
+
+  /* ---- EMBEDDED MODE — the payroll desk mounted INSIDE the Accounts section
+   * (owner: "payroll goes in the accounts section — no side menus, buttons at the
+   * top"). The six sections render as a second pill row; state survives re-renders. */
+  var deskTab = 'manage';
+  EPAL.payrollDesk = function (page, cid) {
+    if (CID !== cid) { payYm = null; deskTab = 'manage'; }
+    CID = cid;
+    var host = el('div');
+    function draw() {
+      host.innerHTML = '';
+      var bar = el('div.pill-tab.mb-3');
+      TABS.forEach(function (t) { bar.appendChild(el('button' + (deskTab === t[0] ? '.active' : ''), { text: t[1], onclick: function () { deskTab = t[0]; draw(); } })); });
+      host.appendChild(bar);
+      if (!PR()) { host.appendChild(card('Payroll engine unavailable.')); return; }
+      var section = el('div');
+      ({ template: tplView, manage: manageView, loans: loansView, payslip: payslipView, advance: advanceView, reports: reportsView }[deskTab])(section);
+      host.appendChild(section);
+    }
+    draw();
+    page.appendChild(host);
+  };
 
   /* =================================================== SALARY TEMPLATE */
   function tplView(page) {
@@ -147,19 +170,31 @@
         : ('Finalized — pay by ' + ui.date(run.dueAfter) + ' or unpaid salaries flag Due.') })
     ]) ]));
 
+    // The FULL salary sheet (spec E6.3): Gross | OT | Bonus | Encash | Advance adj |
+    // Loan EMI | Absent | Other ded | Net Payable | Paid | Due | Status per head.
+    function advOf(s) { return (s.paid > 0) ? (s.advanceRecovered || 0) : Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); }
+    function emiOf(s) { return (s.paid > 0) ? (s.loanRecovered || 0) : PR().emiInstallment(s.empId); }
+    function otherOf(s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.otherDeduction || 0); }
+    function dueOf(s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }
     var tbl = EPAL.table({
       columns: [
         { key: 'empName', label: 'Employee', render: function (s) { return EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : '<span class="strong">' + esc(s.empName) + '</span>'; } },
-        { key: 'dept', label: 'Dept', badge: {} },
-        { key: 'earnedGross', label: 'Gross', num: true, money: true },
-        { key: 'ded', label: 'Tax+PF', num: true, sortVal: function (s) { return s.tax + s.pf; }, render: function (s) { var d = s.tax + s.pf; return d ? '<span class="text-warn">' + ui.money(d) + '</span>' : '—'; } },
-        { key: 'encashAmt', label: 'Leave Encash', num: true, money: true },
-        { key: 'net', label: 'Net', num: true, sortVal: function (s) { return PR().slipPayable(s); }, render: function (s) { return '<span class="num strong">' + ui.money(PR().slipPayable(s)) + '</span>'; } },
+        { key: 'gross', label: 'Gross', num: true, money: true },
+        { key: 'overtime', label: 'OT', num: true, render: function (s) { return s.overtime ? ui.money(s.overtime) : '—'; }, sortVal: function (s) { return s.overtime || 0; } },
+        { key: 'bonus', label: 'Bonus', num: true, render: function (s) { return s.bonus ? ui.money(s.bonus) : '—'; }, sortVal: function (s) { return s.bonus || 0; } },
+        { key: 'encashAmt', label: 'Encash', num: true, money: true },
+        { key: 'adv', label: 'Advance', num: true, sortVal: advOf, render: function (s) { var v = advOf(s); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
+        { key: 'emi', label: 'Loan EMI', num: true, sortVal: emiOf, render: function (s) { var v = emiOf(s); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
+        { key: 'absentDeduction', label: 'Absent', num: true, sortVal: function (s) { return s.absentDeduction || 0; }, render: function (s) { return s.absentDeduction ? '<span class="text-bad">' + ui.money(s.absentDeduction) + '</span>' : '—'; } },
+        { key: 'other', label: 'Other Ded.', num: true, sortVal: otherOf, render: function (s) { var v = otherOf(s); return v ? ui.money(v) : '—'; } },
+        { key: 'net', label: 'Net Payable', num: true, sortVal: function (s) { return PR().slipPayable(s); }, render: function (s) { return '<span class="num strong">' + ui.money(PR().slipPayable(s)) + '</span>'; } },
         { key: 'paid', label: 'Paid', num: true, sortVal: function (s) { return s.paid || 0; }, render: function (s) { return s.paid ? '<span class="text-good">' + ui.money(s.paid) + '</span>' : '—'; } },
+        { key: 'due', label: 'Due', num: true, sortVal: dueOf, render: function (s) { var v = dueOf(s); return v ? '<span class="num strong text-bad">' + ui.money(v) + '</span>' : '—'; } },
         { key: 'status', label: 'Status', badge: { draft: '', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
       ],
-      rows: slips, searchKeys: ['empName', 'dept'], quickFilter: 'dept', filterPanel: true, filters: [{ key: 'status', label: 'Status' }],
-      exportName: 'payroll-' + ym + '.csv', pdfTitle: 'Travels Payroll — ' + PR().mLabel(ym),
+      rows: slips, searchKeys: ['empName', 'dept'], quickFilter: 'status', filterPanel: true, filters: [{ key: 'dept', label: 'Dept' }],
+      totalKey: 'net',
+      exportName: 'salary-sheet-' + ym + '.csv', pdfTitle: 'Salary Sheet — ' + PR().mLabel(ym),
       onRow: function (s) { var e = empById(s.empId); if (e) statement(e, ym); },
       actions: ui.actions({
         edit: (canCreate() && st === 'draft' && inWin) ? function (s) { correctionForm(s, ym); } : null,
@@ -167,7 +202,7 @@
       }),
       empty: { icon: 'cash-stack', title: 'No employees to pay' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash-stack') + ' Payslips — ' + PR().mLabel(ym) }), el('span.card-sub', { text: 'click a row for the statement' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash-stack') + ' Salary Sheet — ' + PR().mLabel(ym) }), el('span.card-sub', { text: 'click a row for the payslip · ✎ to correct' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
 
     if (st !== 'draft' && due > 0 && canCreate()) {
       var grid = el('div.grid-auto.kpi-compact');

@@ -102,26 +102,92 @@
     ].filter(Boolean))]));
   }
 
+  /* ---- the PRINTED payslip — a faithful reproduction of the group's real
+   * payslip layout (letterhead · Payslip # · employee/period grid · EARNINGS |
+   * DEDUCTIONS side by side · Salary Adjustment · framed NET PAYABLE with amount
+   * in words · note · signature blocks · timestamp). ------------------------*/
+  var HQ = {
+    addr: 'Feroza Tower, Level 9, 91/B Khilgaon Chowdhury Para, 1219 DIT Rd, Dhaka 1219',
+    phone: '01901378620', email: 'epalgroup37@gmail.com'
+  };
+  function fmt2(v) { return (Math.round((+v || 0) * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function payslipHtml(emp, ym) {
+    var s = PR().statement(emp, ym);
+    var group = (EPAL.config && EPAL.config.group && EPAL.config.group.name) || 'EPAL GROUP';
+    function row(k, v, strong) {
+      return '<tr' + (strong ? ' class="tot"' : '') + '><td>' + esc(k) + '</td><td class="num">' + fmt2(v) + '</td></tr>';
+    }
+    var earn = s.earnings.map(function (x) { return row(x[0], x[1]); }).join('') + row('Gross Earnings', s.grossEarnings, true);
+    // deductions in the printed order; tax/PF/other only when present
+    var dedList = s.deductions.filter(function (x, i) { return i < 5 || x[1] > 0; });
+    var ded = dedList.map(function (x) { return row(x[0], x[1]); }).join('') + row('Total Deductions', s.totalDeductions, true);
+    var ts = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    return '<div class="sheet">' +
+      '<div class="hdr">' +
+        '<div class="logo">e</div>' +
+        '<div class="co"><div class="con">' + esc(group.toUpperCase()) + '</div>' +
+          '<div class="coa">' + esc(HQ.addr) + '</div>' +
+          '<div class="coa">Phone: ' + esc(HQ.phone) + ' | Email: ' + esc(HQ.email) + '</div></div>' +
+        '<div class="sno">Payslip #' + esc(s.slipNo) + '</div>' +
+      '</div>' +
+      '<table class="grid"><tr>' +
+        '<td><div class="gl">EMPLOYEE NAME</div><div class="gv">' + esc(emp.name) + '</div></td>' +
+        '<td><div class="gl">DESIGNATION</div><div class="gv">' + esc(emp.designation || '—') + '</div></td>' +
+        '<td><div class="gl">EMPLOYEE ID</div><div class="gv">' + esc(emp.id || 'N/A') + '</div></td></tr>' +
+        '<tr><td><div class="gl">PAY PERIOD</div><div class="gv">' + esc(ym.replace('-', '/')) + '</div></td>' +
+        '<td><div class="gl">PAYMENT METHOD</div><div class="gv">' + esc((s.payMethod || 'Bank').toLowerCase()) + '</div></td>' +
+        '<td><div class="gl">GENERATE DATE</div><div class="gv">' + esc(s.generated) + '</div></td></tr></table>' +
+      '<table class="cols"><tr><td class="col">' +
+        '<div class="sec">EARNINGS</div><table class="lines">' + earn + '</table>' +
+      '</td><td class="col">' +
+        '<div class="sec">DEDUCTIONS</div><table class="lines">' + ded + '</table>' +
+      '</td></tr></table>' +
+      '<div class="adj">Salary Adjustment : ' + fmt2(s.adjustment || 0) + '</div>' +
+      '<div class="enc">Leave Encashment (Accrued: ' + s.leaveEncashment.accruedDays.toFixed(2) + ' days | ৳' + fmt2(s.leaveEncashment.accruedValue) + ')' + (s.leaveEncashment.eligible ? ' — Eligible ✓' : '') + '</div>' +
+      '<div class="net"><div><div class="nl">NET PAYABLE AMOUNT</div><div class="nw">Amount In Words: ' + esc(s.inWords) + '</div></div>' +
+        '<div class="na">BDT ' + fmt2(s.netPayable) + '</div></div>' +
+      (s.outstanding ? '<div class="due">Outstanding (Due): BDT ' + fmt2(s.outstanding) + (s.paid ? ' · Paid: BDT ' + fmt2(s.paid) : '') + '</div>' : '') +
+      '<div class="note">Note: No note available</div>' +
+      '<table class="sig"><tr><td><div class="sigl"></div>Employee Signature</td><td><div class="sigl"></div>Authorized Signatory</td></tr></table>' +
+      '<div class="ts">TIMESTAMP: ' + ts + '</div>' +
+    '</div>';
+  }
+  var PAYSLIP_CSS =
+    'body{font-family:Inter,Arial,sans-serif;color:#1c2434;margin:0;background:#fff;}' +
+    '.sheet{max-width:780px;margin:0 auto;padding:38px 44px;}' +
+    '.hdr{display:flex;align-items:flex-start;gap:14px;border-bottom:2.5px solid #1c2434;padding-bottom:14px;}' +
+    '.logo{width:44px;height:44px;border-radius:50%;background:#0A2472;color:#fff;font-weight:800;font-size:24px;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;}' +
+    '.co{flex:1;text-align:center;}.con{font-size:21px;font-weight:800;letter-spacing:.02em;}' +
+    '.coa{font-size:10.5px;color:#6a7387;margin-top:2px;}' +
+    '.sno{font-size:12px;font-weight:700;white-space:nowrap;}' +
+    '.grid{width:100%;border-collapse:collapse;margin:22px 0;}' +
+    '.grid td{border:1px solid #e3e9f4;background:#f6f9fd;padding:9px 12px;width:33.3%;}' +
+    '.gl{font-size:9px;color:#8a93a9;letter-spacing:.06em;}.gv{font-size:13px;font-weight:700;margin-top:2px;}' +
+    '.cols{width:100%;border-collapse:collapse;}.col{width:50%;vertical-align:top;padding:0 14px 0 0;}.col+.col{padding:0 0 0 14px;}' +
+    '.sec{font-size:12px;font-weight:800;letter-spacing:.03em;border-bottom:2px solid #1c2434;padding-bottom:6px;margin-bottom:2px;}' +
+    '.lines{width:100%;border-collapse:collapse;}.lines td{padding:8px 2px;border-bottom:1px solid #edf1f8;font-size:12.5px;}' +
+    '.lines .num{text-align:right;font-variant-numeric:tabular-nums;}' +
+    '.lines .tot td{background:#f2f5fb;font-weight:800;}' +
+    '.adj{text-align:center;font-weight:700;font-size:12.5px;margin:16px 0 6px;}' +
+    '.enc{text-align:center;font-size:11px;color:#54607d;margin-bottom:12px;}' +
+    '.net{display:flex;align-items:center;justify-content:space-between;border:2.5px solid #1c2434;padding:14px 18px;margin:6px 0 14px;}' +
+    '.nl{font-weight:800;font-size:13px;}.nw{font-style:italic;font-size:10.5px;color:#54607d;margin-top:3px;}' +
+    '.na{font-size:22px;font-weight:800;color:#1A43BF;white-space:nowrap;font-variant-numeric:tabular-nums;}' +
+    '.due{font-size:11.5px;font-weight:700;color:#b3261e;margin:-6px 0 10px;}' +
+    '.note{font-size:10.5px;color:#8a93a9;margin:16px 0 34px;}' +
+    '.sig{width:100%;border-collapse:collapse;margin-bottom:26px;}.sig td{width:50%;text-align:center;font-weight:700;font-size:12px;padding:0 40px;}' +
+    '.sigl{border-top:1.5px solid #1c2434;margin:0 10px 8px;}' +
+    '.ts{font-size:9.5px;color:#9aa3b8;}' +
+    '@media print{.sheet{padding:18px 10px;}}';
   function payslipPrint(empIdOrEmp, ym) {
     var emp = typeof empIdOrEmp === 'object' ? empIdOrEmp : resolve(empIdOrEmp);
     if (!emp || !PR()) return;
     ym = ym || PR().curYm();
-    var s = PR().statement(emp, ym);
-    function r(k, v, neg) { return '<tr><td>' + esc(k) + '</td><td style="text-align:right">' + (neg && v ? '−' : '') + money(v) + '</td></tr>'; }
-    var earn = s.earnings.map(function (x) { return r(x[0], x[1]); }).join('') + '<tr><th>Gross Earnings</th><th style="text-align:right">' + money(s.grossEarnings) + '</th></tr>';
-    var ded = s.deductions.map(function (x) { return r(x[0], x[1], true); }).join('') + '<tr><th>Total Deductions</th><th style="text-align:right">' + money(s.totalDeductions) + '</th></tr>';
-    ui().printDoc({
-      title: 'Payslip #' + s.slipNo, subtitle: 'Epal Group · ' + esc(emp.name) + ' · ' + esc(emp.designation || ''),
-      meta: 'Pay period ' + ym + ' · ' + (s.payMethod || 'Bank') + ' · Employee ID ' + esc(emp.id) + ' · Generated ' + ui().date(s.generated),
-      footer: 'Amount in words: ' + s.inWords + ' — system-generated payslip, Confidential.',
-      bodyHtml: '<table><tr><th colspan="2">EARNINGS</th></tr>' + earn + '</table>' +
-        '<table><tr><th colspan="2">DEDUCTIONS</th></tr>' + ded + '</table>' +
-        (s.adjustment ? '<table>' + r('Salary Adjustment', Math.abs(s.adjustment), s.adjustment < 0) + '</table>' : '') +
-        '<table><tr><td>Leave Encashment (' + s.leaveEncashment.days.toFixed(2) + ' d this month)</td><td style="text-align:right">' + money(s.leaveEncashment.amount) + '</td></tr>' +
-        '<tr><td>Leave balance to date</td><td style="text-align:right">' + s.leaveEncashment.accruedDays.toFixed(2) + ' days · ' + money(s.leaveEncashment.accruedValue) + (s.leaveEncashment.eligible ? ' (eligible)' : '') + '</td></tr></table>' +
-        '<table><tr><th>NET PAYABLE</th><th style="text-align:right">' + money(s.netPayable) + '</th></tr>' +
-        (s.paid ? r('Paid', s.paid) : '') + (s.outstanding ? '<tr><td>Outstanding (Due)</td><td style="text-align:right">' + money(s.outstanding) + '</td></tr>' : '') + '</table>'
-    });
+    var w = window.open('', '_blank', 'width=840,height=1060');
+    if (!w) { ui().toast('Allow pop-ups to print', 'warn'); return; }
+    w.document.write('<html><head><title>Payslip — ' + esc(emp.name) + '</title><style>' + PAYSLIP_CSS + '</style></head><body>' + payslipHtml(emp, ym) + '</body></html>');
+    w.document.close();
+    setTimeout(function () { try { w.focus(); w.print(); } catch (e) {} }, 350);
   }
 
   /* ============================================== THE FULL A-Z PROFILE */
@@ -337,6 +403,6 @@
     open(t.getAttribute('data-emp'));
   }, true);
 
-  EPAL.people = { open: open, statement: statement, payslipPrint: payslipPrint, linkify: linkify, resolve: resolve, attendanceForm: attendanceForm };
+  EPAL.people = { open: open, statement: statement, payslipPrint: payslipPrint, payslipHtml: payslipHtml, linkify: linkify, resolve: resolve, attendanceForm: attendanceForm };
 
 })(window.EPAL = window.EPAL || {});

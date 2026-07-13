@@ -113,10 +113,10 @@
   EPAL.view('travels/accounts', {
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
-      if (['overview', 'income', 'expenses', 'journals', 'schedules', 'recurring', 'cheques', 'cashbook', 'pettycash'].indexOf(sub) < 0) sub = 'overview';
+      if (['overview', 'income', 'expenses', 'payroll', 'journals', 'schedules', 'recurring', 'cheques', 'cashbook', 'pettycash'].indexOf(sub) < 0) sub = 'overview';
       var page = el('div.page');
 
-      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register', cashbook: 'Cash Book', pettycash: 'Petty Cash' };
+      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', payroll: 'Payroll', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register', cashbook: 'Cash Book', pettycash: 'Petty Cash' };
       var subs = { overview: 'Income, expenses, journals and payment schedules for Epal Travels.',
         income: 'Every rupee earned — by head, method and month.', expenses: 'Every rupee spent — controlled by head and method.',
         journals: 'Post balanced double-entry journals straight into the general ledger.',
@@ -124,7 +124,8 @@
         recurring: 'Rent, internet and other monthly costs — auto-created on their day each month.',
         cheques: 'Issued and received cheques with clearing status (pending / cleared / bounced).',
         cashbook: 'Every cash & bank movement, dated, with a running balance — straight from the ledger.',
-        pettycash: 'Petty-cash IOU slips to staff and their settlement against bills.' };
+        pettycash: 'Petty-cash IOU slips to staff and their settlement against bills.',
+        payroll: 'Salary template, monthly run, loans, payslips & advances — posted to the ledger.' };
 
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
@@ -146,13 +147,14 @@
 
       // pill-tab navigation across the accounts sub-screens
       var pills = el('div.pill-tab.mb-3');
-      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['cashbook', 'Cash Book'], ['pettycash', 'Petty Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
+      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['payroll', 'Payroll'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['cashbook', 'Cash Book'], ['pettycash', 'Petty Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
       });
       page.appendChild(pills);
 
-      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView, cashbook: cashBookView, pettycash: pettyView }[sub] || overview)(page);
+      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView, cashbook: cashBookView, pettycash: pettyView,
+         payroll: function (p) { if (EPAL.payrollDesk) EPAL.payrollDesk(p, CID); else p.appendChild(el('div.card', null, [el('div.card-body', { text: 'Payroll desk unavailable.' })])); } }[sub] || overview)(page);
       ctx.mount.appendChild(page);
     }
   });
