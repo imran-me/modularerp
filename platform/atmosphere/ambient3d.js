@@ -103,6 +103,7 @@
       white: S(0xa9bae0, 0.48, 0.22), blue: S(0x1c53b8, 0.4, 0.32), soft: S(0x5f7ac9, 0.5, 0.22),
       grey: S(0x8996b4, 0.5, 0.25), gun: S(0x566078, 0.5, 0.34), dark: S(0x232d47, 0.5, 0.4), cockpit: S(0x14203a, 0.22, 0.6),
       nacelle: S(0x3c4658, 0.45, 0.5), fan: S(0xaebbd6, 0.35, 0.65), win: S(0x0e1830, 0.2, 0.5),
+      tire: S(0x14161c, 0.85, 0.05), strut: S(0x8a94a8, 0.5, 0.5),
       accent: S(0xf4b740, 0.5, 0.2), red: S(0xf0506e, 0.5, 0.2),
       lightTex: lightSprite(THREE), mat: mat, THREE: THREE
     };
@@ -149,7 +150,7 @@
     updaters.push(function (t) { radar.head.rotation.y = t * 1.1; });
     scene.add(at(light(THREE, M, 0xff2a2a, 2.4, 'beacon', 0.7, 0.0), 120, 53, -120));   // tower obstruction beacon
     scene.add(at(light(THREE, M, 0xff2a2a, 2.6, 'beacon', 0.6, 1.7), 150, 50, -232));    // skyline obstruction beacon
-    var parked = buildAirliner(THREE, M, 2.0, false, LIVERIES[0]); parked.position.set(-70, 3.4, -66); parked.rotation.y = Math.PI / 2; scene.add(parked);
+    var parked = buildAirliner(THREE, M, 2.0, false, LIVERIES[0]); parked.position.set(-70, 4.8, -66); parked.rotation.y = Math.PI / 2; scene.add(parked);
     scene.add(buildTruck(THREE, M, V(-52, 0, -60)));
     scene.add(buildTruck(THREE, M, V(40, 0, -120)));
 
@@ -172,23 +173,30 @@
       });
     }
 
-    // ---- TAKE-OFF: roll, rotate, climb away up-right ---------------------
-    mover(buildAirliner(THREE, M, 1.9, false, LIVERIES[0]), 21, function (u) {
-      if (u < 0.42) return V(4, 1.9, 40 - (u / 0.42) * 190);
-      var k = (u - 0.42) / 0.58, e = k * k; return V(4 + e * 60, 1.9 + e * 110, -150 - e * 340);
+    // ---- TAKE-OFF: gear down on the roll, retracts just after rotation ----
+    var toP = buildAirliner(THREE, M, 1.9, false, LIVERIES[0]);
+    mover(toP, 21, function (u) {
+      if (u < 0.42) return V(4, 4.6, 40 - (u / 0.42) * 190);
+      var k = (u - 0.42) / 0.58, e = k * k; return V(4 + e * 60, 4.6 + e * 110, -150 - e * 340);
     });
-    // ---- LANDING: descend, touch down, roll out toward viewer ------------
-    mover(buildAirliner(THREE, M, 1.9, false, LIVERIES[1]), 24, function (u) {
-      if (u < 0.62) { var e = u / 0.62; return V(-4, 78 - e * e * 76, -360 + e * 320); }
-      var k = (u - 0.62) / 0.38; return V(-4, 1.9, -40 + k * 74);
+    updaters.push(function (t) { toP.userData.gear.visible = ((t % 21) / 21) < 0.52; });
+    // ---- LANDING: descend, flare, touch down, roll out (gear down) --------
+    var laP = buildAirliner(THREE, M, 1.9, false, LIVERIES[1]);
+    mover(laP, 24, function (u) {
+      if (u < 0.62) { var e = u / 0.62; return V(-4, 80 - e * e * 75.4, -360 + e * 320); }
+      var k = (u - 0.62) / 0.38; return V(-4, 4.6, -40 + k * 74);
     });
-    // ---- TAXIING airliner ------------------------------------------------
-    mover(buildAirliner(THREE, M, 1.7, false, LIVERIES[2]), 40, function (u) { return V(52, 1.9, -230 + u * 200); });
-    // ---- CRUISE pair overhead --------------------------------------------
-    mover(buildAirliner(THREE, M, 1.5, false, LIVERIES[3]), 30, function (u) { return V(-420 + u * 840, 108, -200); });
-    mover(buildAirliner(THREE, M, 1.5, false, LIVERIES[4]), 34, function (u) { return V(430 - u * 860, 138, -300); });
-    // ---- high CARGO freighter --------------------------------------------
-    mover(buildAirliner(THREE, M, 2.4, true), 52, function (u) { return V(460 - u * 920, 186, -420); });
+    // ---- TAXIING airliner (gear down) ------------------------------------
+    var txP = buildAirliner(THREE, M, 1.7, false, LIVERIES[2]);
+    mover(txP, 40, function (u) { return V(52, 4.1, -230 + u * 200); });
+    // ---- CRUISE pair overhead (gear up) ----------------------------------
+    var cr1 = buildAirliner(THREE, M, 1.5, false, LIVERIES[3]); cr1.userData.gear.visible = false;
+    mover(cr1, 30, function (u) { return V(-420 + u * 840, 108, -200); });
+    var cr2 = buildAirliner(THREE, M, 1.5, false, LIVERIES[4]); cr2.userData.gear.visible = false;
+    mover(cr2, 34, function (u) { return V(430 - u * 860, 138, -300); });
+    // ---- high CARGO freighter (gear up) ----------------------------------
+    var cargo = buildAirliner(THREE, M, 2.4, true); cargo.userData.gear.visible = false;
+    mover(cargo, 52, function (u) { return V(460 - u * 920, 186, -420); });
 
     // ---- HELICOPTER crossing ---------------------------------------------
     var heli = buildHeli(THREE, M); scene.add(heli.g);
@@ -221,9 +229,6 @@
     var lights = []; scene.traverse(function (o) { if (o.userData && o.userData.light && o.userData.light.pat !== 'steady' && o.material) lights.push(o); });
     updaters.push(function (t) { for (var i = 0; i < lights.length; i++) lights[i].material.opacity = lightLevel(lights[i].userData.light, t); });
 
-    // ---- 1px charcoal silhouette outline over every solid object ----------
-    addOutlines(THREE, scene, new THREE.LineBasicMaterial({ color: 0x24282f, transparent: true, opacity: 0.75, fog: true }));
-
     return updaters;
   }
 
@@ -232,55 +237,87 @@
   /* Tasteful airline LIVERIES: muted mid-tone body + one saturated tail/cheatline
      accent (wings stay body-coloured, like real jets). Tweak hexes live to taste. */
   var LIVERIES = [
-    { body: 0xa9bcdf, accent: 0x14357f, tail: 0x1a43bf },  // brand blue
-    { body: 0x9fc4c4, accent: 0x0d6f74, tail: 0x0e8a86 },  // teal
-    { body: 0xceb2c2, accent: 0x8e2f57, tail: 0xc23c66 },  // rose
-    { body: 0xb7b1d6, accent: 0x3a2f8f, tail: 0x4a3fb0 },  // indigo
-    { body: 0xd6c39a, accent: 0xa9741c, tail: 0xe0a020 }   // sand / amber
+    { body: 0xdbe3ef, accent: 0x1846b0, tail: 0x1a43bf },  // white · brand blue tail
+    { body: 0xdde8e6, accent: 0x0d6f74, tail: 0x0e8a86 },  // white · teal tail
+    { body: 0xe7dfe4, accent: 0x9c2f5c, tail: 0xc23c66 },  // white · rose tail
+    { body: 0xdedcec, accent: 0x3a2f8f, tail: 0x4a3fb0 },  // white · indigo tail
+    { body: 0xece4d1, accent: 0xa9741c, tail: 0xe0a020 }   // cream · amber tail
   ];
 
-  // a detailed low-poly airliner: tapered fuselage, swept+dihedral wings, under-wing
-  // nacelles, window band, swept tail — plus a full aircraft light set.
+  // a realistic low-poly airliner: smooth revolved (lathe) fuselage with a pointed
+  // nose + tapered tail, flight-deck windshield, window band + cheatline, swept +
+  // dihedral wings with PODDED turbofan engines on pylons, swept tail with a fin
+  // fillet, RETRACTABLE landing gear, and a full aircraft light set.
   function buildAirliner(THREE, M, scale, cargo, livery) {
     var g = new THREE.Group();
     var lv = livery || LIVERIES[0];
-    var body = cargo ? M.grey : M.mat(lv.body, 0.5, 0.2);      // fuselage / wings / stabs
-    var ac   = cargo ? M.dark : M.mat(lv.accent, 0.42, 0.3);   // cheatline
-    var tl   = cargo ? M.red  : M.mat(lv.tail, 0.42, 0.3);     // fin + winglets — colour pop
+    var body = cargo ? M.grey : M.mat(lv.body, 0.42, 0.16);    // fuselage / wings / stabs
+    var ac   = cargo ? M.dark : M.mat(lv.accent, 0.4, 0.3);    // cheatline
+    var tl   = cargo ? M.red  : M.mat(lv.tail, 0.4, 0.3);      // fin + winglets — colour pop
 
-    var fus = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.9, 11, 24), body); fus.rotation.x = Math.PI / 2; g.add(fus);
-    var nose = new THREE.Mesh(new THREE.SphereGeometry(1.0, 22, 16), body); nose.scale.set(1, 1, 1.7); nose.position.z = 6.0; g.add(nose);
-    var tcone = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.6, 24), body); tcone.rotation.x = -Math.PI / 2 + 0.16; tcone.position.set(0, 0.42, -6.6); g.add(tcone);   // upswept tail
-    // window band + cheatline
-    var win = new THREE.Mesh(new THREE.CylinderGeometry(1.005, 0.905, 9.4, 24, 1, true), M.win); win.rotation.x = Math.PI / 2; win.scale.y = 0.11; win.position.y = 0.34; g.add(win);
-    var stripe = new THREE.Mesh(new THREE.CylinderGeometry(1.01, 0.91, 9.4, 24, 1, true), ac); stripe.rotation.x = Math.PI / 2; stripe.scale.y = 0.08; stripe.position.y = 0.02; g.add(stripe);
-    var cock = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.42, 1.1), M.cockpit); cock.position.set(0, 0.5, 4.7); g.add(cock);
+    // fuselage — a lathe-revolved profile (radius, z) so the body is a smooth tube
+    // with a pointed nose (+Z) and a slender tapered tail cone (−Z)
+    var P = [[0.03,-6.7],[0.30,-5.9],[0.55,-4.9],[0.78,-3.6],[0.93,-2.0],[1.0,-0.2],[1.0,2.2],[0.97,3.6],[0.86,4.5],[0.64,5.3],[0.34,5.9],[0.07,6.25]];
+    var prof = P.map(function (p) { return new THREE.Vector2(p[0], p[1]); });
+    var fus = new THREE.Mesh(new THREE.LatheGeometry(prof, 30), body); fus.rotation.x = Math.PI / 2; g.add(fus);
+    // window band + cheatline wrapping the upper fuselage
+    var win = new THREE.Mesh(new THREE.CylinderGeometry(1.002, 0.94, 8.4, 30, 1, true), M.win); win.rotation.x = Math.PI / 2; win.scale.y = 0.12; win.position.set(0, 0.34, -0.3); g.add(win);
+    var cheat = new THREE.Mesh(new THREE.CylinderGeometry(1.006, 0.945, 8.6, 30, 1, true), ac); cheat.rotation.x = Math.PI / 2; cheat.scale.y = 0.06; cheat.position.set(0, 0.08, -0.3); g.add(cheat);
+    // flight-deck windshield (dark glass wrap near the nose)
+    var wsh = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 10), M.cockpit); wsh.scale.set(1.0, 0.6, 1.5); wsh.position.set(0, 0.44, 4.5); g.add(wsh);
 
+    // wings (swept + dihedral, tapered) with podded engines on pylons
     [-1, 1].forEach(function (d) {
-      // swept + dihedral tapered wing (root box + narrower tip box)
-      var wroot = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.22, 2.9), body); wroot.position.set(d * 2.6, -0.08, 0.2); wroot.rotation.y = d * 0.36; wroot.rotation.z = d * -0.05; g.add(wroot);
-      var wtip = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.16, 1.5), body); wtip.position.set(d * 6.2, 0.12, -1.0); wtip.rotation.y = d * 0.36; wtip.rotation.z = d * -0.05; g.add(wtip);
-      var wl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.0, 0.9), tl); wl.position.set(d * 7.7, 0.55, -1.55); wl.rotation.z = d * -0.18; g.add(wl);                        // winglet
-      // engine nacelle under + forward of the wing, with a dark intake + pale fan
-      var nac = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.56, 2.7, 16), M.nacelle); nac.rotation.x = Math.PI / 2; nac.position.set(d * 3.1, -0.85, 1.5); g.add(nac);
-      var lip = new THREE.Mesh(new THREE.CylinderGeometry(0.64, 0.64, 0.35, 16), M.dark); lip.rotation.x = Math.PI / 2; lip.position.set(d * 3.1, -0.85, 2.85); g.add(lip);
-      var fan = new THREE.Mesh(new THREE.CircleGeometry(0.5, 16), M.fan); fan.position.set(d * 3.1, -0.85, 2.9); g.add(fan);
+      var wroot = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.2, 3.0), body); wroot.position.set(d * 2.0, -0.5, 0.3); wroot.rotation.y = d * 0.34; wroot.rotation.z = d * -0.05; g.add(wroot);
+      var wtip = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.15, 1.7), body); wtip.position.set(d * 5.5, -0.2, -0.9); wtip.rotation.y = d * 0.34; wtip.rotation.z = d * -0.05; g.add(wtip);
+      var wl = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.05, 0.85), tl); wl.position.set(d * 7.3, 0.2, -1.55); wl.rotation.z = d * -0.42; g.add(wl);                 // upturned winglet
+      var eng = buildNacelle(THREE, M, body); eng.position.set(d * 3.0, -1.2, 1.4); g.add(eng);
+      var pyl = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.95, 1.5), body); pyl.position.set(d * 3.0, -0.62, 1.0); g.add(pyl);
     });
-    // swept vertical fin + horizontal stabilisers
-    var fin = new THREE.Mesh(new THREE.BoxGeometry(0.24, 3.2, 2.4), tl); fin.position.set(0, 1.7, -5.4); fin.rotation.x = -0.22; g.add(fin);
-    [-1, 1].forEach(function (d) { var hs = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.16, 1.2), body); hs.position.set(d * 1.5, 0.55, -5.9); hs.rotation.y = d * 0.34; g.add(hs); });
+    // tail: swept vertical fin (+ root fillet) and horizontal stabilisers
+    var fin = new THREE.Mesh(new THREE.BoxGeometry(0.22, 3.0, 2.6), tl); fin.position.set(0, 1.6, -5.0); fin.rotation.x = -0.32; g.add(fin);
+    var fillet = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.1, 1.7), body); fillet.position.set(0, 0.55, -5.5); g.add(fillet);
+    [-1, 1].forEach(function (d) { var hs = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.16, 1.3), body); hs.position.set(d * 1.4, 0.5, -5.7); hs.rotation.y = d * 0.36; g.add(hs); });
 
-    // ---- aircraft light set (phase-randomised per craft) -----------------
+    // retractable landing gear (shown/hidden per flight phase via g.userData.gear)
+    var gear = buildGear(THREE, M); g.add(gear); g.userData.gear = gear;
+
+    // aircraft light set (phase-randomised per craft so they blink out of sync)
     var ph = Math.random() * 3;
-    g.add(at(light(THREE, M, 0xff2a2a, 0.95, 'steady'), -7.9, 0.3, -1.5));   // port nav (red, steady)
-    g.add(at(light(THREE, M, 0x30ff58, 0.95, 'steady'), 7.9, 0.3, -1.5));    // starboard nav (green, steady)
-    g.add(at(light(THREE, M, 0xffffff, 0.85, 'steady'), 0, 1.9, -6.2));      // tail nav (white, steady)
-    g.add(at(light(THREE, M, 0xffffff, 1.25, 'strobe', 1.0, ph), -7.95, 0.35, -1.6));  // left wingtip strobe
-    g.add(at(light(THREE, M, 0xffffff, 1.25, 'strobe', 1.0, ph), 7.95, 0.35, -1.6));   // right wingtip strobe
-    g.add(at(light(THREE, M, 0xff3020, 1.05, 'beacon', 0.85, ph), 0, 1.15, 0.5));      // upper anti-collision beacon
-    g.add(at(light(THREE, M, 0xff3020, 1.05, 'beacon', 0.85, ph), 0, -1.05, 0.3));     // lower anti-collision beacon
+    g.add(at(light(THREE, M, 0xff2a2a, 0.9, 'steady'), -7.4, 0.15, -1.6));           // port nav (red)
+    g.add(at(light(THREE, M, 0x30ff58, 0.9, 'steady'), 7.4, 0.15, -1.6));            // starboard nav (green)
+    g.add(at(light(THREE, M, 0xffffff, 0.8, 'steady'), 0, 2.9, -5.4));               // tail nav (white)
+    g.add(at(light(THREE, M, 0xffffff, 1.2, 'strobe', 1.0, ph), -7.45, 0.2, -1.7));  // left wingtip strobe
+    g.add(at(light(THREE, M, 0xffffff, 1.2, 'strobe', 1.0, ph), 7.45, 0.2, -1.7));   // right wingtip strobe
+    g.add(at(light(THREE, M, 0xff3020, 1.0, 'beacon', 0.85, ph), 0, 1.05, 0.3));     // upper anti-collision beacon
+    g.add(at(light(THREE, M, 0xff3020, 1.0, 'beacon', 0.85, ph), 0, -1.05, 0.2));    // lower anti-collision beacon
 
     g.scale.setScalar(scale || 1); return g;
+  }
+
+  // a podded turbofan: cowl + dark intake lip + pale fan face + exhaust cone
+  function buildNacelle(THREE, M, body) {
+    var n = new THREE.Group();
+    var cowl = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.5, 2.4, 18), body); cowl.rotation.x = Math.PI / 2; n.add(cowl);
+    var lip = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.3, 18), M.nacelle); lip.rotation.x = Math.PI / 2; lip.position.z = 1.25; n.add(lip);
+    var intake = new THREE.Mesh(new THREE.CircleGeometry(0.5, 18), M.dark); intake.position.z = 1.28; n.add(intake);
+    var fan = new THREE.Mesh(new THREE.CircleGeometry(0.46, 18), M.fan); fan.position.z = 1.30; n.add(fan);
+    var exh = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.24, 0.7, 16), M.dark); exh.rotation.x = Math.PI / 2; exh.position.z = -1.45; n.add(exh);
+    return n;
+  }
+  // retractable tricycle landing gear (nose + twin mains). Wheel bottom ≈ 2.4 below
+  // the fuselage centre, so a craft rolls with fuselage y ≈ 2.4 × scale.
+  function buildGear(THREE, M) {
+    var gear = new THREE.Group();
+    function leg(x, z, twin) {
+      var l = new THREE.Group();
+      var strut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.2, 8), M.strut); strut.position.y = -0.6; l.add(strut);
+      function wheel(dx) { var w = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.26, 16), M.tire); w.rotation.z = Math.PI / 2; w.position.set(dx, -1.25, 0); l.add(w); }
+      if (twin) { wheel(-0.2); wheel(0.2); } else wheel(0);
+      l.position.set(x, -0.85, z); return l;
+    }
+    gear.add(leg(0, 4.3, false)); gear.add(leg(-1.5, -0.5, true)); gear.add(leg(1.5, -0.5, true));
+    return gear;
   }
 
   function buildFighter(THREE, M) {
@@ -411,13 +448,6 @@
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     return new THREE.Points(geo, new THREE.PointsMaterial({ size: size, map: M.lightTex, vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true, blending: THREE.AdditiveBlending }));
-  }
-
-  // 1px charcoal silhouette outline on every solid Mesh (skips sky/ground + sprites/points)
-  function addOutlines(THREE, scene, edgeMat) {
-    var targets = [];
-    scene.traverse(function (o) { if (o.isMesh && o.geometry && !(o.userData && o.userData.noOutline)) targets.push(o); });
-    for (var i = 0; i < targets.length; i++) { var m = targets[i]; m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30), edgeMat)); }
   }
 
   /* ------------------------------------------------------------- textures */
