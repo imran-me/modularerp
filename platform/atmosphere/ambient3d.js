@@ -74,15 +74,19 @@
 
   /* ------------------------------------------------------------ materials */
   function makeMaterials(THREE) {
+    var cache = {};
     function S(c, r, m) { return new THREE.MeshStandardMaterial({ color: c, roughness: r == null ? 0.6 : r, metalness: m == null ? 0.12 : m }); }
+    // cached factory so per-aircraft livery colours don't allocate duplicate materials
+    function mat(c, r, m) { var k = c + '|' + r + '|' + m; return cache[k] || (cache[k] = S(c, r, m)); }
     return {
       ground: S(0xdbe3f2, 0.98, 0), asphalt: S(0x67728c, 0.92, 0.04),
       bldg: S(0xb9c6e8, 0.85, 0.05), bldg2: S(0xccd6ef, 0.85, 0.05), glass: S(0x8fa8d8, 0.35, 0.4),
-      /* aircraft: body is a VISIBLE steel-blue (pure white merges with the pale
-         sky) + deep-royal accents + dark engines → a clear, colored silhouette */
+      /* aircraft base tones. Airliners now get a per-craft LIVERY (mid-tone body +
+         saturated accent, see LIVERIES) so they never merge into the pale sky.
+         Kept here: helicopter/fighter reuse blue+gun; cargo uses grey+dark+red. */
       white: S(0xa9bae0, 0.48, 0.22), blue: S(0x18409f, 0.4, 0.28), soft: S(0x5f7ac9, 0.5, 0.22),
-      grey: S(0x7d8cb0, 0.5, 0.25), dark: S(0x232d47, 0.5, 0.4), cockpit: S(0x1a2540, 0.26, 0.55),
-      accent: S(0xf4b740, 0.5, 0.2), red: S(0xf0506e, 0.5, 0.2), THREE: THREE
+      grey: S(0x7d8cb0, 0.5, 0.25), gun: S(0x566078, 0.5, 0.34), dark: S(0x232d47, 0.5, 0.4), cockpit: S(0x1a2540, 0.26, 0.55),
+      accent: S(0xf4b740, 0.5, 0.2), red: S(0xf0506e, 0.5, 0.2), mat: mat, THREE: THREE
     };
   }
 
@@ -102,7 +106,7 @@
     scene.add(buildTower(THREE, M, V(120, 0, -120)));
     scene.add(buildSkyline(THREE, M, V(150, 0, -230)));
     // parked airliner at the gate + a service truck
-    var parked = buildAirliner(THREE, M, 2.0); parked.position.set(-70, 3.2, -66); parked.rotation.y = Math.PI / 2; scene.add(parked);
+    var parked = buildAirliner(THREE, M, 2.0, false, LIVERIES[0]); parked.position.set(-70, 3.2, -66); parked.rotation.y = Math.PI / 2; scene.add(parked);
     scene.add(buildTruck(THREE, M, V(-52, 0, -60)));
     scene.add(buildTruck(THREE, M, V(40, 0, -120)));
 
@@ -117,23 +121,23 @@
     function mover(obj, cy, path, bank) { scene.add(obj); updaters.push(function (t) { var u = (t % cy) / cy; var p = path(u), p2 = path(Math.min(0.9999, u + 0.004)); place(obj, p, p2, bank || 0); }); }
 
     // ---- TAKE-OFF: roll down the runway, rotate, climb away up-right ------
-    mover(buildAirliner(THREE, M, 1.9), 21, function (u) {
+    mover(buildAirliner(THREE, M, 1.9, false, LIVERIES[0]), 21, function (u) {
       if (u < 0.42) return V(4, 1.6, 40 - (u / 0.42) * 190);
       var k = (u - 0.42) / 0.58, e = k * k; return V(4 + e * 60, 1.6 + e * 110, -150 - e * 340);
     }, 0.05);
 
     // ---- LANDING: descend from far, touch down, roll out toward viewer ----
-    mover(buildAirliner(THREE, M, 1.9), 24, function (u) {
+    mover(buildAirliner(THREE, M, 1.9, false, LIVERIES[1]), 24, function (u) {
       if (u < 0.62) { var e = u / 0.62; return V(-4, 78 - e * e * 76, -360 + e * 320); }
       var k = (u - 0.62) / 0.38; return V(-4, 1.6, -40 + k * 74);
     });
 
     // ---- TAXIING airliner on the taxiway ---------------------------------
-    mover(buildAirliner(THREE, M, 1.7), 40, function (u) { return V(52, 1.6, -230 + u * 200); });
+    mover(buildAirliner(THREE, M, 1.7, false, LIVERIES[2]), 40, function (u) { return V(52, 1.6, -230 + u * 200); });
 
     // ---- CRUISE traffic overhead (both directions) -----------------------
-    mover(buildAirliner(THREE, M, 1.5), 30, function (u) { return V(-420 + u * 840, 108, -200); });
-    mover(buildAirliner(THREE, M, 1.5), 34, function (u) { return V(430 - u * 860, 138, -300); });
+    mover(buildAirliner(THREE, M, 1.5, false, LIVERIES[3]), 30, function (u) { return V(-420 + u * 840, 108, -200); });
+    mover(buildAirliner(THREE, M, 1.5, false, LIVERIES[4]), 34, function (u) { return V(430 - u * 860, 138, -300); });
     // ---- high CARGO freighter, slow R→L ----------------------------------
     mover(buildAirliner(THREE, M, 2.4, true), 52, function (u) { return V(460 - u * 920, 186, -420); });
 
@@ -171,9 +175,25 @@
   }
 
   /* ------------------------------------------------------------- builders */
-  function buildAirliner(THREE, M, scale, cargo) {
+
+  /* A small fleet of tasteful airline LIVERIES: a muted MID-TONE body (clearly
+     darker than the pale sky, so the jet never merges into it) + ONE saturated
+     accent used on the cheatline, wings, winglets and tail fin. "Coloured, just
+     not over-coloured." ── tweak these hexes live tomorrow to taste. */
+  var LIVERIES = [
+    { body: 0x8fa2d4, accent: 0x14357f, tail: 0x1a43bf },  // brand blue
+    { body: 0x7fb0b0, accent: 0x0d6f74, tail: 0x0e8a86 },  // teal
+    { body: 0xbf9fb1, accent: 0x8e2f57, tail: 0xc23c66 },  // rose
+    { body: 0xa59fcb, accent: 0x3a2f8f, tail: 0x4a3fb0 },  // indigo
+    { body: 0xc7b083, accent: 0xa9741c, tail: 0xe0a020 }   // sand / amber
+  ];
+
+  function buildAirliner(THREE, M, scale, cargo, livery) {
     var g = new THREE.Group();
-    var body = cargo ? M.grey : M.white, ac = cargo ? M.dark : M.blue;
+    var lv = livery || LIVERIES[0];
+    var body = cargo ? M.grey : M.mat(lv.body, 0.5, 0.2);       // fuselage / nose / tail-cone
+    var ac   = cargo ? M.dark : M.mat(lv.accent, 0.42, 0.3);    // cheatline / wings / stabiliser
+    var tl   = cargo ? M.red  : M.mat(lv.tail, 0.42, 0.3);      // fin + winglets — the colour pop
     var fus = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 10, 20), body); fus.rotation.x = Math.PI / 2; g.add(fus);
     var nose = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), body); nose.scale.set(1, 1, 1.9); nose.position.z = 5.6; g.add(nose);
     var tail = new THREE.Mesh(new THREE.ConeGeometry(1, 3, 20), body); tail.rotation.x = -Math.PI / 2; tail.position.z = -6.4; g.add(tail);
@@ -181,23 +201,23 @@
     var cock = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.46, 1.05), M.cockpit); cock.position.set(0, 0.52, 4.4); g.add(cock);
     [-1, 1].forEach(function (d) {
       var w = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.24, 2.6), ac); w.position.set(d * 3.9, -0.15, 0.3); w.rotation.y = d * 0.3; w.rotation.z = d * -0.05; g.add(w);
-      var tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.95, 0.95), M.soft); tip.position.set(d * 7.2, 0.22, -0.7); g.add(tip);
+      var tip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.95, 0.95), tl); tip.position.set(d * 7.2, 0.22, -0.7); g.add(tip);
       var e = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 2.2, 14), M.dark); e.rotation.x = Math.PI / 2; e.position.set(d * 3.3, -0.75, 0.9); g.add(e);
     });
-    var fin = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.9, 2.1), ac); fin.position.set(0, 1.3, -5.2); fin.rotation.x = -0.12; g.add(fin);
+    var fin = new THREE.Mesh(new THREE.BoxGeometry(0.26, 2.9, 2.1), tl); fin.position.set(0, 1.3, -5.2); fin.rotation.x = -0.12; g.add(fin);
     var stab = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.22, 1.4), ac); stab.position.set(0, 0.22, -5.6); g.add(stab);
     g.scale.setScalar(scale || 1); return g;
   }
 
   function buildFighter(THREE, M) {
     var g = new THREE.Group();
-    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 6, 14), M.grey); body.rotation.x = Math.PI / 2; g.add(body);
-    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.4, 14), M.grey); nose.rotation.x = Math.PI / 2; nose.position.z = 4.1; g.add(nose);
+    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 6, 14), M.gun); body.rotation.x = Math.PI / 2; g.add(body);
+    var nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.4, 14), M.gun); nose.rotation.x = Math.PI / 2; nose.position.z = 4.1; g.add(nose);
     var canopy = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), M.cockpit); canopy.scale.set(1, 0.7, 1.6); canopy.position.set(0, 0.42, 1.4); g.add(canopy);
     // delta wings
-    [-1, 1].forEach(function (d) { var w = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 2.4), M.grey); w.position.set(d * 1.9, -0.1, -1.4); w.rotation.y = d * 0.5; g.add(w); });
+    [-1, 1].forEach(function (d) { var w = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 2.4), M.gun); w.position.set(d * 1.9, -0.1, -1.4); w.rotation.y = d * 0.5; g.add(w); });
     // twin tail fins
-    [-1, 1].forEach(function (d) { var f = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 1.1), M.grey); f.position.set(d * 0.6, 0.6, -2.6); f.rotation.z = d * 0.25; g.add(f); });
+    [-1, 1].forEach(function (d) { var f = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 1.1), M.gun); f.position.set(d * 0.6, 0.6, -2.6); f.rotation.z = d * 0.25; g.add(f); });
     var burner = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.22, 0.7, 12), M.accent); burner.rotation.x = Math.PI / 2; burner.position.z = -3.2; g.add(burner);
     var stripe = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 4), M.blue); stripe.position.set(0, 0.5, 0.4); g.add(stripe);
     g.scale.setScalar(1.5); return g;
