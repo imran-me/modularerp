@@ -617,7 +617,7 @@
       canRaise ? el('button.btn.btn-primary', { html: ui.icon('file-earmark-check') + ' Raise IPC',
         onclick: function () { m.close(); raiseIPC(b.id, p, null, refresh); } }) : null,
       canPay ? el('button.btn.btn-sm.btn-outline', { html: ui.icon('cash') + ' Mark Paid',
-        onclick: function () { var cur = billLine(b.id); cur.status = 'Paid'; db.save('cn_billing', cur); ui.toast('IPC marked paid', 'success'); m.close(); refresh && refresh(); } }) : null,
+        onclick: function () { var cur = billLine(b.id); if (!cur) { ui.toast('IPC record not found', 'error'); return; } cur.status = 'Paid'; db.save('cn_billing', cur); ui.toast('IPC marked paid', 'success'); m.close(); refresh && refresh(); } }) : null,
       el('button.btn.btn-sm.btn-outline', { html: ui.icon('printer') + ' Certificate', onclick: function () { openIPCDoc(billLine(b.id), p); } })
     ]));
   }

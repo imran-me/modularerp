@@ -83,6 +83,7 @@
         formField('Income-tax threshold (৳)', 'taxThreshold', t.taxThreshold), formField('Income-tax %', 'taxPct', Math.round(t.taxPct * 100)),
         formField('Provident fund % (of basic)', 'pfPct', Math.round(t.pfPct * 100)),
         formField('Overtime rate / hour (0 = auto 1.5×)', 'overtimeRate', t.overtimeRate || 0),
+        formField('Lates per absent day', 'latesPerAbsent', t.latesPerAbsent || 3),
         formField('Annual leave days', 'leaveDaysPerYear', t.leaveDaysPerYear), formField('Working days / month', 'workingDays', t.workingDays),
         formField('Pay-by day', 'payByDay', t.payByDay), formField('Correction until day', 'correctionDay', t.correctionDay),
         canCreate() ? el('button.btn.btn-primary.mt-2', { html: ui.icon('save') + ' Save Template', onclick: function () { saveTpl(t); } }) : null
@@ -101,7 +102,7 @@
     var page = document.querySelector('#view');
     function g(k) { var i = page.querySelector('[data-key="' + k + '"]'); return i ? +i.value : 0; }
     t.basicPct = g('basicPct') / 100; t.housePct = g('housePct') / 100; t.medicalPct = g('medicalPct') / 100;
-    t.taxThreshold = g('taxThreshold'); t.taxPct = g('taxPct') / 100; t.pfPct = g('pfPct') / 100; t.overtimeRate = g('overtimeRate');
+    t.taxThreshold = g('taxThreshold'); t.taxPct = g('taxPct') / 100; t.pfPct = g('pfPct') / 100; t.overtimeRate = g('overtimeRate'); t.latesPerAbsent = g('latesPerAbsent') || 3;
     t.leaveDaysPerYear = g('leaveDaysPerYear'); t.workingDays = g('workingDays'); t.payByDay = g('payByDay'); t.correctionDay = g('correctionDay');
     if (t.basicPct + t.housePct + t.medicalPct > 1) { ui.toast('Basic + House + Medical cannot exceed 100%', 'error'); return; }
     PR().saveTemplate(t); ui.toast('Template saved', 'success'); EPAL.router.render();
@@ -141,7 +142,7 @@
 
     var tbl = EPAL.table({
       columns: [
-        { key: 'empName', label: 'Employee', render: function (s) { return '<span class="strong">' + esc(s.empName) + '</span>'; } },
+        { key: 'empName', label: 'Employee', render: function (s) { return EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : '<span class="strong">' + esc(s.empName) + '</span>'; } },
         { key: 'dept', label: 'Dept', badge: {} },
         { key: 'earnedGross', label: 'Gross', num: true, money: true },
         { key: 'ded', label: 'Tax+PF', num: true, sortVal: function (s) { return s.tax + s.pf; }, render: function (s) { var d = s.tax + s.pf; return d ? '<span class="text-warn">' + ui.money(d) + '</span>' : '—'; } },
@@ -184,11 +185,15 @@
       saveLabel: 'Post Payment', onSave: function (v) { try { PR().pay(s.empId, ym, +v.amount, v.method); ui.toast('Payment posted', 'success'); EPAL.router.render(); return true; } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; } } });
   }
   function correctionForm(s, ym) {
-    EPAL.formModal({ title: 'Correction — ' + s.empName, icon: 'sliders', size: 'sm', record: { leaveDeductDays: s.leaveDeductDays || 0, overtimeHours: s.overtimeHours || 0, otherDeduction: s.otherDeduction || 0, bonus: s.bonus || 0 },
-      fields: [ { key: 'leaveDeductDays', label: 'Unpaid-leave days', type: 'number', min: 0, max: 30, default: 0, hint: 'Prorates gross by (gross ÷ working days) × days.' },
+    EPAL.formModal({ title: 'Correction — ' + s.empName, icon: 'sliders', size: 'md',
+      record: { leaveDeductDays: s.leaveDeductDays || 0, lateDays: s.lateDays || 0, earlyDays: s.earlyDays || 0, overtimeHours: s.overtimeHours || 0, otherDeduction: s.otherDeduction || 0, bonus: s.bonus || 0, adjustment: s.adjustment || 0 },
+      fields: [ { key: 'leaveDeductDays', label: 'Absent days', type: 'number', min: 0, max: 30, default: 0, hint: 'Deducts (gross ÷ working days) × days.' },
+        { key: 'lateDays', label: 'Late count', type: 'number', min: 0, default: 0, hint: 'Every ' + (PR().template(CID).latesPerAbsent || 3) + ' lates deduct one day.' },
+        { key: 'earlyDays', label: 'Early-leave count', type: 'number', min: 0, default: 0 },
         { key: 'overtimeHours', label: 'Overtime hours', type: 'number', min: 0, default: 0, hint: 'Paid at the template rate (default 1.5× hourly).' },
-        { key: 'otherDeduction', label: 'Other deduction (৳)', type: 'money', min: 0, default: 0 }, { key: 'bonus', label: 'Bonus (৳)', type: 'money', min: 0, default: 0 } ],
-      saveLabel: 'Apply', onSave: function (v) { try { PR().adjustSlip(s.empId, ym, { leaveDeductDays: +v.leaveDeductDays, overtimeHours: +v.overtimeHours, otherDeduction: +v.otherDeduction, bonus: +v.bonus }); ui.toast('Applied', 'success'); EPAL.router.render(); return true; } catch (e) { ui.toast(e.message || 'Blocked', 'error'); return false; } } });
+        { key: 'otherDeduction', label: 'Other deduction (৳)', type: 'money', min: 0, default: 0 }, { key: 'bonus', label: 'Bonus (৳)', type: 'money', min: 0, default: 0 },
+        { key: 'adjustment', label: 'Salary adjustment (± ৳)', type: 'number', default: 0, hint: 'Signed: positive adds, negative deducts.' } ],
+      saveLabel: 'Apply', onSave: function (v) { try { PR().adjustSlip(s.empId, ym, { leaveDeductDays: +v.leaveDeductDays, lateDays: +v.lateDays, earlyDays: +v.earlyDays, overtimeHours: +v.overtimeHours, otherDeduction: +v.otherDeduction, bonus: +v.bonus, adjustment: +v.adjustment }); ui.toast('Applied', 'success'); EPAL.router.render(); return true; } catch (e) { ui.toast(e.message || 'Blocked', 'error'); return false; } } });
   }
 
   /* =================================================== LOAN MANAGEMENT */
@@ -293,7 +298,7 @@
 
     var tbl = EPAL.table({
       columns: [
-        { key: 'empName', label: 'Employee', render: function (s) { return '<span class="strong">' + esc(s.empName) + '</span>'; } },
+        { key: 'empName', label: 'Employee', render: function (s) { return EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : '<span class="strong">' + esc(s.empName) + '</span>'; } },
         { key: 'ym', label: 'Month', render: function (s) { return PR().mLabel(s.ym); } },
         { key: 'earnedGross', label: 'Gross', num: true, money: true },
         { key: 'net', label: 'Net', num: true, sortVal: function (s) { return PR().slipPayable(s); }, render: function (s) { return '<span class="num strong">' + ui.money(PR().slipPayable(s)) + '</span>'; } },
@@ -309,46 +314,10 @@
   }
   function field(label, input) { return el('div', null, [ el('label.text-mute.sm', { text: label, style: { display: 'block', marginBottom: '3px' } }), input ]); }
 
-  /* ---- salary statement (shared) ----------------------------------------*/
-  function statement(e, ym) {
-    var s = PR().statement(e, ym), body = el('div');
-    ui.modal({ title: 'Salary Statement — ' + e.name, icon: 'receipt', size: 'md', body: body, footer: false });
-    var le = s.leaveEncashment;
-    body.appendChild(el('div.card', null, [ el('div.card-body', null, [
-      el('div.flex.items-center.gap-2.mb-3', null, [ el('div.flex-1', null, [ el('div.fw-700', { text: e.name }), el('div.text-mute.sm', { text: PR().mLabel(ym) + ' · ' + (e.designation || '') }) ]),
-        el('span.badge.badge-' + (s.status === 'paid' ? 'good' : s.status === 'due' ? 'bad' : s.status === 'partial' ? 'warn' : 'info'), { text: cap(s.status) }),
-        el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { statementPrint(e, ym); } }) ]),
-      el('div.data-list', null, [
-        el('div.section-label', { text: 'Earnings' }),
-        drow('Basic', ui.money(s.slip.basic)), drow('House rent', ui.money(s.slip.house)), drow('Medical', ui.money(s.slip.medical)), drow('Transport', ui.money(s.slip.transport)),
-        s.slip.leaveDeductDays ? drow('Unpaid leave', s.slip.leaveDeductDays + ' day(s)') : null,
-        el('div.data-row', null, [ el('div.strong.flex-1', { text: 'Gross earned' }), el('div.strong', { text: ui.money(s.grossEarned) }) ]),
-        s.slip.overtime ? drow('Overtime (' + (s.slip.overtimeHours || 0) + 'h)', ui.money(s.slip.overtime)) : null,
-        s.slip.bonus ? drow('Bonus / allowance', ui.money(s.slip.bonus)) : null,
-        el('div.section-label', { text: 'Deductions' }),
-        drow('Income tax', '−' + ui.money(s.slip.tax)), drow('Provident fund', '−' + ui.money(s.slip.pf)),
-        s.slip.otherDeduction ? drow('Other deduction', '−' + ui.money(s.slip.otherDeduction)) : null,
-        el('div.section-label', { text: 'Leave Encashment (annual benefit)' }),
-        drow('Accrued this month', le.days.toFixed(2) + ' day · ' + ui.money(le.amount)),
-        drow('Balance to date', le.accruedDays.toFixed(2) + ' days · ' + ui.money(le.accruedValue)),
-        el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: 'Full-year eligibility' }), el('div', null, [ le.eligible ? el('span.badge.badge-good', { text: 'Eligible — ' + le.fullYearDays + ' days' }) : el('span.badge.badge-warn', { text: 'Accruing' }) ]) ]),
-        el('div.divider'),
-        el('div.data-row', null, [ el('div.strong.flex-1', { text: 'Net Payable' }), el('div.strong.text-good', { text: ui.money(s.netPayable) }) ]),
-        s.paid ? drow('Paid', ui.money(s.paid)) : null,
-        s.outstanding ? el('div.data-row', null, [ el('div.strong.flex-1', { text: 'Outstanding' }), el('div.strong.text-warn', { text: ui.money(s.outstanding) }) ]) : null
-      ].filter(Boolean))
-    ]) ]));
-  }
-  function statementPrint(e, ym) {
-    var s = PR().statement(e, ym), le = s.leaveEncashment;
-    function r(k, v, neg) { return '<tr><td>' + esc(k) + '</td><td>' + (neg ? '−' : '') + ui.money(v) + '</td></tr>'; }
-    ui.printDoc({ title: 'Salary Statement — ' + e.name, subtitle: 'Epal Travels & Consultancy · Payroll', meta: (e.designation || '') + ' · ' + PR().mLabel(ym), footer: 'System-generated — Confidential',
-      bodyHtml: '<table><tr><th>Component</th><th>Amount</th></tr>' + r('Basic', s.slip.basic) + r('House rent', s.slip.house) + r('Medical', s.slip.medical) + r('Transport', s.slip.transport) +
-        '<tr><th>Gross earned</th><th>' + ui.money(s.grossEarned) + '</th></tr>' + r('Income tax', s.slip.tax, true) + r('Provident fund', s.slip.pf, true) +
-        '<tr><td>Leave Encashment (' + le.days.toFixed(2) + ' d)</td><td>' + ui.money(le.amount) + '</td></tr>' +
-        '<tr><td>Leave balance</td><td>' + le.accruedDays.toFixed(2) + ' days' + (le.eligible ? ' (eligible)' : '') + '</td></tr>' +
-        '<tr><th>Net Payable</th><th>' + ui.money(s.netPayable) + '</th></tr></table>' });
-  }
+  /* ---- salary statement / payslip — the SHARED real-format implementation
+   * (platform/kit/emp-profile.js). One payslip everywhere. ------------------*/
+  function statement(e, ym) { if (EPAL.people) EPAL.people.statement(e, ym); }
+  function statementPrint(e, ym) { if (EPAL.people) EPAL.people.payslipPrint(e, ym); }
 
   /* =================================================== PAYROLL REPORTS */
   function reportsView(page) {
@@ -369,7 +338,7 @@
     var encRows = t.map(function (e) { var ls = PR().leaveState(e); return { e: e, name: e.name, dept: e.dept, days: ls.encashableDays, value: ls.value, eligible: ls.eligibleFullYear }; }).filter(function (r) { return r.value > 0; });
     var encTbl = EPAL.table({
       columns: [
-        { key: 'name', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } },
+        { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.e.id) : '<span class="strong">' + esc(r.name) + '</span>'; } },
         { key: 'dept', label: 'Dept', badge: {} },
         { key: 'days', label: 'Accrued days', num: true, sortVal: function (r) { return r.days; }, render: function (r) { return r.days.toFixed(2); } },
         { key: 'value', label: 'Value', num: true, money: true },
@@ -381,11 +350,11 @@
     });
     page.appendChild(reportCard('Leave Encashment Liability', 'piggy-bank', ui.money(liability) + ' total provision · ✎ to pay out & reset', encTbl.el));
 
-    var dueRows = t.map(function (e) { return { name: e.name, dept: e.dept, amt: PR().salaryDue(e.id) }; }).filter(function (r) { return r.amt > 0; });
+    var dueRows = t.map(function (e) { return { id: e.id, name: e.name, dept: e.dept, amt: PR().salaryDue(e.id) }; }).filter(function (r) { return r.amt > 0; });
     if (dueRows.length) page.appendChild(reportCard('Salary Due', 'hourglass-split', dueRows.length + ' employees owed', simpleTbl(dueRows, 'Outstanding')));
-    var advRows = t.map(function (e) { return { name: e.name, dept: e.dept, amt: PR().advanceOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
+    var advRows = t.map(function (e) { return { id: e.id, name: e.name, dept: e.dept, amt: PR().advanceOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
     if (advRows.length) page.appendChild(reportCard('Advance Register', 'cash', 'who holds advance now', simpleTbl(advRows, 'Advance held')));
-    var loanRows = t.map(function (e) { return { name: e.name, dept: e.dept, amt: PR().loanOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
+    var loanRows = t.map(function (e) { return { id: e.id, name: e.name, dept: e.dept, amt: PR().loanOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
     if (loanRows.length) page.appendChild(reportCard('Loan Outstanding', 'bank', 'staff loans in progress', simpleTbl(loanRows, 'Loan balance')));
 
     var dc = PR().departmentCost(CID);
@@ -411,7 +380,7 @@
   }
   function reportCard(title, icon, sub, node) { return el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon(icon) + ' ' + title }), el('span.card-sub', { text: sub }) ]), el('div.card-body', null, [ node ]) ]); }
   function simpleTbl(rows, label) {
-    return EPAL.table({ columns: [ { key: 'name', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'dept', label: 'Dept', badge: {} }, { key: 'amt', label: label, num: true, money: true } ], rows: rows, pageSize: 8, empty: { icon: 'inbox', title: 'Nothing outstanding' } }).el;
+    return EPAL.table({ columns: [ { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id || r.name) : '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'dept', label: 'Dept', badge: {} }, { key: 'amt', label: label, num: true, money: true } ], rows: rows, pageSize: 8, empty: { icon: 'inbox', title: 'Nothing outstanding' } }).el;
   }
   function payEncashFlow(e) {
     var ls = PR().leaveState(e);

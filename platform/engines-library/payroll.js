@@ -84,6 +84,7 @@
       taxThreshold: 50000, taxPct: 0.05,                  // 5% income tax above threshold
       pfPct: 0.10,                                        // provident fund = 10% of basic
       overtimeRate: 0,                                    // ৳/hour; 0 = auto (1.5× the hourly rate)
+      latesPerAbsent: 3,                                  // every N lates deduct one day
       leaveDaysPerYear: 23, workingDays: 30, payByDay: 10, correctionDay: 3
     };
   }
@@ -95,42 +96,81 @@
   function saveTemplate(t) { S.upsert('pay_templates', t); bus.emit('data:changed', { store: 'pay_templates' }); return t; }
 
   /* --------------------------------------------------------- computation */
-  // Pure payslip maths for one employee in one month. `adj` carries correction-window
-  // edits: { leaveDeductDays, otherDeduction, bonus }.
+  // Pure payslip maths for one employee in one month, matching the group's real
+  // payslip format: salary COMPONENTS are shown on the FULL gross; Absent / Late /
+  // Early-leave are money DEDUCTION lines; a signed Salary Adjustment closes gaps.
+  // `adj` carries correction-window edits + attendance:
+  //   { leaveDeductDays(absent), lateDays, earlyDays, overtimeHours, otherDeduction,
+  //     bonus, adjustment }
   function computeSlip(emp, ym, adj) {
     adj = adj || {};
     var t = template(emp.companyId || 'travels');
     var gross = +emp.salary || 0;
     var wd = t.workingDays || 30;
-    var leaveDeduct = clamp(+adj.leaveDeductDays || 0, 0, wd);
-    var workedDays = wd - leaveDeduct;
-    var earnedGross = round(gross * workedDays / wd);        // unpaid-leave proration
-    var basic = round(earnedGross * t.basicPct);
-    var house = round(earnedGross * t.housePct);
-    var medical = round(earnedGross * t.medicalPct);
-    var transport = earnedGross - basic - house - medical;
+    var perDayF = gross / wd;
+    // absent / unpaid-leave — full days deducted at the daily rate
+    var absentDays = clamp(+adj.leaveDeductDays || 0, 0, wd);
+    var absentDeduction = round(perDayF * absentDays);
+    var workedDays = wd - absentDays;
+    var earnedGross = gross - absentDeduction;
+    // late & early-leave — every `latesPerAbsent` (default 3) counts as one day
+    var lpa = t.latesPerAbsent > 0 ? t.latesPerAbsent : 3;
+    var lateDays = Math.max(0, +adj.lateDays || 0);
+    var earlyDays = Math.max(0, +adj.earlyDays || 0);
+    var lateDeduction = round(perDayF * lateDays / lpa);
+    var earlyDeduction = round(perDayF * earlyDays / lpa);
+    // components presented on the FULL gross (the payslip shows the structure,
+    // absences are separate deduction lines)
+    var basic = round(gross * t.basicPct);
+    var house = round(gross * t.housePct);
+    var medical = round(gross * t.medicalPct);
+    var transport = gross - basic - house - medical;
     var tax = earnedGross > t.taxThreshold ? round(earnedGross * t.taxPct) : 0;
     var pf = round(basic * t.pfPct);
     var otherDeduction = round(+adj.otherDeduction || 0);
     var bonus = round(+adj.bonus || 0);
+    var adjustment = round(+adj.adjustment || 0);            // signed: + adds, − deducts
     var otHours = Math.max(0, +adj.overtimeHours || 0);
     var otRate = (t.overtimeRate > 0) ? t.overtimeRate : Math.round((gross / wd / 8) * 1.5);   // default 1.5× the hourly rate
     var overtime = round(otHours * otRate);
-    var net = earnedGross + overtime + bonus - tax - pf - otherDeduction;   // owed to the employee
-    var encashDays = (t.leaveDaysPerYear || 23) / 12;           // 1.92
-    var perDay = gross / wd;
-    var encashAmt = round(encashDays * perDay);
+    var net = gross + overtime + bonus + adjustment
+            - absentDeduction - lateDeduction - earlyDeduction - tax - pf - otherDeduction;
+    var encashDays = (t.leaveDaysPerYear || 23) / 12;        // 1.92
+    var encashAmt = round(encashDays * perDayF);
     return {
-      gross: gross, earnedGross: earnedGross, workedDays: workedDays, leaveDeductDays: leaveDeduct,
+      gross: gross, earnedGross: earnedGross, workedDays: workedDays, leaveDeductDays: absentDays,
+      absentDeduction: absentDeduction, lateDays: lateDays, lateDeduction: lateDeduction,
+      earlyDays: earlyDays, earlyDeduction: earlyDeduction, adjustment: adjustment,
       basic: basic, house: house, medical: medical, transport: transport,
       tax: tax, pf: pf, otherDeduction: otherDeduction, bonus: bonus, overtimeHours: otHours, overtime: overtime,
-      net: net, encashDays: encashDays, perDay: round(perDay), encashAmt: encashAmt
+      net: net, encashDays: encashDays, perDay: round(perDayF), encashAmt: encashAmt
     };
   }
-  // The single source of truth for the net owed to an employee for a month:
-  // earned salary + overtime + bonus − income-tax − PF − other deduction. Every accrual,
-  // payment, status check and report reads through this so they can never disagree.
-  function slipPayable(s) { return round((s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) - (s.tax || 0) - (s.pf || 0) - (s.otherDeduction || 0)); }
+  // The single source of truth for the net owed to an employee for a month.
+  // Old slips (no late/early/adjustment fields) compute identically since the new
+  // fields default to 0 and earnedGross === gross − absentDeduction.
+  function slipPayable(s) {
+    return round((s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + (s.adjustment || 0)
+      - (s.tax || 0) - (s.pf || 0) - (s.otherDeduction || 0) - (s.lateDeduction || 0) - (s.earlyDeduction || 0));
+  }
+  // Amount in words (Bangladeshi numbering: crore / lakh / thousand) for payslips.
+  var W1 = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  var W10 = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  function two(n) { return n < 20 ? W1[n] : (W10[Math.floor(n / 10)] + (n % 10 ? ' ' + W1[n % 10] : '')); }
+  function three(n) { return (n >= 100 ? W1[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' : '') : '') + (n % 100 ? two(n % 100) : ''); }
+  function amountInWords(n) {
+    n = Math.round(Math.abs(+n || 0));
+    if (!n) return 'Zero Taka Only';
+    var parts = [];
+    var crore = Math.floor(n / 10000000); n %= 10000000;
+    var lakh = Math.floor(n / 100000); n %= 100000;
+    var thousand = Math.floor(n / 1000); n %= 1000;
+    if (crore) parts.push(three(crore) + ' Crore');
+    if (lakh) parts.push(two(lakh) + ' Lakh');
+    if (thousand) parts.push(two(thousand) + ' Thousand');
+    if (n) parts.push(three(n));
+    return parts.join(' ') + ' Taka Only';
+  }
 
   /* --------------------------------------------------------------- runs */
   function runId(cid, ym) { return 'PR-' + cid + '-' + ym; }
@@ -144,7 +184,24 @@
     return all.filter(function (e) { return e.status !== 'resigned'; });
   }
 
-  // Create/refresh DRAFT payslips for a month (idempotent; keeps existing correction adj).
+  /* ------------------------------------------------ per-month attendance */
+  // One record per employee per month: {id, empId, companyId, ym, present, absent,
+  // late, earlyLeave, leave}. Feeds payroll auto-deduction (absent days + lates).
+  function attId(empId, ym) { return 'AT-' + empId + '-' + ym; }
+  function attendanceFor(empId, ym) { return S.list('att_monthly').filter(function (a) { return a.id === attId(empId, ym); })[0] || null; }
+  function saveAttendance(empId, ym, rec) {
+    var e = db().employee ? db().employee(empId) : null;
+    var a = attendanceFor(empId, ym) || { id: attId(empId, ym), empId: empId, companyId: (e && e.companyId) || 'travels', ym: ym };
+    ['present', 'absent', 'late', 'earlyLeave', 'leave'].forEach(function (k) { if (rec[k] != null) a[k] = Math.max(0, +rec[k] || 0); });
+    S.upsert('att_monthly', a); bus.emit('data:changed', { store: 'att_monthly' });
+    // re-apply onto the month's draft slip immediately (if still correctable)
+    var s = slip(empId, ym), run = s && getRun(s.companyId, ym);
+    if (s && run && run.status === 'draft') { try { adjustSlip(empId, ym, { leaveDeductDays: a.absent || 0, lateDays: a.late || 0, earlyDays: a.earlyLeave || 0, otherDeduction: s.otherDeduction, bonus: s.bonus, overtimeHours: s.overtimeHours, adjustment: s.adjustment }); } catch (x) {} }
+    return a;
+  }
+
+  // Create/refresh DRAFT payslips for a month (idempotent; keeps existing correction adj;
+  // auto-applies the month's attendance record on first generation).
   function generate(cid, ym) {
     var run = getRun(cid, ym);
     if (!run) {
@@ -153,14 +210,21 @@
         dueAfter: ym + '-' + String(template(cid).payByDay || 10).padStart(2, '0') };
       S.upsert('pay_runs', run);
     }
+    var seq = slipsFor(cid, ym).length;
     activeTeam(cid).forEach(function (e) {
       var existing = slip(e.id, ym);
-      var adj = existing ? { leaveDeductDays: existing.leaveDeductDays, otherDeduction: existing.otherDeduction, bonus: existing.bonus, overtimeHours: existing.overtimeHours } : {};
+      var att = attendanceFor(e.id, ym);
+      var adj = existing
+        ? { leaveDeductDays: existing.leaveDeductDays, lateDays: existing.lateDays, earlyDays: existing.earlyDays,
+            otherDeduction: existing.otherDeduction, bonus: existing.bonus, overtimeHours: existing.overtimeHours, adjustment: existing.adjustment }
+        : (att ? { leaveDeductDays: att.absent || 0, lateDays: att.late || 0, earlyDays: att.earlyLeave || 0 } : {});
       var c = computeSlip(e, ym, adj);
-      var s = existing || { id: slipId(e.id, ym), runId: run.id, empId: e.id, companyId: cid, ym: ym, paid: 0, advanceRecovered: 0, status: 'draft' };
+      var s = existing || { id: slipId(e.id, ym), runId: run.id, empId: e.id, companyId: cid, ym: ym, paid: 0, advanceRecovered: 0, loanRecovered: 0, status: 'draft', slipNo: ym + '-' + String(++seq).padStart(3, '0') };
+      if (!s.slipNo) s.slipNo = ym + '-' + String(++seq).padStart(3, '0');
       s.empName = e.name; s.dept = e.dept;
       // copy computed figures onto the slip
-      ['gross', 'earnedGross', 'workedDays', 'leaveDeductDays', 'basic', 'house', 'medical', 'transport',
+      ['gross', 'earnedGross', 'workedDays', 'leaveDeductDays', 'absentDeduction', 'lateDays', 'lateDeduction',
+        'earlyDays', 'earlyDeduction', 'adjustment', 'basic', 'house', 'medical', 'transport',
         'tax', 'pf', 'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'net', 'encashDays', 'perDay', 'encashAmt'].forEach(function (k) { s[k] = c[k]; });
       S.upsert('pay_slips', s);
     });
@@ -179,7 +243,8 @@
     if (run && run.status !== 'draft') throw new Error('Payroll for ' + ym + ' is finalized — corrections are closed.');
     var emp = db().employee ? db().employee(empId) : { id: empId, salary: s.gross, companyId: s.companyId };
     var c = computeSlip(emp, ym, adj);
-    ['leaveDeductDays', 'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'earnedGross', 'workedDays', 'basic', 'house', 'medical', 'transport', 'tax', 'pf', 'net'].forEach(function (k) { s[k] = c[k]; });
+    ['leaveDeductDays', 'absentDeduction', 'lateDays', 'lateDeduction', 'earlyDays', 'earlyDeduction', 'adjustment',
+      'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'earnedGross', 'workedDays', 'basic', 'house', 'medical', 'transport', 'tax', 'pf', 'net'].forEach(function (k) { s[k] = c[k]; });
     S.upsert('pay_slips', s); bus.emit('data:changed', { store: 'pay_slips' });
     return s;
   }
@@ -189,14 +254,18 @@
     var run = generate(cid, ym);
     if (run.status !== 'draft') return run;
     slipsFor(cid, ym).forEach(function (s) {
-      // salary accrual — DR 5100 (earned + OT + bonus) / CR 2120 tax, 2110 pf,
-      // 4900 (deduction recovered as other income), 2100 net payable. Always balances.
-      var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0);
+      // salary accrual — DR 5100 (earned + OT + bonus ± positive adjustment) /
+      // CR 2120 tax, 2110 pf, 4900 (other/late/early deductions recovered, and a
+      // negative adjustment), 2100 net payable. Always balances by construction:
+      // payable = earned + OT + bonus + adj − tax − pf − other − late − early.
+      var adjPos = Math.max(0, s.adjustment || 0), adjNeg = Math.max(0, -(s.adjustment || 0));
+      var recovered = (s.otherDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + adjNeg;
+      var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + adjPos;
       var payable = slipPayable(s);
       var lines = [{ account: '5100', dr: expense, cr: 0 }];
       if (s.tax) lines.push({ account: '2120', dr: 0, cr: s.tax });
       if (s.pf) lines.push({ account: '2110', dr: 0, cr: s.pf });
-      if (s.otherDeduction) lines.push({ account: '4900', dr: 0, cr: s.otherDeduction });
+      if (recovered) lines.push({ account: '4900', dr: 0, cr: recovered });
       lines.push({ account: '2100', dr: 0, cr: payable });
       glPost('GL-PAYA-' + s.empId + '-' + ym, ym + '-01', cid, 'PAY-' + ym, 'Salary accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
       // leave-encashment accrual — DR 5150 / CR 2150
@@ -229,7 +298,8 @@
     lines.push({ account: '1010', dr: 0, cr: cash });
     glPost('GL-PAYP-' + s.empId + '-' + ym + '-' + ((s.payCount || 0) + 1), today(), s.companyId, 'PAY-' + ym, 'Salary paid · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
     if (emiRecover > 0) txn({ type: 'loan-repay', empId: empId, empName: s.empName, companyId: s.companyId, date: today(), amount: emiRecover, memo: 'EMI auto-deducted from ' + mLabel(ym) + ' salary' });
-    s.paid = (s.paid || 0) + amt; s.advanceRecovered = (s.advanceRecovered || 0) + recover; s.payCount = (s.payCount || 0) + 1; s.paidDate = today();
+    s.paid = (s.paid || 0) + amt; s.advanceRecovered = (s.advanceRecovered || 0) + recover; s.loanRecovered = (s.loanRecovered || 0) + emiRecover;
+    s.payMethod = method || s.payMethod || 'Bank'; s.payCount = (s.payCount || 0) + 1; s.paidDate = today();
     s.status = s.paid >= payable ? 'paid' : 'partial';
     S.upsert('pay_slips', s);
     refreshRunStatus(s.companyId, ym);
@@ -437,20 +507,40 @@
     return rows;
   }
 
-  // Full salary statement for one month, incl. the separate Leave-Encashment row + eligibility.
+  // Full salary statement for one month in the group's REAL payslip format:
+  // earnings (full-gross components + bonus + overtime), deductions (advance, loan
+  // EMI, absent, late, early leave, tax, PF, other), salary adjustment, net payable
+  // with amount-in-words, payslip number and payment method — plus the separate
+  // Leave-Encashment benefit block.
   function statement(emp, ym) {
     var s = slip(emp.id, ym) || Object.assign({ empName: emp.name }, computeSlip(emp, ym, {}));
     var ls = leaveState(emp);
     var payable = slipPayable(s);
+    // advance/loan lines: actual recoveries once paid, else the projected recovery
+    var advLine = (s.paid > 0) ? (s.advanceRecovered || 0) : Math.min(advanceOutstanding(emp.id), Math.max(0, payable));
+    var loanLine = (s.paid > 0) ? (s.loanRecovered || 0) : emiInstallment(emp.id);
+    var cashAfter = Math.max(0, payable - advLine - loanLine);
     return {
       ym: ym, emp: emp, slip: s,
+      slipNo: s.slipNo || (ym + '-001'),
+      payMethod: s.payMethod || emp.salaryMethod || 'Bank',
+      generated: today(),
       earnings: [
-        ['Basic', s.basic], ['House rent', s.house], ['Medical', s.medical], ['Transport', s.transport]
+        ['Basic Salary', s.basic], ['House Rent Allowance', s.house], ['Medical Allowance', s.medical],
+        ['Conveyance Allowance', s.transport], ['Bonus', s.bonus || 0], ['Overtime', s.overtime || 0]
       ],
+      grossEarnings: (s.gross || 0) + (s.overtime || 0) + (s.bonus || 0),
       grossEarned: s.earnedGross,
-      deductions: [['Income tax', s.tax], ['Provident fund', s.pf]].concat(s.otherDeduction ? [['Other deduction', s.otherDeduction]] : []),
+      deductions: [
+        ['Advance Salary', advLine], ['Loan', loanLine],
+        ['Absent', s.absentDeduction || 0], ['Late', s.lateDeduction || 0], ['Early leave', s.earlyDeduction || 0],
+        ['Income tax', s.tax || 0], ['Provident fund', s.pf || 0]
+      ].concat(s.otherDeduction ? [['Other deduction', s.otherDeduction]] : []),
+      totalDeductions: advLine + loanLine + (s.absentDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.tax || 0) + (s.pf || 0) + (s.otherDeduction || 0),
+      adjustment: s.adjustment || 0,
       leaveEncashment: { days: s.encashDays, amount: s.encashAmt, accruedDays: ls.encashableDays, accruedValue: ls.value, eligible: ls.eligibleFullYear, fullYearDays: ls.fullYearDays, fullYearValue: ls.fullYearValue },
-      netPayable: payable, paid: s.paid || 0, outstanding: Math.max(0, payable - (s.paid || 0)), status: s.status || 'draft'
+      netPayable: payable, netCash: cashAfter, inWords: amountInWords(payable),
+      paid: s.paid || 0, outstanding: Math.max(0, payable - (s.paid || 0)), status: s.status || 'draft'
     };
   }
 
@@ -511,6 +601,7 @@
   /* --------------------------------------------------------------- API */
   EPAL.payroll = {
     template: template, saveTemplate: saveTemplate, computeSlip: computeSlip, slipPayable: slipPayable,
+    amountInWords: amountInWords, attendanceFor: attendanceFor, saveAttendance: saveAttendance,
     generate: generate, getRun: getRun, run: getRun, slipsFor: slipsFor, slip: slip,
     inCorrectionWindow: inCorrectionWindow, adjustSlip: adjustSlip,
     finalize: finalize, pay: pay, autoDue: autoDue, refreshRunStatus: refreshRunStatus,

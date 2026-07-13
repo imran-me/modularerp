@@ -197,8 +197,12 @@
     return '<div class="flex items-center gap-1">' + av + '<div><div class="strong">' + esc(e.name) + '</div><div class="text-mute xs">' + esc(e.email || '') + '</div></div></div>';
   }
 
-  /* ---- rich employee profile (row-click) --------------------------------*/
+  /* ---- rich employee profile (row-click) --------------------------------
+   * Delegates to the UNIVERSAL profile (platform/kit/emp-profile.js) so the same
+   * A-Z employee file — accounts ledger, payslips, attendance — opens here, in
+   * Payroll, in Accounts, everywhere. Falls back to the legacy modal if absent. */
   function empDetail(e) {
+    if (EPAL.people) { EPAL.people.open(e.id, { onEdit: canCreate() ? function (x) { empForm(x); } : undefined }); return; }
     var body = el('div');
     var m = ui.modal({ title: e.name, icon: 'person-badge', size: 'lg', body: body, footer: false });
     var a = att(e), ps = payslip(e), lv = leavesFor(e.id);

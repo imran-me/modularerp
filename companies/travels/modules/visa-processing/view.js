@@ -444,6 +444,11 @@
     return card;
   }
   function appDetail(a, refresh) {
+    // BUG FIX: several call sites open this detail WITHOUT a refresh callback
+    // (Manage Sales row, Embassy Tracking row, category detail) — Mark Paid /
+    // stage-move / doc-check / delete then threw "refresh is not a function"
+    // AFTER saving. Normalise once: default to a full re-render.
+    refresh = (typeof refresh === 'function') ? refresh : function () { try { EPAL.router.render(); } catch (x) {} };
     var body = el('div');
     var m = ui.modal({ title:a.applicant+' · '+a.country, icon:'passport', size:'lg', body:body, footer:false });
     function redraw() {

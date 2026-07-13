@@ -181,6 +181,10 @@
 .ring::before { content:''; position: absolute; inset: 8px; border-radius: 50%; background: var(--surface); }
 .ring-label { position: relative; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
 
+/* Row flash — jumpTo() lands the user on the exact row and pulses it briefly. */
+@keyframes rowFlash { 0%, 55% { background: color-mix(in srgb, var(--accent) 16%, transparent); } 100% { background: transparent; } }
+.row-flash { animation: rowFlash 2.4s ease-out 1; }
+
 /* --------------------------------------------------------------- Kanban */
 .kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(268px, 1fr); gap: 16px; overflow-x: auto; padding-bottom: 12px; align-items: start; }
 .kb-col { background: color-mix(in srgb, var(--surface) 60%, var(--bg)); border: 1px solid var(--border); border-radius: var(--r-lg); display: flex; flex-direction: column; min-height: 120px; }

@@ -90,6 +90,16 @@
       .sort(function (a, b) { return b.value - a.value; });
   }
 
+  // Party name cell: when the party is an EMPLOYEE (payroll postings use the emp id,
+  // people may also type the name), render the universal clickable profile link.
+  function partyCell(party, strong) {
+    if (!party) return '—';
+    if (EPAL.people && EPAL.people.resolve && EPAL.people.resolve(party)) {
+      var emp = EPAL.people.resolve(party);
+      return EPAL.people.linkify(emp.name, emp.id);
+    }
+    return strong ? '<span class="strong">' + esc(party) + '</span>' : esc(party);
+  }
   function daysTo(str) { var d = new Date(str); if (isNaN(d)) return 0; return Math.floor((d.getTime() - TODAY.getTime()) / 86400000); }
   function openSchedules() { return schedules().filter(function (s) { return s.status !== 'Paid'; }); }
   function overdueSchedules() { return openSchedules().filter(function (s) { return daysTo(s.due) < 0; }); }
@@ -478,7 +488,7 @@
       columns: [
         { key: 'date', label: 'Date', date: true }, { key: 'id', label: 'JV' }, { key: 'ref', label: 'Reference' }, { key: 'memo', label: 'Narration' },
         { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', opening: 'accent', payroll: 'warn', refund: 'bad' } },
-        { key: 'party', label: 'Party' },
+        { key: 'party', label: 'Party', render: function (g) { return partyCell(g.party); } },
         { key: 'amount', label: 'Amount', num: true, render: function (e) { return '<span class="num">' + ui.money(glTotal(e)) + '</span>'; }, exportVal: function (e) { return glTotal(e); } }
       ],
       rows: glRows, searchKeys: ['id', 'ref', 'memo', 'party', 'source'], quickFilter: 'source', filterPanel: true, dateKey: 'date',
@@ -524,7 +534,7 @@
     var t = EPAL.table({
       columns: [
         { key: 'id', label: 'Ref', render: function (s) { return '<span class="mono xs text-mute">' + esc(s.id) + '</span>'; } },
-        { key: 'party', label: 'Party', render: function (s) { return '<span class="strong">' + esc(s.party) + '</span>'; } },
+        { key: 'party', label: 'Party', render: function (s) { return partyCell(s.party, true); } },
         { key: 'kind', label: 'Type', badge: { Payable: 'bad', Receivable: 'good' } },
         { key: 'amount', label: 'Amount', num: true, money: true },
         { key: 'due', label: 'Due', sortVal: function (s) { return new Date(s.due).getTime() || 0; }, render: function (s) {

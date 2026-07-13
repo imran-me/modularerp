@@ -537,6 +537,18 @@
     balanceSheet: balanceSheet,
     consolidatedTrialBalance: consolidatedTrialBalance,
     postIntercompany: postIntercompany,
+    // remove one journal by id (used when a mirrored quick-entry is deleted, so
+    // the GL doesn't keep an orphaned posting). Prefer reversal entries for real
+    // audit trails; this exists for the mirrored-entry lifecycle.
+    remove: function (id) {
+      var rows = S.list(GL_KEY), before = rows.length;
+      rows = rows.filter(function (e) { return e.id !== id; });
+      if (rows.length === before) return false;
+      S.set(GL_KEY, rows);
+      bus.emit('data:changed', { store: GL_KEY, action: 'delete', id: id });
+      if (EPAL.audit && EPAL.audit.record) { try { EPAL.audit.record({ action: 'delete', entity: 'gl_entries', entityId: id, entityLabel: id }); } catch (e) {} }
+      return true;
+    },
     lockPeriod: function (ym) { S.set('period_lock', ym); bus.emit('data:changed', { store: 'period_lock' }); return ym; },
     unlockPeriod: function () { S.remove('period_lock'); bus.emit('data:changed', { store: 'period_lock' }); },
     lockedThrough: function () { return S.get('period_lock', null); }
