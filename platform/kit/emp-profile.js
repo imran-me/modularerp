@@ -88,9 +88,15 @@
         el('div', null, [el('div.strong', { text: 'NET PAYABLE' }), el('div.text-mute.xs', { text: s.inWords })]),
         el('div.fw-700.text-accent', { style: { fontSize: '20px' }, text: money(s.netPayable) })
       ]),
-      (s.paid || s.outstanding) ? el('div.data-list.mt-2', null, [
+      (s.paid || s.outstanding || s.previousDue) ? el('div.data-list.mt-2', null, [
         s.paid ? line('Paid', s.paid) : null,
-        s.outstanding ? el('div.data-row', null, [el('div.strong.flex-1', { text: 'Outstanding (Due)' }), el('div.strong.text-warn', { text: money(s.outstanding) })]) : null
+        s.outstanding ? el('div.data-row', null, [el('div.strong.flex-1', { text: 'Outstanding (Due)' }), el('div.strong.text-warn', { text: money(s.outstanding) })]) : null,
+        // arrears — salary still owed from EARLIER months, carried onto this payslip
+        s.previousDue ? el('div.data-row', null, [el('div.strong.flex-1', { text: 'Previous Months Due (arrears)' }), el('div.strong.text-bad', { text: money(s.previousDue) })]) : null,
+        s.previousDue ? el('div.data-row', null, [el('div.strong.flex-1', { text: 'TOTAL PAYABLE (incl. arrears)' }), el('div.strong', { text: money(s.totalPayable) })]) : null,
+        (s.previousDue && canPay(emp)) ? el('div.flex.justify-end.mt-1', null, [el('button.btn.btn-sm.btn-outline', { html: ui().icon('cash-coin') + ' Pay Arrears (' + money(s.previousDue) + ')', onclick: function () {
+          ui().confirm({ title: 'Pay all past-month dues?', text: money(s.previousDue) + ' across earlier months (oldest first).', confirmLabel: 'Pay Arrears' })
+            .then(function (ok) { if (!ok) return; var paid = PR().payArrears(emp.id); ui().toast('Paid ' + money(paid) + ' arrears', 'success'); EPAL.router.render(); }); } })]) : null
       ].filter(Boolean)) : null,
       el('div.section-label', { text: 'Leave Encashment (annual benefit — 23 days)' }),
       el('div.data-list', null, [
@@ -147,6 +153,7 @@
       '<div class="net"><div><div class="nl">NET PAYABLE AMOUNT</div><div class="nw">Amount In Words: ' + esc(s.inWords) + '</div></div>' +
         '<div class="na">BDT ' + fmt2(s.netPayable) + '</div></div>' +
       (s.outstanding ? '<div class="due">Outstanding (Due): BDT ' + fmt2(s.outstanding) + (s.paid ? ' · Paid: BDT ' + fmt2(s.paid) : '') + '</div>' : '') +
+      (s.previousDue ? '<div class="due">Previous Months Due (arrears): BDT ' + fmt2(s.previousDue) + ' &nbsp;·&nbsp; TOTAL PAYABLE incl. arrears: BDT ' + fmt2(s.totalPayable) + '</div>' : '') +
       '<div class="note">Note: No note available</div>' +
       '<table class="sig"><tr><td><div class="sigl"></div>Employee Signature</td><td><div class="sigl"></div>Authorized Signatory</td></tr></table>' +
       '<div class="ts">TIMESTAMP: ' + ts + '</div>' +
@@ -244,7 +251,9 @@
         e.nid ? drow('NID', e.nid) : null, e.passport ? drow('Passport', e.passport) : null,
         e.dob ? drow('Date of birth', ui().date(e.dob)) : null, e.bloodGroup ? drow('Blood group', e.bloodGroup) : null,
         e.presentAddress ? drow('Present address', e.presentAddress) : null, e.permanentAddress ? drow('Permanent address', e.permanentAddress) : null,
-        drow('Salary via', (e.salaryMethod || 'Bank') + (e.bankName ? ' · ' + e.bankName : '') + (e.bankAccount ? ' · ' + e.bankAccount : ''))
+        drow('Salary via', (e.salaryMethod || 'Bank') + (e.bankName ? ' · ' + e.bankName : '') + (e.bankAccount ? ' · ' + e.bankAccount : '')),
+        drow('Overtime eligible', e.otEligible === false ? 'No' : 'Yes'),
+        drow('Bonus eligible', e.bonusEligible === false ? 'No' : 'Yes')
       ].filter(Boolean))])
     ]));
 

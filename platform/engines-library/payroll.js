@@ -128,9 +128,11 @@
     var tax = earnedGross > t.taxThreshold ? round(earnedGross * t.taxPct) : 0;
     var pf = round(basic * t.pfPct);
     var otherDeduction = round(+adj.otherDeduction || 0);
-    var bonus = round(+adj.bonus || 0);
+    // eligibility marks: overtime/bonus only count for employees flagged eligible
+    // (emp.otEligible / emp.bonusEligible — default true when unset)
+    var bonus = (emp.bonusEligible === false) ? 0 : round(+adj.bonus || 0);
     var adjustment = round(+adj.adjustment || 0);            // signed: + adds, − deducts
-    var otHours = Math.max(0, +adj.overtimeHours || 0);
+    var otHours = (emp.otEligible === false) ? 0 : Math.max(0, +adj.overtimeHours || 0);
     var otRate = (t.overtimeRate > 0) ? t.overtimeRate : Math.round((gross / wd / 8) * 1.5);   // default 1.5× the hourly rate
     var overtime = round(otHours * otRate);
     var net = gross + overtime + bonus + adjustment
@@ -512,6 +514,14 @@
   // EMI, absent, late, early leave, tax, PF, other), salary adjustment, net payable
   // with amount-in-words, payslip number and payment method — plus the separate
   // Leave-Encashment benefit block.
+  // Arrears: everything still owed to the employee from EARLIER months (partial /
+  // unpaid salaries). Surfaced beneath the net on the NEXT month's payslip —
+  // "company paid 14,000 of 24,000 → the other 10,000 shows as past-months due".
+  function previousDue(empId, ym) {
+    return S.list('pay_slips')
+      .filter(function (s) { return s.empId === empId && s.ym < ym && s.status !== 'draft'; })
+      .reduce(function (a, s) { return a + Math.max(0, slipPayable(s) - (s.paid || 0)); }, 0);
+  }
   function statement(emp, ym) {
     var s = slip(emp.id, ym) || Object.assign({ empName: emp.name }, computeSlip(emp, ym, {}));
     var ls = leaveState(emp);
@@ -520,6 +530,7 @@
     var advLine = (s.paid > 0) ? (s.advanceRecovered || 0) : Math.min(advanceOutstanding(emp.id), Math.max(0, payable));
     var loanLine = (s.paid > 0) ? (s.loanRecovered || 0) : emiInstallment(emp.id);
     var cashAfter = Math.max(0, payable - advLine - loanLine);
+    var arrears = previousDue(emp.id, ym);
     return {
       ym: ym, emp: emp, slip: s,
       slipNo: s.slipNo || (ym + '-001'),
@@ -540,8 +551,18 @@
       adjustment: s.adjustment || 0,
       leaveEncashment: { days: s.encashDays, amount: s.encashAmt, accruedDays: ls.encashableDays, accruedValue: ls.value, eligible: ls.eligibleFullYear, fullYearDays: ls.fullYearDays, fullYearValue: ls.fullYearValue },
       netPayable: payable, netCash: cashAfter, inWords: amountInWords(payable),
+      previousDue: arrears, totalPayable: payable + arrears, totalInWords: amountInWords(payable + arrears),
       paid: s.paid || 0, outstanding: Math.max(0, payable - (s.paid || 0)), status: s.status || 'draft'
     };
+  }
+  // Pay off every earlier month still owed (walks old unpaid/partial slips oldest-first).
+  function payArrears(empId, method) {
+    var owed = S.list('pay_slips')
+      .filter(function (s) { return s.empId === empId && s.status !== 'draft' && slipPayable(s) > (s.paid || 0); })
+      .sort(function (a, b) { return a.ym < b.ym ? -1 : 1; });
+    var total = 0;
+    owed.forEach(function (s) { try { var before = s.paid || 0; pay(empId, s.ym, null, method); var after = (slip(empId, s.ym) || {}).paid || 0; total += after - before; } catch (e) {} });
+    return total;
   }
 
   /* --------------------------------------------------------------- helpers */
@@ -609,6 +630,7 @@
     advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, emiInstallment: emiInstallment, salaryDue: salaryDue,
     leaveState: leaveState, settlementPreview: settlementPreview, settle: settle,
     encashmentLiability: encashmentLiability, payEncashment: payEncashment, departmentCost: departmentCost,
+    previousDue: previousDue, payArrears: payArrears,
     empLedger: empLedger, statement: statement, txnsFor: txnsFor,
     curYm: curYm, today: today, mLabel: mLabel
   };

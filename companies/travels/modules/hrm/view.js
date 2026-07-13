@@ -306,6 +306,8 @@
         { key: 'status', label: 'Status', type: 'select', options: ['active', 'on-leave'], default: 'active' },
         { key: 'salary', label: 'Monthly salary (৳)', type: 'money', default: 40000, min: 0 },
         { key: 'rating', label: 'Rating (0–5)', type: 'number', default: 4, min: 0, max: 5 },
+        { key: 'otEligible', label: 'Eligible for overtime pay', type: 'checkbox', default: true },
+        { key: 'bonusEligible', label: 'Eligible for bonus', type: 'checkbox', default: true },
         { type: 'section', label: 'Salary Bank' },
         { key: 'salaryMethod', label: 'Salary paid via', type: 'select', options: ['Bank', 'bKash', 'Nagad', 'Cash', 'Cheque'], default: 'Bank' },
         { key: 'bankName', label: 'Bank / wallet', type: 'text', col2: true },
@@ -328,6 +330,7 @@
         r.bloodGroup = val.bloodGroup || ''; r.presentAddress = val.presentAddress || ''; r.permanentAddress = val.permanentAddress || '';
         r.confirmDate = val.confirmDate || ''; r.empType = val.empType || 'Permanent'; r.reportsTo = val.reportsTo || ''; r.workLocation = val.workLocation || '';
         r.salaryMethod = val.salaryMethod || 'Bank'; r.bankName = val.bankName || ''; r.bankAccount = val.bankAccount || '';
+        r.otEligible = val.otEligible !== false; r.bonusEligible = val.bonusEligible !== false;   // eligibility marks (payroll respects these)
         r.companyId = CID;
         // increment history — log a salary revision whenever it changes on edit
         if (e && oldSalary && r.salary !== oldSalary) {

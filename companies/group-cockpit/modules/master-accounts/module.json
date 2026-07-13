@@ -1,0 +1,23 @@
+{
+  "key": "master-accounts",
+  "company": "group",
+  "title": "Master Accounts",
+  "icon": "safe2",
+  "desc": "Group accounting desk with a company switcher — expenses (category/sub-category), budget setup, expense reports (daily/weekly/monthly/custom), journals, payment schedules, party types, master payroll, banks.",
+  "route": "#/group/master-accounts",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "expenses", "label": "All Expenses", "route": "#/group/master-accounts/expenses", "enabled": true },
+    { "id": "categories", "label": "Categories", "route": "#/group/master-accounts/categories", "enabled": true },
+    { "id": "budget", "label": "Budget Setup", "route": "#/group/master-accounts/budget", "enabled": true },
+    { "id": "report", "label": "Expense Report", "route": "#/group/master-accounts/report", "enabled": true },
+    { "id": "journals", "label": "Manage Journals", "route": "#/group/master-accounts/journals", "enabled": true },
+    { "id": "schedules", "label": "Payment Schedules", "route": "#/group/master-accounts/schedules", "enabled": true },
+    { "id": "party-types", "label": "Party Types", "route": "#/group/master-accounts/party-types", "enabled": true },
+    { "id": "payroll", "label": "Master Payroll", "route": "#/group/master-accounts/payroll", "enabled": true },
+    { "id": "banks", "label": "Manage Banks", "route": "#/group/master-accounts/banks", "enabled": true }
+  ],
+  "files": { "view": "view.js", "backend": "backend/LARAVEL-BLUEPRINT.md" },
+  "note": "Company switcher buttons at the top scope every section (All / Group HQ / each concern); Master Payroll mounts the shared EPAL.payrollDesk per company."
+}
