@@ -132,15 +132,18 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
    resort on very narrow (mobile) widths. */
 .tbl tbody td { padding: 6px 9px; border-bottom: 1px solid var(--border); color: var(--text-dim);
   font-variant-numeric: tabular-nums; vertical-align: middle; white-space: normal; overflow-wrap: anywhere; }
-.tbl td.num, .tbl thead th.num, .tbl td.dt-actions, .tbl td.nowrap, .tbl th.nowrap { white-space: nowrap; overflow-wrap: normal; }
+.tbl td.dt-actions, .tbl td.nowrap, .tbl th.nowrap { white-space: nowrap; overflow-wrap: normal; }
 .tbl td .badge, .tbl td .mono { white-space: nowrap; }
 .tbl td.wrap, .tbl th.wrap { white-space: normal; }
 .tbl tbody tr { transition: background var(--t-fast); }
 .tbl tbody tr:hover { background: var(--surface-2); }
 .tbl tbody tr:last-child td { border-bottom: none; }
 .tbl td .strong, .tbl td strong { color: var(--text); font-weight: 600; }
-.tbl td.num { text-align: right; color: var(--text); }
-.tbl thead th.num { text-align: right; }         /* numeric header aligns over its right-aligned figures */
+/* numeric cells stay right-aligned & tabular, but MAY WRAP when the container is
+   tight (e.g. inside a modal) so the table always fits — no horizontal scrollbar,
+   every column visible. On wide layouts there is room, so figures stay on one line. */
+.tbl td.num, .tbl thead th.num { text-align: right; white-space: normal; overflow-wrap: anywhere; }
+.tbl td.num { color: var(--text); }
 .tbl .row-click { cursor: pointer; }
 /* left-align numeric figures in a cell while keeping tabular spacing (phones, refs) */
 .tbl td.lnum, .tnum { font-variant-numeric: tabular-nums; }

@@ -285,6 +285,21 @@
 .modal-body { padding: 22px; overflow-y: auto; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--border); }
 
+/* A table inside a modal has the LEAST width to work with, so force it to FIT:
+   `table-layout: fixed` makes the table exactly the modal width — it can never
+   overflow, so every column (incl. the last) stays visible with NO horizontal
+   scrollbar at any zoom. Content wraps to share the space; numbers wrap; badges
+   shrink. This is the definitive no-scroll guarantee for drill-down/detail lists. */
+.modal-body .table-wrap { overflow: hidden; }
+.modal-body table.tbl { table-layout: fixed; font-size: 12px; }
+.modal-body .tbl th, .modal-body .tbl td { padding-left: 7px; padding-right: 7px; overflow-wrap: anywhere; word-break: break-word; }
+/* let every otherwise-nowrap element WRAP so nothing spills past the fixed width */
+.modal-body .tbl td.num, .modal-body .tbl th.num,
+.modal-body .tbl td.nowrap, .modal-body .tbl .mono { white-space: normal; }
+.modal-body .tbl .dt-actions { white-space: normal; width: auto; }
+.modal-body .row-actions { flex-wrap: wrap; white-space: normal; justify-content: flex-start; }
+.modal-body .tbl .badge { font-size: 10px; padding: 2px 6px; white-space: normal; }
+
 /* Form grid inside modals */
 .form-grid { display: grid; gap: 0 16px; grid-template-columns: 1fr 1fr; }
 .form-grid .col-2 { grid-column: span 2; }

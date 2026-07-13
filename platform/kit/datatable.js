@@ -250,7 +250,10 @@
         }
         th.appendChild(lbl); htr.appendChild(th);
       });
-      if (opts.actions && opts.actions.length) htr.appendChild(el('th', { text: '', style: { width: '1%' } }));
+      // actions header carries the .dt-actions class (which sets width:1% via CSS)
+      // rather than an inline width, so a modal can override it to keep the column
+      // from collapsing under table-layout:fixed (see components.css modal rules).
+      if (opts.actions && opts.actions.length) htr.appendChild(el('th.dt-actions', { text: '' }));
       thead.appendChild(htr); table.appendChild(thead);
 
       var tbody = el('tbody');
