@@ -468,6 +468,29 @@
     page.appendChild(el('div.card.mb-3', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('flag-fill') + ' Needs Attention' }), el('span.card-sub', { text: flags.length ? (flags.length + ' flag' + (flags.length > 1 ? 's' : '')) : 'all clear' }) ]), body ]));
   }
 
+  /* ---- PERIOD LOCK / month-end close (spec A2 governance) ----------------*/
+  function renderPeriodLock(page) {
+    if (!hasLedger() || !LED().lockedThrough) return;
+    var locked = LED().lockedThrough();
+    page.appendChild(el('div.card.mb-3', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('lock-fill') + ' Period Lock' }), el('span.card-sub', { text: 'month-end close' }) ]),
+      el('div.card-body', null, [ el('div.flex.justify-between.items-center.flex-wrap.gap-2', null, [
+        el('div', null, [ el('div.fw-600', { html: locked ? ('Books closed through <b>' + locked + '</b>') : 'All periods open' }),
+          el('div.text-mute.sm', { text: locked ? ('Back-dated entries into ' + locked + ' and earlier are blocked across every company.') : 'Close a month to lock it against back-dated entries.' }) ]),
+        can('create') ? el('div.flex.gap-1.flex-wrap', null, [
+          el('button.btn.btn-sm.btn-outline', { html: ui.icon('lock') + ' Close a Month', onclick: closeMonthPrompt }),
+          locked ? el('button.btn.btn-sm.btn-ghost', { html: ui.icon('unlock') + ' Reopen', onclick: function () { ui.confirm({ title: 'Reopen the books?', text: 'Removes the period lock (MD action).', confirmLabel: 'Reopen' }).then(function (ok) { if (ok) { LED().unlockPeriod(); ui.toast('Books reopened', 'success'); EPAL.router.render(); } }); } }) : null
+        ].filter(Boolean)) : null
+      ]) ])
+    ]));
+  }
+  function closeMonthPrompt() {
+    EPAL.formModal({ title: 'Close Accounting Period', icon: 'lock', size: 'sm', record: { ym: LED().lockedThrough() || '2026-06' },
+      fields: [ { key: 'ym', label: 'Close through month (YYYY-MM)', type: 'text', required: true, placeholder: '2026-06', hint: 'Locks this month and everything before it against new/back-dated entries.' } ],
+      saveLabel: 'Close Period',
+      onSave: function (val) { var ym = (val.ym || '').trim(); if (!/^\d{4}-\d{2}$/.test(ym)) { ui.toast('Use the YYYY-MM format', 'error'); return false; } LED().lockPeriod(ym); ui.toast('Books closed through ' + ym, 'success'); EPAL.router.render(); return true; } });
+  }
+
   function renderOverview(page) {
     var f = ledgerFinance(null);
     var snap = db().groupSnapshot();
@@ -517,6 +540,7 @@
     ]));
 
     renderRedFlagPanel(page);
+    renderPeriodLock(page);
 
     var trendId = ui.uid('gfTrend');
     page.appendChild(chartCard('Revenue, Expense & Profit — Consolidated', 'activity', trendId, 'monthly · all concerns combined', 300));

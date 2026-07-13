@@ -157,6 +157,14 @@
     var lines = spec.lines || [];
     if (!lines.length) throw new Error('ledger.post: entry has no lines');
 
+    // period lock (governance): a closed month blocks back-dated posting unless the
+    // caller explicitly overrides (MD action). Seeds run before any lock is set.
+    var lockedThrough = S.get('period_lock', null);
+    if (lockedThrough && !spec.override) {
+      var mo = String(spec.date || new Date().toISOString().slice(0, 10)).slice(0, 7);
+      if (mo <= lockedThrough) throw new Error('Accounting period ' + mo + ' is closed (locked through ' + lockedThrough + '). Reopen it to post.');
+    }
+
     // normalise lines to {account,dr,cr}
     var clean = [];
     for (var i = 0; i < lines.length; i++) {
@@ -528,7 +536,10 @@
     pnl: pnl,
     balanceSheet: balanceSheet,
     consolidatedTrialBalance: consolidatedTrialBalance,
-    postIntercompany: postIntercompany
+    postIntercompany: postIntercompany,
+    lockPeriod: function (ym) { S.set('period_lock', ym); bus.emit('data:changed', { store: 'period_lock' }); return ym; },
+    unlockPeriod: function () { S.remove('period_lock'); bus.emit('data:changed', { store: 'period_lock' }); },
+    lockedThrough: function () { return S.get('period_lock', null); }
   };
 
   /* ==========================================================================
