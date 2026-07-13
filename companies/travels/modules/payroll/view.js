@@ -26,6 +26,9 @@
 (function (EPAL) {
   'use strict';
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
+  // COMPANY-AGNOSTIC payroll desk: one implementation registered for EVERY sister
+  // concern (roadmap #7 UI roll-out). CID is stamped at render time — click
+  // handlers run while that company's page is on screen, so it stays correct.
   var CID = 'travels';
   function PR() { return EPAL.payroll; }
   var TABS = [['template', 'Salary Template'], ['manage', 'Salary Manage'], ['loans', 'Loan Management'], ['payslip', 'Payslip'], ['advance', 'Advance Salary'], ['reports', 'Reports']];
@@ -33,30 +36,34 @@
 
   function team() { return (db.employees ? db.employees({ companyId: CID }) : []).slice().sort(function (a, b) { return (a.name || '') < (b.name || '') ? -1 : 1; }); }
   function empById(id) { return team().filter(function (e) { return e.id === id; })[0] || (db.employee ? db.employee(id) : null); }
-  function canCreate() { return !EPAL.perm || EPAL.perm.can('travels', 'payroll', 'create'); }
+  function canCreate() { return !EPAL.perm || EPAL.perm.can(CID, 'payroll', 'create'); }
   function esc(s) { return ui.escapeHtml(String(s == null ? '' : s)); }
   function cap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
   function today() { return PR() ? PR().today() : '2026-07-05'; }
   function sum(a, f) { return a.reduce(function (x, y) { return x + (f(y) || 0); }, 0); }
+  function coShort(cid) { var c = EPAL.config && EPAL.config.company ? EPAL.config.company(cid) : null; return c ? c.short : cid; }
 
-  EPAL.view('travels/payroll', {
-    render: function (ctx) {
-      var sub = ctx.subId || 'manage';
-      if (TABS.map(function (t) { return t[0]; }).indexOf(sub) < 0) sub = 'manage';
-      var page = el('div.page');
-      var titles = { template: 'Salary Template', manage: 'Salary Manage', loans: 'Loan Management', payslip: 'Payslip', advance: 'Advance Salary', reports: 'Payroll Reports' };
-      var subs = { template: 'The statutory salary structure — components, tax, provident fund and the leave-encashment rule.',
-        manage: 'The monthly payroll run — generate, correct, finalize and pay. Posts to the ledger.', loans: 'Staff loans — disburse, track balances and record repayments.',
-        payslip: 'Salary statements per employee & month, with the annual Leave-Encashment benefit.', advance: 'Advance salary — disburse and recover against future pay.',
-        reports: 'Leave-encashment liability, salary due, advance & loan registers, department cost.' };
-      page.appendChild(EPAL.pageHead({ eyebrow: 'Travels › Payroll', icon: 'cash-coin', title: titles[sub], sub: subs[sub] }));
-      var pills = el('div.pill-tab.mb-3');
-      TABS.forEach(function (t) { pills.appendChild(el('button' + (sub === t[0] ? '.active' : ''), { text: t[1], onclick: function () { EPAL.router.navigate('travels/payroll/' + t[0]); } })); });
-      page.appendChild(pills);
-      if (!PR()) { page.appendChild(card('Payroll engine unavailable.')); ctx.mount.appendChild(page); return; }
-      ({ template: tplView, manage: manageView, loans: loansView, payslip: payslipView, advance: advanceView, reports: reportsView }[sub])(page);
-      ctx.mount.appendChild(page);
-    }
+  ['travels', 'woodart', 'it', 'shop', 'construction'].forEach(function (cid) {
+    EPAL.view(cid + '/payroll', {
+      render: function (ctx) {
+        CID = cid; payYm = null;
+        var sub = ctx.subId || 'manage';
+        if (TABS.map(function (t) { return t[0]; }).indexOf(sub) < 0) sub = 'manage';
+        var page = el('div.page');
+        var titles = { template: 'Salary Template', manage: 'Salary Manage', loans: 'Loan Management', payslip: 'Payslip', advance: 'Advance Salary', reports: 'Payroll Reports' };
+        var subs = { template: 'The statutory salary structure — components, tax, provident fund and the leave-encashment rule.',
+          manage: 'The monthly payroll run — generate, correct, finalize and pay. Posts to the ledger.', loans: 'Staff loans — disburse, track balances and record repayments.',
+          payslip: 'Salary statements per employee & month, with the annual Leave-Encashment benefit.', advance: 'Advance salary — disburse and recover against future pay.',
+          reports: 'Leave-encashment liability, salary due, advance & loan registers, department cost.' };
+        page.appendChild(EPAL.pageHead({ eyebrow: coShort(cid) + ' › Payroll', icon: 'cash-coin', title: titles[sub], sub: subs[sub] }));
+        var pills = el('div.pill-tab.mb-3');
+        TABS.forEach(function (t) { pills.appendChild(el('button' + (sub === t[0] ? '.active' : ''), { text: t[1], onclick: function () { EPAL.router.navigate(cid + '/payroll/' + t[0]); } })); });
+        page.appendChild(pills);
+        if (!PR()) { page.appendChild(card('Payroll engine unavailable.')); ctx.mount.appendChild(page); return; }
+        ({ template: tplView, manage: manageView, loans: loansView, payslip: payslipView, advance: advanceView, reports: reportsView }[sub])(page);
+        ctx.mount.appendChild(page);
+      }
+    });
   });
 
   /* =================================================== SALARY TEMPLATE */

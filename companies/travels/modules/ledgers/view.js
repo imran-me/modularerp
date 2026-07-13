@@ -312,7 +312,10 @@
         { key: 'debit', label: 'Debit', num: true, render: function (r) { return r.debit ? ui.money(r.debit) : '—'; }, exportVal: function (r) { return r.debit; } },
         { key: 'credit', label: 'Credit', num: true, render: function (r) { return r.credit ? ui.money(r.credit) : '—'; }, exportVal: function (r) { return r.credit; } },
         { key: 'balance', label: 'Balance', num: true, money: true } ],
-      rows: rows.slice().reverse(), pageSize: 10, exportName: 'travels-' + slug(party) + '-statement.csv', empty: { icon: 'people', title: 'No transactions' }
+      rows: rows.slice().reverse(), pageSize: 10, exportName: 'travels-' + slug(party) + '-statement.csv', empty: { icon: 'people', title: 'No transactions' },
+      // checklist 04: statement searchable BOTH ways — custom (date-range via the
+      // Filter card + text search) or overall; totals follow the active filter.
+      searchKeys: ['ref', 'memo', 'source'], dateKey: 'date', filterPanel: true, totalKey: ['debit', 'credit']
     });
     body.appendChild(t.el);
     body.appendChild(el('div.flex.justify-end.mt-2', null, [ el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement', onclick: function () { printPartyStatement(party, rows.slice().reverse(), closing); } }) ]));

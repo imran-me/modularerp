@@ -222,6 +222,17 @@
       syncFilterBtn();
 
       countEl.textContent = rows.length + ' record' + (rows.length === 1 ? '' : 's');
+      // Filtered TOTAL (opts.totalKey: 'amount' or ['debit','credit']) — sums the
+      // WHOLE filtered set (not just the page), so e.g. filtering the journal by
+      // Source = Salary immediately shows that source's total amount.
+      if (opts.totalKey) {
+        var tks = Array.isArray(opts.totalKey) ? opts.totalKey : [opts.totalKey];
+        countEl.textContent += ' · Total ' + tks.map(function (k) {
+          var col = cols.filter(function (x) { return x.key === k; })[0] || {};
+          var sum = rows.reduce(function (a, r) { var v = col.sortVal ? col.sortVal(r) : r[k]; return a + (+v || 0); }, 0);
+          return (tks.length > 1 ? (col.label || k) + ' ' : '') + ui.money(sum);
+        }).join(' · ');
+      }
 
       wrap.innerHTML = '';
       if (!rows.length) {

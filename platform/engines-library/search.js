@@ -82,15 +82,24 @@
     } catch (e) { return 'Epal Group'; }
   }
 
-  // Earliest index-of the query across a record's identifying fields.
-  // Returns -1 when none of the fields contain the query.
+  // FRIENDLY partial match: every space-separated token of the query must appear
+  // SOMEWHERE in the record's fields, in any order — so "rahman visa" finds
+  // Rahman's visa file and "dxb emirates" finds the DXB Emirates ticket.
+  // Returns the earliest match position (for ranking) or -1 when any token misses.
   function matchPos(rec, fields, q) {
+    var toks = q.split(/\s+/).filter(Boolean);
+    if (!toks.length) return -1;
     var best = -1;
-    for (var i = 0; i < fields.length; i++) {
-      var v = rec[fields[i]];
-      if (v == null) continue;
-      var idx = String(v).toLowerCase().indexOf(q);
-      if (idx >= 0 && (best < 0 || idx < best)) best = idx;
+    for (var t = 0; t < toks.length; t++) {
+      var tok = toks[t], found = -1;
+      for (var i = 0; i < fields.length; i++) {
+        var v = rec[fields[i]];
+        if (v == null) continue;
+        var idx = String(v).toLowerCase().indexOf(tok);
+        if (idx >= 0 && (found < 0 || idx < found)) found = idx;
+      }
+      if (found < 0) return -1;                    // a token missed → no match
+      if (best < 0 || found < best) best = found;
     }
     return best;
   }
@@ -178,7 +187,25 @@
         fields: ['name', 'sku', 'brand', 'category', 'id'],
         primary: function (r) { return r.name; },
         cid: cidShop,
-        route: function () { return 'shop/inventory'; } }
+        route: function () { return 'shop/inventory'; } },
+
+      { key: 'vendors', type: 'Vendor', icon: 'truck',
+        fields: ['name', 'category', 'phone', 'email', 'id'],
+        primary: function (r) { return r.name; },
+        cid: cidTravels,
+        route: function () { return 'travels/vendor-agent/vendors'; } },
+
+      { key: 'tv_agents', type: 'Sub-Agent', icon: 'person-badge',
+        fields: ['name', 'agency', 'phone', 'email', 'id'],
+        primary: function (r) { return r.name; },
+        cid: cidTravels,
+        route: function () { return 'travels/vendor-agent/sub-agents'; } },
+
+      { key: 'acc_schedules', type: 'Payment Schedule', icon: 'calendar2-week',
+        fields: ['party', 'kind', 'status', 'id'],
+        primary: function (r) { return r.party + ' · ' + (r.kind || ''); },
+        cid: cidField,
+        route: function (r) { return cidField(r) + '/accounts/schedules'; } }
     ];
   }
 

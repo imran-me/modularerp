@@ -38,6 +38,7 @@
     { id: 'balance-sheet', group: 'financial', title: 'Balance Sheet', icon: 'building', desc: 'Assets, liabilities and equity.', build: rBalanceSheet },
     { id: 'ar-ageing', group: 'financial', title: 'AR Ageing', icon: 'arrow-down-left-circle', desc: 'Receivables by ageing bucket.', build: function () { return rAgeing('AR'); } },
     { id: 'ap-ageing', group: 'financial', title: 'AP Ageing', icon: 'arrow-up-right-circle', desc: 'Payables by ageing bucket.', build: function () { return rAgeing('AP'); } },
+    { id: 'loans', group: 'financial', title: 'Loans & Liabilities', icon: 'bank', desc: 'Staff loans outstanding + loan-type accounts + vendor payable position.', build: rLoans },
     { id: 'income', group: 'financial', title: 'Income Register', icon: 'cash-coin', desc: 'Journal income grouped by head.', build: function () { return rRegister('Income'); } },
     { id: 'expense', group: 'financial', title: 'Expense Register', icon: 'wallet2', desc: 'Journal expenses grouped by head.', build: function () { return rRegister('Expense'); } },
     // ---- SALES & CRM ------------------------------------------------------
@@ -164,6 +165,31 @@
     return { kpis: [['Total Debit', ui.money(td, { compact: true }), 'arrow-up-right-circle'], ['Total Credit', ui.money(tc, { compact: true }), 'arrow-down-left-circle'], ['Accounts', String(rows.length), 'list-ol'], ['Check', Math.abs(td - tc) < 1 ? 'Balanced' : 'Out', 'check2-circle']],
       columns: [ { key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'type', label: 'Type', badge: {} }, { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true } ],
       rows: rows };
+  }
+  // Loans & Liabilities (checklist 08): how much loan the company carries — staff
+  // loans per employee (from the payroll engine) + every loan-type ledger account —
+  // and the vendor-payable position for context.
+  function rLoans() {
+    var L = EPAL.ledger, P = EPAL.payroll, rows = [];
+    if (P) team().forEach(function (e) {
+      var out = P.loanOutstanding(e.id);
+      if (out > 0) rows.push({ kind: 'Staff loan', party: e.name, detail: e.dept || '', amount: out });
+    });
+    if (L) L.accounts().forEach(function (a) {
+      if (a.type !== 'liability' || !/loan/i.test(a.name)) return;
+      var bal = Math.round(L.balance(a.code, { companyId: CID }));
+      if (bal) rows.push({ kind: 'Loan account', party: a.code + ' · ' + a.name, detail: 'ledger balance', amount: bal });
+    });
+    var staffTotal = rows.filter(function (r) { return r.kind === 'Staff loan'; }).reduce(function (a, r) { return a + r.amount; }, 0);
+    var apTotal = L && L.aging ? L.aging('AP', { companyId: CID }).reduce(function (a, r) { return a + (r.total || 0); }, 0) : 0;
+    return {
+      kpis: [ ['Staff Loans Out', ui.money(staffTotal, { compact: true }), 'bank'],
+        ['Loan Accounts', String(rows.filter(function (r) { return r.kind === 'Loan account'; }).length), 'journal'],
+        ['Vendor Payable (AP)', ui.money(apTotal, { compact: true }), 'arrow-up-right-circle'],
+        ['Rows', String(rows.length), 'list-ol'] ],
+      columns: [ { key: 'kind', label: 'Kind', badge: {} }, { key: 'party', label: 'Borrower / Account' }, { key: 'detail', label: 'Detail' }, { key: 'amount', label: 'Outstanding', num: true, money: true } ],
+      rows: rows
+    };
   }
   function rBalanceSheet() {
     var L = EPAL.ledger; var bs = L ? L.balanceSheet(CID) : { assets: [], liabilities: [], equity: [], totals: {} };

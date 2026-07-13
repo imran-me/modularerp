@@ -38,7 +38,9 @@
   var CID = 'travels';
   var TODAY = new Date(2026, 6, 5);                 // demo "today" = 2026-07-05
   var TODAY_STR = '2026-07-05';
-  var METHODS = ['Bank', 'Cash', 'bKash', 'Nagad', 'Card', 'Cheque'];
+  // Payment sources — Debit Card and Credit Card are SEPARATE sources from a bank
+  // transfer (checklist 06 clarification); 'Card' kept for legacy records.
+  var METHODS = ['Bank', 'Cash', 'bKash', 'Nagad', 'Debit Card', 'Credit Card', 'Cheque'];
   // Common Bangladeshi travel-agency posting heads — offered on the form, but the
   // field stays free-text so bookkeepers can add their own.
   var INCOME_HEADS = ['Air Ticket', 'Visa Service', 'Package Tour', 'Umrah / Hajj', 'Hotel Booking',
@@ -431,7 +433,7 @@
   /* ======================================================= JOURNALS (GL) */
   function journalsView(page) {
     var accts = (EPAL.ledger && EPAL.ledger.accounts) ? EPAL.ledger.accounts() : [];
-    var acctOpts = accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; });
+    var acctOpts = accts.filter(function (a) { return a.active !== false; }).map(function (a) { return [a.code, a.code + ' · ' + a.name]; });
 
     var balStrip = el('div.flex.gap-2.items-center');
     var postBtn = el('button.btn.btn-primary', { disabled: true, html: ui.icon('journal-plus') + ' Post Journal' });
@@ -489,9 +491,10 @@
         { key: 'date', label: 'Date', date: true }, { key: 'id', label: 'JV' }, { key: 'ref', label: 'Reference' }, { key: 'memo', label: 'Narration' },
         { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', opening: 'accent', payroll: 'warn', refund: 'bad' } },
         { key: 'party', label: 'Party', render: function (g) { return partyCell(g.party); } },
-        { key: 'amount', label: 'Amount', num: true, render: function (e) { return '<span class="num">' + ui.money(glTotal(e)) + '</span>'; }, exportVal: function (e) { return glTotal(e); } }
+        { key: 'amount', label: 'Amount', num: true, sortVal: glTotal, render: function (e) { return '<span class="num">' + ui.money(glTotal(e)) + '</span>'; }, exportVal: function (e) { return glTotal(e); } }
       ],
       rows: glRows, searchKeys: ['id', 'ref', 'memo', 'party', 'source'], quickFilter: 'source', filterPanel: true, dateKey: 'date',
+      totalKey: 'amount',   // filter Source = Salary (or anything) → live filtered total
       exportName: 'travels-gl-entries.csv', pdfTitle: 'Travels Ledger Entries',
       onRow: function (e) { showEntry(e); },
       empty: { icon: 'journal-text', title: 'No ledger entries yet — post one above' }
@@ -519,6 +522,13 @@
     var overdue = overdueSchedules();
     var soon = dueSoon(7);
 
+    // Upcoming 15 days — FIRST, above everything (checklist 06: "shobar age/upore")
+    var in15 = dueSoon(15);
+    var sum15 = in15.reduce(function (a, s) { return a + (+s.amount || 0); }, 0);
+    page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('calendar-week')),
+      el('div.flex-1', { html: '<strong>Upcoming 15 days: ' + in15.length + ' settlement' + (in15.length === 1 ? '' : 's') + ' · ' + ui.money(sum15) + '.</strong> ' +
+        (in15.length ? in15.slice(0, 6).map(function (s) { return esc(s.party) + ' (' + ui.money(s.amount) + ' · ' + ui.date(s.due) + ')'; }).join(', ') + (in15.length > 6 ? ' …' : '') : 'Nothing due.') }) ]));
+
     page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
       kpi('Payable', ui.money(payable, { compact: true }), 'arrow-up-right-circle', payable ? 'text-bad' : ''),
       kpi('Receivable', ui.money(receivable, { compact: true }), 'arrow-down-left-circle', receivable ? 'text-good' : ''),
@@ -542,7 +552,7 @@
             return '<span class="' + tone + '">' + ui.date(s.due) + (s.status !== 'Paid' && d < 0 ? ' · ' + Math.abs(d) + 'd late' : '') + '</span>'; } },
         { key: 'status', label: 'Status', badge: { Paid: 'good', Partial: 'warn', Pending: 'bad' } }
       ],
-      rows: list, dateKey: 'due',
+      rows: list, dateKey: 'due', totalKey: 'amount',
       quickFilter: 'kind', filterPanel: true, filters: [{ key: 'status', label: 'Status' }],
       searchKeys: ['id', 'party', 'desc'], pageSize: 12, exportName: 'travels-schedules.csv', pdfTitle: 'Travels Payment Schedules',
       onRow: function (s) { scheduleDetail(s); },

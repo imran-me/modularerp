@@ -308,7 +308,8 @@
   function renderGroupExpenses(page) {
     ensureGroupAccounts();
     page.appendChild(head('Group Expenses', 'building', 'The Group\'s own running costs — office, food, utilities, rent — with budget vs actual. Posted to the group ledger.',
-      [ can('create') ? el('button.btn.btn-ghost', { html: ui.icon('bullseye') + ' Set Budget', onclick: function () { setBudgetForm(null); } }) : null,
+      [ can('create') ? el('button.btn.btn-ghost', { html: ui.icon('diagram-3') + ' Allocate Costs', onclick: allocateCostsForm }) : null,
+        can('create') ? el('button.btn.btn-ghost', { html: ui.icon('bullseye') + ' Set Budget', onclick: function () { setBudgetForm(null); } }) : null,
         can('create') ? el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' Record Expense', onclick: function () { groupExpenseForm(null); } }) : null ].filter(Boolean)));
     page.appendChild(pills('expenses'));
     if (!hasLedger()) { page.appendChild(el('div.card', null, [ el('div.card-body', { text: 'Ledger engine unavailable.' }) ])); return; }
@@ -407,6 +408,45 @@
       ui.toast('Deleted', 'success'); EPAL.router.render();
     });
   }
+  /* ---- SHARED-COST ALLOCATION (spec C2): recharge a group cost to the concerns
+   * by ratio. Group posts DR 1300 Inter-co Receivable / CR <head> per concern
+   * (cost moves out) and each concern posts DR <head> / CR 2400 Inter-co Payable
+   * (cost moves in) — the pairs auto-eliminate on consolidation. ------------*/
+  function allocateCostsForm() {
+    var comps = activeCompanies();
+    var fields = [
+      { key: 'category', label: 'Expense head to allocate', type: 'select', required: true, options: GROUP_EXP_HEADS.map(function (h) { return h[0]; }) },
+      { key: 'amount', label: 'Amount to allocate (৳)', type: 'money', required: true, min: 1 },
+      { key: 'date', label: 'Date', type: 'date', default: gToday() },
+      { type: 'section', label: 'Split % per concern (must total 100)' }
+    ];
+    var def = Math.floor(100 / comps.length);
+    comps.forEach(function (c, i) {
+      fields.push({ key: 'pct_' + c.id, label: c.short + ' %', type: 'number', min: 0, max: 100, default: i === 0 ? (100 - def * (comps.length - 1)) : def });
+    });
+    EPAL.formModal({
+      title: 'Allocate Shared Cost to Concerns', icon: 'diagram-3', size: 'md', record: { date: gToday() },
+      fields: fields, saveLabel: 'Allocate',
+      onSave: function (v) {
+        var totalPct = comps.reduce(function (a, c) { return a + (+v['pct_' + c.id] || 0); }, 0);
+        if (Math.abs(totalPct - 100) > 0.5) { ui.toast('Split must total 100% (now ' + totalPct + '%)', 'error'); return false; }
+        var head2 = acctForHead(v.category), amt = +v.amount || 0, ref = 'ALLOC-' + Date.now().toString(36).toUpperCase();
+        var remaining = amt;
+        try {
+          comps.forEach(function (c, i) {
+            var share = (i === comps.length - 1) ? remaining : Math.round(amt * (+v['pct_' + c.id] || 0) / 100);
+            remaining -= share;
+            if (share <= 0) return;
+            LED().post({ date: v.date, companyId: 'group', ref: ref, memo: v.category + ' allocated to ' + c.short, source: 'intercompany', party: c.id,
+              lines: [{ account: '1300', dr: share, cr: 0 }, { account: head2, dr: 0, cr: share }] });
+            LED().post({ date: v.date, companyId: c.id, ref: ref, memo: v.category + ' share (group allocation)', source: 'intercompany', party: 'group',
+              lines: [{ account: head2, dr: share, cr: 0 }, { account: '2400', dr: 0, cr: share }] });
+          });
+          ui.toast('Allocated ' + ui.money(amt) + ' across ' + comps.length + ' concerns', 'success'); EPAL.router.render(); return true;
+        } catch (e) { ui.toast(e.message || 'Allocation failed', 'error'); return false; }
+      }
+    });
+  }
   function setBudgetForm(existing) {
     EPAL.formModal({
       title: 'Set Budget', icon: 'bullseye', size: 'sm', record: existing || { period: 'Annual' },
@@ -472,15 +512,20 @@
   function renderPeriodLock(page) {
     if (!hasLedger() || !LED().lockedThrough) return;
     var locked = LED().lockedThrough();
+    // fiscal-year setting (spec A2): July–June or January–December
+    var fyStart = EPAL.store.get('fiscal_year_start', '07');
+    var fySel = el('select.input', { style: { width: 'auto' }, onchange: function () { EPAL.store.set('fiscal_year_start', this.value); ui.toast('Fiscal year set to ' + (this.value === '07' ? 'July–June' : 'January–December'), 'success'); } });
+    [['07', 'FY: July – June'], ['01', 'FY: January – December']].forEach(function (o) { var op = el('option', { value: o[0], text: o[1] }); if (o[0] === fyStart) op.selected = true; fySel.appendChild(op); });
     page.appendChild(el('div.card.mb-3', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('lock-fill') + ' Period Lock' }), el('span.card-sub', { text: 'month-end close' }) ]),
+      el('div.card-head', null, [ el('h3', { html: ui.icon('lock-fill') + ' Period Lock & Fiscal Year' }), el('span.card-sub', { text: 'month-end close · FY setting' }) ]),
       el('div.card-body', null, [ el('div.flex.justify-between.items-center.flex-wrap.gap-2', null, [
         el('div', null, [ el('div.fw-600', { html: locked ? ('Books closed through <b>' + locked + '</b>') : 'All periods open' }),
           el('div.text-mute.sm', { text: locked ? ('Back-dated entries into ' + locked + ' and earlier are blocked across every company.') : 'Close a month to lock it against back-dated entries.' }) ]),
-        can('create') ? el('div.flex.gap-1.flex-wrap', null, [
-          el('button.btn.btn-sm.btn-outline', { html: ui.icon('lock') + ' Close a Month', onclick: closeMonthPrompt }),
-          locked ? el('button.btn.btn-sm.btn-ghost', { html: ui.icon('unlock') + ' Reopen', onclick: function () { ui.confirm({ title: 'Reopen the books?', text: 'Removes the period lock (MD action).', confirmLabel: 'Reopen' }).then(function (ok) { if (ok) { LED().unlockPeriod(); ui.toast('Books reopened', 'success'); EPAL.router.render(); } }); } }) : null
-        ].filter(Boolean)) : null
+        el('div.flex.gap-1.flex-wrap.items-center', null, [
+          fySel,
+          can('create') ? el('button.btn.btn-sm.btn-outline', { html: ui.icon('lock') + ' Close a Month', onclick: closeMonthPrompt }) : null,
+          can('create') && locked ? el('button.btn.btn-sm.btn-ghost', { html: ui.icon('unlock') + ' Reopen', onclick: function () { ui.confirm({ title: 'Reopen the books?', text: 'Removes the period lock (MD action).', confirmLabel: 'Reopen' }).then(function (ok) { if (ok) { LED().unlockPeriod(); ui.toast('Books reopened', 'success'); EPAL.router.render(); } }); } }) : null
+        ].filter(Boolean))
       ]) ])
     ]));
   }
@@ -1004,9 +1049,10 @@
     var largest = all.slice().sort(function (a, b) { return (b.balance || 0) - (a.balance || 0); })[0];
 
     page.appendChild(head('Bank Positions', 'bank',
-      'Every bank and mobile-money account across the group with live balances. Account numbers are masked on screen.', [
-      el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' Add Bank Account', onclick: function () { editBank(null); } })
-    ]));
+      'Every bank, mobile-wallet and cash account across the group with live balances. Account numbers are masked on screen.', [
+      can('create') ? el('button.btn.btn-ghost', { html: ui.icon('arrow-left-right') + ' Transfer', onclick: function () { bankTransferForm(); } }) : null,
+      el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' Add Account', onclick: function () { editBank(null); } })
+    ].filter(Boolean)));
     page.appendChild(pills('banks'));
 
     page.appendChild(el('div.kpi-grid', null, [
@@ -1050,10 +1096,12 @@
     ]));
     page.appendChild(row);
 
+    var TYPE_ICON = { 'Bank': 'bank', 'bKash': 'phone', 'Nagad': 'phone-fill', 'Cash Box': 'cash-stack', 'Card': 'credit-card' };
     var table = EPAL.table({
       columns: [
-        { key: 'name', label: 'Bank', render: function (b) {
-          return '<span class="strong">' + ui.icon('bank') + ' ' + ui.escapeHtml(b.name) + '</span>'; } },
+        { key: 'name', label: 'Account', render: function (b) {
+          return '<span class="strong">' + ui.icon(TYPE_ICON[b.type] || 'bank') + ' ' + ui.escapeHtml(b.name) + '</span>'; } },
+        { key: 'type', label: 'Type', badge: { 'Bank': 'info', 'bKash': 'accent', 'Nagad': 'accent', 'Cash Box': 'good', 'Card': 'warn' }, render: function (b) { return '<span class="badge badge-' + ({ 'Bank': 'info', 'bKash': 'accent', 'Nagad': 'accent', 'Cash Box': 'good', 'Card': 'warn' }[b.type || 'Bank'] || 'info') + '">' + ui.escapeHtml(b.type || 'Bank') + '</span>'; }, exportVal: function (b) { return b.type || 'Bank'; } },
         { key: 'branch', label: 'Branch' },
         { key: 'account', label: 'Account', render: function (b) {
           return '<span class="num text-mute">•••• ' + ui.escapeHtml(String(b.account || '').slice(-4)) + '</span>'; },
@@ -1092,14 +1140,75 @@
       });
     });
 
+    // ---- transfers register (with the Delete option the checklist asked for) ---
+    var transfers = EPAL.store.list('bank_transfers').slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
+    if (transfers.length) {
+      var tt = EPAL.table({
+        columns: [
+          { key: 'date', label: 'Date', date: true },
+          { key: 'from', label: 'From', render: function (t) { return ui.escapeHtml(t.fromName || t.from); } },
+          { key: 'to', label: 'To', render: function (t) { return ui.escapeHtml(t.toName || t.to); } },
+          { key: 'memo', label: 'Note' },
+          { key: 'amount', label: 'Amount', num: true, money: true }
+        ],
+        rows: transfers, pageSize: 8, exportName: 'bank-transfers.csv', totalKey: 'amount',
+        actions: can('delete') ? [{ icon: 'trash', title: 'Delete (reverses balances)', onClick: function (t) { deleteTransfer(t); } }] : [],
+        empty: { icon: 'arrow-left-right', title: 'No transfers' }
+      });
+      page.appendChild(el('div.section-label', { text: 'Bank Transfers' }));
+      page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ tt.el ]) ]));
+    }
+    function deleteTransfer(t) {
+      ui.confirm({ title: 'Delete this transfer?', text: ui.money(t.amount) + ' will move back ' + (t.toName || t.to) + ' → ' + (t.fromName || t.from) + '.', danger: true, confirmLabel: 'Delete & Reverse' })
+        .then(function (ok) {
+          if (!ok) return;
+          var banks = db().col('banks');
+          var from = banks.filter(function (b) { return b.id === t.from; })[0];
+          var to = banks.filter(function (b) { return b.id === t.to; })[0];
+          if (from) { from.balance = (+from.balance || 0) + (+t.amount || 0); db().save('banks', from); }
+          if (to) { to.balance = (+to.balance || 0) - (+t.amount || 0); db().save('banks', to); }
+          EPAL.store.removeFrom('bank_transfers', t.id);
+          ui.toast('Transfer deleted & reversed', 'success'); EPAL.router.render();
+        });
+    }
+    function bankTransferForm() {
+      var banks = db().col('banks');
+      if (banks.length < 2) { ui.toast('Need at least two accounts to transfer', 'error'); return; }
+      var opts = banks.map(function (b) { return [b.id, (b.type && b.type !== 'Bank' ? b.type + ' · ' : '') + b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; });
+      EPAL.formModal({
+        title: 'Transfer Between Accounts', icon: 'arrow-left-right', size: 'md', record: { date: gToday() },
+        fields: [
+          { key: 'from', label: 'From account', type: 'select', required: true, options: opts },
+          { key: 'to', label: 'To account', type: 'select', required: true, options: opts },
+          { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+          { key: 'date', label: 'Date', type: 'date', default: gToday() },
+          { key: 'memo', label: 'Note', type: 'text', col2: true }
+        ],
+        saveLabel: 'Transfer',
+        onSave: function (v) {
+          if (v.from === v.to) { ui.toast('Pick two different accounts', 'error'); return false; }
+          var amt = +v.amount || 0;
+          var from = banks.filter(function (b) { return b.id === v.from; })[0];
+          var to = banks.filter(function (b) { return b.id === v.to; })[0];
+          if (!from || !to) { ui.toast('Account not found', 'error'); return false; }
+          from.balance = (+from.balance || 0) - amt; to.balance = (+to.balance || 0) + amt;
+          db().save('banks', from); db().save('banks', to);
+          EPAL.store.upsert('bank_transfers', { id: 'BT-' + Date.now().toString(36).toUpperCase(), from: from.id, fromName: from.name, to: to.id, toName: to.name, amount: amt, date: v.date, memo: v.memo || '' });
+          ui.toast('Transferred ' + ui.money(amt), 'success'); EPAL.router.render(); return true;
+        }
+      });
+    }
     function editBank(b) {
       EPAL.formModal({
-        title: b ? 'Edit Bank Account' : 'Add Bank Account', icon: 'bank', record: b,
+        title: b ? 'Edit Account' : 'Add Account', icon: 'bank', record: b || { type: 'Bank' },
         fields: [
-          { key: 'name', label: 'Bank', type: 'text', required: true, placeholder: 'e.g. BRAC Bank', col2: true },
-          { key: 'branch', label: 'Branch', type: 'text', required: true, placeholder: 'e.g. Gulshan Avenue' },
-          { key: 'account', label: 'Account Number', type: 'text', required: true, pattern: /^\d{6,18}$/,
-            hint: '6–18 digits · shown masked everywhere else', placeholder: '15XXXXXXXX' },
+          { key: 'type', label: 'Account type', type: 'select', required: true, default: 'Bank',
+            options: ['Bank', 'bKash', 'Nagad', 'Cash Box', 'Card'] },
+          { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. BRAC Bank / Office bKash / Main cash', col2: true },
+          { key: 'branch', label: 'Branch / holder', type: 'text', placeholder: 'e.g. Gulshan Avenue · or who holds it' },
+          { key: 'account', label: 'Account / wallet number', type: 'text', pattern: /^\d{4,18}$/,
+            hint: '4–18 digits (bank a/c or wallet number) · masked everywhere else', placeholder: '15XXXXXXXX',
+            showIf: function (x) { return x.type !== 'Cash Box'; } },
           { key: 'companyId', label: 'Owned By', type: 'select', required: true,
             options: EPAL.config.companies.map(function (c) { return [c.id, c.short]; }) },
           { key: 'balance', label: 'Current Balance (৳)', type: 'money', required: true, min: 0 }
@@ -1107,10 +1216,12 @@
         onSave: function (vals) {
           var rec = Object.assign({}, b || { id: 'BNK-' + Date.now().toString().slice(-5),
             created: new Date().toISOString().slice(0, 10) }, vals);
+          rec.type = vals.type || 'Bank';
+          if (rec.type === 'Cash Box' && !rec.account) rec.account = '0000';
           db().save('banks', rec);
           db().log(EPAL.auth.current ? (EPAL.auth.current() || {}).name || 'Finance' : 'Finance',
-            (b ? 'Bank account updated' : 'Bank account added') + ' · ' + rec.name + ' (' + rec.branch + ')', rec.companyId);
-          ui.toast('Bank account saved', 'success');
+            (b ? 'Account updated' : 'Account added') + ' · ' + rec.name + (rec.branch ? ' (' + rec.branch + ')' : ''), rec.companyId);
+          ui.toast('Account saved', 'success');
           EPAL.router.render();
         }
       });
@@ -1228,13 +1339,13 @@
       var list = accts.filter(function (a) { return a.type === t[0]; });
       if (!list.length) return;
       var rows = list.map(function (a) {
-        return { code: a.code, name: a.name, group: a.group || '—', normal: a.normal, balance: LED().balance(a.code, {}) };
+        return { code: a.code, name: a.name, group: a.group || '—', normal: a.normal, active: a.active !== false, balance: LED().balance(a.code, {}) };
       });
       page.appendChild(el('div.section-label', { html: ui.icon(t[2]) + ' ' + t[1] }));
       var tbl = EPAL.table({
         columns: [
           { key: 'code', label: 'Code', render: function (r) { return '<span class="num strong">' + ui.escapeHtml(r.code) + '</span>'; } },
-          { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.name) + '</span>'; } },
+          { key: 'name', label: 'Account', render: function (r) { return '<span class="strong' + (r.active ? '' : ' text-mute') + '">' + ui.escapeHtml(r.name) + '</span>' + (r.active ? '' : ' <span class="badge">Inactive</span>'); } },
           { key: 'group', label: 'Group' },
           { key: 'normal', label: 'Normal', badge: { debit: 'info', credit: 'accent' } },
           { key: 'balance', label: 'Balance', num: true, render: function (r) {
@@ -1244,6 +1355,16 @@
         rows: rows, pageSize: 25, searchKeys: ['code', 'name', 'group'],
         exportName: 'coa-' + t[0] + '.csv',
         onRow: function (r) { openAccountLedger(r.code, r.name); },
+        // deactivate — never delete: history stays, the head just leaves the pickers
+        actions: can('create') ? [{ icon: 'power', title: 'Deactivate / reactivate', onClick: function (r) {
+          var coa = EPAL.store.list('coa');
+          var acc2 = coa.filter(function (a) { return a.code === r.code; })[0];
+          if (!acc2) return;
+          acc2.active = acc2.active === false;   // toggle
+          EPAL.store.set('coa', coa);
+          ui.toast('Account ' + r.code + (acc2.active === false ? ' deactivated (history kept)' : ' reactivated'), 'success');
+          EPAL.router.render();
+        } }] : [],
         empty: { icon: 'diagram-2', title: 'No accounts' }
       });
       page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ tbl.el ]) ]));
@@ -1351,7 +1472,7 @@
   function newJournal() {
     if (!hasLedger()) { ui.toast('Ledger engine not available', 'error'); return; }
     if (!can('create')) { ui.toast('You do not have permission to post journals', 'error'); return; }
-    var accOpts = LED().accounts().map(function (a) { return [a.code, a.code + ' · ' + a.name]; });
+    var accOpts = LED().accounts().filter(function (a) { return a.active !== false; }).map(function (a) { return [a.code, a.code + ' · ' + a.name]; });
     function balNote(rowsArr) {
       var dr = 0, cr = 0;
       (rowsArr || []).forEach(function (l) { dr += +l.dr || 0; cr += +l.cr || 0; });
@@ -1387,6 +1508,18 @@
         try {
           var entry = LED().post({ date: vals.date, companyId: vals.companyId, ref: vals.ref,
             memo: vals.memo, source: vals.source || 'manual', party: vals.party, lines: lines });
+          // approval workflow (spec A2, light-touch): a large manual journal also
+          // files an approval request so it lands in the Group Approvals inbox for
+          // MD/Accounts-Head sign-off. Posting proceeds (MD can void via reversal).
+          try {
+            var totalDr = lines.reduce(function (a, l) { return a + (+l.dr || 0); }, 0);
+            if (EPAL.approvals && EPAL.approvals.needsApproval && EPAL.approvals.needsApproval('journal', totalDr)) {
+              EPAL.approvals.request({ docType: 'journal', docId: entry.id, companyId: vals.companyId,
+                title: 'Manual journal ' + (vals.ref || entry.id) + ' · ' + ui.money(totalDr), amount: totalDr,
+                maker: (EPAL.auth && EPAL.auth.current && (EPAL.auth.current() || {}).id) || '' });
+              ui.toast('Filed for approval (large journal)', 'info');
+            }
+          } catch (x) { /* approvals optional */ }
           ui.toast('Journal ' + entry.id + ' posted', 'success');
           EPAL.router.render();
         } catch (e) {
