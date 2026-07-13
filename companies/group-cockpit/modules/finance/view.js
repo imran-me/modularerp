@@ -426,6 +426,48 @@
   /* ==========================================================================
    * OVERVIEW — the consolidated cockpit
    * ========================================================================*/
+  /* ---- MD RED-FLAG PANEL (spec C1) — what needs attention across the group,
+   * each flag a door to the screen that fixes it. Computed live from the ledger,
+   * payroll runs and budgets. ------------------------------------------------*/
+  function groupRedFlags() {
+    var flags = [];
+    if (!hasLedger()) return flags;
+    // 1) overdue salaries — payslips still unpaid after the 10th (auto-Due)
+    var dueSlips = EPAL.store.list('pay_slips').filter(function (s) { return s.status === 'due'; });
+    if (dueSlips.length) {
+      var amt = dueSlips.reduce(function (a, s) { return a + Math.max(0, (s.earnedGross - s.tax - s.pf) - (s.paid || 0)); }, 0);
+      flags.push({ sev: 'bad', icon: 'cash-stack', title: dueSlips.length + ' salar' + (dueSlips.length === 1 ? 'y' : 'ies') + ' overdue', detail: ui.money(amt) + ' unpaid past the 10th', route: 'travels/payroll/manage' });
+    }
+    // 2) negative cash in any entity
+    activeCompanies().concat([{ id: 'group', short: 'Group HQ' }]).forEach(function (c) {
+      var cash = LED().balance('1010', { companyId: c.id }) + LED().balance('1000', { companyId: c.id });
+      if (cash < -1) flags.push({ sev: 'bad', icon: 'bank', title: (c.short || c.id) + ' cash negative', detail: ui.money(cash), route: c.id === 'group' ? 'group/finance/banks' : c.id + '/accounts' });
+    });
+    // 3) receivables overdue (past 30 days)
+    if (LED().aging) {
+      var overdue = LED().aging('AR', {}).reduce(function (a, r) { return a + (r.d30 || 0) + (r.d60 || 0) + (r.d90 || 0); }, 0);
+      if (overdue > 0) flags.push({ sev: 'warn', icon: 'hourglass-split', title: 'Receivables overdue', detail: ui.money(overdue) + ' past 30 days', route: 'group/finance/receivables' });
+    }
+    // 4) group budget overruns
+    var over = 0;
+    EPAL.store.list('group_budgets').forEach(function (b) { var act = Math.max(0, LED().balance(b.account, { companyId: 'group' })); var bud = b.period === 'Monthly' ? (b.amount || 0) * 12 : (b.amount || 0); if (bud > 0 && act > bud) over++; });
+    if (over) flags.push({ sev: 'warn', icon: 'exclamation-triangle', title: over + ' budget' + (over > 1 ? 's' : '') + ' exceeded', detail: 'group expense over plan', route: 'group/finance/expenses' });
+    return flags;
+  }
+  function renderRedFlagPanel(page) {
+    var flags = groupRedFlags();
+    var body = el('div.card-body');
+    if (!flags.length) body.appendChild(el('div.flex.items-center.gap-2', null, [ ui.frag('<span class="notif-ico notif-success">' + ui.icon('check2-circle') + '</span>'), el('div.text-mute', { text: 'All clear — no red flags across the group.' }) ]));
+    else flags.forEach(function (f, i) {
+      body.appendChild(el('div.flex.items-center.gap-2', { style: { padding: '9px 0', borderBottom: i < flags.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }, onclick: function () { EPAL.router.navigate(f.route); } }, [
+        ui.frag('<span class="notif-ico notif-' + (f.sev === 'bad' ? 'error' : f.sev === 'warn' ? 'warning' : 'info') + '">' + ui.icon(f.icon) + '</span>'),
+        el('div.flex-1', null, [ el('div.fw-600', { text: f.title }), el('div.text-mute.sm', { text: f.detail }) ]),
+        ui.frag('<i class="bi bi-chevron-right text-mute"></i>')
+      ]));
+    });
+    page.appendChild(el('div.card.mb-3', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('flag-fill') + ' Needs Attention' }), el('span.card-sub', { text: flags.length ? (flags.length + ' flag' + (flags.length > 1 ? 's' : '')) : 'all clear' }) ]), body ]));
+  }
+
   function renderOverview(page) {
     var f = ledgerFinance(null);
     var snap = db().groupSnapshot();
@@ -473,6 +515,8 @@
       kpi('AR Outstanding', ui.money(ar, { compact: true }), 'arrow-down-left-circle', 'group/finance/receivables', 'to collect'),
       kpi('AP Outstanding', ui.money(ap, { compact: true }), 'arrow-up-right-circle', 'group/finance/payables', 'to settle')
     ]));
+
+    renderRedFlagPanel(page);
 
     var trendId = ui.uid('gfTrend');
     page.appendChild(chartCard('Revenue, Expense & Profit — Consolidated', 'activity', trendId, 'monthly · all concerns combined', 300));
