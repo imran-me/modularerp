@@ -1054,7 +1054,8 @@
         // Include agent commission in the posted cost so ledger profit
         // (sale - cost - commission) reconciles with the module's Net Profit.
         db.postSale('travels', { amount:t.sale, cost:t.cost + (t.commission||0), ref:t.id,
-          desc:'Air ticket '+route+' ('+v.airlineCode+') · '+t.passenger, customer:t.passenger });
+          desc:'Air ticket '+route+' ('+v.airlineCode+') · '+t.passenger, customer:t.passenger,
+          category:'air', vendor:(t.vendor||''), costPaid:(+t.costPaid||0) > 0 });
         docRows.push({ passenger:t.passenger, ticketNo:t.ticketNo||'—', sector:route, base:base, tax:tax, fee:mShare, total:sale });
         sumBase+=base; sumTax+=tax; sumSale+=sale; sumComm+=comm;
       });

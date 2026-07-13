@@ -558,7 +558,12 @@
         date: sale.date || new Date().toISOString().slice(0, 10),
         amount: +sale.amount || 0, cost: +sale.cost || 0,
         profit: (+sale.amount || 0) - (+sale.cost || 0),
-        ref: sale.ref || '', desc: sale.desc || '', customer: sale.customer || ''
+        ref: sale.ref || '', desc: sale.desc || '', customer: sale.customer || '',
+        // accounting hints for the ledger auto-post: categorised income + whether the
+        // customer paid (cash vs receivable) + the vendor and whether they're paid.
+        category: sale.category || '', incomeAccount: sale.incomeAccount || '',
+        vendor: sale.vendor || '', paid: sale.paid === true, costPaid: sale.costPaid === true,
+        payStatus: sale.payStatus || ''
       };
       S.upsert('sales', rec);
       // roll into the company's latest financials month

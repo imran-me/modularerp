@@ -94,6 +94,10 @@
     { code: '3000', name: 'Owner Equity',          type: 'equity',    group: 'Equity' },
     { code: '3100', name: 'Retained Earnings',     type: 'equity',    group: 'Equity' },
     { code: '4000', name: 'Sales Revenue',         type: 'income',    group: 'Revenue' },
+    { code: '4010', name: 'Air Ticket Sales',      type: 'income',    group: 'Revenue' },
+    { code: '4020', name: 'Visa Services',         type: 'income',    group: 'Revenue' },
+    { code: '4030', name: 'Package & Tour',        type: 'income',    group: 'Revenue' },
+    { code: '4040', name: 'Hotel & Other Travel',  type: 'income',    group: 'Revenue' },
     { code: '4100', name: 'Commission Income',     type: 'income',    group: 'Revenue' },
     { code: '4900', name: 'Other Income',          type: 'income',    group: 'Revenue' },
     { code: '5000', name: 'Cost of Sales',         type: 'expense',   group: 'Cost of Sales' },
@@ -530,10 +534,29 @@
   /* ==========================================================================
    * SEED  (idempotent — survives db.reset via seedOnce)
    * ========================================================================*/
+  // Categorise revenue by travel section from the sale's category/desc so income is
+  // not lumped into one account (air ticket / visa / package / hotel). Explicit
+  // rec.incomeAccount wins; else infer from keywords; else generic Sales Revenue.
+  function incomeAccountFor(rec) {
+    if (rec && rec.incomeAccount && account(rec.incomeAccount)) return rec.incomeAccount;
+    var s = (((rec && rec.category) || '') + ' ' + ((rec && rec.desc) || '')).toLowerCase();
+    if (/visa/.test(s)) return '4020';
+    if (/package|tour|umrah|hajj|holiday/.test(s)) return '4030';
+    if (/hotel|room/.test(s)) return '4040';
+    if (/air|ticket|emd|reissue|re-issue|void|flight|bsp|sector|pnr/.test(s)) return '4010';
+    return '4000';
+  }
+  // ensure the categorised income accounts exist for already-seeded installs
+  function ensureExtraAccounts() {
+    var extra = [['4010', 'Air Ticket Sales'], ['4020', 'Visa Services'], ['4030', 'Package & Tour'], ['4040', 'Hotel & Other Travel']];
+    var coa = S.list(COA_KEY); if (!coa.length) return; var have = {}; coa.forEach(function (a) { have[a.code] = true; });
+    var add = false; extra.forEach(function (x) { if (!have[x[0]]) { coa.push(withNormal({ code: x[0], name: x[1], type: 'income', group: 'Revenue' })); add = true; } });
+    if (add) S.set(COA_KEY, coa);
+  }
   function saleEntry(sale, idx) {
     var lines = [
       { account: '1200', dr: sale.amount, cr: 0 },
-      { account: '4000', dr: 0, cr: sale.amount }
+      { account: incomeAccountFor(sale), dr: 0, cr: sale.amount }
     ];
     if (sale.cost > 0) {
       lines.push({ account: '5000', dr: sale.cost, cr: 0 });
@@ -652,6 +675,7 @@
   }
 
   function boot() {
+    ensureExtraAccounts();
     var postedKeys = {};
     // pre-load keys from any already-posted sale entries
     var existing = S.list(GL_KEY);
@@ -667,17 +691,22 @@
       postedKeys[key] = true;
 
       var amount = +rec.amount || 0, cost = +rec.cost || 0;
-      var lines = [
-        { account: '1200', dr: amount, cr: 0 },
-        { account: '4000', dr: 0, cr: amount }
-      ];
-      if (cost > 0) {
-        lines.push({ account: '5000', dr: cost, cr: 0 });
-        lines.push({ account: '2000', dr: 0, cr: cost });
-      }
+      var incAcct = incomeAccountFor(rec);
+      var paid = rec.paid === true || rec.payStatus === 'Paid';
+      var debit = paid ? '1010' : '1200';          // cash if the customer has paid, else receivable
       try {
+        // revenue leg — categorised income, party = customer
         post({ id: 'GL-S' + (rec.id || key), date: rec.date, companyId: rec.companyId,
-          ref: rec.ref, memo: rec.desc || 'Sale', source: 'sale', party: rec.customer, lines: lines });
+          ref: rec.ref, memo: rec.desc || 'Sale', source: 'sale', party: rec.customer || '',
+          lines: [ { account: debit, dr: amount, cr: 0 }, { account: incAcct, dr: 0, cr: amount } ] });
+        // cost leg — a SEPARATE entry so the vendor's payable sub-ledger is correct;
+        // cash-out if the vendor is already paid (costPaid), otherwise a payable.
+        if (cost > 0) {
+          var creditCost = rec.costPaid === true ? '1010' : '2000';
+          post({ id: 'GL-SC' + (rec.id || key), date: rec.date, companyId: rec.companyId,
+            ref: rec.ref, memo: (rec.desc || 'Sale') + ' — cost', source: 'sale', party: rec.vendor || rec.customer || '',
+            lines: [ { account: '5000', dr: cost, cr: 0 }, { account: creditCost, dr: 0, cr: cost } ] });
+        }
       } catch (e) { console.error('[ledger] auto-post failed', e); }
     });
   }

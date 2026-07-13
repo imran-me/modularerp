@@ -113,7 +113,8 @@
       cost: f.cost || a.cost || 0,
       ref: a.id,
       desc: 'Visa ' + (a.country || ''),
-      customer: a.applicant || ''
+      customer: a.applicant || '',
+      category: 'visa', vendor: 'Embassy / VFS'
     });
     a.posted = true;
     db.saveVisaApp(a);
