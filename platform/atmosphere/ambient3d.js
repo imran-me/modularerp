@@ -113,7 +113,7 @@
     var updaters = [];
 
     // ---- ground (grass), runway, taxiway, apron --------------------------
-    var ground = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), M.grass); ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.15, -420); scene.add(ground);
+    var ground = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), M.grass); ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.15, -420); ground.userData.noOutline = true; scene.add(ground);
     var runway = new THREE.Mesh(new THREE.PlaneGeometry(46, 620), new THREE.MeshStandardMaterial({ map: runwayTex(THREE), roughness: 0.94, metalness: 0.04 })); runway.rotation.x = -Math.PI / 2; runway.position.set(0, 0, -250); scene.add(runway);
     var taxi = new THREE.Mesh(new THREE.PlaneGeometry(18, 360), new THREE.MeshStandardMaterial({ map: taxiTex(THREE), roughness: 0.94, metalness: 0.04 })); taxi.rotation.x = -Math.PI / 2; taxi.position.set(52, 0.01, -150); scene.add(taxi);
     var apron = new THREE.Mesh(new THREE.PlaneGeometry(120, 70), M.apron); apron.rotation.x = -Math.PI / 2; apron.position.set(-66, 0.01, -66); scene.add(apron);
@@ -202,7 +202,21 @@
     var blinkers = []; scene.traverse(function (o) { if (o.userData && o.userData.blink && o.material) { o.userData.base = o.material.opacity; blinkers.push(o); } });
     updaters.push(function (t) { for (var i = 0; i < blinkers.length; i++) { var o = blinkers[i], r = o.userData.rate || 3; o.material.opacity = o.userData.base * (0.12 + 0.88 * (0.5 + 0.5 * Math.sin(t * r + i))); } });
 
+    // ---- 1px charcoal silhouette outline over every solid object ----------
+    addOutlines(THREE, scene, new THREE.LineBasicMaterial({ color: 0x24282f, transparent: true, opacity: 0.75, fog: true }));
+
     return updaters;
+  }
+
+  // Draws a thin charcoal edge outline (1px — WebGL line width is fixed) on every
+  // solid Mesh, inheriting each mesh's transform so it tracks moving craft. Skips
+  // the sky dome + ground (userData.noOutline) and all Sprites/Points (glows, sun,
+  // clouds, runway lights — outlining those would look wrong). A 30° edge threshold
+  // keeps it to silhouette/crease lines, not a busy full wireframe.
+  function addOutlines(THREE, scene, edgeMat) {
+    var targets = [];
+    scene.traverse(function (o) { if (o.isMesh && o.geometry && !(o.userData && o.userData.noOutline)) targets.push(o); });
+    for (var i = 0; i < targets.length; i++) { var m = targets[i]; m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30), edgeMat)); }
   }
 
   /* ------------------------------------------------------------- builders */
@@ -338,7 +352,7 @@
       fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; varying vec3 vW; void main(){ float h = normalize(vW).y; vec3 col = h < 0.16 ? mix(bottom, mid, clamp(h/0.16,0.0,1.0)) : mix(mid, top, clamp((h-0.16)/0.84,0.0,1.0)); gl_FragColor = vec4(col, 1.0); }',
       side: THREE.BackSide, depthWrite: false, fog: false
     });
-    var dome = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 20), mat); dome.renderOrder = -1; return dome;
+    var dome = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 20), mat); dome.renderOrder = -1; dome.userData.noOutline = true; return dome;
   }
   // the sun: a bright disc + a warm additive glow, placed on the sky in the key-light direction
   function buildSun(THREE, SUN) {
