@@ -48,6 +48,18 @@
   var SCHEDULE_KINDS = ['Payable', 'Receivable'];
   var SCHEDULE_STATUS = ['Pending', 'Partial', 'Paid'];
 
+  // seed a little recurring-expense + cheque demo data (idempotent; survives db.reset)
+  EPAL.registerEngine({ name: 'travels-accounts-seed', seed: function () {
+    S.seedOnce('tv_recurring', [
+      { id: 'REC-RENT', companyId: CID, category: 'Office Rent', amount: 85000, dayOfMonth: 1, method: 'Bank', party: 'Landlord', active: true },
+      { id: 'REC-NET', companyId: CID, category: 'Internet & Utilities', amount: 12000, dayOfMonth: 5, method: 'Bank', party: 'ISP / DESCO', active: true }
+    ]);
+    S.seedOnce('tv_cheques', [
+      { id: 'CHQ-1', companyId: CID, type: 'Issued', number: 'A-4471209', bank: 'City Bank', party: 'Biman Bangladesh', amount: 249000, date: '2026-07-02', dueDate: '2026-07-15', status: 'Pending' },
+      { id: 'CHQ-2', companyId: CID, type: 'Received', number: 'B-8830112', bank: 'BRAC Bank', party: 'Concord Group', amount: 279000, date: '2026-06-28', dueDate: '2026-07-08', status: 'Cleared' }
+    ]);
+  } });
+
   /* ==========================================================================
    * DATA ACCESSORS
    * ========================================================================*/
@@ -85,36 +97,42 @@
   EPAL.view('travels/accounts', {
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
-      if (['overview', 'income', 'expenses', 'journals', 'schedules'].indexOf(sub) < 0) sub = 'overview';
+      if (['overview', 'income', 'expenses', 'journals', 'schedules', 'recurring', 'cheques'].indexOf(sub) < 0) sub = 'overview';
       var page = el('div.page');
 
-      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', journals: 'Journals', schedules: 'Payment Schedules' };
+      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register' };
       var subs = { overview: 'Income, expenses, journals and payment schedules for Epal Travels.',
         income: 'Every rupee earned — by head, method and month.', expenses: 'Every rupee spent — controlled by head and method.',
         journals: 'Post balanced double-entry journals straight into the general ledger.',
-        schedules: 'Payables and receivables with due dates, ageing and settlement.' };
+        schedules: 'Payables and receivables with due dates, ageing and settlement.',
+        recurring: 'Rent, internet and other monthly costs — auto-created on their day each month.',
+        cheques: 'Issued and received cheques with clearing status (pending / cleared / bounced).' };
 
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
         icon: 'cash-stack', title: titles[sub], sub: subs[sub],
         actions: [
-          canCreate() && sub !== 'journals' && sub !== 'schedules'
+          canCreate() && ['overview', 'income', 'expenses'].indexOf(sub) >= 0
             ? el('button.btn.btn-ghost', { html: ui.icon('journal-plus') + ' New Entry', onclick: function () { entryForm(null); } }) : null,
           canCreate() && sub === 'schedules'
             ? el('button.btn.btn-ghost', { html: ui.icon('calendar2-plus') + ' New Schedule', onclick: function () { scheduleForm(null); } }) : null,
+          canCreate() && sub === 'recurring'
+            ? el('button.btn.btn-ghost', { html: ui.icon('arrow-repeat') + ' New Recurring', onclick: function () { recurringForm(null); } }) : null,
+          canCreate() && sub === 'cheques'
+            ? el('button.btn.btn-ghost', { html: ui.icon('bank') + ' New Cheque', onclick: function () { chequeForm(null); } }) : null,
           el('a.btn.btn-primary', { href: '#/travels/ledgers', html: ui.icon('journal-text') + ' Ledgers' })
         ]
       }));
 
       // pill-tab navigation across the accounts sub-screens
       var pills = el('div.pill-tab.mb-3');
-      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
+      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
       });
       page.appendChild(pills);
 
-      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView }[sub] || overview)(page);
+      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView }[sub] || overview)(page);
       ctx.mount.appendChild(page);
     }
   });
@@ -594,6 +612,151 @@
   function monthSum(list, ym, kind) { return list.filter(function (e) { return String(e.date || '').indexOf(ym) === 0 && (!kind || e.kind === kind); }).reduce(function (a, e) { return a + (+e.amount || 0); }, 0); }
 
   /* ---------------------------------------------------- shared UI helpers */
+  /* ======================================================= RECURRING EXPENSES (spec D4) */
+  function recurring() { return db.col('tv_recurring').filter(function (r) { return r.companyId === CID; }); }
+  function recurringDue() {
+    var ym = TODAY_STR.slice(0, 7), day = TODAY.getDate();
+    return recurring().filter(function (r) { return r.active !== false && r.lastGenerated !== ym && (+r.dayOfMonth || 1) <= day; });
+  }
+  // Generate this month's actual expense from a recurring template (posts to the ledger).
+  function generateRecurring(r) {
+    var ym = TODAY_STR.slice(0, 7);
+    var e = { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: CID, created: TODAY_STR, kind: 'Expense',
+      amount: +r.amount || 0, category: r.category, method: r.method || 'Bank',
+      date: ym + '-' + String(r.dayOfMonth || 1).padStart(2, '0'), party: r.party || '', ref: 'REC-' + r.id, desc: (r.desc || r.category) + ' (recurring)', auto: true };
+    db.save('acc_entries', e); mirrorToLedger(e);
+    r.lastGenerated = ym; db.save('tv_recurring', r);
+    return e;
+  }
+  function recurringView(page) {
+    var list = recurring(), due = recurringDue();
+    var monthly = list.filter(function (r) { return r.active !== false; }).reduce(function (a, r) { return a + (+r.amount || 0); }, 0);
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Recurring Heads', String(list.length), 'arrow-repeat'),
+      kpi('Monthly Total', ui.money(monthly, { compact: true }), 'cash-stack'),
+      kpi('Due This Month', String(due.length), 'calendar-check', due.length ? 'text-warn' : 'text-good'),
+      kpi('Active', String(list.filter(function (r) { return r.active !== false; }).length), 'toggle-on', 'text-good')
+    ]));
+    if (due.length) page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('calendar-check')),
+      el('div.flex-1', { html: '<strong>' + due.length + ' recurring expense' + (due.length > 1 ? 's' : '') + ' due this month.</strong> ' + due.map(function (r) { return esc(r.category) + ' (' + ui.money(r.amount) + ')'; }).join(', ') }),
+      canCreate() ? el('button.btn.btn-sm.btn-primary', { html: ui.icon('play-circle') + ' Generate All', onclick: function () { due.forEach(generateRecurring); ui.toast(due.length + ' expenses posted', 'success'); EPAL.router.render(); } }) : null ]));
+    var tbl = EPAL.table({
+      columns: [
+        { key: 'category', label: 'Head', render: function (r) { return '<span class="strong">' + esc(r.category) + '</span>'; } },
+        { key: 'amount', label: 'Amount', num: true, money: true },
+        { key: 'dayOfMonth', label: 'Day', num: true, render: function (r) { return 'Day ' + (r.dayOfMonth || 1); } },
+        { key: 'method', label: 'Method', badge: {} },
+        { key: 'party', label: 'Paid to', render: function (r) { return esc(r.party || '—'); } },
+        { key: 'lastGenerated', label: 'Last run', render: function (r) { return r.lastGenerated || '—'; } },
+        { key: 'active', label: 'Status', render: function (r) { return r.active === false ? '<span class="badge">Paused</span>' : '<span class="badge badge-good">Active</span>'; } }
+      ],
+      rows: list, searchKeys: ['category', 'party'], pageSize: 10, exportName: 'recurring-expenses.csv',
+      actions: ui.actions({
+        edit: canCreate() ? function (r) { recurringForm(r); } : null,
+        del: canDelete() ? function (r) { ui.confirm({ title: 'Delete recurring "' + r.category + '"?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { db.remove('tv_recurring', r.id); ui.toast('Deleted', 'success'); EPAL.router.render(); } }); } : null
+      }),
+      empty: { icon: 'arrow-repeat', title: 'No recurring expenses', hint: 'Add rent, internet or other monthly costs to auto-generate.' }
+    });
+    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('arrow-repeat') + ' Recurring Expenses' }), el('span.card-sub', { text: 'auto-created monthly on their day' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+  }
+  function recurringForm(rec) {
+    var isNew = !rec;
+    EPAL.formModal({
+      title: isNew ? 'New Recurring Expense' : 'Edit Recurring', icon: 'arrow-repeat', size: 'md', record: rec || { method: 'Bank', dayOfMonth: 1, active: true },
+      fields: [
+        { key: 'category', label: 'Expense head', type: 'text', required: true, placeholder: 'e.g. Office Rent, Internet' },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+        { key: 'dayOfMonth', label: 'Day of month', type: 'number', min: 1, max: 28, default: 1 },
+        { key: 'method', label: 'Method', type: 'select', options: METHODS, default: 'Bank' },
+        { key: 'party', label: 'Paid to (vendor)', type: 'text' },
+        { key: 'active', label: 'Active', type: 'checkbox', default: true, col2: true },
+        { key: 'desc', label: 'Note', type: 'textarea', col2: true }
+      ],
+      saveLabel: isNew ? 'Add' : 'Save',
+      onSave: function (val) {
+        var r = rec || { id: 'REC-' + ui.uid('').slice(-5).toUpperCase(), companyId: CID };
+        r.category = (val.category || '').trim(); r.amount = +val.amount || 0; r.dayOfMonth = +val.dayOfMonth || 1; r.method = val.method; r.party = val.party || ''; r.desc = val.desc || ''; r.active = val.active !== false;
+        db.save('tv_recurring', r);
+        ui.toast('Recurring expense saved', 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+
+  /* ======================================================= CHEQUE REGISTER (spec D5) */
+  function cheques() { return db.col('tv_cheques').filter(function (c) { return c.companyId === CID; }); }
+  function chequesView(page) {
+    var list = cheques().slice().sort(function (a, b) { return (a.dueDate || a.date || '') < (b.dueDate || b.date || '') ? 1 : -1; });
+    var pending = list.filter(function (c) { return c.status === 'Pending'; });
+    var issued = list.filter(function (c) { return c.type === 'Issued'; }).reduce(function (a, c) { return a + (+c.amount || 0); }, 0);
+    var received = list.filter(function (c) { return c.type === 'Received'; }).reduce(function (a, c) { return a + (+c.amount || 0); }, 0);
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Cheques', String(list.length), 'bank'),
+      kpi('Pending', String(pending.length), 'hourglass-split', pending.length ? 'text-warn' : ''),
+      kpi('Issued (Σ)', ui.money(issued, { compact: true }), 'arrow-up-right-circle'),
+      kpi('Received (Σ)', ui.money(received, { compact: true }), 'arrow-down-left-circle', 'text-good')
+    ]));
+    var tbl = EPAL.table({
+      columns: [
+        { key: 'number', label: 'Cheque No', render: function (c) { return '<span class="mono">' + esc(c.number || '—') + '</span>'; } },
+        { key: 'type', label: 'Type', badge: { Issued: 'warn', Received: 'info' } },
+        { key: 'party', label: 'Party', render: function (c) { return esc(c.party || '—'); } },
+        { key: 'bank', label: 'Bank', render: function (c) { return esc(c.bank || '—'); } },
+        { key: 'dueDate', label: 'Due', date: true },
+        { key: 'amount', label: 'Amount', num: true, money: true },
+        { key: 'status', label: 'Status', badge: { Pending: 'warn', Cleared: 'good', Bounced: 'bad' } }
+      ],
+      rows: list, searchKeys: ['number', 'party', 'bank'], quickFilter: 'status', filterPanel: true, filters: [{ key: 'type', label: 'Type' }], dateKey: 'dueDate',
+      exportName: 'cheque-register.csv', pdfTitle: 'Cheque Register',
+      onRow: function (c) { chequeDetail(c); },
+      actions: ui.actions({
+        edit: canCreate() ? function (c) { chequeForm(c); } : null,
+        del: canDelete() ? function (c) { ui.confirm({ title: 'Delete cheque?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { db.remove('tv_cheques', c.id); ui.toast('Deleted', 'success'); EPAL.router.render(); } }); } : null
+      }),
+      empty: { icon: 'bank', title: 'No cheques', hint: 'Record issued & received cheques to track clearing.' }
+    });
+    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('bank') + ' Cheque Register' }), el('span.card-sub', { text: 'issued & received · clearing status' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+  }
+  function chequeDetail(c) {
+    var body = el('div');
+    var m = ui.modal({ title: 'Cheque ' + (c.number || c.id), icon: 'bank', size: 'md', body: body, footer: false });
+    var actions = el('div.flex.gap-1.flex-wrap', { style: { marginLeft: 'auto' } });
+    if (canCreate() && c.status === 'Pending') {
+      actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('check2') + ' Mark Cleared', onclick: function () { setChequeStatus(c, 'Cleared'); m.close(); } }));
+      actions.appendChild(el('button.btn.btn-sm.btn-outline.text-bad', { html: ui.icon('x') + ' Bounced', onclick: function () { setChequeStatus(c, 'Bounced'); m.close(); } }));
+    }
+    body.appendChild(el('div.card', null, [ el('div.card-body', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [ el('div.flex-1', null, [ el('div.fw-700', { text: (c.type || '') + ' · ' + ui.money(c.amount) }), el('div.text-mute.sm', { text: 'Cheque ' + (c.number || '—') + ' · ' + (c.bank || '') }) ]),
+        el('span.badge.badge-' + (c.status === 'Cleared' ? 'good' : c.status === 'Bounced' ? 'bad' : 'warn'), { text: c.status }), actions ]),
+      el('div.data-list', null, [ drow('Type', c.type), drow('Party', c.party), drow('Bank', c.bank), drow('Issue date', c.date ? ui.date(c.date) : '—'), drow('Due / clearing date', c.dueDate ? ui.date(c.dueDate) : '—'), drow('Reference', c.ref) ])
+    ]) ]));
+  }
+  function setChequeStatus(c, status) { c.status = status; db.save('tv_cheques', c); ui.toast('Cheque ' + status.toLowerCase(), 'success'); EPAL.router.render(); }
+  function chequeForm(rec) {
+    var isNew = !rec;
+    EPAL.formModal({
+      title: isNew ? 'New Cheque' : 'Edit Cheque', icon: 'bank', size: 'md', record: rec || { type: 'Issued', status: 'Pending', date: TODAY_STR, dueDate: TODAY_STR },
+      fields: [
+        { key: 'type', label: 'Type', type: 'select', options: ['Issued', 'Received'], required: true },
+        { key: 'number', label: 'Cheque no', type: 'text', required: true },
+        { key: 'bank', label: 'Bank', type: 'text' },
+        { key: 'party', label: 'Party', type: 'text', placeholder: 'Payee / drawer' },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+        { key: 'date', label: 'Issue date', type: 'date', default: TODAY_STR },
+        { key: 'dueDate', label: 'Clearing date', type: 'date', default: TODAY_STR },
+        { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'Cleared', 'Bounced'], default: 'Pending' },
+        { key: 'ref', label: 'Reference', type: 'text', col2: true }
+      ],
+      saveLabel: isNew ? 'Add' : 'Save',
+      onSave: function (val) {
+        var r = rec || { id: 'CHQ-' + ui.uid('').slice(-5).toUpperCase(), companyId: CID };
+        ['type', 'number', 'bank', 'party', 'date', 'dueDate', 'status', 'ref'].forEach(function (k) { r[k] = val[k]; });
+        r.amount = +val.amount || 0;
+        db.save('tv_cheques', r);
+        ui.toast('Cheque saved', 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+
   function canCreate() { return !EPAL.perm || EPAL.perm.can('travels', 'accounts', 'create'); }
   function canDelete() { return !EPAL.perm || EPAL.perm.can('travels', 'accounts', 'delete'); }
   function esc(s) { return ui.escapeHtml(String(s == null ? '' : s)); }
