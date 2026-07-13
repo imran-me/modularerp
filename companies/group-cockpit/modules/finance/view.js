@@ -111,7 +111,7 @@
   }
   // The board-grade CSV statement (built by hand, like the shared reports do).
   function exportPnlCsv() {
-    var s = db().series(null), yms = db().months(12), perCo = perCompanySeries();
+    var s = ledgerSeries(null), yms = db().months(12), perCo = perCompanySeriesLedger();
     var lines = [['Month', 'Group Revenue', 'Group Expense', 'Group Profit', 'Margin %']
       .concat(perCo.map(function (p) { return p.co.short + ' Revenue'; }))];
     var tr = 0, te = 0;
@@ -168,6 +168,31 @@
   }
   // natural P&L amount for one account at one entity (income credit-side +, expense debit-side +)
   function pnlAmt(code, eid) { return Math.round(LED().balance(code, { companyId: eid })); }
+
+  /* ---- LEDGER-DERIVED P&L (single source of truth) -----------------------
+   * These replace the old `financials` summary store on the Overview / P&L /
+   * Cash Flow screens so every group figure comes from the same double-entry
+   * ledger as the by-concern statement — meaning payroll and group expenses are
+   * reflected everywhere. eid omitted/null = whole group (all entities). */
+  function ledgerFinance(eid) {
+    var rev = 0, exp = 0;
+    LED().accounts().forEach(function (a) { if (a.type === 'income') rev += pnlAmt(a.code, eid); else if (a.type === 'expense') exp += pnlAmt(a.code, eid); });
+    return { revenue: rev, expense: exp, profit: rev - exp, margin: rev ? (rev - exp) / rev * 100 : 0 };
+  }
+  function ledgerAcctType() { var m = {}; LED().accounts().forEach(function (a) { m[a.code] = a.type; }); return m; }
+  function ledgerSeries(eid) {
+    var base = db().series(null), months = db().months(12), typ = ledgerAcctType();
+    var idx = {}; months.forEach(function (m, i) { idx[m] = i; });
+    var rev = months.map(function () { return 0; }), exp = months.map(function () { return 0; });
+    LED().entries(eid ? { companyId: eid } : {}).forEach(function (e) {
+      var i = idx[String(e.date).slice(0, 7)]; if (i == null) return;
+      e.lines.forEach(function (ln) { var t = typ[ln.account];
+        if (t === 'income') rev[i] += (+ln.cr || 0) - (+ln.dr || 0);
+        else if (t === 'expense') exp[i] += (+ln.dr || 0) - (+ln.cr || 0); });
+    });
+    return { labels: base.labels, months: months, revenue: rev.map(Math.round), expense: exp.map(Math.round), profit: rev.map(function (r, i) { return Math.round(r - exp[i]); }) };
+  }
+  function perCompanySeriesLedger() { return activeCompanies().map(function (c) { return { co: c, series: ledgerSeries(c.id) }; }); }
 
   function renderConcernPnl(page) {
     page.appendChild(head('P&L by Concern', 'diagram-3',
@@ -402,7 +427,7 @@
    * OVERVIEW — the consolidated cockpit
    * ========================================================================*/
   function renderOverview(page) {
-    var f = db().finance(null, 12);
+    var f = ledgerFinance(null);
     var snap = db().groupSnapshot();
     var cash = bankTotal();
     // Source AR/AP from the same population the KPI cards drill into: when the
@@ -454,11 +479,13 @@
 
     page.appendChild(el('div.section-label', { text: 'Per-Company Performance (12M) — click a row to open that concern’s accounts' }));
     var rows = activeCompanies().map(function (c) {
-      var cf = db().finance(c.id, 12);
+      var cf = ledgerFinance(c.id);
       return { id: c.id, short: c.short, accent: c.accent, icon: c.icon,
         revenue: cf.revenue, expense: cf.expense, profit: cf.profit, margin: cf.margin,
         mom: db().momRevenue(c.id) };
     });
+    var ghq = ledgerFinance('group');   // the Group entity's own overhead (office/food/utilities)
+    if (ghq.revenue || ghq.expense) rows.push({ id: 'group', short: 'Group HQ', accent: '#1A43BF', icon: 'building', revenue: ghq.revenue, expense: ghq.expense, profit: ghq.profit, margin: ghq.margin, mom: 0 });
     var table = EPAL.table({
       columns: [
         { key: 'short', label: 'Company', render: function (r) {
@@ -479,13 +506,13 @@
       ],
       rows: rows, searchKeys: ['short'], pageSize: 10,
       exportName: 'group-company-pnl.csv',
-      onRow: function (r) { EPAL.router.navigate(r.id + '/accounts'); },
+      onRow: function (r) { EPAL.router.navigate(r.id === 'group' ? 'group/finance/expenses' : r.id + '/accounts'); },
       empty: { icon: 'diagram-3', title: 'No active concerns' }
     });
     page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ table.el ]) ]));
 
     requestAnimationFrame(function () {
-      var s = db().series(null);
+      var s = ledgerSeries(null);
       var c = document.getElementById(trendId);
       if (c) EPAL.charts.area(c, { labels: s.labels, legend: true, datasets: [
         { label: 'Revenue', data: s.revenue, color: GOLD },
@@ -499,8 +526,8 @@
    * P&L — month-by-month statement + per-company revenue matrix
    * ========================================================================*/
   function renderPnl(page) {
-    var s = db().series(null), yms = db().months(12), perCo = perCompanySeries();
-    var f = db().finance(null, 12);
+    var s = ledgerSeries(null), yms = db().months(12), perCo = perCompanySeriesLedger();
+    var f = ledgerFinance(null);
     var best = 0;
     s.profit.forEach(function (p, i) { if (p > s.profit[best]) best = i; });
 
@@ -576,7 +603,7 @@
    * CASH FLOW — monthly net movement + cumulative build-up
    * ========================================================================*/
   function renderCashflow(page) {
-    var s = db().series(null), yms = db().months(12);
+    var s = ledgerSeries(null), yms = db().months(12);
     var cum = 0;
     var rows = yms.map(function (ym, i) {
       cum += s.profit[i];
