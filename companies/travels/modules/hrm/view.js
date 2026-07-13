@@ -101,7 +101,7 @@
   EPAL.view('travels/hrm', {
     render: function (ctx) {
       var sub = ctx.subId || 'directory';
-      if (['directory', 'attendance', 'leaves', 'payroll', 'performance'].indexOf(sub) < 0) sub = 'directory';
+      if (['directory', 'attendance', 'leaves', 'performance'].indexOf(sub) < 0) sub = 'directory';
       var page = el('div.page');
       var titles = { directory: 'HRM — Team', attendance: 'Attendance', leaves: 'Leave Register', payroll: 'Payroll', performance: 'Performance' };
       var subs = { directory: 'The Epal Travels team — roster, attendance, payroll and performance.',
@@ -116,7 +116,7 @@
         ].filter(Boolean)
       }));
       var pills = el('div.pill-tab.mb-3');
-      [['directory', 'Directory'], ['attendance', 'Attendance'], ['leaves', 'Leaves'], ['payroll', 'Payroll'], ['performance', 'Performance']].forEach(function (p) {
+      [['directory', 'Directory'], ['attendance', 'Attendance'], ['leaves', 'Leaves'], ['performance', 'Performance']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/hrm' + (p[0] === 'directory' ? '' : '/' + p[0])); } }));
       });

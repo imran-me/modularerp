@@ -1,0 +1,22 @@
+{
+  "key": "payroll",
+  "company": "travels",
+  "title": "Payroll",
+  "icon": "cash-coin",
+  "desc": "Dedicated payroll desk — salary template, monthly run, loans, payslips and advances.",
+  "route": "#/travels/payroll",
+  "enabled": true,
+  "built": true,
+  "menu": [
+    { "id": "template", "label": "Salary Template", "route": "#/travels/payroll/template", "enabled": true },
+    { "id": "manage", "label": "Salary Manage", "route": "#/travels/payroll/manage", "enabled": true },
+    { "id": "loans", "label": "Loan Management", "route": "#/travels/payroll/loans", "enabled": true },
+    { "id": "payslip", "label": "Payslip", "route": "#/travels/payroll/payslip", "enabled": true },
+    { "id": "advance", "label": "Advance Salary", "route": "#/travels/payroll/advance", "enabled": true }
+  ],
+  "files": {
+    "view": "view.js",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "Driven by the shared EPAL.payroll engine; posts accruals/payments/advances/loans/encashment to the GL tagged companyId:travels."
+}

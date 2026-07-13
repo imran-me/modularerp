@@ -123,6 +123,8 @@
         subs:[['holders','Holders'],['categories','Categories'],['expiry','Expiry Radar']] }),
     m('accounts',        'Accounts',         'cash-stack', { desc:'Income, expenses, journals, payment schedules.',
         subs:[['income','Income'],['expenses','Expenses'],['journals','Journals'],['schedules','Payment Schedules']] }),
+    m('payroll',         'Payroll',          'cash-coin', { desc:'Salary template, monthly run, loans, payslips & advances.',
+        subs:[['template','Salary Template'],['manage','Salary Manage'],['loans','Loan Management'],['payslip','Payslip'],['advance','Advance Salary']] }),
     m('ledgers',         'Ledgers',          'journal-text', { desc:'General & party ledgers, trial balance.' }),
     m('reports',         'Reports',          'file-earmark-spreadsheet', { desc:'Sales, visa, ticketing, financial reports.' }),
     m('analytics',       'Analytics',        'graph-up', { desc:'Profit leak, fraud sentinel, travel-DNA.' }),
