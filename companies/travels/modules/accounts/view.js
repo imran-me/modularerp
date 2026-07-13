@@ -97,16 +97,17 @@
   EPAL.view('travels/accounts', {
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
-      if (['overview', 'income', 'expenses', 'journals', 'schedules', 'recurring', 'cheques'].indexOf(sub) < 0) sub = 'overview';
+      if (['overview', 'income', 'expenses', 'journals', 'schedules', 'recurring', 'cheques', 'cashbook'].indexOf(sub) < 0) sub = 'overview';
       var page = el('div.page');
 
-      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register' };
+      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register', cashbook: 'Cash Book' };
       var subs = { overview: 'Income, expenses, journals and payment schedules for Epal Travels.',
         income: 'Every rupee earned — by head, method and month.', expenses: 'Every rupee spent — controlled by head and method.',
         journals: 'Post balanced double-entry journals straight into the general ledger.',
         schedules: 'Payables and receivables with due dates, ageing and settlement.',
         recurring: 'Rent, internet and other monthly costs — auto-created on their day each month.',
-        cheques: 'Issued and received cheques with clearing status (pending / cleared / bounced).' };
+        cheques: 'Issued and received cheques with clearing status (pending / cleared / bounced).',
+        cashbook: 'Every cash & bank movement, dated, with a running balance — straight from the ledger.' };
 
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
@@ -126,13 +127,13 @@
 
       // pill-tab navigation across the accounts sub-screens
       var pills = el('div.pill-tab.mb-3');
-      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
+      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['cashbook', 'Cash Book'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
       });
       page.appendChild(pills);
 
-      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView }[sub] || overview)(page);
+      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView, cashbook: cashBookView }[sub] || overview)(page);
       ctx.mount.appendChild(page);
     }
   });
@@ -755,6 +756,43 @@
         ui.toast('Cheque saved', 'success'); EPAL.router.render(); return true;
       }
     });
+  }
+
+  /* ======================================================= CASH BOOK (spec D5) */
+  // Every movement on Cash (1000) + Bank (1010) for the company, dated, with a
+  // combined running balance — read straight from the double-entry ledger.
+  function cashBookView(page) {
+    if (!EPAL.ledger || !EPAL.ledger.entries) { page.appendChild(el('div.card', null, [ el('div.card-body', { text: 'Ledger engine unavailable.' }) ])); return; }
+    var rows = [], bal = 0, inflow = 0, outflow = 0;
+    EPAL.ledger.entries({ companyId: CID }).forEach(function (e) {
+      var d = 0, c = 0;
+      e.lines.forEach(function (l) { if (l.account === '1000' || l.account === '1010') { d += (+l.dr || 0); c += (+l.cr || 0); } });
+      if (d === 0 && c === 0) return;
+      bal += d - c; inflow += d; outflow += c;
+      rows.push({ date: e.date, ref: e.ref || e.id, memo: e.memo || '', party: e.party || '', inflow: d, outflow: c, balance: bal });
+    });
+    var closing = bal;
+    rows.reverse();   // newest first for display
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Cash & Bank', ui.money(closing, { compact: true }), 'bank', closing < 0 ? 'text-bad' : ''),
+      kpi('Total In', ui.money(inflow, { compact: true }), 'arrow-down-left-circle', 'text-good'),
+      kpi('Total Out', ui.money(outflow, { compact: true }), 'arrow-up-right-circle', 'text-warn'),
+      kpi('Movements', String(rows.length), 'card-list')
+    ]));
+    var tbl = EPAL.table({
+      columns: [
+        { key: 'date', label: 'Date', date: true },
+        { key: 'ref', label: 'Ref', render: function (r) { return '<span class="mono xs text-mute">' + esc(r.ref) + '</span>'; } },
+        { key: 'memo', label: 'Particulars', render: function (r) { return esc(r.memo || r.party || '—'); } },
+        { key: 'inflow', label: 'In', num: true, render: function (r) { return r.inflow ? '<span class="num text-good">' + ui.money(r.inflow) + '</span>' : '—'; }, sortVal: function (r) { return r.inflow; } },
+        { key: 'outflow', label: 'Out', num: true, render: function (r) { return r.outflow ? '<span class="num text-warn">' + ui.money(r.outflow) + '</span>' : '—'; }, sortVal: function (r) { return r.outflow; } },
+        { key: 'balance', label: 'Balance', num: true, render: function (r) { return '<span class="num strong ' + (r.balance < 0 ? 'text-bad' : '') + '">' + ui.money(r.balance) + '</span>'; }, sortVal: function (r) { return r.balance; } }
+      ],
+      rows: rows, searchKeys: ['memo', 'party', 'ref'], pageSize: 15, exportName: 'cash-book.csv', pdfTitle: 'Cash Book — Epal Travels',
+      empty: { icon: 'bank', title: 'No cash movements yet' }
+    });
+    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('bank') + ' Cash & Bank Book' }), el('span.card-sub', { text: 'closing balance ' + ui.money(closing) } ) ]), el('div.card-body', null, [ tbl.el ]) ]));
   }
 
   function canCreate() { return !EPAL.perm || EPAL.perm.can('travels', 'accounts', 'create'); }
