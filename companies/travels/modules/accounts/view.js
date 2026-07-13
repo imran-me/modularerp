@@ -58,6 +58,10 @@
       { id: 'CHQ-1', companyId: CID, type: 'Issued', number: 'A-4471209', bank: 'City Bank', party: 'Biman Bangladesh', amount: 249000, date: '2026-07-02', dueDate: '2026-07-15', status: 'Pending' },
       { id: 'CHQ-2', companyId: CID, type: 'Received', number: 'B-8830112', bank: 'BRAC Bank', party: 'Concord Group', amount: 279000, date: '2026-06-28', dueDate: '2026-07-08', status: 'Cleared' }
     ]);
+    S.seedOnce('tv_petty', [
+      { id: 'PC-1', companyId: CID, staff: 'Naeem Chowdhury', amount: 5000, purpose: 'Office supplies & courier', date: '2026-07-03', status: 'Open' },
+      { id: 'PC-2', companyId: CID, staff: 'Rafiul Islam', amount: 3000, purpose: 'Client refreshments', date: '2026-06-29', status: 'Settled', category: 'Travel & Conveyance', billAmount: 2650, billNo: 'BR-118', settledDate: '2026-07-01' }
+    ]);
   } });
 
   /* ==========================================================================
@@ -97,17 +101,18 @@
   EPAL.view('travels/accounts', {
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
-      if (['overview', 'income', 'expenses', 'journals', 'schedules', 'recurring', 'cheques', 'cashbook'].indexOf(sub) < 0) sub = 'overview';
+      if (['overview', 'income', 'expenses', 'journals', 'schedules', 'recurring', 'cheques', 'cashbook', 'pettycash'].indexOf(sub) < 0) sub = 'overview';
       var page = el('div.page');
 
-      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register', cashbook: 'Cash Book' };
+      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register', cashbook: 'Cash Book', pettycash: 'Petty Cash' };
       var subs = { overview: 'Income, expenses, journals and payment schedules for Epal Travels.',
         income: 'Every rupee earned — by head, method and month.', expenses: 'Every rupee spent — controlled by head and method.',
         journals: 'Post balanced double-entry journals straight into the general ledger.',
         schedules: 'Payables and receivables with due dates, ageing and settlement.',
         recurring: 'Rent, internet and other monthly costs — auto-created on their day each month.',
         cheques: 'Issued and received cheques with clearing status (pending / cleared / bounced).',
-        cashbook: 'Every cash & bank movement, dated, with a running balance — straight from the ledger.' };
+        cashbook: 'Every cash & bank movement, dated, with a running balance — straight from the ledger.',
+        pettycash: 'Petty-cash IOU slips to staff and their settlement against bills.' };
 
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
@@ -121,19 +126,21 @@
             ? el('button.btn.btn-ghost', { html: ui.icon('arrow-repeat') + ' New Recurring', onclick: function () { recurringForm(null); } }) : null,
           canCreate() && sub === 'cheques'
             ? el('button.btn.btn-ghost', { html: ui.icon('bank') + ' New Cheque', onclick: function () { chequeForm(null); } }) : null,
+          canCreate() && sub === 'pettycash'
+            ? el('button.btn.btn-ghost', { html: ui.icon('cash') + ' Give IOU', onclick: function () { pettyForm(null); } }) : null,
           el('a.btn.btn-primary', { href: '#/travels/ledgers', html: ui.icon('journal-text') + ' Ledgers' })
         ]
       }));
 
       // pill-tab navigation across the accounts sub-screens
       var pills = el('div.pill-tab.mb-3');
-      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['cashbook', 'Cash Book'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
+      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['cashbook', 'Cash Book'], ['pettycash', 'Petty Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
       });
       page.appendChild(pills);
 
-      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView, cashbook: cashBookView }[sub] || overview)(page);
+      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView, cashbook: cashBookView, pettycash: pettyView }[sub] || overview)(page);
       ctx.mount.appendChild(page);
     }
   });
@@ -763,25 +770,31 @@
   // combined running balance — read straight from the double-entry ledger.
   function cashBookView(page) {
     if (!EPAL.ledger || !EPAL.ledger.entries) { page.appendChild(el('div.card', null, [ el('div.card-body', { text: 'Ledger engine unavailable.' }) ])); return; }
+    var recon = S.get('tv_recon', {});                 // { glEntryId: true } — reconciled vs the bank statement
     var rows = [], bal = 0, inflow = 0, outflow = 0;
     EPAL.ledger.entries({ companyId: CID }).forEach(function (e) {
       var d = 0, c = 0;
       e.lines.forEach(function (l) { if (l.account === '1000' || l.account === '1010') { d += (+l.dr || 0); c += (+l.cr || 0); } });
       if (d === 0 && c === 0) return;
       bal += d - c; inflow += d; outflow += c;
-      rows.push({ date: e.date, ref: e.ref || e.id, memo: e.memo || '', party: e.party || '', inflow: d, outflow: c, balance: bal });
+      rows.push({ id: e.id, date: e.date, ref: e.ref || e.id, memo: e.memo || '', party: e.party || '', inflow: d, outflow: c, balance: bal, reconciled: !!recon[e.id] });
     });
     var closing = bal;
+    var reconRows = rows.filter(function (r) { return r.reconciled; });
+    var unrecon = rows.filter(function (r) { return !r.reconciled; });
+    var unreconAmt = unrecon.reduce(function (a, r) { return a + (r.inflow - r.outflow); }, 0);
     rows.reverse();   // newest first for display
 
     page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
       kpi('Cash & Bank', ui.money(closing, { compact: true }), 'bank', closing < 0 ? 'text-bad' : ''),
-      kpi('Total In', ui.money(inflow, { compact: true }), 'arrow-down-left-circle', 'text-good'),
-      kpi('Total Out', ui.money(outflow, { compact: true }), 'arrow-up-right-circle', 'text-warn'),
-      kpi('Movements', String(rows.length), 'card-list')
+      kpi('Reconciled', reconRows.length + ' / ' + rows.length, 'check2-circle', reconRows.length === rows.length && rows.length ? 'text-good' : ''),
+      kpi('Unreconciled', ui.money(unreconAmt, { compact: true }), 'question-circle', unrecon.length ? 'text-warn' : 'text-good'),
+      kpi('Total In / Out', ui.money(inflow, { compact: true }) + ' / ' + ui.money(outflow, { compact: true }), 'arrow-down-up')
     ]));
+    page.appendChild(el('div.text-mute.sm.mb-2', { html: ui.icon('info-circle') + ' Bank reconciliation — click a row to tick it off against your bank statement.' }));
     var tbl = EPAL.table({
       columns: [
+        { key: 'reconciled', label: '✓', render: function (r) { return r.reconciled ? '<span class="text-good">' + ui.icon('check-circle-fill') + '</span>' : '<span class="text-mute">' + ui.icon('circle') + '</span>'; } },
         { key: 'date', label: 'Date', date: true },
         { key: 'ref', label: 'Ref', render: function (r) { return '<span class="mono xs text-mute">' + esc(r.ref) + '</span>'; } },
         { key: 'memo', label: 'Particulars', render: function (r) { return esc(r.memo || r.party || '—'); } },
@@ -790,9 +803,81 @@
         { key: 'balance', label: 'Balance', num: true, render: function (r) { return '<span class="num strong ' + (r.balance < 0 ? 'text-bad' : '') + '">' + ui.money(r.balance) + '</span>'; }, sortVal: function (r) { return r.balance; } }
       ],
       rows: rows, searchKeys: ['memo', 'party', 'ref'], pageSize: 15, exportName: 'cash-book.csv', pdfTitle: 'Cash Book — Epal Travels',
+      onRow: canCreate() ? function (r) { var m = S.get('tv_recon', {}); if (m[r.id]) delete m[r.id]; else m[r.id] = true; S.set('tv_recon', m); EPAL.router.render(); } : null,
       empty: { icon: 'bank', title: 'No cash movements yet' }
     });
     page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('bank') + ' Cash & Bank Book' }), el('span.card-sub', { text: 'closing balance ' + ui.money(closing) } ) ]), el('div.card-body', null, [ tbl.el ]) ]));
+  }
+
+  /* ======================================================= PETTY CASH (spec D5) */
+  function petty() { return db.col('tv_petty').filter(function (p) { return p.companyId === CID; }); }
+  function pettyView(page) {
+    var list = petty().slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
+    var open = list.filter(function (p) { return p.status !== 'Settled'; });
+    var openAmt = open.reduce(function (a, p) { return a + (+p.amount || 0); }, 0);
+    var settled = list.filter(function (p) { return p.status === 'Settled'; }).reduce(function (a, p) { return a + (+p.billAmount || 0); }, 0);
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Open IOUs', String(open.length), 'cash', open.length ? 'text-warn' : 'text-good'),
+      kpi('Held by Staff', ui.money(openAmt, { compact: true }), 'people'),
+      kpi('Settled (Σ)', ui.money(settled, { compact: true }), 'check2-circle', 'text-good'),
+      kpi('Slips', String(list.length), 'card-list')
+    ]));
+    var tbl = EPAL.table({
+      columns: [
+        { key: 'staff', label: 'Staff', render: function (p) { return '<span class="strong">' + esc(p.staff) + '</span>'; } },
+        { key: 'purpose', label: 'Purpose', render: function (p) { return esc(p.purpose || '—'); } },
+        { key: 'date', label: 'Date', date: true },
+        { key: 'amount', label: 'IOU', num: true, money: true },
+        { key: 'billAmount', label: 'Bill', num: true, render: function (p) { return p.billAmount ? ui.money(p.billAmount) : '—'; }, sortVal: function (p) { return p.billAmount || 0; } },
+        { key: 'status', label: 'Status', badge: { Open: 'warn', Settled: 'good' } }
+      ],
+      rows: list, searchKeys: ['staff', 'purpose'], quickFilter: 'status', pageSize: 10, exportName: 'petty-cash.csv', pdfTitle: 'Petty Cash Register',
+      onRow: function (p) { if (p.status !== 'Settled' && canCreate()) settlePetty(p); },
+      actions: ui.actions({
+        edit: canCreate() ? function (p) { if (p.status !== 'Settled') settlePetty(p); else ui.toast('Already settled', 'info'); } : null,
+        del: canDelete() ? function (p) { ui.confirm({ title: 'Delete IOU slip?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { db.remove('tv_petty', p.id); ui.toast('Deleted', 'success'); EPAL.router.render(); } }); } : null
+      }),
+      empty: { icon: 'cash', title: 'No petty-cash slips', hint: 'Give an IOU to staff for petty expenses.' }
+    });
+    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash') + ' Petty Cash — IOU Register' }), el('span.card-sub', { text: 'click an open slip to settle against a bill' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+  }
+  function pettyForm(rec) {
+    EPAL.formModal({
+      title: 'Give Petty-Cash IOU', icon: 'cash', size: 'md', record: { date: TODAY_STR },
+      fields: [
+        { key: 'staff', label: 'Staff', type: 'text', required: true, placeholder: 'Who is holding the cash' },
+        { key: 'amount', label: 'IOU amount (৳)', type: 'money', required: true, min: 1 },
+        { key: 'purpose', label: 'Purpose', type: 'text', required: true, placeholder: 'e.g. Office supplies, courier' },
+        { key: 'date', label: 'Date', type: 'date', default: TODAY_STR }
+      ],
+      saveLabel: 'Give IOU',
+      onSave: function (val) {
+        var r = { id: 'PC-' + ui.uid('').slice(-5).toUpperCase(), companyId: CID, staff: (val.staff || '').trim(), amount: +val.amount || 0, purpose: val.purpose || '', date: val.date || TODAY_STR, status: 'Open' };
+        db.save('tv_petty', r);
+        ui.toast('IOU given to ' + r.staff, 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+  // settle an IOU against a bill — books the actual spend (DR expense / CR Cash).
+  function settlePetty(p) {
+    EPAL.formModal({
+      title: 'Settle IOU — ' + p.staff, icon: 'check2-circle', size: 'md', record: { billAmount: p.amount, category: 'Travel & Conveyance' },
+      fields: [
+        { key: 'category', label: 'Expense head', type: 'text', required: true, default: 'Travel & Conveyance', hint: 'What the petty cash was spent on.' },
+        { key: 'billAmount', label: 'Bill amount (৳)', type: 'money', required: true, min: 0, max: p.amount, hint: 'IOU was ' + ui.money(p.amount) + '; any balance is returned to cash.' },
+        { key: 'billNo', label: 'Bill / voucher no', type: 'text' }
+      ],
+      saveLabel: 'Settle',
+      onSave: function (val) {
+        var bill = Math.min(+val.billAmount || 0, p.amount);
+        if (EPAL.ledger && EPAL.ledger.post && bill > 0) {
+          try { EPAL.ledger.post({ id: 'GL-PCS-' + p.id, date: TODAY_STR, companyId: CID, ref: p.id, memo: 'Petty cash · ' + p.staff + ' · ' + val.category, source: 'manual', party: p.staff, lines: [{ account: expenseAccountFor(val.category), dr: bill, cr: 0 }, { account: '1000', dr: 0, cr: bill }] }); } catch (e) {}
+        }
+        p.status = 'Settled'; p.category = val.category; p.billAmount = bill; p.billNo = val.billNo || ''; p.settledDate = TODAY_STR;
+        db.save('tv_petty', p);
+        ui.toast('IOU settled', 'success'); EPAL.router.render(); return true;
+      }
+    });
   }
 
   function canCreate() { return !EPAL.perm || EPAL.perm.can('travels', 'accounts', 'create'); }
