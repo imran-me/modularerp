@@ -484,6 +484,34 @@
       ]) ])
     ]));
   }
+  /* ---- INTER-COMPANY FUND TRANSFER (spec C3) — move cash between concerns; the
+   * pair posts to the inter-company control accounts (1300/2400) so it eliminates
+   * on consolidation. --------------------------------------------------------*/
+  function fundTransferForm() {
+    var comps = activeCompanies();
+    EPAL.formModal({
+      title: 'Inter-Company Fund Transfer', icon: 'arrow-left-right', size: 'md', record: { date: gToday() },
+      fields: [
+        { key: 'from', label: 'From company', type: 'select', required: true, options: comps.map(function (c) { return [c.id, c.short]; }) },
+        { key: 'to', label: 'To company', type: 'select', required: true, options: comps.map(function (c) { return [c.id, c.short]; }) },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+        { key: 'date', label: 'Date', type: 'date', default: gToday() },
+        { key: 'memo', label: 'Note', type: 'text', placeholder: 'e.g. working-capital support' }
+      ],
+      saveLabel: 'Post Transfer',
+      onSave: function (val) {
+        if (val.from === val.to) { ui.toast('Pick two different companies', 'error'); return false; }
+        var amt = +val.amount || 0; if (amt <= 0) { ui.toast('Enter an amount', 'error'); return false; }
+        var ref = 'FT-' + Date.now().toString(36).toUpperCase();
+        try {
+          LED().post({ date: val.date, companyId: val.from, ref: ref, memo: 'Fund transfer to ' + val.to + (val.memo ? ' · ' + val.memo : ''), source: 'intercompany', party: val.to, lines: [{ account: '1300', dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt }] });
+          LED().post({ date: val.date, companyId: val.to, ref: ref, memo: 'Fund transfer from ' + val.from + (val.memo ? ' · ' + val.memo : ''), source: 'intercompany', party: val.from, lines: [{ account: '1010', dr: amt, cr: 0 }, { account: '2400', dr: 0, cr: amt }] });
+          EPAL.bus.emit('intercompany:posted', { from: val.from, to: val.to, amount: amt, ref: ref });
+          ui.toast('Transferred ' + ui.money(amt), 'success'); EPAL.router.render(); return true;
+        } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; }
+      }
+    });
+  }
   function closeMonthPrompt() {
     EPAL.formModal({ title: 'Close Accounting Period', icon: 'lock', size: 'sm', record: { ym: LED().lockedThrough() || '2026-06' },
       fields: [ { key: 'ym', label: 'Close through month (YYYY-MM)', type: 'text', required: true, placeholder: '2026-06', hint: 'Locks this month and everything before it against new/back-dated entries.' } ],
@@ -524,6 +552,8 @@
           onclick: function () { EPAL.router.navigate('group/finance/journal'); } }),
         el('button.btn.btn-sm.btn-ghost', { html: ui.icon('list-columns-reverse') + ' Trial Balance',
           onclick: function () { EPAL.router.navigate('group/finance/trial-balance'); } }),
+        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-left-right') + ' Fund Transfer',
+          onclick: function () { fundTransferForm(); } }),
         el('button.btn.btn-sm.btn-primary', { html: ui.icon('journal-plus') + ' New Journal',
           onclick: function () { newJournal(); } })
       ]));
