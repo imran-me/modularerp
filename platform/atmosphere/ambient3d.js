@@ -119,7 +119,7 @@
       nacelle: S(0x3c4658, 0.45, 0.5), fan: S(0xaebbd6, 0.35, 0.65), win: S(0x0e1830, 0.2, 0.5),
       tire: S(0x14161c, 0.85, 0.05), strut: S(0x8a94a8, 0.5, 0.5),
       accent: S(0xf4b740, 0.5, 0.2), red: S(0xf0506e, 0.5, 0.2),
-      lightTex: lightSprite(THREE), mat: mat, THREE: THREE
+      lightTex: lightSprite(THREE), shadowT: shadowTex(THREE), mat: mat, THREE: THREE
     };
   }
 
@@ -205,56 +205,98 @@
     // RULE: nothing appears or disappears ON SCREEN. Every leg starts and ends
     // either far inside the fog, off the frame edge, or occluded behind the
     // terminal/hangar — only then does the craft hide and wait for its next leg.
+    // a soft elliptical ground shadow that follows a craft (readability: a landed
+    // plane must never blend into the runway greys)
+    function addShadow(craft, w) {
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.3, depthWrite: false, fog: false }));
+      sp.scale.set(w, w * 0.6, 1); sp.visible = false; scene.add(sp);
+      (craft.g || craft).userData.shadowS = sp;
+      return sp;
+    }
     function legMover(obj, makeLeg) {
       var o = obj.g || obj; scene.add(o);
       var leg = null, start = 0, idleUntil = -1;
       updaters.push(function (t) {
+        var sh = o.userData.shadowS;
         if (idleUntil >= 0) { if (t < idleUntil) return; leg = null; idleUntil = -1; }
-        if (!leg) { leg = makeLeg(); start = t; o.visible = true; if (leg.init) leg.init(); }
+        if (!leg) {
+          leg = makeLeg(t);
+          if (!leg) { idleUntil = t + 1.2 + Math.random(); return; }     // e.g. runway busy → retry shortly
+          start = t; o.visible = true; if (leg.init) leg.init();
+        }
         var u = (t - start) / leg.dur;
-        if (u >= 1) { idleUntil = t + (leg.gap || 0.01); o.visible = false; return; }
+        if (u >= 1) { idleUntil = t + (leg.gap || 0.01); o.visible = false; if (sh) sh.visible = false; return; }
         var du = 0.006, p = leg.path(u), p2 = leg.path(Math.min(0.9999, u + du)), p0 = leg.path(Math.max(0, u - du));
-        place(o, p, p2, bankOf(p0, p, p2) + (leg.bank || 0));
+        // aircraft bank INTO turns only in the air — on the ground they stay flat
+        // (the "nearly crashing" lean during runway exits came from ground banking)
+        var bank = (p.y > 7) ? bankOf(p0, p, p2) : 0;
+        place(o, p, p2, bank + (leg.bank || 0));
+        if (sh) { sh.visible = o.visible; sh.position.set(p.x, 0.24, p.z); var f = Math.max(0, 1 - p.y / 150); sh.material.opacity = 0.3 * f * f; }
         if (leg.tick) leg.tick(u, t);
       });
     }
 
-    // DEPARTURE — the FULL cycle: emerges from the terminal stand (occluded),
-    // taxis out, lines up, rolls, rotates and climbs DEEP into the fog before
-    // hiding. Every departure differs (route timing, climb, drift, distance).
-    var toP = buildAirliner(THREE, M, 1.9, false, LIVERIES[0]);
-    legMover(toP, function () {
-      var climb = rnd(110, 190), drift = rnd(-130, 140), dist = rnd(620, 840);
-      var S = V(-108, 4.6, -68), T1 = V(52, 4.6, -62), T2 = V(52, 4.6, 22), R = V(4, 4.6, 36), RE = V(4, 4.6, -150);
-      var E = V(4 + drift, 4.6 + climb, -150 - dist);
-      return { dur: rnd(38, 56), gap: rnd(4, 18),
-        path: function (u) {
-          if (u < 0.16) return bez(S, V(-20, 4.6, -50), T1, u / 0.16);        // out of the stand
-          if (u < 0.40) return lerpV(T1, T2, (u - 0.16) / 0.24);              // taxi south
-          if (u < 0.48) return bez(T2, V(44, 4.6, 40), R, (u - 0.40) / 0.08); // line up
-          if (u < 0.70) { var k = (u - 0.48) / 0.22; return lerpV(R, RE, k * k); }   // accelerating roll
-          var e = (u - 0.70) / 0.30; e = e * e;
-          return V(RE.x + e * (E.x - RE.x), RE.y + e * (E.y - RE.y), RE.z + e * (E.z - RE.z));   // climb into the haze
-        },
-        tick: function (u) { toP.userData.gear.visible = u < 0.76; } };
+    /* THE FIELD LIFECYCLE — a pool of coloured airliners that LAND, slow down,
+     * vacate in a wide flat turn, taxi to THEIR OWN gate, rest, then taxi out
+     * and DEPART again. A single-runway MUTEX (runwayFreeAt) means only one
+     * aircraft ever owns the strip + taxiway at a time — nothing can touch. */
+    var runwayFreeAt = 0;
+    var GATES = [V(-124, 4.6, -74), V(-110, 4.6, -78), V(-96, 4.6, -80), V(-82, 4.6, -74)];
+    var POOL = [
+      { livery: LIVERIES[0], scale: 1.9, cfg: {} },
+      { livery: LIVERIES[5], scale: 1.5, cfg: {} },                           // the toy yellow/blue lands too
+      { livery: LIVERIES[6], scale: 1.45, cfg: {} },                          // and the orange one
+      { livery: LIVERIES[4], scale: 1.75, cfg: { engines: 4, stretch: 1.2 } } // and the 4-engine heavy
+    ];
+    POOL.forEach(function (spec, pi) {
+      var craft = buildAirliner(THREE, M, spec.scale, false, spec.livery, spec.cfg);
+      addShadow(craft, 16 * spec.scale);
+      var gate = GATES[pi];
+      var away = (pi % 2 === 1);                    // stagger: half start airborne-side
+      legMover(craft, function (tNow) {
+        if (tNow < runwayFreeAt) return null;       // strip occupied → wait, retry
+        var dur, leg;
+        if (away) {                                 // ARRIVE: fog → land → gate
+          var glide = rnd(95, 140);
+          var TD = V(-4, 4.6, -40), RO = V(-4, 4.6, 34), X1 = V(-58, 4.6, -14);
+          dur = rnd(42, 58);
+          leg = { dur: dur, gap: rnd(6, 22), path: function (u) {
+            if (u < 0.46) { var e = u / 0.46; return V(-4, glide - e * e * (glide - 4.6), -740 + e * 700); }   // long final
+            if (u < 0.62) { var k = (u - 0.46) / 0.16; k = 1 - (1 - k) * (1 - k); return lerpV(TD, RO, k); }   // decelerate
+            if (u < 0.82) return bez(RO, V(-26, 4.6, 50), X1, (u - 0.62) / 0.20);                              // wide slow vacate
+            return bez(X1, V((X1.x + gate.x) / 2 - 16, 4.6, -48), gate, (u - 0.82) / 0.18);                    // to own gate
+          } };
+        } else {                                    // DEPART: gate → strip → sky
+          var climb = rnd(110, 190), drift = rnd(-140, 150), dist = rnd(640, 860);
+          var T1 = V(52, 4.6, -66), T2 = V(52, 4.6, 22), R = V(4, 4.6, 36), RE = V(4, 4.6, -150);
+          var E = V(4 + drift, 4.6 + climb, -150 - dist);
+          dur = rnd(40, 58);
+          leg = { dur: dur, gap: rnd(6, 24), path: function (u) {
+            if (u < 0.16) return bez(gate, V(gate.x + 44, 4.6, -54), T1, u / 0.16);
+            if (u < 0.40) return lerpV(T1, T2, (u - 0.16) / 0.24);
+            if (u < 0.48) return bez(T2, V(44, 4.6, 42), R, (u - 0.40) / 0.08);
+            if (u < 0.70) { var k = (u - 0.48) / 0.22; return lerpV(R, RE, k * k); }         // accelerating roll
+            var e2 = (u - 0.70) / 0.30; e2 = e2 * e2;
+            return V(RE.x + e2 * (E.x - RE.x), RE.y + e2 * (E.y - RE.y), RE.z + e2 * (E.z - RE.z));
+          }, tick: function (u) { craft.userData.gear.visible = u < 0.76; } };
+        }
+        away = !away;                               // the cycle: land ↔ depart
+        runwayFreeAt = tNow + dur + rnd(5, 12);     // own the field until well clear
+        return leg;
+      });
     });
-    // ARRIVAL — materialises deep in the fog on final, lands, decelerates,
-    // vacates the runway and taxis INTO the stand (occluded) before hiding.
-    var laP = buildAirliner(THREE, M, 1.9, false, LIVERIES[1]);
-    legMover(laP, function () {
-      var glide = rnd(95, 140);
-      var TD = V(-4, 4.6, -40), RO = V(-4, 4.6, 28), X1 = V(-52, 4.6, -8), ST = V(-106, 4.6, -66);
-      return { dur: rnd(34, 50), gap: rnd(5, 20),
-        path: function (u) {
-          if (u < 0.5) { var e = u / 0.5; return V(-4, glide - e * e * (glide - 4.6), -740 + e * 700); }   // long final from the fog
-          if (u < 0.66) { var k = (u - 0.5) / 0.16; k = 1 - (1 - k) * (1 - k); return lerpV(TD, RO, k); }  // decelerating rollout
-          if (u < 0.84) return bez(RO, V(-18, 4.6, 44), X1, (u - 0.66) / 0.18);                            // vacate
-          return bez(X1, V(-88, 4.6, -34), ST, (u - 0.84) / 0.16);                                         // into the stand
-        } };
+    // static shadows under the gate/stand aircraft (same readability rule)
+    [[parked, 2.0], [parked2, 1.7], [parked3, 1.9]].forEach(function (pr) {
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.28, depthWrite: false, fog: false }));
+      sp.scale.set(16 * pr[1], 10 * pr[1], 1);
+      sp.position.set(pr[0].position.x, 0.24, pr[0].position.z);
+      scene.add(sp);
     });
+
     // TOW / repositioning — shuttles between the hangar mouth and the terminal
     // stand: BOTH endpoints are occluded, with a brief hold on the open apron.
     var txP = buildAirliner(THREE, M, 1.6, false, LIVERIES[7]);
+    addShadow(txP, 26);
     legMover(txP, function () {
       var out = Math.random() < 0.5;
       var H = V(-148, 4.0, -146), T = V(-106, 4.0, -64);
@@ -274,11 +316,10 @@
     // an A340-style 4-engine long-hauler, a stretched 777-style wide-body, the
     // toy blue-and-yellow plane, the orange 737, the dark-navy A220 and a teal
     // narrow-body. Each pass picks its own altitude, depth, heading, bob, speed.
+    // (the toy/orange/heavy types now live in the landing POOL above — cruisers
+    // keep the types that stay high so nothing appears twice at once)
     var FLEET = [
-      { scale: 1.8, livery: LIVERIES[4], cfg: { engines: 4, stretch: 1.28 } },   // 4-engine A340 type
-      { scale: 1.9, livery: LIVERIES[0], cfg: { stretch: 1.18 } },               // stretched wide-body 777 type
-      { scale: 1.5, livery: LIVERIES[5], cfg: {} },                              // TOY yellow/blue
-      { scale: 1.4, livery: LIVERIES[6], cfg: {} },                              // orange 737 type
+      { scale: 1.9, livery: LIVERIES[3], cfg: { stretch: 1.18 } },               // stretched wide-body 777 type
       { scale: 1.35, livery: LIVERIES[7], cfg: {} },                             // dark-navy A220 type
       { scale: 1.5, livery: LIVERIES[1], cfg: {} }                               // teal narrow-body
     ];
@@ -542,6 +583,15 @@
     var g = new THREE.Group(); g.position.copy(pos);
     var arch = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, 44, 20, 1, true, 0, Math.PI), M.bldg2); arch.rotation.z = Math.PI / 2; arch.position.y = 0.2; g.add(arch);
     var back = new THREE.Mesh(new THREE.CircleGeometry(16, 20, 0, Math.PI), M.bldg); back.position.set(-22, 0, 0); back.rotation.y = Math.PI / 2; g.add(back);
+    // realism: a dark interior visible through the open end, structural ribs
+    // across the arch, and a small side office annex with a window band
+    var mouth = new THREE.Mesh(new THREE.CircleGeometry(15.4, 20, 0, Math.PI), M.dark); mouth.position.set(21.6, 0.2, 0); mouth.rotation.y = Math.PI / 2; g.add(mouth);
+    for (var i = -1; i <= 1; i++) {
+      var rib = new THREE.Mesh(new THREE.TorusGeometry(16.15, 0.32, 6, 18, Math.PI), M.grey);
+      rib.rotation.y = Math.PI / 2; rib.position.set(i * 14, 0.2, 0); g.add(rib);
+    }
+    var office = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 9), M.bldg); office.position.set(-12, 3, 16); g.add(office);
+    var offWin = new THREE.Mesh(new THREE.BoxGeometry(10.2, 1.6, 9.2), M.win); offWin.position.set(-12, 3.6, 16); g.add(offWin);
     return g;
   }
   function buildTerminal(THREE, M, pos) {
@@ -549,6 +599,13 @@
     var main = new THREE.Mesh(new THREE.BoxGeometry(70, 14, 26), M.bldg); main.position.y = 7; g.add(main);
     var glass = new THREE.Mesh(new THREE.BoxGeometry(70.4, 6, 26.4), M.glass); glass.position.y = 8; g.add(glass);
     var roof = new THREE.Mesh(new THREE.BoxGeometry(72, 1.4, 28), M.bldg2); roof.position.y = 14.4; g.add(roof);
+    // realism: window bands, vertical mullions, an entrance canopy on pillars,
+    // and rooftop plant (AC units) like the reference terminal models
+    [4.2, 11.6].forEach(function (y) { var band = new THREE.Mesh(new THREE.BoxGeometry(70.6, 1.4, 26.6), M.win); band.position.y = y; g.add(band); });
+    for (var mx = -30; mx <= 30; mx += 10) { var mul = new THREE.Mesh(new THREE.BoxGeometry(0.5, 13.6, 26.8), M.bldg2); mul.position.set(mx, 7, 0); g.add(mul); }
+    var canopy = new THREE.Mesh(new THREE.BoxGeometry(24, 0.8, 8), M.bldg2); canopy.position.set(0, 5.4, 17); g.add(canopy);
+    [-9, 9].forEach(function (px) { var pil = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 5.4, 8), M.grey); pil.position.set(px, 2.7, 19); g.add(pil); });
+    [-22, -4, 16].forEach(function (ax, i) { var ac = new THREE.Mesh(new THREE.BoxGeometry(6, 2.2, 4.5), i % 2 ? M.grey : M.bldg2); ac.position.set(ax, 16.2, i % 2 ? -5 : 4); g.add(ac); });
     var flag = new THREE.Mesh(new THREE.BoxGeometry(0.3, 8, 0.3), M.dark); flag.position.set(30, 18, 0); g.add(flag);
     var cloth = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.4, 4), M.accent); cloth.position.set(30, 20.5, 2.2); g.add(cloth);
     var bridge = new THREE.Mesh(new THREE.BoxGeometry(3, 3, 20), M.bldg2); bridge.position.set(24, 5, 18); g.add(bridge);
@@ -556,7 +613,16 @@
   }
   function buildSkyline(THREE, M, pos) {
     var g = new THREE.Group(); g.position.copy(pos);
-    var hs = [30, 46, 22, 38, 18, 28]; for (var i = 0; i < hs.length; i++) { var b = new THREE.Mesh(new THREE.BoxGeometry(12, hs[i], 12), i % 2 ? M.bldg2 : M.bldg); b.position.set(i * 16 - 40, hs[i] / 2, i % 2 ? -8 : 8); g.add(b); }
+    var hs = [30, 46, 22, 38, 18, 28];
+    for (var i = 0; i < hs.length; i++) {
+      var h = hs[i], bx = i * 16 - 40, bz = i % 2 ? -8 : 8;
+      var b = new THREE.Mesh(new THREE.BoxGeometry(12, h, 12), i % 2 ? M.bldg2 : M.bldg); b.position.set(bx, h / 2, bz); g.add(b);
+      // window floors — dark bands every few metres make them read as towers
+      for (var wy = 4; wy < h - 3; wy += 5.5) {
+        var w = new THREE.Mesh(new THREE.BoxGeometry(12.2, 1.5, 12.2), M.win); w.position.set(bx, wy, bz); g.add(w);
+      }
+      var lift = new THREE.Mesh(new THREE.BoxGeometry(4, 2.2, 4), M.grey); lift.position.set(bx + 2.5, h + 1.1, bz - 2.5); g.add(lift);
+    }
     return g;
   }
   function buildTruck(THREE, M, pos) {
@@ -708,10 +774,19 @@
   }
   function grassTex(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 512; var g = c.getContext('2d');
-    g.fillStyle = '#6f8a49'; g.fillRect(0, 0, 512, 512);
-    for (var i = 0; i < 512; i += 32) { g.fillStyle = (i / 32) % 2 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.05)'; g.fillRect(0, i, 512, 32); }
-    for (var k = 0; k < 1600; k++) { g.fillStyle = 'rgba(' + (58 + Math.random() * 40 | 0) + ',' + (108 + Math.random() * 44 | 0) + ',' + (48 + Math.random() * 30 | 0) + ',0.5)'; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
+    // muted, deeper turf — the bright green stole focus from the aircraft
+    g.fillStyle = '#55693e'; g.fillRect(0, 0, 512, 512);
+    for (var i = 0; i < 512; i += 32) { g.fillStyle = (i / 32) % 2 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)'; g.fillRect(0, i, 512, 32); }
+    for (var k = 0; k < 1600; k++) { g.fillStyle = 'rgba(' + (44 + Math.random() * 26 | 0) + ',' + (78 + Math.random() * 30 | 0) + ',' + (38 + Math.random() * 20 | 0) + ',0.5)'; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
     var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(22, 22); t.anisotropy = 4; return t;
+  }
+  // a soft dark ellipse — the ground shadow that keeps craft readable on asphalt
+  function shadowTex(THREE) {
+    var c = document.createElement('canvas'); c.width = c.height = 128; var g = c.getContext('2d');
+    var gr = g.createRadialGradient(64, 64, 6, 64, 64, 62);
+    gr.addColorStop(0, 'rgba(8,12,18,0.9)'); gr.addColorStop(1, 'rgba(8,12,18,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
   }
   function lightSprite(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 64; var x = c.getContext('2d');
