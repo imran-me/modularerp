@@ -55,19 +55,21 @@
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-      var HORIZON = 0xdae8f5;
+      var HORIZON = 0xdce9f6;
       var scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(HORIZON, 900, 2600);
-      // HIGH AERIAL camera — the reference diorama angle
-      var camera = new THREE.PerspectiveCamera(45, 1, 1, 9000);
-      camera.position.set(25, 330, 330); camera.lookAt(15, 0, -60);
+      scene.fog = new THREE.Fog(HORIZON, 1000, 2800);
+      // REFERENCE COMPOSITION: elevated 3/4 view from the south — the whole
+      // field fills the frame edge-to-edge, horizon high in the frame so a
+      // band of SKY (clouds + the plane parade) stays visible on top
+      var camera = new THREE.PerspectiveCamera(44, 1, 1, 9000);
+      camera.position.set(-40, 205, 480); camera.lookAt(25, 0, -120);
 
       var SUN = new THREE.Vector3(-380, 420, -260);
       scene.add(buildSky(THREE));
       scene.add(buildSun(THREE, SUN));
 
-      scene.add(new THREE.HemisphereLight(0xbdd8f6, 0x64784c, 0.92));
-      var key = new THREE.DirectionalLight(0xfff3d4, 1.4); key.position.copy(SUN);
+      scene.add(new THREE.HemisphereLight(0xbdd8f6, 0x64784c, 0.6));
+      var key = new THREE.DirectionalLight(0xfff3d4, 1.2); key.position.copy(SUN);
       key.castShadow = true;
       key.shadow.mapSize.set(2048, 2048);
       key.shadow.camera.left = -520; key.shadow.camera.right = 520;
@@ -111,7 +113,9 @@
    * ========================================================================*/
   function makeMaterials(THREE) {
     var cache = {};
-    function S(c, r, m) { return new THREE.MeshStandardMaterial({ color: c, roughness: r == null ? 0.6 : r, metalness: m == null ? 0.12 : m }); }
+    // author colours in sRGB, feed the renderer linear — otherwise the
+    // sRGB output pass washes every material toward pastel
+    function S(c, r, m) { var col = new THREE.Color(c); if (col.convertSRGBToLinear) col.convertSRGBToLinear(); return new THREE.MeshStandardMaterial({ color: col, roughness: r == null ? 0.6 : r, metalness: m == null ? 0.12 : m }); }
     function mat(c, r, m) { var k = c + '|' + r + '|' + m; return cache[k] || (cache[k] = S(c, r, m)); }
     return {
       grass: new THREE.MeshStandardMaterial({ map: grassTex(THREE), roughness: 1, metalness: 0 }),
@@ -125,7 +129,7 @@
       tire: S(0x14161c, 0.85, 0.05), strut: S(0x8a94a8, 0.5, 0.5),
       accent: S(0xf4b740, 0.5, 0.2), red: S(0xc4453a, 0.55, 0.15),
       water: S(0x2f86c8, 0.12, 0.6), wood: S(0x8a6b46, 0.8, 0.05),
-      treeTop: S(0x2f5d33, 0.9, 0.02), treeTop2: S(0x3e7040, 0.9, 0.02), trunk: S(0x6d5230, 0.9, 0.02),
+      treeTop: S(0x2f7a3e, 0.9, 0.02), treeTop2: S(0x4a9b52, 0.9, 0.02), trunk: S(0x6d5230, 0.9, 0.02),
       lightTex: lightSprite(THREE), shadowT: shadowTex(THREE), mat: mat, THREE: THREE
     };
   }
@@ -133,19 +137,19 @@
   // charcoal asphalt runway, HORIZONTAL use (white edge lines + dashed centre)
   function runwayTex(THREE) {
     var c = document.createElement('canvas'); c.width = 1024; c.height = 128; var g = c.getContext('2d');
-    g.fillStyle = '#26282c'; g.fillRect(0, 0, 1024, 128);
-    for (var k = 0; k < 3200; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (30 + v * 26 | 0) + ',' + (31 + v * 26 | 0) + ',' + (35 + v * 28 | 0) + ',0.6)'; g.fillRect(Math.random() * 1024, Math.random() * 128, 2, 2); }
+    g.fillStyle = '#1e2024'; g.fillRect(0, 0, 1024, 128);
+    for (var k = 0; k < 3200; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (26 + v * 24 | 0) + ',' + (27 + v * 24 | 0) + ',' + (31 + v * 26 | 0) + ',0.6)'; g.fillRect(Math.random() * 1024, Math.random() * 128, 2, 2); }
     g.fillStyle = '#eef1f7'; g.fillRect(0, 8, 1024, 5); g.fillRect(0, 115, 1024, 5);
     g.fillStyle = '#f4f7fd'; for (var x = 30; x < 994; x += 64) g.fillRect(x, 60, 40, 8);
     g.fillStyle = '#f0f4fb'; for (var i = 0; i < 7; i++) { g.fillRect(12, 18 + i * 13, 56, 8); g.fillRect(956, 18 + i * 13, 56, 8); }
-    var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 8; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
   }
   function taxiTexV(THREE) {
     var c = document.createElement('canvas'); c.width = 64; c.height = 256; var g = c.getContext('2d');
     g.fillStyle = '#2e3036'; g.fillRect(0, 0, 64, 256);
     for (var k = 0; k < 300; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (38 + v * 22 | 0) + ',' + (40 + v * 22 | 0) + ',' + (44 + v * 22 | 0) + ',0.55)'; g.fillRect(Math.random() * 64, Math.random() * 256, 2, 2); }
     g.fillStyle = '#e8c53a'; g.fillRect(29, 0, 6, 256);
-    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
   }
   function apronTex(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 512; var g = c.getContext('2d');
@@ -154,27 +158,27 @@
     g.strokeStyle = 'rgba(232,197,58,0.8)'; g.lineWidth = 3;
     for (var i2 = 0; i2 < 6; i2++) { g.beginPath(); g.moveTo(20 + i2 * 84, 0); g.quadraticCurveTo(40 + i2 * 84, 256, 20 + i2 * 84, 512); g.stroke(); }
     g.strokeStyle = 'rgba(230,235,245,0.5)'; g.setLineDash([14, 12]); g.beginPath(); g.moveTo(0, 40); g.lineTo(512, 40); g.stroke(); g.setLineDash([]);
-    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
   }
   function roadTex(THREE) {
     var c = document.createElement('canvas'); c.width = 64; c.height = 256; var g = c.getContext('2d');
-    g.fillStyle = '#3d4048'; g.fillRect(0, 0, 64, 256);
-    for (var k = 0; k < 260; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (48 + v * 22 | 0) + ',' + (52 + v * 22 | 0) + ',' + (58 + v * 22 | 0) + ',0.5)'; g.fillRect(Math.random() * 64, Math.random() * 256, 2, 2); }
-    g.fillStyle = '#e8ecf4'; for (var y = 12; y < 244; y += 46) g.fillRect(29, y, 6, 22);
-    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+    g.fillStyle = '#33363c'; g.fillRect(0, 0, 64, 256);
+    for (var k = 0; k < 260; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (42 + v * 20 | 0) + ',' + (45 + v * 20 | 0) + ',' + (50 + v * 20 | 0) + ',0.5)'; g.fillRect(Math.random() * 64, Math.random() * 256, 2, 2); }
+    g.fillStyle = '#f2f5fb'; for (var y = 10; y < 246; y += 42) g.fillRect(28, y, 8, 24);
+    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
   }
   function grassTex(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 512; var g = c.getContext('2d');
-    g.fillStyle = '#5c7a42'; g.fillRect(0, 0, 512, 512);
+    g.fillStyle = '#6d8c4e'; g.fillRect(0, 0, 512, 512);
     for (var p = 0; p < 24; p++) {
       var px = Math.random() * 512, py = Math.random() * 512, pr = 50 + Math.random() * 110;
       var gr = g.createRadialGradient(px, py, 4, px, py, pr);
-      var tone = ['rgba(80,104,56,0.5)', 'rgba(104,128,72,0.45)', 'rgba(70,92,50,0.5)', 'rgba(114,136,78,0.4)'][p % 4];
+      var tone = ['rgba(96,122,66,0.5)', 'rgba(122,148,84,0.45)', 'rgba(86,110,60,0.5)', 'rgba(132,156,92,0.4)'][p % 4];
       gr.addColorStop(0, tone); gr.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = gr; g.beginPath(); g.arc(px, py, pr, 0, 6.3); g.fill();
     }
     for (var k = 0; k < 2200; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (64 + v * 30 | 0) + ',' + (86 + v * 34 | 0) + ',' + (46 + v * 22 | 0) + ',0.5)'; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
-    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(18, 18); t.anisotropy = 4; return t;
+    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(18, 18); t.anisotropy = 4; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
   }
   function heliPadTex(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 256; var g = c.getContext('2d');
@@ -182,21 +186,21 @@
     g.fillStyle = '#2f3238'; g.beginPath(); g.arc(128, 128, 124, 0, 6.3); g.fill();
     g.strokeStyle = '#eef2fa'; g.lineWidth = 10; g.beginPath(); g.arc(128, 128, 106, 0, 6.3); g.stroke();
     g.fillStyle = '#f2f5fc'; g.font = 'bold 120px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', 128, 134);
-    var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 8; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
   }
   function carParkTex(THREE) {
     var c = document.createElement('canvas'); c.width = 256; c.height = 128; var g = c.getContext('2d');
     g.fillStyle = '#43464e'; g.fillRect(0, 0, 256, 128);
     g.strokeStyle = '#e6ebf5'; g.lineWidth = 3;
     for (var x = 12; x <= 244; x += 24) { g.beginPath(); g.moveTo(x, 8); g.lineTo(x, 56); g.stroke(); g.beginPath(); g.moveTo(x, 72); g.lineTo(x, 120); g.stroke(); }
-    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
   }
   function textTex(THREE, txt, fg, bg, w, h, size) {
     var c = document.createElement('canvas'); c.width = w || 512; c.height = h || 96; var g = c.getContext('2d');
     if (bg) { g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); } else g.clearRect(0, 0, c.width, c.height);
     g.fillStyle = fg; g.font = 'bold ' + (size || 56) + 'px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(txt, c.width / 2, c.height / 2 + 2);
-    var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 8; if (THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
   }
   function shadowTex(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 128; var g = c.getContext('2d');
@@ -342,6 +346,8 @@
         var band = new THREE.Mesh(new THREE.BoxGeometry(b[1] + 0.4, 3.2, 26.4), M.win); band.position.set(b[0], 5.4, 0); g.add(band);
         var band2 = new THREE.Mesh(new THREE.BoxGeometry(b[1] + 0.4, 2.6, 26.4), M.win); band2.position.set(b[0], 9.6, 0); g.add(band2);
         var roofBox = new THREE.Mesh(new THREE.BoxGeometry(10, 2.4, 8), M.grey); roofBox.position.set(b[0] + (bi === 0 ? -12 : bi === 1 ? 12 : 0), b[2] + 1.2, -4); g.add(roofBox);
+        var ac1 = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, 2.2, 10), M.bldg2); ac1.position.set(b[0] + 8, b[2] + 1.1, 5); g.add(ac1);
+        var ac2 = new THREE.Mesh(new THREE.BoxGeometry(5, 1.8, 4), M.grey); ac2.position.set(b[0] - 8, b[2] + 0.9, 5); g.add(ac2);
       });
       var title = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), new THREE.MeshBasicMaterial({ map: textTex(THREE, 'TERMINAL', '#2b6cd4', null, 512, 80, 58), transparent: true }));
       title.position.set(0, 12.5, 13.3); g.add(title);
@@ -448,9 +454,9 @@
     })();
     // FIGHTER LANE — dashed lane + open sheds + parked fighters (diagonal)
     (function () {
-      taxiV(-96, -130, 60, 13);                              // fighter-plane lane
-      for (var i = 0; i < 6; i++) {
-        var z = -112 + i * 30;
+      taxiV(-96, -136, 70, 13);                              // fighter-plane lane
+      for (var i = 0; i < 9; i++) {
+        var z = -116 + i * 22;
         var sh3 = new THREE.Mesh(new THREE.BoxGeometry(16, 6.4, 12), M.shed); sh3.position.set(-121, 3.2, z); sh3.castShadow = true; scene.add(sh3);
         var ro = new THREE.Mesh(new THREE.BoxGeometry(17.4, 1.2, 13.4), M.shedRoof); ro.position.set(-121, 7, z); scene.add(ro);
         var jet = buildFighter(THREE, M, i % 3 === 2 ? 'white' : undefined);
@@ -459,16 +465,34 @@
     })();
     // PARKED-PLANE SHEDS west of the transport road + white airliners between
     (function () {
-      [[-238, 20], [-238, 78], [-238, 136]].forEach(function (sp2, si) {
+      [[-238, 20], [-238, 78], [-238, 136], [-238, 194]].forEach(function (sp2, si) {
         var s4 = new THREE.Mesh(new THREE.BoxGeometry(22, 9, 20), M.shed); s4.position.set(sp2[0], 4.5, sp2[1]); s4.castShadow = true; scene.add(s4);
         var r4 = new THREE.Mesh(new THREE.BoxGeometry(23.6, 1.4, 21.6), M.shedRoof); r4.position.set(sp2[0], 9.7, sp2[1]); scene.add(r4);
-        if (si < 2) {
+        if (si < 3) {
           var pk = buildAirliner(THREE, M, 1.15, false, LIVERIES[0]);
           pk.position.set(sp2[0] + 20, 3, sp2[1] + 28); pk.rotation.y = 0.5; pk.traverse(function (o) { if (o.isMesh) o.castShadow = true; }); scene.add(pk);
           var shd = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.26, depthWrite: false, fog: false }));
           shd.scale.set(17, 10, 1); shd.position.set(sp2[0] + 20, 0.24, sp2[1] + 28); scene.add(shd);
         }
       });
+    })();
+
+    /* ---- PAINTED GROUND LABELS — the reference render captions every zone --*/
+    (function () {
+      function groundLabel(txt, x, z, w, rotZ, fg, bg) {
+        var lbl = new THREE.Mesh(new THREE.PlaneGeometry(w, w * 0.15),
+          new THREE.MeshBasicMaterial({ map: textTex(THREE, txt, fg || '#f4f7fb', bg || null, 1024, 152, 96), transparent: true, depthWrite: false }));
+        lbl.rotation.x = -Math.PI / 2; if (rotZ) lbl.rotation.z = rotZ;
+        lbl.position.set(x, 0.055, z); scene.add(lbl); return lbl;
+      }
+      groundLabel('TAKE OFF RUNWAY', 70, RT.z, 170);
+      groundLabel('LANDING RUNWAY', 80, RL.z, 170);
+      groundLabel('TRANSPORT ROAD', -208, -70, 92, Math.PI / 2);
+      groundLabel('FIGHTER PLANE', -96, -30, 100, Math.PI / 2);
+      groundLabel('PARKED PLANE', -262, 49, 46, Math.PI / 2, '#1B2A4A');
+      groundLabel('PARKED PLANE', -262, 165, 46, Math.PI / 2, '#1B2A4A');
+      groundLabel('RADAR + HANGER', -222, -118, 62, 0, '#1B2A4A');
+      groundLabel('Heli Copter', -178, -176, 34, 0, '#ffffff', '#2b6cd4');
     })();
 
     /* ---- POND (small blue blob, centre) ------------------------------------*/
@@ -478,34 +502,48 @@
     shine.scale.x = 1.28; shine.rotation.x = -Math.PI / 2; shine.position.set(-18, 0.05, -30); scene.add(shine);
     updaters.push(function (t) { shine.material.opacity = 0.1 + 0.08 * (0.5 + 0.5 * Math.sin(t * 0.7)); shine.rotation.z = t * 0.02; });
 
-    /* ---- CONIFER FOREST (instanced — the reference is full of trees) -------*/
+    /* ---- DENSE MIXED FOREST (instanced) — the reference is thick with round
+     * deciduous puffs plus conifers, right up to the frame edges -------------*/
     (function () {
       var CLUSTERS = [
-        [-40, -215, 30], [110, -215, 40], [-190, -230, 34], [160, -125, 26, true], [10, -122, 60, true],
-        [-60, -60, 26], [-230, -50, 22], [-170, 100, 26], [-60, 120, 30], [-20, 60, 24],
-        [240, -40, 20], [120, -60, 46, true], [-120, -170, 16], [250, 120, 18], [-240, -190, 20]
+        [-40, -215, 34], [110, -215, 44], [-190, -232, 36], [160, -125, 26, true], [10, -122, 62, true],
+        [-60, -60, 28], [-230, -50, 24], [-170, 100, 28], [-60, 130, 32], [-20, 60, 26],
+        [240, -40, 22], [120, -62, 48, true], [-120, -172, 18], [252, 120, 20], [-240, -190, 22],
+        [-315, 40, 40], [-300, -120, 40], [300, -180, 44], [300, 60, 36], [60, -238, 40],
+        [-150, 190, 44], [10, 210, 30], [150, -252, 36], [-300, 175, 26], [320, -60, 30]
       ];
       var pts = [];
       CLUSTERS.forEach(function (cl) {
-        var n = cl[3] ? 5 : 9;
+        var n = cl[3] ? 6 : 12;
         for (var i = 0; i < n; i++) {
           var a2 = Math.random() * 6.2832, r2 = Math.sqrt(Math.random()) * cl[2];
-          pts.push([cl[0] + Math.cos(a2) * r2, cl[1] + Math.sin(a2) * r2 * 0.8, 0.8 + Math.random() * 0.7]);
+          pts.push([cl[0] + Math.cos(a2) * r2, cl[1] + Math.sin(a2) * r2 * 0.8, 0.8 + Math.random() * 0.8, Math.random() < 0.55]);
         }
       });
-      var topGeo = new THREE.ConeGeometry(2.6, 7.4, 7), trGeo = new THREE.CylinderGeometry(0.4, 0.55, 2.6, 5);
-      var tops = new THREE.InstancedMesh(topGeo, M.treeTop, pts.length);
-      var tops2Count = Math.floor(pts.length / 3);
+      var coneGeo = new THREE.ConeGeometry(2.6, 7.4, 7);
+      var puffGeo = new THREE.IcosahedronGeometry(3.1, 1);
+      var trGeo = new THREE.CylinderGeometry(0.4, 0.55, 2.6, 5);
+      var cones = pts.filter(function (p) { return !p[3]; });
+      var puffs2 = pts.filter(function (p) { return p[3]; });
+      var mCone = new THREE.InstancedMesh(coneGeo, M.treeTop, cones.length);
+      var mPuffA = new THREE.InstancedMesh(puffGeo, M.treeTop2, Math.ceil(puffs2.length / 2));
+      var mPuffB = new THREE.InstancedMesh(puffGeo, M.treeTop, Math.floor(puffs2.length / 2));
       var trunks = new THREE.InstancedMesh(trGeo, M.trunk, pts.length);
-      var m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), s4 = new THREE.Vector3(), p4 = new THREE.Vector3();
+      var m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), s4 = new THREE.Vector3(), p4 = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
+      var ci = 0, pa = 0, pb = 0;
       pts.forEach(function (pt, i) {
         var s = pt[2];
-        p4.set(pt[0], 1.3 * s, pt[1]); s4.set(s, s, s); q4.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * 6.28);
+        q4.setFromAxisAngle(Y, Math.random() * 6.28);
+        p4.set(pt[0], 1.3 * s, pt[1]); s4.set(s, s, s);
         m4.compose(p4, q4, s4); trunks.setMatrixAt(i, m4);
-        p4.set(pt[0], (2.6 + 3.7) * s, pt[1]); m4.compose(p4, q4, s4); tops.setMatrixAt(i, m4);
+        if (!pt[3]) { p4.set(pt[0], 6.3 * s, pt[1]); m4.compose(p4, q4, s4); mCone.setMatrixAt(ci++, m4); }
+        else {
+          p4.set(pt[0], 5.4 * s, pt[1]); s4.set(s, s * 0.92, s); m4.compose(p4, q4, s4);
+          if ((pa + pb) % 2 === 0 && pa < mPuffA.count) mPuffA.setMatrixAt(pa++, m4); else if (pb < mPuffB.count) mPuffB.setMatrixAt(pb++, m4); else if (pa < mPuffA.count) mPuffA.setMatrixAt(pa++, m4);
+        }
       });
-      tops.castShadow = true;
-      scene.add(tops); scene.add(trunks);
+      mCone.castShadow = true; mPuffA.castShadow = true; mPuffB.castShadow = true;
+      scene.add(mCone); scene.add(mPuffA); scene.add(mPuffB); scene.add(trunks);
     })();
 
     /* ---- lamp fields --------------------------------------------------------*/
@@ -585,6 +623,28 @@
         else { standLights[i].material.color.setHex(0x35e07a); standLights[i].material.opacity = 1; }
       }
     });
+    // GSE clusters at every stand — baggage carts + belt loader (reference
+    // renders show equipment scattered along the whole gate row)
+    (function () {
+      var GSE_COLS = [0xe6b93c, 0x2e86c1, 0x9aa2b1];
+      GATES_X.forEach(function (gx, gi) {
+        var cart = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.1, 1.6), M.mat(GSE_COLS[gi % 3], 0.55, 0.15));
+        cart.position.set(gx - 11, 0.6, APR_GATE.z + 7); cart.castShadow = true; scene.add(cart);
+        var cart2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 1.4), M.grey);
+        cart2.position.set(gx - 11, 0.55, APR_GATE.z + 9.6); scene.add(cart2);
+        var belt = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.8, 4.4), M.mat(0xc0392b, 0.55, 0.15));
+        belt.position.set(gx + 6.5, 0.45, APR_GATE.z + 8); scene.add(belt);
+      });
+    })();
+    // small statics parked at the apron's far-east end (the "air parking"
+    // corner) — clear of the z≈29 taxi-in sweep, which only runs x ≤ 220
+    [[232, 0.35, 36], [248, -0.25, 30], [240, 0.1, 14]].forEach(function (rp, ri) {
+      var stat2 = buildAirliner(THREE, M, 1.1, false, LIVERIES[(ri * 2 + 2) % LIVERIES.length]);
+      stat2.position.set(rp[0], 3, rp[2]); stat2.rotation.y = rp[1];
+      stat2.traverse(function (o) { if (o.isMesh) o.castShadow = true; }); scene.add(stat2);
+      var shd2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.25, depthWrite: false, fog: false }));
+      shd2.scale.set(13, 8, 1); shd2.position.set(rp[0], 0.24, APR_TOP.z + 13); scene.add(shd2);
+    });
 
     /* ---- contrails + smoke pool --------------------------------------------*/
     function makeTrail(n) {
@@ -623,15 +683,15 @@
     function easeOut(k) { return 1 - (1 - k) * (1 - k); }
 
     var PLANE_SPECS = [
-      { livery: LIVERIES[8], scale: 1.7, cfg: {} },
-      { livery: LIVERIES[8], scale: 1.55, cfg: { stretch: 1.14 } },
-      { livery: LIVERIES[5], scale: 1.4, cfg: {} },
-      { livery: LIVERIES[6], scale: 1.35, cfg: {} }
+      { livery: LIVERIES[8], scale: 1.95, cfg: {} },
+      { livery: LIVERIES[8], scale: 1.8, cfg: { stretch: 1.14 } },
+      { livery: LIVERIES[5], scale: 1.6, cfg: {} },
+      { livery: LIVERIES[6], scale: 1.55, cfg: {} }
     ];
     // three extra static jets fill the gate row like the reference picture
     [[1, 2], [3, 1], [5, 7]].forEach(function (gg) {
       var g2 = gates[gg[0]]; g2.taken = true;
-      var stat = buildAirliner(THREE, M, 1.45, false, LIVERIES[gg[1]]);
+      var stat = buildAirliner(THREE, M, 1.6, false, LIVERIES[gg[1]]);
       stat.position.copy(g2.p); stat.rotation.y = Math.PI;   // nose to the terminal
       stat.traverse(function (o) { if (o.isMesh) o.castShadow = true; }); scene.add(stat);
       var shd = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.28, depthWrite: false, fog: false }));
@@ -655,7 +715,7 @@
       function freeGate() { if (st.gate) { st.gate.taken = false; st.gate = null; } }
       function claimGate() { var free = gates.filter(function (g2) { return !g2.taken; }); var g3 = free.length ? pickOf(free) : gates[0]; g3.taken = true; st.gate = g3; return g3; }
       function cruiseCircle() {
-        var cx = rnd(-180, 180), cy = rnd(150, 220), cz = rnd(-620, -380), r = rnd(260, 400), pts = [];
+        var cx = rnd(-180, 180), cy = rnd(190, 280), cz = rnd(-620, -380), r = rnd(260, 400), pts = [];
         for (var i = 0; i < 10; i++) { var a2 = i / 10 * 6.2832; pts.push(V(cx + Math.cos(a2) * r, cy + Math.sin(a2 * 2) * 8, cz + Math.sin(a2) * r * 0.55)); }
         return new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
       }
@@ -817,28 +877,29 @@
 
     // colourful cruisers high above (the sky stays busy + random)
     var FLEET = [
-      { scale: 1.9, livery: LIVERIES[3], cfg: { stretch: 1.18 } },
-      { scale: 1.35, livery: LIVERIES[7], cfg: {} },
-      { scale: 1.5, livery: LIVERIES[1], cfg: {} },
-      { scale: 1.45, livery: LIVERIES[8], cfg: {} },
-      { scale: 1.4, livery: LIVERIES[2], cfg: {} },
-      { scale: 1.75, livery: LIVERIES[4], cfg: { engines: 4, stretch: 1.24 } },
-      { scale: 1.45, livery: LIVERIES[0], cfg: {} }
+      { scale: 3.1, livery: LIVERIES[3], cfg: { stretch: 1.18 } },
+      { scale: 2.2, livery: LIVERIES[7], cfg: {} },
+      { scale: 2.5, livery: LIVERIES[1], cfg: {} },
+      { scale: 2.4, livery: LIVERIES[8], cfg: {} },
+      { scale: 2.3, livery: LIVERIES[2], cfg: {} },
+      { scale: 2.9, livery: LIVERIES[4], cfg: { engines: 4, stretch: 1.24 } },
+      { scale: 2.4, livery: LIVERIES[0], cfg: {} }
     ];
     FLEET.forEach(function (spec, fi) {
       var cr = buildAirliner(THREE, M, spec.scale, false, spec.livery, spec.cfg);
       cr.userData.gear.visible = false;
       var trail = (fi % 2 === 0) ? makeTrail(12) : null;
       legMover(cr, function () {
-        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(150, 260), z1 = rnd(-380, -700), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
+        // parade band: above the camera's horizon so it reads as SKY traffic
+        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(245, 430), z1 = rnd(-240, -480), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
         return { dur: rnd(24, 48), gap: rnd(1, 9),
           path: function (u) { return V(dir * (-800 + u * 1600), alt + Math.sin(u * Math.PI) * bob, z1 + (z2 - z1) * u); },
-          tick: trail ? function (u, t) { trail(cr.position, t, alt > 170); } : null };
+          tick: trail ? function (u, t) { trail(cr.position, t, alt > 280); } : null };
       });
     });
     var cargo = buildAirliner(THREE, M, 2.4, true); cargo.userData.gear.visible = false;
     legMover(cargo, function () {
-      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(200, 270), z = rnd(-500, -700);
+      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(290, 390), z = rnd(-500, -700);
       return { dur: rnd(48, 78), gap: rnd(8, 30), path: function (u) { return V(dir * (820 - u * 1640), alt, z); } };
     });
     var LAYOUTS = [
@@ -854,7 +915,7 @@
     }
     legMover(fteam, function () {
       var L = pickOf(LAYOUTS), squad = Math.random() < 0.55 ? jetsA : jetsB, other = (squad === jetsA) ? jetsB : jetsA;
-      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(140, 200), arc = rnd(10, 38), zb = rnd(-360, -520), wig = rnd(14, 36);
+      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(250, 340), arc = rnd(10, 38), zb = rnd(-360, -520), wig = rnd(14, 36);
       return { dur: rnd(12, 19), gap: rnd(5, 18),
         init: function () {
           for (var i = 0; i < other.length; i++) other[i].visible = false;
@@ -925,11 +986,12 @@
 
     /* ---- clouds ------------------------------------------------------------*/
     var cloudTexv = softSprite(THREE), clouds = [];
-    for (var c = 0; c < 12; c++) {
+    for (var c = 0; c < 16; c++) {
       var mm = new THREE.SpriteMaterial({ map: cloudTexv, color: [0xffffff, 0xfbfdff, 0xeef4ff][c % 3], transparent: true, opacity: 0.5 + Math.random() * 0.3, depthWrite: false, fog: false });
       var sp = new THREE.Sprite(mm); var sz = 200 + Math.random() * 260;
       sp.scale.set(sz, sz * 0.55, 1);
-      sp.position.set((Math.random() - 0.5) * 1400, 240 + Math.random() * 200, -560 - Math.random() * 620);
+      if (c < 12) sp.position.set((Math.random() - 0.5) * 1400, 240 + Math.random() * 200, -560 - Math.random() * 620);
+      else sp.position.set((Math.random() - 0.5) * 1000, 190 + Math.random() * 90, -380 - Math.random() * 220);
       sp.userData = { vx: (0.05 + Math.random() * 0.07) * (Math.random() < 0.5 ? -1 : 1) };
       scene.add(sp); clouds.push(sp);
     }
