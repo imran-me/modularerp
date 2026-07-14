@@ -72,10 +72,15 @@
         ]),
         el('span.badge.badge-' + (s.status === 'paid' ? 'good' : s.status === 'due' ? 'bad' : s.status === 'partial' ? 'warn' : 'info'), { text: cap(s.status) }),
         el('button.btn.btn-sm.btn-outline', { html: ui().icon('person-badge') + ' Profile', onclick: function () { open(emp.id); } }),
-        // PAY right on the slip (owner: "his payable is 24,000 — how do I choose to
-        // pay 20,000 with 4,000 becoming due, IN THE SLIP"): pay any amount here;
-        // the remainder shows as Outstanding and rolls onto next month as arrears.
-        (canPay(emp) && s.outstanding > 0 && s.status !== 'draft') ? el('button.btn.btn-sm.btn-primary', { html: ui().icon('cash-coin') + ' Pay… (' + money(s.outstanding) + ' due)', onclick: function () { payFromSlip(emp, ym, s.outstanding); } }) : null,
+        // EDIT (OT · Bonus · deductions) — the adjust form, right from the slip
+        (canPay(emp) && EPAL.payrollEdit) ? el('button.btn.btn-sm.btn-outline', { html: ui().icon('sliders') + ' Edit (OT · Bonus)', onclick: function () { EPAL.payrollEdit(emp.id, ym); } }) : null,
+        // PAY FULL and PAY PARTIAL, explicitly, right on the slip (owner ask):
+        // partial leaves the rest as Due here and as arrears on next month.
+        (canPay(emp) && s.outstanding > 0 && s.status !== 'draft') ? el('button.btn.btn-sm.btn-primary', { html: ui().icon('check2-circle') + ' Pay Full (' + money(s.outstanding) + ')', onclick: function () {
+          ui().confirm({ title: 'Pay ' + emp.name + ' in full?', text: money(s.outstanding) + ' now — advance/loan EMI recover automatically.', confirmLabel: 'Pay Full' })
+            .then(function (ok) { if (!ok) return; try { PR().pay(emp.id, ym); ui().toast('Paid in full', 'success'); EPAL.router.render(); setTimeout(function () { statement(emp, ym); }, 60); } catch (x) { ui().toast(x.message || 'Failed', 'error'); } });
+        } }) : null,
+        (canPay(emp) && s.outstanding > 0 && s.status !== 'draft') ? el('button.btn.btn-sm.btn-outline', { html: ui().icon('cash-coin') + ' Pay Partial…', onclick: function () { payFromSlip(emp, ym, s.outstanding); } }) : null,
         el('button.btn.btn-sm.btn-primary', { html: ui().icon('printer') + ' Print', onclick: function () { payslipPrint(emp, ym); } })
       ]),
       el('div.two-col', null, [

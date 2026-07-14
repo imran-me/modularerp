@@ -323,6 +323,18 @@
       }
     });
   }
+  /* ---- edit-from-the-PAYSLIP hook: the kit's "Edit (OT · Bonus)" button lands
+   * here — opens the full adjust form for that slip (draft months; finalized
+   * months point to Reopen Draft). ------------------------------------------*/
+  EPAL.payrollEdit = function (empId, ym) {
+    var s = PR().slip(empId, ym);
+    if (!s) { ui.toast('No payslip for that month', 'error'); return; }
+    var run = PR().getRun(s.companyId, ym);
+    if (run && run.status !== 'draft') { ui.toast('This month is finalized — hit "Reopen Draft" on the Salary Sheet to edit OT/Bonus (or Mark Unpaid to change the payment).', 'info'); return; }
+    CID = s.companyId;
+    correctionForm(s, ym);
+  };
+
   /* ---- EDIT SALARY (owner: "simple — every amount visible, auto-calculated but
    * I can change any figure"). Amount boxes come PRE-FILLED with the automatic
    * value; leave one untouched and it stays automatic (re-follows the counts),
