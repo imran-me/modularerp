@@ -72,6 +72,10 @@
         ]),
         el('span.badge.badge-' + (s.status === 'paid' ? 'good' : s.status === 'due' ? 'bad' : s.status === 'partial' ? 'warn' : 'info'), { text: cap(s.status) }),
         el('button.btn.btn-sm.btn-outline', { html: ui().icon('person-badge') + ' Profile', onclick: function () { open(emp.id); } }),
+        // PAY right on the slip (owner: "his payable is 24,000 — how do I choose to
+        // pay 20,000 with 4,000 becoming due, IN THE SLIP"): pay any amount here;
+        // the remainder shows as Outstanding and rolls onto next month as arrears.
+        (canPay(emp) && s.outstanding > 0 && s.status !== 'draft') ? el('button.btn.btn-sm.btn-primary', { html: ui().icon('cash-coin') + ' Pay… (' + money(s.outstanding) + ' due)', onclick: function () { payFromSlip(emp, ym, s.outstanding); } }) : null,
         el('button.btn.btn-sm.btn-primary', { html: ui().icon('printer') + ' Print', onclick: function () { payslipPrint(emp, ym); } })
       ]),
       el('div.two-col', null, [
@@ -238,105 +242,148 @@
       })() : null
     ].filter(Boolean))]));
 
-    // ---- personal & job details (A-Z) -----------------------------------
-    body.appendChild(el('div.card', null, [
-      el('div.card-head', null, [el('h3', { html: ui().icon('person-vcard') + ' Employee Details' })]),
-      el('div.card-body', null, [el('div.data-list', null, [
-        drow('Employee ID', e.id), drow('Company', e.companyId), drow('Department', e.dept), drow('Designation', e.designation),
-        drow('Employment type', e.empType || 'Permanent'), e.reportsTo ? drow('Reports to', e.reportsTo) : null,
-        e.workLocation ? drow('Work location', e.workLocation) : null,
-        drow('Join date', e.joinDate ? ui().date(e.joinDate) : '—'), e.confirmDate ? drow('Confirmed', ui().date(e.confirmDate)) : null,
-        e.resignedDate ? drow('Resigned', ui().date(e.resignedDate)) : null,
-        drow('Phone', e.phone), drow('Email', e.email), e.emergency ? drow('Emergency contact', e.emergency) : null,
-        e.nid ? drow('NID', e.nid) : null, e.passport ? drow('Passport', e.passport) : null,
-        e.dob ? drow('Date of birth', ui().date(e.dob)) : null, e.bloodGroup ? drow('Blood group', e.bloodGroup) : null,
-        e.presentAddress ? drow('Present address', e.presentAddress) : null, e.permanentAddress ? drow('Permanent address', e.permanentAddress) : null,
-        drow('Salary via', (e.salaryMethod || 'Bank') + (e.bankName ? ' · ' + e.bankName : '') + (e.bankAccount ? ' · ' + e.bankAccount : '')),
-        drow('Overtime eligible', e.otEligible === false ? 'No' : 'Yes'),
-        drow('Bonus eligible', e.bonusEligible === false ? 'No' : 'Yes')
-      ].filter(Boolean))])
-    ]));
+    /* ---- TABBED SECTIONS — one clean bar instead of a long scroll:
+     * Overview · Accounts · Payslips · Attendance · All Details -------------*/
+    var tabs = P
+      ? [['overview', 'Overview'], ['accounts', 'Accounts'], ['payslips', 'Payslips'], ['attendance', 'Attendance'], ['details', 'All Details']]
+      : [['details', 'All Details']];
+    var curTab = tabs[0][0];
+    var bar = el('div.pill-tab.mb-3');
+    var host = el('div');
+    body.appendChild(bar); body.appendChild(host);
+    function draw() {
+      bar.innerHTML = ''; host.innerHTML = '';
+      tabs.forEach(function (t) { bar.appendChild(el('button' + (curTab === t[0] ? '.active' : ''), { text: t[1], onclick: function () { curTab = t[0]; draw(); } })); });
+      ({ overview: secOverview, accounts: secAccounts, payslips: secPayslips, attendance: secAttendance, details: secDetails }[curTab])(host);
+    }
+    draw();
 
-    if (!P) { return; }
+    // OVERVIEW — salary structure + the facts you reach for first
+    function secOverview(h) {
+      var c = P.computeSlip(e, P.curYm(), {});
+      var row = el('div.two-col');
+      row.appendChild(el('div.card', null, [
+        el('div.card-head', null, [el('h3', { html: ui().icon('cash-stack') + ' Salary Structure' })]),
+        el('div.card-body', null, [el('div.data-list', null, [
+          drow('Basic Salary', money(c.basic)), drow('House Rent Allowance', money(c.house)),
+          drow('Medical Allowance', money(c.medical)), drow('Conveyance Allowance', money(c.transport)),
+          el('div.data-row', null, [el('div.strong.flex-1', { text: 'Gross' }), el('div.strong', { text: money(c.gross) })]),
+          el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Eligibility' }), el('div.flex.gap-1', null, [
+            el('span.badge.badge-' + (e.otEligible === false ? '' : 'good'), { text: 'Overtime ' + (e.otEligible === false ? '✗' : '✓') }),
+            el('span.badge.badge-' + (e.bonusEligible === false ? '' : 'good'), { text: 'Bonus ' + (e.bonusEligible === false ? '✗' : '✓') })
+          ])])
+        ].concat((e.salaryHistory || []).slice(-3).reverse().map(function (h2) {
+          return drow('Increment · ' + ui().date(h2.date), money(h2.from) + ' → ' + money(h2.to));
+        })))])
+      ]));
+      row.appendChild(el('div.card', null, [
+        el('div.card-head', null, [el('h3', { html: ui().icon('person-lines-fill') + ' Quick Facts' })]),
+        el('div.card-body', null, [el('div.data-list', null, [
+          drow('Employee ID', e.id), drow('Department', e.dept), drow('Designation', e.designation),
+          drow('Join date', e.joinDate ? ui().date(e.joinDate) : '—'),
+          drow('Phone', e.phone), drow('Email', e.email),
+          drow('Salary via', (e.salaryMethod || 'Bank') + (e.bankName ? ' · ' + e.bankName : ''))
+        ])])
+      ]));
+      h.appendChild(row);
+    }
 
-    // ---- salary structure + increments ----------------------------------
-    var c = P.computeSlip(e, P.curYm(), {});
-    body.appendChild(el('div.card', null, [
-      el('div.card-head', null, [el('h3', { html: ui().icon('cash-stack') + ' Salary Structure' })]),
-      el('div.card-body', null, [el('div.data-list', null, [
-        drow('Basic Salary', money(c.basic)), drow('House Rent Allowance', money(c.house)),
-        drow('Medical Allowance', money(c.medical)), drow('Conveyance Allowance', money(c.transport)),
-        el('div.data-row', null, [el('div.strong.flex-1', { text: 'Gross' }), el('div.strong', { text: money(c.gross) })])
-      ].concat((e.salaryHistory || []).slice(-3).reverse().map(function (h) {
-        return drow('Increment · ' + ui().date(h.date), money(h.from) + ' → ' + money(h.to));
-      })))])
-    ]));
+    // ACCOUNTS — the personal money book + money actions
+    function secAccounts(h) {
+      var led = P.empLedger(e.id);
+      var netDue2 = led.length ? led[led.length - 1].balance : 0;
+      var accCard = el('div.card');
+      accCard.appendChild(el('div.card-head', null, [
+        el('h3', { html: ui().icon('journal-text') + ' Accounts — full transaction history' }),
+        el('span.card-sub', { text: (netDue2 >= 0 ? 'company owes ' : 'employee owes ') + money(Math.abs(netDue2)) })
+      ]));
+      var accBody = el('div.card-body'); accCard.appendChild(accBody);
+      if (canPay(e) && e.status !== 'resigned') accBody.appendChild(el('div.flex.gap-1.flex-wrap.mb-3', null, [
+        el('button.btn.btn-sm.btn-outline', { html: ui().icon('cash') + ' Advance', onclick: function () { moneyForm(e, 'advance'); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui().icon('bank') + ' Loan', onclick: function () { moneyForm(e, 'loan'); } }),
+        P.loanOutstanding(e.id) > 0 ? el('button.btn.btn-sm.btn-outline', { html: ui().icon('arrow-return-left') + ' Repay Loan', onclick: function () { moneyForm(e, 'loan-repay'); } }) : null,
+        el('button.btn.btn-sm.btn-outline', { html: ui().icon('gift') + ' Bonus', onclick: function () { moneyForm(e, 'bonus'); } }),
+        P.leaveState(e).value > 0 ? el('button.btn.btn-sm.btn-ghost', { html: ui().icon('piggy-bank') + ' Pay Encashment', onclick: function () { payEncash(e); } }) : null,
+        el('button.btn.btn-sm.btn-ghost.text-bad', { html: ui().icon('box-arrow-right') + ' Final Settlement', onclick: function () { settlement(e, m); } })
+      ].filter(Boolean)));
+      if (led.length) {
+        accBody.appendChild(EPAL.table({
+          columns: [
+            { key: 'date', label: 'Date', date: true },
+            { key: 'kind', label: 'Type', badge: { 'Salary earned': 'good', 'Leave encashment': 'info', 'Salary paid': '', 'Advance': 'warn', 'Loan': 'warn', 'Bonus': 'good', 'Final settlement': 'bad', 'Loan repaid': '' } },
+            { key: 'memo', label: 'Detail' },
+            { key: 'credit', label: 'Owed to emp', num: true, render: function (r) { return r.credit ? '<span class="num text-good">' + money(r.credit) + '</span>' : '—'; }, sortVal: function (r) { return r.credit; } },
+            { key: 'debit', label: 'Paid / recovered', num: true, render: function (r) { return r.debit ? '<span class="num">' + money(r.debit) + '</span>' : '—'; }, sortVal: function (r) { return r.debit; } },
+            { key: 'balance', label: 'Net due', num: true, render: function (r) { return '<span class="num strong ' + (r.balance >= 0 ? 'text-good' : 'text-bad') + '">' + money(r.balance) + '</span>'; }, sortVal: function (r) { return r.balance; } }
+          ],
+          rows: led, pageSize: 8, exportName: 'employee-ledger-' + e.id + '.csv', pdfTitle: 'Employee Statement — ' + e.name,
+          empty: { icon: 'journal', title: 'No movements yet' }
+        }).el);
+      } else accBody.appendChild(el('div.text-mute.sm', { text: 'No salary movements yet.' }));
+      h.appendChild(accCard);
+    }
 
-    // ---- attendance (per-month) + leave ----------------------------------
-    var ym = P.curYm();
-    var att = P.attendanceFor(e.id, ym) || {};
-    var lv = S().list('tv_leaves').filter(function (l) { return l.empId === e.id; });
-    body.appendChild(el('div.card', null, [
-      el('div.card-head', null, [el('h3', { html: ui().icon('calendar-check') + ' Attendance — ' + P.mLabel(ym) }),
-        canPay(e) ? el('button.btn.btn-sm.btn-ghost', { style: { marginLeft: 'auto' }, html: ui().icon('pencil') + ' Record', onclick: function () { attendanceForm(e, ym); } }) : null].filter(Boolean)),
-      el('div.card-body', null, [el('div.stat-row', null, [
-        st2('Present', String(att.present || 0)), st2('Absent', String(att.absent || 0)),
-        st2('Late', String(att.late || 0)), st2('Early leave', String(att.earlyLeave || 0)), st2('On leave', String(att.leave || 0))
-      ]),
-      lv.length ? el('div.text-mute.sm.mt-2', { text: lv.length + ' leave request(s) · ' + lv.reduce(function (a, l) { return a + (l.status === 'Approved' ? l.days : 0); }, 0) + ' approved days taken' }) : null].filter(Boolean))
-    ]));
-
-    // ---- ACCOUNTS — the personal money book ------------------------------
-    var led = P.empLedger(e.id);
-    var netDue2 = led.length ? led[led.length - 1].balance : 0;
-    var accCard = el('div.card');
-    accCard.appendChild(el('div.card-head', null, [
-      el('h3', { html: ui().icon('journal-text') + ' Accounts — full transaction history' }),
-      el('span.card-sub', { text: (netDue2 >= 0 ? 'company owes ' : 'employee owes ') + money(Math.abs(netDue2)) })
-    ]));
-    var accBody = el('div.card-body'); accCard.appendChild(accBody);
-    if (canPay(e) && e.status !== 'resigned') accBody.appendChild(el('div.flex.gap-1.flex-wrap.mb-3', null, [
-      el('button.btn.btn-sm.btn-outline', { html: ui().icon('cash') + ' Advance', onclick: function () { moneyForm(e, 'advance'); } }),
-      el('button.btn.btn-sm.btn-outline', { html: ui().icon('bank') + ' Loan', onclick: function () { moneyForm(e, 'loan'); } }),
-      P.loanOutstanding(e.id) > 0 ? el('button.btn.btn-sm.btn-outline', { html: ui().icon('arrow-return-left') + ' Repay Loan', onclick: function () { moneyForm(e, 'loan-repay'); } }) : null,
-      el('button.btn.btn-sm.btn-outline', { html: ui().icon('gift') + ' Bonus', onclick: function () { moneyForm(e, 'bonus'); } }),
-      P.leaveState(e).value > 0 ? el('button.btn.btn-sm.btn-ghost', { html: ui().icon('piggy-bank') + ' Pay Encashment', onclick: function () { payEncash(e); } }) : null,
-      el('button.btn.btn-sm.btn-ghost.text-bad', { html: ui().icon('box-arrow-right') + ' Final Settlement', onclick: function () { settlement(e, m); } })
-    ].filter(Boolean)));
-    if (led.length) {
-      accBody.appendChild(EPAL.table({
-        columns: [
-          { key: 'date', label: 'Date', date: true },
-          { key: 'kind', label: 'Type', badge: { 'Salary earned': 'good', 'Leave encashment': 'info', 'Salary paid': '', 'Advance': 'warn', 'Loan': 'warn', 'Bonus': 'good', 'Final settlement': 'bad', 'Loan repaid': '' } },
-          { key: 'memo', label: 'Detail' },
-          { key: 'credit', label: 'Owed to emp', num: true, render: function (r) { return r.credit ? '<span class="num text-good">' + money(r.credit) + '</span>' : '—'; }, sortVal: function (r) { return r.credit; } },
-          { key: 'debit', label: 'Paid / recovered', num: true, render: function (r) { return r.debit ? '<span class="num">' + money(r.debit) + '</span>' : '—'; }, sortVal: function (r) { return r.debit; } },
-          { key: 'balance', label: 'Net due', num: true, render: function (r) { return '<span class="num strong ' + (r.balance >= 0 ? 'text-good' : 'text-bad') + '">' + money(r.balance) + '</span>'; }, sortVal: function (r) { return r.balance; } }
-        ],
-        rows: led, pageSize: 8, exportName: 'employee-ledger-' + e.id + '.csv', pdfTitle: 'Employee Statement — ' + e.name,
-        empty: { icon: 'journal', title: 'No movements yet' }
-      }).el);
-    } else accBody.appendChild(el('div.text-mute.sm', { text: 'No salary movements yet.' }));
-    body.appendChild(accCard);
-
-    // ---- payslip history --------------------------------------------------
-    var slips = S().list('pay_slips').filter(function (s) { return s.empId === e.id && s.status !== 'draft'; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
-    if (slips.length) {
-      body.appendChild(el('div.card', null, [
-        el('div.card-head', null, [el('h3', { html: ui().icon('receipt') + ' Payslip History' }), el('span.card-sub', { text: 'click for the payslip' })]),
+    // PAYSLIPS — history, click any month for the slip
+    function secPayslips(h) {
+      var slips = S().list('pay_slips').filter(function (s) { return s.empId === e.id && s.status !== 'draft'; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
+      h.appendChild(el('div.card', null, [
+        el('div.card-head', null, [el('h3', { html: ui().icon('receipt') + ' Payslip History' }), el('span.card-sub', { text: 'click a month for the payslip' })]),
         el('div.card-body', null, [EPAL.table({
           columns: [
             { key: 'ym', label: 'Month', render: function (s) { return '<span class="strong">' + P.mLabel(s.ym) + '</span>'; } },
             { key: 'net', label: 'Net', num: true, sortVal: function (s) { return P.slipPayable(s); }, render: function (s) { return '<span class="num strong">' + money(P.slipPayable(s)) + '</span>'; } },
             { key: 'paid', label: 'Paid', num: true, render: function (s) { return s.paid ? '<span class="text-good">' + money(s.paid) + '</span>' : '—'; }, sortVal: function (s) { return s.paid || 0; } },
+            { key: 'due', label: 'Due', num: true, sortVal: function (s) { return Math.max(0, P.slipPayable(s) - (s.paid || 0)); }, render: function (s) { var d = Math.max(0, P.slipPayable(s) - (s.paid || 0)); return d ? '<span class="num strong text-bad">' + money(d) + '</span>' : '—'; } },
             { key: 'status', label: 'Status', badge: { accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
           ],
-          rows: slips, pageSize: 6, onRow: function (s) { statement(e, s.ym); },
-          empty: { icon: 'receipt', title: 'No payslips' }
+          rows: slips, pageSize: 8, onRow: function (s) { statement(e, s.ym); },
+          empty: { icon: 'receipt', title: 'No payslips yet' }
         }).el])
       ]));
     }
-    if (EPAL.comments && EPAL.comments.widget) { body.appendChild(el('div.section-label', { text: 'Notes' })); body.appendChild(EPAL.comments.widget('employee', e.id)); }
+
+    // ATTENDANCE — this month's counts + leave summary
+    function secAttendance(h) {
+      var ym = P.curYm();
+      var att = P.attendanceFor(e.id, ym) || {};
+      var lv = S().list('tv_leaves').filter(function (l) { return l.empId === e.id; });
+      h.appendChild(el('div.card', null, [
+        el('div.card-head', null, [el('h3', { html: ui().icon('calendar-check') + ' Attendance — ' + P.mLabel(ym) }),
+          canPay(e) ? el('button.btn.btn-sm.btn-ghost', { style: { marginLeft: 'auto' }, html: ui().icon('pencil') + ' Record', onclick: function () { attendanceForm(e, ym); } }) : null].filter(Boolean)),
+        el('div.card-body', null, [el('div.stat-row', null, [
+          st2('Present', String(att.present || 0)), st2('Absent', String(att.absent || 0)),
+          st2('Late', String(att.late || 0)), st2('Early leave', String(att.earlyLeave || 0)), st2('On leave', String(att.leave || 0))
+        ]),
+        el('div.text-mute.sm.mt-2', { text: 'Absents and lates recorded here auto-apply to the month\'s draft payslip.' }),
+        lv.length ? el('div.text-mute.sm.mt-1', { text: lv.length + ' leave request(s) · ' + lv.reduce(function (a, l) { return a + (l.status === 'Approved' ? l.days : 0); }, 0) + ' approved days taken' }) : null].filter(Boolean))
+      ]));
+    }
+
+    // ALL DETAILS — the full A-Z record, split into tidy two-column cards
+    function secDetails(h) {
+      function card2(title, icon2, rows2) {
+        return el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui().icon(icon2) + ' ' + title })]),
+          el('div.card-body', null, [el('div.data-list', null, rows2.filter(Boolean))])]);
+      }
+      var row = el('div.two-col');
+      row.appendChild(card2('Job', 'briefcase', [
+        drow('Employee ID', e.id), drow('Company', e.companyId), drow('Department', e.dept), drow('Designation', e.designation),
+        drow('Employment type', e.empType || 'Permanent'), e.reportsTo ? drow('Reports to', e.reportsTo) : null,
+        e.workLocation ? drow('Work location', e.workLocation) : null,
+        drow('Join date', e.joinDate ? ui().date(e.joinDate) : '—'), e.confirmDate ? drow('Confirmed', ui().date(e.confirmDate)) : null,
+        e.resignedDate ? drow('Resigned', ui().date(e.resignedDate)) : null,
+        drow('Overtime eligible', e.otEligible === false ? 'No' : 'Yes'), drow('Bonus eligible', e.bonusEligible === false ? 'No' : 'Yes')
+      ]));
+      row.appendChild(card2('Personal', 'person-vcard', [
+        drow('Phone', e.phone), drow('Email', e.email), e.emergency ? drow('Emergency contact', e.emergency) : null,
+        e.nid ? drow('NID', e.nid) : null, e.passport ? drow('Passport', e.passport) : null,
+        e.dob ? drow('Date of birth', ui().date(e.dob)) : null, e.bloodGroup ? drow('Blood group', e.bloodGroup) : null,
+        e.presentAddress ? drow('Present address', e.presentAddress) : null, e.permanentAddress ? drow('Permanent address', e.permanentAddress) : null,
+        drow('Salary via', (e.salaryMethod || 'Bank') + (e.bankName ? ' · ' + e.bankName : '') + (e.bankAccount ? ' · ' + e.bankAccount : ''))
+      ]));
+      h.appendChild(row);
+      if (EPAL.comments && EPAL.comments.widget) { h.appendChild(el('div.section-label', { text: 'Notes' })); h.appendChild(EPAL.comments.widget('employee', e.id)); }
+    }
   }
 
   /* ---- money forms (advance / loan / repay / bonus) ----------------------*/
@@ -356,6 +403,24 @@
       onSave: function (v) {
         var fn = { advance: P.advance, loan: P.loan, 'loan-repay': P.repayLoan, bonus: P.bonus }[type];
         try { fn(e.id, +v.amount, { date: v.date, method: v.method, memo: v.memo, emiMonths: +v.emiMonths || 0 }); ui().toast(meta[0] + ' recorded', 'success'); EPAL.router.render(); return true; } catch (x) { ui().toast(x.message || 'Failed', 'error'); return false; }
+      }
+    });
+  }
+  // Pay straight from the payslip: any amount up to the outstanding; paying less
+  // leaves the rest as Due (this month) which becomes next month's arrears line.
+  function payFromSlip(e, ym, outstanding) {
+    var P = PR();
+    EPAL.formModal({
+      title: 'Pay — ' + e.name + ' · ' + P.mLabel(ym), icon: 'cash-coin', size: 'sm', record: { amount: outstanding, method: e.salaryMethod || 'Bank' },
+      fields: [
+        { key: 'amount', label: 'Pay now (৳)', type: 'money', required: true, min: 1, max: outstanding,
+          hint: 'Payable ' + money(outstanding) + '. Pay e.g. ' + money(Math.max(1, outstanding - 4000)) + ' and ' + money(Math.min(outstanding, 4000)) + ' stays DUE — it appears on this slip and carries to next month.' },
+        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Nagad', 'Rocket', 'Upay', 'Card', 'Cheque'], default: 'Bank' }
+      ],
+      saveLabel: 'Post Payment',
+      onSave: function (v) {
+        try { P.pay(e.id, ym, +v.amount, v.method); ui().toast('Paid ' + money(+v.amount) + (+v.amount < outstanding ? ' — ' + money(outstanding - v.amount) + ' now Due' : ' — cleared'), 'success'); EPAL.router.render(); setTimeout(function () { statement(e, ym); }, 60); return true; }
+        catch (x) { ui().toast(x.message || 'Failed', 'error'); return false; }
       }
     });
   }

@@ -315,16 +315,50 @@
       }
     });
   }
+  /* ---- EDIT SALARY (owner: "simple — every amount visible, auto-calculated but
+   * I can change any figure"). Amount boxes come PRE-FILLED with the automatic
+   * value; leave one untouched and it stays automatic (re-follows the counts),
+   * type a different figure and THAT amount is used. ------------------------*/
   function correctionForm(s, ym) {
-    EPAL.formModal({ title: 'Correction — ' + s.empName, icon: 'sliders', size: 'md',
-      record: { leaveDeductDays: s.leaveDeductDays || 0, lateDays: s.lateDays || 0, earlyDays: s.earlyDays || 0, overtimeHours: s.overtimeHours || 0, otherDeduction: s.otherDeduction || 0, bonus: s.bonus || 0, adjustment: s.adjustment || 0 },
-      fields: [ { key: 'leaveDeductDays', label: 'Absent days', type: 'number', min: 0, max: 30, default: 0, hint: 'Deducts (gross ÷ working days) × days.' },
-        { key: 'lateDays', label: 'Late count', type: 'number', min: 0, default: 0, hint: 'Every ' + (PR().template(CID).latesPerAbsent || 3) + ' lates deduct one day.' },
+    var pre = {   // what the form opens with — used to detect "did the owner touch it"
+      absentAmt: s.absentDeduction || 0, lateAmt: s.lateDeduction || 0,
+      earlyAmt: s.earlyDeduction || 0, otAmt: s.overtime || 0
+    };
+    EPAL.formModal({ title: 'Edit Salary — ' + s.empName + ' · ' + PR().mLabel(ym), icon: 'sliders', size: 'md',
+      record: { leaveDeductDays: s.leaveDeductDays || 0, lateDays: s.lateDays || 0, earlyDays: s.earlyDays || 0, overtimeHours: s.overtimeHours || 0,
+        absentAmt: pre.absentAmt, lateAmt: pre.lateAmt, earlyAmt: pre.earlyAmt, otAmt: pre.otAmt,
+        otherDeduction: s.otherDeduction || 0, bonus: s.bonus || 0, adjustment: s.adjustment || 0 },
+      fields: [
+        { type: 'section', label: 'Attendance counts (drive the automatic amounts)' },
+        { key: 'leaveDeductDays', label: 'Absent days', type: 'number', min: 0, max: 30, default: 0 },
+        { key: 'lateDays', label: 'Late count', type: 'number', min: 0, default: 0, hint: 'Every ' + (PR().template(CID).latesPerAbsent || 3) + ' lates = one day.' },
         { key: 'earlyDays', label: 'Early-leave count', type: 'number', min: 0, default: 0 },
-        { key: 'overtimeHours', label: 'Overtime hours', type: 'number', min: 0, default: 0, hint: 'Paid at the template rate (default 1.5× hourly).' },
-        { key: 'otherDeduction', label: 'Other deduction (৳)', type: 'money', min: 0, default: 0 }, { key: 'bonus', label: 'Bonus (৳)', type: 'money', min: 0, default: 0 },
-        { key: 'adjustment', label: 'Salary adjustment (± ৳)', type: 'number', default: 0, hint: 'Signed: positive adds, negative deducts.' } ],
-      saveLabel: 'Apply', onSave: function (v) { try { PR().adjustSlip(s.empId, ym, { leaveDeductDays: +v.leaveDeductDays, lateDays: +v.lateDays, earlyDays: +v.earlyDays, overtimeHours: +v.overtimeHours, otherDeduction: +v.otherDeduction, bonus: +v.bonus, adjustment: +v.adjustment }); ui.toast('Applied', 'success'); EPAL.router.render(); return true; } catch (e) { ui.toast(e.message || 'Blocked', 'error'); return false; } } });
+        { key: 'overtimeHours', label: 'Overtime hours', type: 'number', min: 0, default: 0 },
+        { type: 'section', label: 'Amounts (৳) — automatic; change any figure to override it' },
+        { key: 'absentAmt', label: 'Absent deduction (৳)', type: 'money', min: 0, hint: s.absentOverride != null ? 'Currently overridden.' : 'Auto from absent days — edit to override.' },
+        { key: 'lateAmt', label: 'Late deduction (৳)', type: 'money', min: 0, hint: s.lateOverride != null ? 'Currently overridden.' : 'Auto from late count.' },
+        { key: 'earlyAmt', label: 'Early-leave deduction (৳)', type: 'money', min: 0 },
+        { key: 'otAmt', label: 'Overtime pay (৳)', type: 'money', min: 0, hint: s.otOverride != null ? 'Currently overridden.' : 'Auto from OT hours × rate.' },
+        { key: 'otherDeduction', label: 'Other deduction (৳)', type: 'money', min: 0, default: 0 },
+        { key: 'bonus', label: 'Bonus (৳)', type: 'money', min: 0, default: 0 },
+        { key: 'adjustment', label: 'Salary adjustment (± ৳)', type: 'number', default: 0, hint: 'Signed: positive adds, negative deducts.' }
+      ],
+      saveLabel: 'Apply',
+      onSave: function (v) {
+        // untouched amount box → stays automatic; changed → becomes the override
+        function pick(entered, prefill, existingOvr) { return (+entered === +prefill) ? (existingOvr != null ? existingOvr : null) : +entered; }
+        try {
+          PR().adjustSlip(s.empId, ym, {
+            leaveDeductDays: +v.leaveDeductDays, lateDays: +v.lateDays, earlyDays: +v.earlyDays, overtimeHours: +v.overtimeHours,
+            absentOverride: pick(v.absentAmt, pre.absentAmt, s.absentOverride),
+            lateOverride: pick(v.lateAmt, pre.lateAmt, s.lateOverride),
+            earlyOverride: pick(v.earlyAmt, pre.earlyAmt, s.earlyOverride),
+            otOverride: pick(v.otAmt, pre.otAmt, s.otOverride),
+            otherDeduction: +v.otherDeduction, bonus: +v.bonus, adjustment: +v.adjustment
+          });
+          ui.toast('Salary updated', 'success'); EPAL.router.render(); return true;
+        } catch (e) { ui.toast(e.message || 'Blocked', 'error'); return false; }
+      } });
   }
 
   /* =================================================== LOAN MANAGEMENT */

@@ -102,23 +102,28 @@
   // `adj` carries correction-window edits + attendance:
   //   { leaveDeductDays(absent), lateDays, earlyDays, overtimeHours, otherDeduction,
   //     bonus, adjustment }
+  // AMOUNT OVERRIDES (owner: "deduction is automatic, but I can change the amount"):
+  //   absentOverride / lateOverride / earlyOverride / otOverride — when set (৳),
+  //   that figure REPLACES the auto-calculated one; null/blank = stay automatic.
+  function ovr(v, auto) { return (v == null || v === '' || isNaN(+v)) ? auto : round(+v); }
+  function keepOvr(v) { return (v == null || v === '' || isNaN(+v)) ? null : round(+v); }
   function computeSlip(emp, ym, adj) {
     adj = adj || {};
     var t = template(emp.companyId || 'travels');
     var gross = +emp.salary || 0;
     var wd = t.workingDays || 30;
     var perDayF = gross / wd;
-    // absent / unpaid-leave — full days deducted at the daily rate
+    // absent / unpaid-leave — full days deducted at the daily rate (or the override)
     var absentDays = clamp(+adj.leaveDeductDays || 0, 0, wd);
-    var absentDeduction = round(perDayF * absentDays);
+    var absentDeduction = ovr(adj.absentOverride, round(perDayF * absentDays));
     var workedDays = wd - absentDays;
     var earnedGross = gross - absentDeduction;
     // late & early-leave — every `latesPerAbsent` (default 3) counts as one day
     var lpa = t.latesPerAbsent > 0 ? t.latesPerAbsent : 3;
     var lateDays = Math.max(0, +adj.lateDays || 0);
     var earlyDays = Math.max(0, +adj.earlyDays || 0);
-    var lateDeduction = round(perDayF * lateDays / lpa);
-    var earlyDeduction = round(perDayF * earlyDays / lpa);
+    var lateDeduction = ovr(adj.lateOverride, round(perDayF * lateDays / lpa));
+    var earlyDeduction = ovr(adj.earlyOverride, round(perDayF * earlyDays / lpa));
     // components presented on the FULL gross (the payslip shows the structure,
     // absences are separate deduction lines)
     var basic = round(gross * t.basicPct);
@@ -134,7 +139,7 @@
     var adjustment = round(+adj.adjustment || 0);            // signed: + adds, − deducts
     var otHours = (emp.otEligible === false) ? 0 : Math.max(0, +adj.overtimeHours || 0);
     var otRate = (t.overtimeRate > 0) ? t.overtimeRate : Math.round((gross / wd / 8) * 1.5);   // default 1.5× the hourly rate
-    var overtime = round(otHours * otRate);
+    var overtime = (emp.otEligible === false) ? 0 : ovr(adj.otOverride, round(otHours * otRate));
     var net = gross + overtime + bonus + adjustment
             - absentDeduction - lateDeduction - earlyDeduction - tax - pf - otherDeduction;
     var encashDays = (t.leaveDaysPerYear || 23) / 12;        // 1.92
@@ -143,6 +148,8 @@
       gross: gross, earnedGross: earnedGross, workedDays: workedDays, leaveDeductDays: absentDays,
       absentDeduction: absentDeduction, lateDays: lateDays, lateDeduction: lateDeduction,
       earlyDays: earlyDays, earlyDeduction: earlyDeduction, adjustment: adjustment,
+      absentOverride: keepOvr(adj.absentOverride), lateOverride: keepOvr(adj.lateOverride),
+      earlyOverride: keepOvr(adj.earlyOverride), otOverride: keepOvr(adj.otOverride),
       basic: basic, house: house, medical: medical, transport: transport,
       tax: tax, pf: pf, otherDeduction: otherDeduction, bonus: bonus, overtimeHours: otHours, overtime: overtime,
       net: net, encashDays: encashDays, perDay: round(perDayF), encashAmt: encashAmt
@@ -198,7 +205,7 @@
     S.upsert('att_monthly', a); bus.emit('data:changed', { store: 'att_monthly' });
     // re-apply onto the month's draft slip immediately (if still correctable)
     var s = slip(empId, ym), run = s && getRun(s.companyId, ym);
-    if (s && run && run.status === 'draft') { try { adjustSlip(empId, ym, { leaveDeductDays: a.absent || 0, lateDays: a.late || 0, earlyDays: a.earlyLeave || 0, otherDeduction: s.otherDeduction, bonus: s.bonus, overtimeHours: s.overtimeHours, adjustment: s.adjustment }); } catch (x) {} }
+    if (s && run && run.status === 'draft') { try { adjustSlip(empId, ym, { leaveDeductDays: a.absent || 0, lateDays: a.late || 0, earlyDays: a.earlyLeave || 0, otherDeduction: s.otherDeduction, bonus: s.bonus, overtimeHours: s.overtimeHours, adjustment: s.adjustment, absentOverride: s.absentOverride, lateOverride: s.lateOverride, earlyOverride: s.earlyOverride, otOverride: s.otOverride }); } catch (x) {} }
     return a;
   }
 
@@ -218,7 +225,8 @@
       var att = attendanceFor(e.id, ym);
       var adj = existing
         ? { leaveDeductDays: existing.leaveDeductDays, lateDays: existing.lateDays, earlyDays: existing.earlyDays,
-            otherDeduction: existing.otherDeduction, bonus: existing.bonus, overtimeHours: existing.overtimeHours, adjustment: existing.adjustment }
+            otherDeduction: existing.otherDeduction, bonus: existing.bonus, overtimeHours: existing.overtimeHours, adjustment: existing.adjustment,
+            absentOverride: existing.absentOverride, lateOverride: existing.lateOverride, earlyOverride: existing.earlyOverride, otOverride: existing.otOverride }
         : (att ? { leaveDeductDays: att.absent || 0, lateDays: att.late || 0, earlyDays: att.earlyLeave || 0 } : {});
       var c = computeSlip(e, ym, adj);
       var s = existing || { id: slipId(e.id, ym), runId: run.id, empId: e.id, companyId: cid, ym: ym, paid: 0, advanceRecovered: 0, loanRecovered: 0, status: 'draft', slipNo: ym + '-' + String(++seq).padStart(3, '0') };
@@ -226,7 +234,8 @@
       s.empName = e.name; s.dept = e.dept;
       // copy computed figures onto the slip
       ['gross', 'earnedGross', 'workedDays', 'leaveDeductDays', 'absentDeduction', 'lateDays', 'lateDeduction',
-        'earlyDays', 'earlyDeduction', 'adjustment', 'basic', 'house', 'medical', 'transport',
+        'earlyDays', 'earlyDeduction', 'adjustment', 'absentOverride', 'lateOverride', 'earlyOverride', 'otOverride',
+        'basic', 'house', 'medical', 'transport',
         'tax', 'pf', 'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'net', 'encashDays', 'perDay', 'encashAmt'].forEach(function (k) { s[k] = c[k]; });
       S.upsert('pay_slips', s);
     });
@@ -246,6 +255,7 @@
     var emp = db().employee ? db().employee(empId) : { id: empId, salary: s.gross, companyId: s.companyId };
     var c = computeSlip(emp, ym, adj);
     ['leaveDeductDays', 'absentDeduction', 'lateDays', 'lateDeduction', 'earlyDays', 'earlyDeduction', 'adjustment',
+      'absentOverride', 'lateOverride', 'earlyOverride', 'otOverride',
       'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'earnedGross', 'workedDays', 'basic', 'house', 'medical', 'transport', 'tax', 'pf', 'net'].forEach(function (k) { s[k] = c[k]; });
     S.upsert('pay_slips', s); bus.emit('data:changed', { store: 'pay_slips' });
     return s;
