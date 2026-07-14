@@ -161,6 +161,14 @@
     actions.appendChild(el('button.btn.btn-ghost', { html: ui.icon('printer') + ' Print Sheet', onclick: function () { printSheetForm(slips, ym); } }));
     if (canCreate()) {
       if (st === 'draft') actions.appendChild(el('button.btn.btn-primary', { html: ui.icon('lock') + ' Finalize & Accrue', onclick: function () { finalizeRun(ym, net); } }));
+      if (st !== 'draft') actions.appendChild(el('button.btn.btn-outline', { html: ui.icon('arrow-counterclockwise') + ' Reopen Draft',
+        title: 'Rewind to the BEFORE-ACCRUED state — repeatable (demo-safe)',
+        onclick: function () {
+          var paidCount = slips.filter(function (s) { return s.paid > 0; }).length;
+          ui.confirm({ title: 'Reopen ' + PR().mLabel(ym) + ' as Draft?', confirmLabel: 'Reopen Draft',
+            text: 'Shows the month as it was BEFORE accrual: ' + (paidCount ? paidCount + ' payment(s) are reversed, ' : '') + 'the accrual is lifted from the books, and ✎ adjustments unlock. You can Finalize & Accrue again any time — fully repeatable.' })
+            .then(function (ok) { if (!ok) return; PR().unfinalize(CID, ym); ui.toast('Back to draft — before-accrued state', 'success'); EPAL.router.render(); });
+        } }));
       if (st !== 'draft' && due > 0) actions.appendChild(el('button.btn.btn-primary', { html: ui.icon('cash-coin') + ' Pay All', onclick: function () { payAll(ym); } }));
     }
     page.appendChild(el('div.card.mb-3', null, [ el('div.card-body', null, [

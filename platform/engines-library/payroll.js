@@ -291,6 +291,29 @@
     return run;
   }
 
+  // Walk a month back to BEFORE-ACCRUED (owner demos this lifecycle repeatedly):
+  // 1) reverse any payments (unpay), 2) lift the accrual entries out of the books
+  // (they use STABLE ids, so re-finalize re-posts the very same entries — the
+  // cycle is repeatable any number of times), 3) run + slips back to draft, with
+  // ✎ adjustments re-enabled.
+  function unfinalize(cid, ym) {
+    var run = getRun(cid, ym);
+    if (!run || run.status === 'draft') return run;
+    slipsFor(cid, ym).forEach(function (s) {
+      if (s.paid > 0) { unpay(s.empId, ym); s = slip(s.empId, ym) || s; }   // re-fetch: unpay rewrote the record
+      try {
+        if (EPAL.ledger && EPAL.ledger.remove) {
+          EPAL.ledger.remove('GL-PAYA-' + s.empId + '-' + ym);
+          EPAL.ledger.remove('GL-ENC-' + s.empId + '-' + ym);
+        }
+      } catch (e) {}
+      s.status = 'draft'; S.upsert('pay_slips', s);
+    });
+    run.status = 'draft'; run.finalizedAt = null; S.upsert('pay_runs', run);
+    bus.emit('data:changed', { store: 'pay_runs' });
+    return run;
+  }
+
   // Pay a slip (full by default, or a partial `amount`). Recovers outstanding advance first.
   function pay(empId, ym, amount, method) {
     var s = slip(empId, ym); if (!s) throw new Error('No payslip for ' + empId + ' ' + ym);
@@ -660,7 +683,7 @@
     amountInWords: amountInWords, attendanceFor: attendanceFor, saveAttendance: saveAttendance,
     generate: generate, getRun: getRun, run: getRun, slipsFor: slipsFor, slip: slip,
     inCorrectionWindow: inCorrectionWindow, adjustSlip: adjustSlip,
-    finalize: finalize, pay: pay, unpay: unpay, autoDue: autoDue, refreshRunStatus: refreshRunStatus,
+    finalize: finalize, unfinalize: unfinalize, pay: pay, unpay: unpay, autoDue: autoDue, refreshRunStatus: refreshRunStatus,
     advance: advance, loan: loan, repayLoan: repayLoan, bonus: bonus,
     advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, emiInstallment: emiInstallment, salaryDue: salaryDue,
     leaveState: leaveState, settlementPreview: settlementPreview, settle: settle,
