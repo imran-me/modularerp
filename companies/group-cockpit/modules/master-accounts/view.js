@@ -31,7 +31,9 @@
 (function (EPAL) {
   'use strict';
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
-  var TODAY_STR = '2026-07-05';
+  // real local today (was a hardcoded seed date — broke TODAY chips + report
+  // anchors). Local parts, NOT toISOString(): UTC lands on yesterday in +06.
+  var TODAY_STR = (function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
   var METHODS = ['Bank', 'Cash', 'bKash', 'Nagad', 'Debit Card', 'Credit Card', 'Cheque'];
   // OWNER LAYOUT: the group's operational expenses live in ONE section — all
   // expenses, budget setup, the D/W/M/custom report and the combined
@@ -41,7 +43,9 @@
   var EXP_TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Category & Sub-category']];
   var expTab = 'all';                                 // active button inside Operational Expenses
   var selCo = 'all';                                  // the company switcher state
-  var reportMode = 'daily';                           // expense-report bucket
+  var reportMode = 'monthly';                         // expense-report period mode
+  var reportDate = TODAY_STR;                         // daily / weekly anchor
+  var reportMonth = TODAY_STR.slice(0, 7);            // monthly anchor (YYYY-MM)
   var reportFrom = '2026-07-01', reportTo = TODAY_STR;
 
   /* ---- seeds -------------------------------------------------------------*/
@@ -377,55 +381,124 @@
     });
   }
 
-  /* ======================================================= EXPENSE REPORT */
+  /* ======================================================= EXPENSE REPORT
+   * Production parity (Expense Report screen): reports the OFFICE /
+   * operational expenses only (the acc_entries register — never payroll
+   * accruals or sales money). Pick ONE period — a day, a week, a month
+   * (month + year selects) or a custom range — and get the Total / Active
+   * transaction KPIs, a day-by-day Period Overview (zero days included) and
+   * the category / payment-mode breakdowns, with Print. */
   function reportView(page) {
     var modes = [['daily', 'Daily'], ['weekly', 'Weekly'], ['monthly', 'Monthly'], ['custom', 'Custom']];
     var bar = el('div.pill-tab.mb-2');
     modes.forEach(function (m) { bar.appendChild(el('button' + (reportMode === m[0] ? '.active' : ''), { text: m[1], onclick: function () { reportMode = m[0]; EPAL.router.render(); } })); });
     page.appendChild(bar);
-    var list = entriesFor('Expense');
-    if (reportMode === 'custom') {
-      var fromI = el('input.input', { type: 'date', value: reportFrom, onchange: function () { reportFrom = this.value; EPAL.router.render(); } });
-      var toI = el('input.input', { type: 'date', value: reportTo, onchange: function () { reportTo = this.value; EPAL.router.render(); } });
-      page.appendChild(el('div.flex.gap-2.items-center.mb-2', null, [el('span.text-mute.sm', { text: 'From' }), fromI, el('span.text-mute.sm', { text: 'to' }), toI]));
-      list = list.filter(function (e) { var d = String(e.date).slice(0, 10); return d >= reportFrom && d <= reportTo; });
+
+    // ---- resolve the selected period into a [from..to] day range ----------
+    function addDays(iso, n) {
+      // format from LOCAL date parts — toISOString() shifts to UTC and lands
+      // on the previous day in +06 Dhaka time
+      var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
-    function bucketOf(e) {
-      var d = String(e.date).slice(0, 10);
-      if (reportMode === 'monthly') return d.slice(0, 7);
-      if (reportMode === 'weekly') { var dt = new Date(d); var onejan = new Date(dt.getFullYear(), 0, 1); var wk = Math.ceil((((dt - onejan) / 86400000) + onejan.getDay() + 1) / 7); return d.slice(0, 4) + ' · W' + String(wk).padStart(2, '0'); }
-      return d;                                        // daily + custom → per day
+    var from, to, periodLabel;
+    if (reportMode === 'daily') { from = to = reportDate; periodLabel = ui.date(reportDate); }
+    else if (reportMode === 'weekly') {
+      var dow = (new Date(reportDate + 'T00:00:00').getDay() + 6) % 7;      // Monday-start week
+      from = addDays(reportDate, -dow); to = addDays(from, 6);
+      periodLabel = 'Week of ' + ui.date(from);
+    } else if (reportMode === 'monthly') {
+      from = reportMonth + '-01';
+      var y = +reportMonth.slice(0, 4), mo = +reportMonth.slice(5, 7);
+      to = reportMonth + '-' + String(new Date(y, mo, 0).getDate()).padStart(2, '0');
+      periodLabel = new Date(from + 'T00:00:00').toLocaleString('en', { month: 'long' }) + ' ' + y;
+    } else { from = reportFrom; to = reportTo; periodLabel = ui.date(from) + ' – ' + ui.date(to); }
+    if (from > to) { var sw = from; from = to; to = sw; }
+
+    // ---- the period picker row (per mode, like the production filters) ----
+    var picker = el('div.flex.gap-2.items-center.flex-wrap.mb-2');
+    if (reportMode === 'daily' || reportMode === 'weekly') {
+      picker.appendChild(el('span.text-mute.sm', { text: reportMode === 'daily' ? 'Date' : 'Any day in the week' }));
+      picker.appendChild(el('input.input', { type: 'date', value: reportDate, onchange: function () { reportDate = this.value || TODAY_STR; EPAL.router.render(); } }));
+    } else if (reportMode === 'monthly') {
+      var mSel = el('select.input', { style: { width: 'auto' }, onchange: function () { reportMonth = reportMonth.slice(0, 4) + '-' + this.value; EPAL.router.render(); } });
+      for (var mi = 1; mi <= 12; mi++) { var mv = String(mi).padStart(2, '0'); var o = el('option', { value: mv, text: new Date(2026, mi - 1, 1).toLocaleString('en', { month: 'long' }) }); if (reportMonth.slice(5, 7) === mv) o.selected = true; mSel.appendChild(o); }
+      var ySel = el('input.input', { type: 'number', value: reportMonth.slice(0, 4), min: 2020, max: 2040, style: { width: '110px' },
+        onchange: function () { var yv = String(this.value || '2026'); reportMonth = yv + '-' + reportMonth.slice(5, 7); EPAL.router.render(); } });
+      picker.appendChild(el('span.text-mute.sm', { text: 'Month' })); picker.appendChild(mSel);
+      picker.appendChild(el('span.text-mute.sm', { text: 'Year' })); picker.appendChild(ySel);
+    } else {
+      picker.appendChild(el('span.text-mute.sm', { text: 'From' }));
+      picker.appendChild(el('input.input', { type: 'date', value: reportFrom, onchange: function () { reportFrom = this.value; EPAL.router.render(); } }));
+      picker.appendChild(el('span.text-mute.sm', { text: 'to' }));
+      picker.appendChild(el('input.input', { type: 'date', value: reportTo, onchange: function () { reportTo = this.value; EPAL.router.render(); } }));
     }
-    var byBucket = {};
-    list.forEach(function (e) {
-      var k = bucketOf(e);
-      byBucket[k] = byBucket[k] || { bucket: k, count: 0, total: 0, byCat: {} };
-      byBucket[k].count++; byBucket[k].total += (+e.amount || 0);
-      byBucket[k].byCat[e.category || '—'] = (byBucket[k].byCat[e.category || '—'] || 0) + (+e.amount || 0);
-    });
-    var rows = Object.keys(byBucket).sort().reverse().map(function (k) {
-      var b = byBucket[k];
-      var top = Object.keys(b.byCat).sort(function (x, y) { return b.byCat[y] - b.byCat[x]; })[0];
-      return { bucket: b.bucket, count: b.count, top: top ? (top + ' (' + ui.money(b.byCat[top]) + ')') : '—', total: b.total };
-    });
-    var grand = rows.reduce(function (a, r) { return a + r.total; }, 0);
+    picker.appendChild(el('button.btn.btn-sm.btn-outline', { style: { marginLeft: 'auto' }, html: ui.icon('arrow-left') + ' Back to Expenses', onclick: function () { expTab = 'all'; EPAL.router.render(); } }));
+    picker.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printReport(); } }));
+    page.appendChild(picker);
+
+    // ---- office expenses inside the selected period ------------------------
+    var list = entriesFor('Expense').filter(function (e) { var d = String(e.date).slice(0, 10); return d >= from && d <= to; });
+    var total = list.reduce(function (a, e) { return a + (+e.amount || 0); }, 0);
     page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
-      kpi('Total Spend', ui.money(grand, { compact: true }), 'cash-stack'),
-      kpi('Periods', String(rows.length), 'calendar3'),
-      kpi('Entries', String(list.length), 'card-list'),
-      kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
+      kpi('Total Transactions', String(list.length), 'card-list'),
+      kpi('Total Amount', ui.money(total, { compact: true }), 'cash-stack'),
+      kpi('Active Transactions', String(list.length), 'check-circle'),
+      kpi('Average Amount', list.length ? ui.money(total / list.length, { compact: true }) : '৳0', 'distribute-vertical')
     ]));
+
+    // ---- Period Overview — one row per day, zero days included -------------
+    var byDay = {};
+    list.forEach(function (e) {
+      var d = String(e.date).slice(0, 10);
+      byDay[d] = byDay[d] || { n: 0, total: 0 };
+      byDay[d].n++; byDay[d].total += (+e.amount || 0);
+    });
+    var days = [];
+    for (var d2 = from, guard = 0; d2 <= to && guard < 370; d2 = addDays(d2, 1), guard++) {
+      days.push({ date: d2, n: (byDay[d2] || {}).n || 0, total: (byDay[d2] || {}).total || 0, active: (byDay[d2] || {}).total || 0 });
+    }
     var tbl = EPAL.table({
       columns: [
-        { key: 'bucket', label: reportMode === 'monthly' ? 'Month' : reportMode === 'weekly' ? 'Week' : 'Date', render: function (r) { return '<span class="strong">' + esc(r.bucket) + '</span>'; } },
-        { key: 'count', label: 'Entries', num: true },
-        { key: 'top', label: 'Biggest head' },
-        { key: 'total', label: 'Total', num: true, money: true }
+        { key: 'date', label: 'Date', date: true, render: function (r) { return '<span class="strong">' + ui.date(r.date) + '</span>' + (r.date === TODAY_STR ? ' <span class="badge badge-warn">TODAY</span>' : ''); } },
+        { key: 'n', label: 'Transactions', num: true },
+        { key: 'total', label: 'Total Amount', num: true, money: true },
+        { key: 'active', label: 'Active Amount', num: true, money: true }
       ],
-      rows: rows, pageSize: 15, totalKey: 'total', exportName: 'expense-report-' + reportMode + '.csv', pdfTitle: 'Expense Report (' + reportMode + ') — ' + coName(selCo),
-      empty: { icon: 'graph-down', title: 'No expenses in this range' }
+      rows: days, pageSize: 16, totalKey: 'total', exportName: 'expense-report-' + reportMode + '.csv',
+      pdfTitle: 'Expense Report (' + periodLabel + ') — ' + coName(selCo),
+      empty: { icon: 'graph-down', title: 'No days in range' }
     });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('graph-down-arrow') + ' Expense Report — ' + reportMode.charAt(0).toUpperCase() + reportMode.slice(1) })]), el('div.card-body', null, [tbl.el])]));
+    page.appendChild(el('div.card.mb-2', null, [
+      el('div.card-head', null, [el('h3', { html: ui.icon('graph-down-arrow') + ' Period Overview' }),
+        el('span.card-sub', { text: periodLabel + ' · ' + list.length + ' transaction' + (list.length === 1 ? '' : 's') })]),
+      el('div.card-body', null, [tbl.el])
+    ]));
+    var grand = total;
+    function printReport() {
+      var catM = {}; list.forEach(function (e) { var k = e.category || '—'; catM[k] = (catM[k] || 0) + (+e.amount || 0); });
+      var catRows = Object.keys(catM).sort(function (a, b) { return catM[b] - catM[a]; })
+        .map(function (k) { return '<tr><td>' + esc(k) + '</td><td class="num">' + ui.money(catM[k]) + '</td></tr>'; }).join('');
+      var dayRows = days.filter(function (r) { return r.n > 0; })
+        .map(function (r) { return '<tr><td>' + ui.date(r.date) + '</td><td class="num">' + r.n + '</td><td class="num">' + ui.money(r.total) + '</td></tr>'; }).join('');
+      var html = '<html><head><title>Expense Report — ' + esc(periodLabel) + '</title><style>' +
+        'body{font-family:Arial,sans-serif;color:#111;margin:36px;font-size:13px}h1{font-size:19px;margin:0}.mut{color:#555}' +
+        '.head{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}' +
+        'table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #999;padding:6px 9px;text-align:left}' +
+        'th{background:#eef1f6}.num{text-align:right;font-variant-numeric:tabular-nums}h2{font-size:14px;margin:18px 0 0}' +
+        '</style></head><body>' +
+        '<div class="head"><div><h1>EPAL GROUP</h1><div class="mut">' + esc(coName(selCo)) + ' · Operational Expenses</div></div>' +
+        '<div style="text-align:right"><h1>EXPENSE REPORT</h1><div class="mut">' + esc(periodLabel) + '</div></div></div>' +
+        '<div><b>Transactions:</b> ' + list.length + ' &nbsp; <b>Total:</b> ' + ui.money(grand) +
+        ' &nbsp; <b>Average:</b> ' + (list.length ? ui.money(grand / list.length) : '—') + '</div>' +
+        '<h2>Day by day</h2><table><thead><tr><th>Date</th><th class="num">Transactions</th><th class="num">Total</th></tr></thead><tbody>' +
+        (dayRows || '<tr><td colspan="3" class="mut">No transactions in this period.</td></tr>') + '</tbody></table>' +
+        '<h2>Category split</h2><table><thead><tr><th>Category</th><th class="num">Amount</th></tr></thead><tbody>' +
+        (catRows || '<tr><td colspan="2" class="mut">No category data.</td></tr>') + '</tbody></table>' +
+        '<script>window.print()<\/script></body></html>';
+      var w = window.open('', '_blank'); if (!w) { ui.toast('Allow pop-ups to print', 'error'); return; }
+      w.document.write(html); w.document.close();
+    }
 
     // --- breakdowns (ported from the production report): Category Split · Payment
     // Modes · Top expenses — all over the same filtered range. -----------------
