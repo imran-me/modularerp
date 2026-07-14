@@ -181,8 +181,8 @@
 
     // The FULL salary sheet (spec E6.3): Gross | OT | Bonus | Encash | Advance adj |
     // Loan EMI | Absent | Other ded | Net Payable | Paid | Due | Status per head.
-    function advOf(s) { return (s.paid > 0) ? (s.advanceRecovered || 0) : Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); }
-    function emiOf(s) { return (s.paid > 0) ? (s.loanRecovered || 0) : PR().emiInstallment(s.empId); }
+    function advOf(s) { var auto = Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); return (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? auto : Math.min(auto, +s.advCap)); }
+    function emiOf(s) { return (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? PR().emiInstallment(s.empId) : +s.emiCap); }
     function otherOf(s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.otherDeduction || 0); }
     function dueOf(s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }
     var tbl = EPAL.table({
@@ -328,13 +328,17 @@
    * value; leave one untouched and it stays automatic (re-follows the counts),
    * type a different figure and THAT amount is used. ------------------------*/
   function correctionForm(s, ym) {
+    var payableNow = PR().slipPayable(s);
     var pre = {   // what the form opens with — used to detect "did the owner touch it"
       absentAmt: s.absentDeduction || 0, lateAmt: s.lateDeduction || 0,
-      earlyAmt: s.earlyDeduction || 0, otAmt: s.overtime || 0
+      earlyAmt: s.earlyDeduction || 0, otAmt: s.overtime || 0,
+      advCap: (s.advCap != null && s.advCap !== '') ? +s.advCap : Math.min(PR().advanceOutstanding(s.empId), Math.max(0, payableNow)),
+      emiCap: (s.emiCap != null && s.emiCap !== '') ? +s.emiCap : PR().emiInstallment(s.empId)
     };
     EPAL.formModal({ title: 'Edit Salary — ' + s.empName + ' · ' + PR().mLabel(ym), icon: 'sliders', size: 'md',
       record: { leaveDeductDays: s.leaveDeductDays || 0, lateDays: s.lateDays || 0, earlyDays: s.earlyDays || 0, overtimeHours: s.overtimeHours || 0,
         absentAmt: pre.absentAmt, lateAmt: pre.lateAmt, earlyAmt: pre.earlyAmt, otAmt: pre.otAmt,
+        advCap: pre.advCap, emiCap: pre.emiCap,
         otherDeduction: s.otherDeduction || 0, bonus: s.bonus || 0, adjustment: s.adjustment || 0 },
       fields: [
         { type: 'section', label: 'Attendance counts (drive the automatic amounts)' },
@@ -349,7 +353,10 @@
         { key: 'otAmt', label: 'Overtime pay (৳)', type: 'money', min: 0, hint: s.otOverride != null ? 'Currently overridden.' : 'Auto from OT hours × rate.' },
         { key: 'otherDeduction', label: 'Other deduction (৳)', type: 'money', min: 0, default: 0 },
         { key: 'bonus', label: 'Bonus (৳)', type: 'money', min: 0, default: 0 },
-        { key: 'adjustment', label: 'Salary adjustment (± ৳)', type: 'number', default: 0, hint: 'Signed: positive adds, negative deducts.' }
+        { key: 'adjustment', label: 'Salary adjustment (± ৳)', type: 'number', default: 0, hint: 'Signed: positive adds, negative deducts.' },
+        { type: 'section', label: 'Agreed pay-time deductions (auto — change what the company takes this month)' },
+        { key: 'advCap', label: 'Advance to recover this month (৳)', type: 'money', min: 0, hint: 'Outstanding advance ' + ui.money(PR().advanceOutstanding(s.empId)) + ' — auto takes what fits.' },
+        { key: 'emiCap', label: 'Loan EMI this month (৳)', type: 'money', min: 0, hint: 'Scheduled EMI ' + ui.money(PR().emiInstallment(s.empId)) + ' — edit what the company agrees to deduct.' }
       ],
       saveLabel: 'Apply',
       onSave: function (v) {
@@ -362,6 +369,8 @@
             lateOverride: pick(v.lateAmt, pre.lateAmt, s.lateOverride),
             earlyOverride: pick(v.earlyAmt, pre.earlyAmt, s.earlyOverride),
             otOverride: pick(v.otAmt, pre.otAmt, s.otOverride),
+            advCap: pick(v.advCap, pre.advCap, s.advCap),
+            emiCap: pick(v.emiCap, pre.emiCap, s.emiCap),
             otherDeduction: +v.otherDeduction, bonus: +v.bonus, adjustment: +v.adjustment
           });
           ui.toast('Salary updated', 'success'); EPAL.router.render(); return true;
@@ -394,6 +403,22 @@
         actions: ui.actions({ edit: canCreate() ? function (r) { moneyForm(r.e, 'loan-repay'); } : null }), empty: { icon: 'bank', title: 'No active loans' }
       });
       page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('people') + ' Employees with loans' }), el('span.card-sub', { text: 'click to record a repayment' }) ]), el('div.card-body', null, [ lt.el ]) ]));
+    }
+    // EMI DEDUCTION HISTORY — every automatic salary-time EMI, individually dated
+    // (owner: "10,000 deducted as loan EMI at xyz date — history individually")
+    var emis = txns.filter(function (x) { return x.type === 'loan-repay' && /EMI auto-deducted/.test(x.memo || ''); });
+    if (emis.length) {
+      var et = EPAL.table({
+        columns: [
+          { key: 'date', label: 'Deducted on', date: true },
+          { key: 'empName', label: 'Employee', render: function (x) { return EPAL.people ? EPAL.people.linkify(x.empName, x.empId) : esc(x.empName); } },
+          { key: 'memo', label: 'From which salary', render: function (x) { return esc(String(x.memo || '').replace('EMI auto-deducted from ', '')); } },
+          { key: 'amount', label: 'EMI deducted', num: true, money: true }
+        ],
+        rows: emis, pageSize: 8, totalKey: 'amount', exportName: 'emi-history.csv', pdfTitle: 'Loan EMI Deduction History',
+        empty: { icon: 'bank', title: 'No EMI deductions yet' }
+      });
+      page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('calendar2-check') + ' EMI Deduction History' }), el('span.card-sub', { text: 'auto-deducted from salary · dated individually' }) ]), el('div.card-body', null, [ et.el ]) ]));
     }
     page.appendChild(txnTable('Loan transactions', txns));
   }

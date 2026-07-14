@@ -95,8 +95,14 @@
       (s.paid || s.outstanding || s.previousDue) ? el('div.data-list.mt-2', null, [
         s.paid ? line('Paid', s.paid) : null,
         s.outstanding ? el('div.data-row', null, [el('div.strong.flex-1', { text: 'Outstanding (Due)' }), el('div.strong.text-warn', { text: money(s.outstanding) })]) : null,
-        // arrears — salary still owed from EARLIER months, carried onto this payslip
+        // arrears — salary still owed from EARLIER months, carried onto this payslip,
+        // ITEMISED with month + due-since date (owner: "date record of which month")
         s.previousDue ? el('div.data-row', null, [el('div.strong.flex-1', { text: 'Previous Months Due (arrears)' }), el('div.strong.text-bad', { text: money(s.previousDue) })]) : null,
+        s.previousDue ? el('div', null, (s.previousDueItems || []).map(function (it) {
+          return el('div.data-row', null, [
+            el('div.text-mute.sm.flex-1', { text: '· ' + it.label + ' salary — due since ' + ui().date(it.dueSince) + (it.paid ? ' (paid ' + money(it.paid) + (it.paidDate ? ' on ' + ui().date(it.paidDate) : '') + ')' : '') }),
+            el('div.text-bad', { text: money(it.amount) })]);
+        })) : null,
         s.previousDue ? el('div.data-row', null, [el('div.strong.flex-1', { text: 'TOTAL PAYABLE (incl. arrears)' }), el('div.strong', { text: money(s.totalPayable) })]) : null,
         (s.previousDue && canPay(emp)) ? el('div.flex.justify-end.mt-1', null, [el('button.btn.btn-sm.btn-outline', { html: ui().icon('cash-coin') + ' Pay Arrears (' + money(s.previousDue) + ')', onclick: function () {
           ui().confirm({ title: 'Pay all past-month dues?', text: money(s.previousDue) + ' across earlier months (oldest first).', confirmLabel: 'Pay Arrears' })
@@ -157,7 +163,8 @@
       '<div class="net"><div><div class="nl">NET PAYABLE AMOUNT</div><div class="nw">Amount In Words: ' + esc(s.inWords) + '</div></div>' +
         '<div class="na">BDT ' + fmt2(s.netPayable) + '</div></div>' +
       (s.outstanding ? '<div class="due">Outstanding (Due): BDT ' + fmt2(s.outstanding) + (s.paid ? ' · Paid: BDT ' + fmt2(s.paid) : '') + '</div>' : '') +
-      (s.previousDue ? '<div class="due">Previous Months Due (arrears): BDT ' + fmt2(s.previousDue) + ' &nbsp;·&nbsp; TOTAL PAYABLE incl. arrears: BDT ' + fmt2(s.totalPayable) + '</div>' : '') +
+      (s.previousDue ? '<div class="due">Previous Months Due (arrears): BDT ' + fmt2(s.previousDue) + ' &nbsp;·&nbsp; TOTAL PAYABLE incl. arrears: BDT ' + fmt2(s.totalPayable) + '</div>' +
+        (s.previousDueItems || []).map(function (it) { return '<div class="enc" style="text-align:left">· ' + esc(it.label) + ' salary — due since ' + esc(it.dueSince) + (it.paid ? ' (part-paid ' + fmt2(it.paid) + ')' : '') + ': BDT ' + fmt2(it.amount) + '</div>'; }).join('') : '') +
       '<div class="note">Note: No note available</div>' +
       '<table class="sig"><tr><td><div class="sigl"></div>Employee Signature</td><td><div class="sigl"></div>Authorized Signatory</td></tr></table>' +
       '<div class="ts">TIMESTAMP: ' + ts + '</div>' +

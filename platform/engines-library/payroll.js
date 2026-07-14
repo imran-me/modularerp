@@ -257,6 +257,10 @@
     ['leaveDeductDays', 'absentDeduction', 'lateDays', 'lateDeduction', 'earlyDays', 'earlyDeduction', 'adjustment',
       'absentOverride', 'lateOverride', 'earlyOverride', 'otOverride',
       'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'earnedGross', 'workedDays', 'basic', 'house', 'medical', 'transport', 'tax', 'pf', 'net'].forEach(function (k) { s[k] = c[k]; });
+    // agreed pay-time deductions (auto when null): how much advance / loan EMI
+    // the company takes out of THIS month's payment
+    if ('advCap' in adj) s.advCap = keepOvr(adj.advCap);
+    if ('emiCap' in adj) s.emiCap = keepOvr(adj.emiCap);
     S.upsert('pay_slips', s); bus.emit('data:changed', { store: 'pay_slips' });
     return s;
   }
@@ -323,9 +327,13 @@
     var outstanding = payable - (s.paid || 0);
     var amt = amount == null ? outstanding : clamp(round(amount), 0, outstanding);
     if (amt <= 0) return s;
+    // AUTO deductions, but the company decides how much it agrees to take this
+    // month: slip.advCap / slip.emiCap (set in Edit Salary) override the autos.
     var advOut = advanceOutstanding(empId);
-    var recover = clamp(advOut, 0, amt);                 // recover advance out of this pay
-    var emiRecover = clamp(emiInstallment(empId), 0, amt - recover);   // auto loan EMI installment
+    var advWant = (s.advCap == null || s.advCap === '') ? advOut : Math.min(advOut, round(+s.advCap));
+    var emiWant = (s.emiCap == null || s.emiCap === '') ? emiInstallment(empId) : round(+s.emiCap);
+    var recover = clamp(advWant, 0, amt);                // agreed advance recovery out of this pay
+    var emiRecover = clamp(emiWant, 0, amt - recover);   // agreed loan EMI installment
     var cash = amt - recover - emiRecover;
     var lines = [{ account: '2100', dr: amt, cr: 0 }];
     if (recover > 0) lines.push({ account: '1250', dr: 0, cr: recover });
@@ -580,15 +588,32 @@
       .filter(function (s) { return s.empId === empId && s.ym < ym && s.status !== 'draft'; })
       .reduce(function (a, s) { return a + Math.max(0, slipPayable(s) - (s.paid || 0)); }, 0);
   }
+  // The arrears BREAKDOWN with dates (owner: "for every due there should be a
+  // date record of WHICH month's due that is"): one row per unpaid month —
+  // month, label, amount still owed, and since when it counts as due (the
+  // month's pay-by date), plus what was part-paid and when.
+  function previousDueList(empId, ym) {
+    return S.list('pay_slips')
+      .filter(function (s) { return s.empId === empId && s.ym < ym && s.status !== 'draft' && slipPayable(s) - (s.paid || 0) > 0.5; })
+      .sort(function (a, b) { return a.ym < b.ym ? -1 : 1; })
+      .map(function (s) {
+        var run = getRun(s.companyId, s.ym);
+        return { ym: s.ym, label: mLabel(s.ym), amount: round(slipPayable(s) - (s.paid || 0)),
+          dueSince: (run && run.dueAfter) || (s.ym + '-10'), paid: s.paid || 0, paidDate: s.paidDate || null };
+      });
+  }
   function statement(emp, ym) {
     var s = slip(emp.id, ym) || Object.assign({ empName: emp.name }, computeSlip(emp, ym, {}));
     var ls = leaveState(emp);
     var payable = slipPayable(s);
-    // advance/loan lines: actual recoveries once paid, else the projected recovery
-    var advLine = (s.paid > 0) ? (s.advanceRecovered || 0) : Math.min(advanceOutstanding(emp.id), Math.max(0, payable));
-    var loanLine = (s.paid > 0) ? (s.loanRecovered || 0) : emiInstallment(emp.id);
+    // advance/loan lines: actual recoveries once paid, else the projected AGREED
+    // recovery (auto, capped by advCap/emiCap when the company set them)
+    var advAuto = Math.min(advanceOutstanding(emp.id), Math.max(0, payable));
+    var advLine = (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? advAuto : Math.min(advAuto, round(+s.advCap)));
+    var loanLine = (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? emiInstallment(emp.id) : round(+s.emiCap));
     var cashAfter = Math.max(0, payable - advLine - loanLine);
     var arrears = previousDue(emp.id, ym);
+    var arrearsList = previousDueList(emp.id, ym);
     return {
       ym: ym, emp: emp, slip: s,
       slipNo: s.slipNo || (ym + '-001'),
@@ -609,7 +634,7 @@
       adjustment: s.adjustment || 0,
       leaveEncashment: { days: s.encashDays, amount: s.encashAmt, accruedDays: ls.encashableDays, accruedValue: ls.value, eligible: ls.eligibleFullYear, fullYearDays: ls.fullYearDays, fullYearValue: ls.fullYearValue },
       netPayable: payable, netCash: cashAfter, inWords: amountInWords(payable),
-      previousDue: arrears, totalPayable: payable + arrears, totalInWords: amountInWords(payable + arrears),
+      previousDue: arrears, previousDueItems: arrearsList, totalPayable: payable + arrears, totalInWords: amountInWords(payable + arrears),
       paid: s.paid || 0, outstanding: Math.max(0, payable - (s.paid || 0)), status: s.status || 'draft'
     };
   }
@@ -658,7 +683,7 @@
   // board), plus one outstanding Travels advance. Idempotent — generate keeps existing
   // slips, finalize/pay are no-ops once done, the advance is de-duped.
   function seedDemo() {
-    if (S.get('pay_seeded_v2', false)) return;
+    if (S.get('pay_seeded_v3', false)) return;
     var companies = (EPAL.config && EPAL.config.companies)
       ? EPAL.config.companies.filter(function (c) { return c.type === 'company'; }).map(function (c) { return c.id; })
       : ['travels', 'woodart', 'it', 'shop', 'construction'];
@@ -667,14 +692,40 @@
       ['2026-05', '2026-06'].forEach(function (ym) {
         generate(cid, ym);
         finalize(cid, ym);
-        slipsFor(cid, ym).forEach(function (s) { try { pay(s.empId, ym); } catch (e) {} });   // fully paid
+        var monthSlips = slipsFor(cid, ym);
+        // Travels June: the 3rd person is PART-paid → a dated past-month due
+        // that then shows itemised on the July payslip (demo scenario).
+        var partialId = (cid === 'travels' && ym === '2026-06' && monthSlips[2]) ? monthSlips[2].empId : null;
+        monthSlips.forEach(function (s) {
+          if (s.empId === partialId) { try { pay(s.empId, ym, Math.round(slipPayable(s) * 0.6), 'Bank'); } catch (e) {} return; }
+          try { pay(s.empId, ym); } catch (e) {}
+        });
       });
       generate(cid, curYm());   // current (July) draft run
     });
-    // one live Travels advance against July (unrecovered), de-duped for re-seed
-    var tt = activeTeam('travels');
-    if (tt[0] && !txnsFor(tt[0].id).some(function (x) { return x.type === 'advance'; })) advance(tt[0].id, 15000, { date: '2026-07-02', memo: 'Advance salary (July)' });
-    S.set('pay_seeded_v2', true);
+    // ---- rich July texture for Travels so every sheet column shows life ----
+    var tt = activeTeam('travels'), ym7 = curYm();
+    // browsers seeded before v3 may already hold a finalized July — rewind it so
+    // the attendance/OT/bonus texture can apply, then re-finalize below
+    try { var r7 = getRun('travels', ym7); if (r7 && r7.status !== 'draft') unfinalize('travels', ym7); } catch (e) {}
+    if (tt.length >= 5) {
+      // advance + a live loan with monthly EMI (histories: pay_txns keep dates)
+      if (!txnsFor(tt[1].id).some(function (x) { return x.type === 'advance'; })) advance(tt[1].id, 15000, { date: '2026-07-02', memo: 'Advance salary (July)' });
+      if (!txnsFor(tt[0].id).some(function (x) { return x.type === 'loan'; })) loan(tt[0].id, 40000, { date: '2026-06-15', memo: 'Staff loan · 12 EMIs', emiMonths: 12 });
+      if (!txnsFor(tt[3].id).some(function (x) { return x.type === 'loan'; })) loan(tt[3].id, 52000, { date: '2026-05-20', memo: 'Staff loan · 6 EMIs', emiMonths: 6 });
+      // July attendance → automatic absent/late deductions on the draft slips
+      saveAttendance(tt[2].id, ym7, { present: 22, absent: 2, late: 3, earlyLeave: 0, leave: 0 });
+      saveAttendance(tt[4].id, ym7, { present: 25, absent: 1, late: 1, earlyLeave: 1, leave: 0 });
+      // overtime + bonus on the drafts (eligible staff)
+      try { adjustSlip(tt[0].id, ym7, { leaveDeductDays: 0, lateDays: 0, earlyDays: 0, overtimeHours: 8, otherDeduction: 0, bonus: 0, adjustment: 0 }); } catch (e) {}
+      try { adjustSlip(tt[1].id, ym7, { leaveDeductDays: 0, lateDays: 0, earlyDays: 0, overtimeHours: 0, otherDeduction: 0, bonus: 6000, adjustment: 0 }); } catch (e) {}
+      // finalize July and pay a mix: one in full, one partial — so Paid/Due/status
+      // all show demo values (Reopen Draft rewinds all of this for live demos)
+      finalize('travels', ym7);
+      try { pay(tt[0].id, ym7); } catch (e) {}
+      try { pay(tt[1].id, ym7, 40000, 'Bank'); } catch (e) {}
+    }
+    S.set('pay_seeded_v3', true);
   }
 
   /* --------------------------------------------------------------- API */
@@ -688,7 +739,7 @@
     advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, emiInstallment: emiInstallment, salaryDue: salaryDue,
     leaveState: leaveState, settlementPreview: settlementPreview, settle: settle,
     encashmentLiability: encashmentLiability, payEncashment: payEncashment, departmentCost: departmentCost,
-    previousDue: previousDue, payArrears: payArrears,
+    previousDue: previousDue, previousDueList: previousDueList, payArrears: payArrears,
     empLedger: empLedger, statement: statement, txnsFor: txnsFor,
     curYm: curYm, today: today, mLabel: mLabel
   };
