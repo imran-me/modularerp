@@ -206,9 +206,9 @@
       exportName: 'salary-sheet-' + ym + '.csv', pdfTitle: 'Salary Sheet — ' + PR().mLabel(ym),
       onRow: function (s) { var e = empById(s.empId); if (e) statement(e, ym); },
       actions: (canCreate() ? [{ icon: 'wallet2', title: 'Manage salary — pay / partial / due / advance / status', onClick: function (s) { manageSalary(s, ym); } }] : []).concat(ui.actions({
-        // corrections stay open through the whole DRAFT stage for the owner (MD
-        // unlock) — the 1st–3rd window is the staff cutoff, not the owner's.
-        edit: (canCreate() && st === 'draft') ? function (s) { correctionForm(s, ym); } : null,
+        // editing stays open even AFTER finalization (owner rule) — the engine
+        // re-posts the accrual under its stable id so the books follow exactly.
+        edit: canCreate() ? function (s) { correctionForm(s, ym); } : null,
         print: function (s) { var e = empById(s.empId); if (e) statementPrint(e, ym); }
       })),
       empty: { icon: 'cash-stack', title: 'No employees to pay' }
@@ -329,10 +329,8 @@
   EPAL.payrollEdit = function (empId, ym) {
     var s = PR().slip(empId, ym);
     if (!s) { ui.toast('No payslip for that month', 'error'); return; }
-    var run = PR().getRun(s.companyId, ym);
-    if (run && run.status !== 'draft') { ui.toast('This month is finalized — hit "Reopen Draft" on the Salary Sheet to edit OT/Bonus (or Mark Unpaid to change the payment).', 'info'); return; }
     CID = s.companyId;
-    correctionForm(s, ym);
+    correctionForm(s, ym);   // finalized months stay editable — the accrual re-posts
   };
 
   /* ---- EDIT SALARY (owner: "simple — every amount visible, auto-calculated but

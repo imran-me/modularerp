@@ -65,24 +65,25 @@
     }
     body.appendChild(el('div.card', null, [el('div.card-body', null, [
       // header strip — like the printed payslip
-      el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+      el('div.flex.items-center.gap-2.flex-wrap.mb-2', null, [
         el('div.flex-1', null, [
           el('div.fw-700', { style: { fontSize: '16px' }, html: esc(emp.name) + ' <span class="text-mute sm">· ' + esc(emp.designation || '') + '</span>' }),
           el('div.text-mute.sm', { text: 'Payslip #' + s.slipNo + ' · Period ' + ym + ' · ' + (s.payMethod || 'Bank') + ' · Generated ' + ui().date(s.generated) })
         ]),
-        el('span.badge.badge-' + (s.status === 'paid' ? 'good' : s.status === 'due' ? 'bad' : s.status === 'partial' ? 'warn' : 'info'), { text: cap(s.status) }),
-        el('button.btn.btn-sm.btn-outline', { html: ui().icon('person-badge') + ' Profile', onclick: function () { open(emp.id); } }),
-        // EDIT (OT · Bonus · deductions) — the adjust form, right from the slip
-        (canPay(emp) && EPAL.payrollEdit) ? el('button.btn.btn-sm.btn-outline', { html: ui().icon('sliders') + ' Edit (OT · Bonus)', onclick: function () { EPAL.payrollEdit(emp.id, ym); } }) : null,
-        // PAY FULL and PAY PARTIAL, explicitly, right on the slip (owner ask):
-        // partial leaves the rest as Due here and as arrears on next month.
-        (canPay(emp) && s.outstanding > 0 && s.status !== 'draft') ? el('button.btn.btn-sm.btn-primary', { html: ui().icon('check2-circle') + ' Pay Full (' + money(s.outstanding) + ')', onclick: function () {
+        el('span.badge.badge-' + (s.status === 'paid' ? 'good' : s.status === 'due' ? 'bad' : s.status === 'partial' ? 'warn' : 'info'), { text: cap(s.status) })
+      ]),
+      // one compact action row (owner: "same row, just reduce button size") —
+      // Edit stays available even after finalization (the accrual re-posts).
+      el('div.flex.items-center.gap-1.mb-3', { style: { flexWrap: 'nowrap', overflowX: 'auto' } }, [
+        el('button.btn.btn-xxs.btn-outline', { html: ui().icon('person-badge') + ' Profile', onclick: function () { open(emp.id); } }),
+        (canPay(emp) && EPAL.payrollEdit) ? el('button.btn.btn-xxs.btn-outline', { html: ui().icon('sliders') + ' Edit (OT · Bonus)', onclick: function () { EPAL.payrollEdit(emp.id, ym); } }) : null,
+        (canPay(emp) && s.outstanding > 0 && s.status !== 'draft') ? el('button.btn.btn-xxs.btn-primary', { html: ui().icon('check2-circle') + ' Pay Full (' + money(s.outstanding) + ')', onclick: function () {
           ui().confirm({ title: 'Pay ' + emp.name + ' in full?', text: money(s.outstanding) + ' now — advance/loan EMI recover automatically.', confirmLabel: 'Pay Full' })
             .then(function (ok) { if (!ok) return; try { PR().pay(emp.id, ym); ui().toast('Paid in full', 'success'); EPAL.router.render(); setTimeout(function () { statement(emp, ym); }, 60); } catch (x) { ui().toast(x.message || 'Failed', 'error'); } });
         } }) : null,
-        (canPay(emp) && s.outstanding > 0 && s.status !== 'draft') ? el('button.btn.btn-sm.btn-outline', { html: ui().icon('cash-coin') + ' Pay Partial…', onclick: function () { payFromSlip(emp, ym, s.outstanding); } }) : null,
-        el('button.btn.btn-sm.btn-primary', { html: ui().icon('printer') + ' Print', onclick: function () { payslipPrint(emp, ym); } })
-      ]),
+        (canPay(emp) && s.outstanding > 0 && s.status !== 'draft') ? el('button.btn.btn-xxs.btn-outline', { html: ui().icon('cash-coin') + ' Pay Partial…', onclick: function () { payFromSlip(emp, ym, s.outstanding); } }) : null,
+        el('button.btn.btn-xxs.btn-primary', { html: ui().icon('printer') + ' Print', onclick: function () { payslipPrint(emp, ym); } })
+      ].filter(Boolean)),
       el('div.two-col', null, [
         el('div', null, [el('div.section-label.mt-0', { text: 'Earnings' }), el('div.data-list', null,
           s.earnings.map(function (x) { return line(x[0], x[1]); })

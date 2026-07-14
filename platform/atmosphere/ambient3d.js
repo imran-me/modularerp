@@ -205,10 +205,10 @@
       scene.add(at(light(THREE, M, 0xffe2a8, 1.1, 'steady'), bp[0] + 2.6, 4.6, bp[1]));
     });
 
-    // PLANE PARKING apron (right of the take-off runway) + props
-    var apron2 = new THREE.Mesh(new THREE.PlaneGeometry(58, 40), M.apron);
-    apron2.rotation.x = -Math.PI / 2; apron2.position.set(116, 0.01, -136); scene.add(apron2);
-    [[100, -126, -0.55, 2], [116, -138, -0.55, 3], [132, -150, -0.55, 1]].forEach(function (ps) {
+    // AIR PARKING on the far right — a big apron with SEVERAL parked jets
+    var apron2 = new THREE.Mesh(new THREE.PlaneGeometry(84, 52), M.apron);
+    apron2.rotation.x = -Math.PI / 2; apron2.position.set(126, 0.01, -142); scene.add(apron2);
+    [[98, -124, -0.55, 2], [113, -134, -0.55, 3], [128, -144, -0.55, 1], [143, -154, -0.55, 5], [120, -162, 0.5, 6]].forEach(function (ps) {
       var pp = buildAirliner(THREE, M, 1.05, false, LIVERIES[ps[3]]);
       pp.position.set(ps[0], 2.6, ps[1]); pp.rotation.y = ps[2]; scene.add(pp);
       var sp2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.26, depthWrite: false, fog: false }));
@@ -418,19 +418,23 @@
     // an A340-style 4-engine long-hauler, a stretched 777-style wide-body, the
     // toy blue-and-yellow plane, the orange 737, the dark-navy A220 and a teal
     // narrow-body. Each pass picks its own altitude, depth, heading, bob, speed.
-    // (the toy/orange/heavy types now live in the landing POOL above — cruisers
-    // keep the types that stay high so nothing appears twice at once)
+    // a BUSY random sky (owner: several colourful planes flying continuously —
+    // short random gaps, every pass a fresh route; no cycle to perceive)
     var FLEET = [
       { scale: 1.9, livery: LIVERIES[3], cfg: { stretch: 1.18 } },               // stretched wide-body 777 type
       { scale: 1.35, livery: LIVERIES[7], cfg: {} },                             // dark-navy A220 type
-      { scale: 1.5, livery: LIVERIES[1], cfg: {} }                               // teal narrow-body
+      { scale: 1.5, livery: LIVERIES[1], cfg: {} },                              // teal narrow-body
+      { scale: 1.45, livery: LIVERIES[5], cfg: {} },                             // toy yellow/blue (sky sister)
+      { scale: 1.4, livery: LIVERIES[6], cfg: {} },                              // orange 737 (sky sister)
+      { scale: 1.45, livery: LIVERIES[2], cfg: {} },                             // rose tail
+      { scale: 1.75, livery: LIVERIES[4], cfg: { engines: 4, stretch: 1.24 } }   // 4-engine heavy (sky sister)
     ];
     FLEET.forEach(function (spec) {
       var cr = buildAirliner(THREE, M, spec.scale, false, spec.livery, spec.cfg);
       cr.userData.gear.visible = false;
       legMover(cr, function () {
-        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(95, 225), z1 = rnd(-160, -520), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
-        return { dur: rnd(26, 52), gap: rnd(3, 22),
+        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(95, 235), z1 = rnd(-160, -540), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
+        return { dur: rnd(24, 48), gap: rnd(1, 9),
           path: function (u) { return V(dir * (-720 + u * 1440), alt + Math.sin(u * Math.PI) * bob, z1 + (z2 - z1) * u); } };   // ±720: enters/exits beyond the frame
       });
     });
@@ -501,7 +505,7 @@
     legMover(fteam, function () {
       var L = pickOf(LAYOUTS), squad = Math.random() < 0.55 ? jetsA : jetsB, other = (squad === jetsA) ? jetsB : jetsA;
       var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(100, 160), arc = rnd(10, 38), zb = rnd(-140, -270), wig = rnd(14, 36);
-      return { dur: rnd(12, 19), gap: rnd(12, 45),
+      return { dur: rnd(12, 19), gap: rnd(5, 18),   // formations show up often, never on a beat
         init: function () {
           for (var i = 0; i < other.length; i++) other[i].visible = false;
           for (var i2 = 0; i2 < squad.length; i2++) { var s = L[i2]; if (s) { squad[i2].visible = true; squad[i2].position.set(s[0], s[1], s[2]); } else squad[i2].visible = false; }

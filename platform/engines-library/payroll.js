@@ -251,7 +251,6 @@
   function adjustSlip(empId, ym, adj) {
     var s = slip(empId, ym); if (!s) return null;
     var run = getRun(s.companyId, ym);
-    if (run && run.status !== 'draft') throw new Error('Payroll for ' + ym + ' is finalized — corrections are closed.');
     var emp = db().employee ? db().employee(empId) : { id: empId, salary: s.gross, companyId: s.companyId };
     var c = computeSlip(emp, ym, adj);
     ['leaveDeductDays', 'absentDeduction', 'lateDays', 'lateDeduction', 'earlyDays', 'earlyDeduction', 'adjustment',
@@ -261,35 +260,38 @@
     // the company takes out of THIS month's payment
     if ('advCap' in adj) s.advCap = keepOvr(adj.advCap);
     if ('emiCap' in adj) s.emiCap = keepOvr(adj.emiCap);
-    S.upsert('pay_slips', s); bus.emit('data:changed', { store: 'pay_slips' });
+    // FINALIZED month? Editing stays open (owner rule) — the accrual is simply
+    // RE-POSTED under its stable id, so the books follow the new figures exactly.
+    if (run && run.status !== 'draft') accrueSlip(s, s.companyId, ym);
+    else S.upsert('pay_slips', s);
+    bus.emit('data:changed', { store: 'pay_slips' });
     return s;
+  }
+
+  // Post (or RE-post — stable ids upsert) one slip's accrual + encashment into
+  // the GL and refresh its status against what's already been paid.
+  function accrueSlip(s, cid, ym) {
+    var adjPos = Math.max(0, s.adjustment || 0), adjNeg = Math.max(0, -(s.adjustment || 0));
+    var recovered = (s.otherDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + adjNeg;
+    var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + adjPos;
+    var payable = slipPayable(s);
+    var lines = [{ account: '5100', dr: expense, cr: 0 }];
+    if (s.tax) lines.push({ account: '2120', dr: 0, cr: s.tax });
+    if (s.pf) lines.push({ account: '2110', dr: 0, cr: s.pf });
+    if (recovered) lines.push({ account: '4900', dr: 0, cr: recovered });
+    lines.push({ account: '2100', dr: 0, cr: payable });
+    glPost('GL-PAYA-' + s.empId + '-' + ym, ym + '-01', cid, 'PAY-' + ym, 'Salary accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
+    if (s.encashAmt > 0) glPost('GL-ENC-' + s.empId + '-' + ym, ym + '-01', cid, 'ENC-' + ym, 'Leave encashment accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId,
+      [{ account: '5150', dr: s.encashAmt, cr: 0 }, { account: '2150', dr: 0, cr: s.encashAmt }]);
+    s.status = (s.paid || 0) >= payable ? 'paid' : ((s.paid || 0) > 0 ? 'partial' : 'accrued');
+    S.upsert('pay_slips', s);
   }
 
   // Finalize: lock the run and ACCRUE every payslip into the GL (idempotent per head).
   function finalize(cid, ym) {
     var run = generate(cid, ym);
     if (run.status !== 'draft') return run;
-    slipsFor(cid, ym).forEach(function (s) {
-      // salary accrual — DR 5100 (earned + OT + bonus ± positive adjustment) /
-      // CR 2120 tax, 2110 pf, 4900 (other/late/early deductions recovered, and a
-      // negative adjustment), 2100 net payable. Always balances by construction:
-      // payable = earned + OT + bonus + adj − tax − pf − other − late − early.
-      var adjPos = Math.max(0, s.adjustment || 0), adjNeg = Math.max(0, -(s.adjustment || 0));
-      var recovered = (s.otherDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + adjNeg;
-      var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + adjPos;
-      var payable = slipPayable(s);
-      var lines = [{ account: '5100', dr: expense, cr: 0 }];
-      if (s.tax) lines.push({ account: '2120', dr: 0, cr: s.tax });
-      if (s.pf) lines.push({ account: '2110', dr: 0, cr: s.pf });
-      if (recovered) lines.push({ account: '4900', dr: 0, cr: recovered });
-      lines.push({ account: '2100', dr: 0, cr: payable });
-      glPost('GL-PAYA-' + s.empId + '-' + ym, ym + '-01', cid, 'PAY-' + ym, 'Salary accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
-      // leave-encashment accrual — DR 5150 / CR 2150
-      if (s.encashAmt > 0) glPost('GL-ENC-' + s.empId + '-' + ym, ym + '-01', cid, 'ENC-' + ym, 'Leave encashment accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId,
-        [{ account: '5150', dr: s.encashAmt, cr: 0 }, { account: '2150', dr: 0, cr: s.encashAmt }]);
-      s.status = s.paid >= payable ? 'paid' : (s.paid > 0 ? 'partial' : 'accrued');
-      S.upsert('pay_slips', s);
-    });
+    slipsFor(cid, ym).forEach(function (s) { accrueSlip(s, cid, ym); });
     run.status = 'finalized'; run.finalizedAt = today(); S.upsert('pay_runs', run);
     bus.emit('data:changed', { store: 'pay_runs' });
     return run;
