@@ -34,7 +34,7 @@
   var TODAY_STR = '2026-07-05';
   var METHODS = ['Bank', 'Cash', 'bKash', 'Nagad', 'Debit Card', 'Credit Card', 'Cheque'];
   var SECTIONS = [['expenses', 'All Expenses'], ['categories', 'Categories'], ['budget', 'Budget Setup'], ['report', 'Expense Report'],
-    ['journals', 'Manage Journals'], ['schedules', 'Payment Schedules'], ['party-types', 'Party Types'], ['payroll', 'Master Payroll'], ['banks', 'Manage Banks']];
+    ['accounts', 'Manage Accounts'], ['journals', 'Manage Journals'], ['schedules', 'Payment Schedules'], ['party-types', 'Party Types'], ['payroll', 'Master Payroll'], ['banks', 'Manage Banks']];
   var selCo = 'all';                                  // the company switcher state
   var reportMode = 'daily';                           // expense-report bucket
   var reportFrom = '2026-07-01', reportTo = TODAY_STR;
@@ -111,7 +111,7 @@
       page.appendChild(swWrap);
       if (sub === 'payroll' && (selCo === 'all')) selCo = 'travels';
       ({ expenses: expensesView, categories: categoriesView, budget: budgetView, report: reportView,
-         journals: journalsView, schedules: schedulesView, 'party-types': partyTypesView, payroll: payrollView, banks: banksView }[sub])(page);
+         accounts: accountsView, journals: journalsView, schedules: schedulesView, 'party-types': partyTypesView, payroll: payrollView, banks: banksView }[sub])(page);
       ctx.mount.appendChild(page);
     }
   });
@@ -564,27 +564,257 @@
     else page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Payroll desk unavailable.' })]));
   }
 
-  /* ======================================================= MANAGE BANKS */
+  /* ======================================================= MANAGE ACCOUNTS
+   * The group chart of accounts, managed right here (same 'coa' store the
+   * Group Finance tab uses, so both screens always agree). Balances respect
+   * the company switcher — pick a concern to see ITS balance on each head. */
+  function accountsView(page) {
+    if (!EPAL.ledger) { page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Ledger engine unavailable.' })])); return; }
+    var L = EPAL.ledger;
+    var scope = selCo === 'all' ? {} : { companyId: selCo };
+    var accts = L.accounts();
+    var TYPE_META = [['asset', 'Assets', 'safe2'], ['liability', 'Liabilities', 'file-earmark-minus'],
+      ['equity', 'Equity', 'gem'], ['income', 'Income', 'graph-up-arrow'], ['expense', 'Expenses', 'wallet2']];
+    var counts = {}; accts.forEach(function (a) { counts[a.type] = (counts[a.type] || 0) + 1; });
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, TYPE_META.map(function (t) {
+      return kpi(t[1], String(counts[t[0]] || 0), t[2]);
+    })));
+    if (canCreate()) {
+      page.appendChild(el('div.flex.gap-1.mb-2', null, [
+        el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-square') + ' Add Account', onclick: addAccountForm }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('flag') + ' Opening Balance', onclick: openingBalanceForm })
+      ]));
+    }
+    TYPE_META.forEach(function (t) {
+      var list = accts.filter(function (a) { return a.type === t[0]; });
+      if (!list.length) return;
+      var rows = list.map(function (a) {
+        return { code: a.code, name: a.name, group: a.group || '—', normal: a.normal, active: a.active !== false, balance: L.balance(a.code, scope) };
+      });
+      var tbl = EPAL.table({
+        columns: [
+          { key: 'code', label: 'Code', render: function (r) { return '<span class="num strong">' + esc(r.code) + '</span>'; } },
+          { key: 'name', label: 'Account', render: function (r) { return '<span class="strong' + (r.active ? '' : ' text-mute') + '">' + esc(r.name) + '</span>' + (r.active ? '' : ' <span class="badge">Inactive</span>'); } },
+          { key: 'group', label: 'Group' },
+          { key: 'normal', label: 'Normal', badge: { debit: 'info', credit: 'accent' } },
+          { key: 'balance', label: 'Balance — ' + (selCo === 'all' ? 'Group' : coName(selCo)), num: true, money: true }
+        ],
+        rows: rows, pageSize: 25, searchKeys: ['code', 'name', 'group'], exportName: 'master-coa-' + t[0] + '.csv',
+        onRow: function (r) { openAccountLedger(r.code, r.name); },
+        // deactivate — never delete: history stays, the head just leaves the pickers
+        actions: canCreate() ? [{ icon: 'power', title: 'Deactivate / reactivate', onClick: function (r) {
+          var coa = S.list('coa');
+          var acc2 = coa.filter(function (a) { return a.code === r.code; })[0];
+          if (!acc2) return;
+          acc2.active = acc2.active === false;
+          S.set('coa', coa);
+          ui.toast('Account ' + r.code + (acc2.active === false ? ' deactivated (history kept)' : ' reactivated'), 'success');
+          EPAL.router.render();
+        } }] : [],
+        empty: { icon: 'diagram-2', title: 'No accounts' }
+      });
+      page.appendChild(el('div.card.mb-2', null, [
+        el('div.card-head', null, [el('h3', { html: ui.icon(t[2]) + ' ' + t[1] })]),
+        el('div.card-body', null, [tbl.el])
+      ]));
+    });
+    function openAccountLedger(code, name) {
+      var rows = L.ledgerFor(code, scope) || [];
+      var t = el('table.tbl');
+      t.appendChild(el('thead', null, [el('tr', null, [el('th', { text: 'Date' }), el('th', { text: 'Ref' }), el('th', { text: 'Memo' }),
+        el('th.num', { text: 'Debit' }), el('th.num', { text: 'Credit' }), el('th.num', { text: 'Balance' })])]));
+      var tb = el('tbody');
+      rows.forEach(function (r) {
+        tb.appendChild(el('tr', null, [el('td', { text: ui.date(r.date) }), el('td', { text: r.ref || '—' }), el('td', { text: r.memo || '—' }),
+          el('td.num', { html: r.debit ? ui.money(r.debit) : '—' }), el('td.num', { html: r.credit ? ui.money(r.credit) : '—' }),
+          el('td.num', { html: '<span class="num">' + ui.money(r.balance) + '</span>' })]));
+      });
+      t.appendChild(tb);
+      var body = rows.length ? el('div.table-wrap', null, [t]) : el('div.text-mute', { text: 'No movement in this scope.' });
+      ui.modal({ title: code + ' · ' + name + ' — ' + (selCo === 'all' ? 'Group' : coName(selCo)), icon: 'journal-text', size: 'xl', body: body, footer: false });
+    }
+    function addAccountForm() {
+      EPAL.formModal({
+        title: 'Add Ledger Account', icon: 'plus-square', size: 'md', record: { type: 'expense' },
+        fields: [
+          { key: 'code', label: 'Account code', type: 'text', required: true, placeholder: 'e.g. 5450' },
+          { key: 'name', label: 'Account name', type: 'text', required: true },
+          { key: 'type', label: 'Type', type: 'select', required: true, options: ['asset', 'liability', 'equity', 'income', 'expense'] },
+          { key: 'group', label: 'Group / class', type: 'text', placeholder: 'e.g. Operating Expenses' }
+        ],
+        saveLabel: 'Add Account',
+        onSave: function (val) {
+          var code = (val.code || '').trim(); if (!code) { ui.toast('Enter a code', 'error'); return false; }
+          var coa = S.list('coa');
+          if (coa.some(function (a) { return a.code === code; })) { ui.toast('Account ' + code + ' already exists', 'error'); return false; }
+          var type = val.type;
+          coa.push({ id: code, code: code, name: (val.name || '').trim() || code, type: type,
+            normal: (type === 'asset' || type === 'expense') ? 'debit' : 'credit', group: val.group || 'Other', intercompany: false });
+          S.set('coa', coa);
+          ui.toast('Account ' + code + ' added', 'success'); EPAL.router.render(); return true;
+        }
+      });
+    }
+    function openingBalanceForm() {
+      EPAL.formModal({
+        title: 'Post Opening Balance', icon: 'flag', size: 'md', record: { date: '2026-07-01', companyId: selCo === 'all' ? 'group' : selCo },
+        fields: [
+          { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+          { key: 'account', label: 'Account', type: 'select', required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
+          { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 0 },
+          { key: 'date', label: 'As-of date', type: 'date', default: '2026-07-01' }
+        ],
+        saveLabel: 'Post Opening',
+        onSave: function (val) {
+          var acct = L.account(val.account); if (!acct) { ui.toast('Pick an account', 'error'); return false; }
+          var amt = +val.amount || 0; if (amt <= 0) { ui.toast('Enter an amount', 'error'); return false; }
+          // opening balances against Retained Earnings (3100), same as Group Finance
+          var lines = acct.normal === 'debit' ? [{ account: val.account, dr: amt, cr: 0 }, { account: '3100', dr: 0, cr: amt }]
+            : [{ account: '3100', dr: amt, cr: 0 }, { account: val.account, dr: 0, cr: amt }];
+          try {
+            L.post({ id: 'GL-OPEN-' + val.companyId + '-' + val.account, date: val.date, companyId: val.companyId, ref: 'OPENING',
+              memo: 'Opening balance · ' + acct.name, source: 'opening', override: true, lines: lines });
+            ui.toast('Opening balance posted', 'success'); EPAL.router.render(); return true;
+          } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; }
+        }
+      });
+    }
+  }
+
+  /* ======================================================= MANAGE BANKS
+   * Full bank desk INSIDE Master Accounts — dashboard, all banks (add / edit /
+   * remove) and transfers (record / delete-reverse). Same 'banks' +
+   * 'bank_transfers' stores as Group Finance, so both stay in sync. */
   function banksView(page) {
     var banks = db.col('banks').filter(function (b) { return selCo === 'all' ? true : (b.companyId || 'group') === selCo; });
     var total = banks.reduce(function (a, b) { return a + (+b.balance || 0); }, 0);
+    var largest = banks.slice().sort(function (a, b) { return (b.balance || 0) - (a.balance || 0); })[0];
+
+    // ---- 1) BANK ACCOUNTS DASHBOARD -----------------------------------------
     page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
       kpi('Cash Position', ui.money(total, { compact: true }), 'safe2'),
       kpi('Accounts', String(banks.length), 'bank'),
+      kpi('Largest', largest ? ui.money(largest.balance, { compact: true }) : '—', 'trophy'),
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
+    if (canCreate()) {
+      page.appendChild(el('div.flex.gap-1.mb-2', null, [
+        el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-lg') + ' Add Account', onclick: function () { editBank(null); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('arrow-left-right') + ' Transfer', onclick: transferForm }),
+        el('a.btn.btn-sm.btn-outline', { href: '#/group/finance/banks', html: ui.icon('pie-chart') + ' Charts view' })
+      ]));
+    }
+
+    // ---- 2) ALL BANKS --------------------------------------------------------
     var cols = [
       { key: 'name', label: 'Account', render: function (b) { return '<span class="strong">' + esc(b.name) + '</span>'; } },
       { key: 'type', label: 'Type', render: function (b) { return '<span class="badge">' + esc(b.type || 'Bank') + '</span>'; }, exportVal: function (b) { return b.type || 'Bank'; } },
+      { key: 'branch', label: 'Branch / holder', render: function (b) { return esc(b.branch || '—'); } },
+      { key: 'account', label: 'Number', render: function (b) { return '<span class="num text-mute">•••• ' + esc(String(b.account || '').slice(-4)) + '</span>'; }, exportVal: function (b) { return '****' + String(b.account || '').slice(-4); } },
       { key: 'balance', label: 'Balance', num: true, money: true }
     ];
     if (selCo === 'all') cols.splice(1, 0, { key: 'companyId', label: 'Company', render: function (b) { return coCell(b.companyId || 'group'); }, exportVal: function (b) { return b.companyId; } });
-    var tbl = EPAL.table({ columns: cols, rows: banks, pageSize: 10, totalKey: 'balance', exportName: 'master-banks.csv', empty: { icon: 'bank', title: 'No accounts in scope' } });
-    page.appendChild(el('div.card', null, [
-      el('div.card-head', null, [el('h3', { html: ui.icon('bank') + ' Accounts — ' + coName(selCo) }),
-        el('a.btn.btn-sm.btn-primary', { href: '#/group/finance/banks', style: { marginLeft: 'auto' }, html: ui.icon('gear') + ' Manage Banks (add · transfer · types)' })]),
+    var tbl = EPAL.table({
+      columns: cols, rows: banks, pageSize: 10, totalKey: 'balance', exportName: 'master-banks.csv',
+      searchKeys: ['name', 'branch'],
+      onRow: canCreate() ? function (b) { editBank(b); } : null,
+      actions: canCreate() ? [
+        { icon: 'pencil', title: 'Edit', onClick: function (b) { editBank(b); } },
+        { icon: 'trash', title: 'Remove', onClick: function (b) {
+          ui.confirm({ title: 'Remove ' + b.name + ' account?', text: 'Balance ' + ui.money(b.balance) + ' will leave the cash position.', danger: true, confirmLabel: 'Remove' })
+            .then(function (ok) { if (ok) { db.remove('banks', b.id); ui.toast('Bank account removed', 'success'); EPAL.router.render(); } });
+        } }
+      ] : [],
+      empty: { icon: 'bank', title: 'No accounts in scope', hint: 'Add the first account with Add Account.' }
+    });
+    page.appendChild(el('div.card.mb-2', null, [
+      el('div.card-head', null, [el('h3', { html: ui.icon('bank') + ' All Banks — ' + coName(selCo) })]),
       el('div.card-body', null, [tbl.el])
     ]));
+
+    // ---- 3) BANK TRANSFERS ---------------------------------------------------
+    var transfers = S.list('bank_transfers').slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
+    var tt = EPAL.table({
+      columns: [
+        { key: 'date', label: 'Date', date: true },
+        { key: 'from', label: 'From', render: function (t) { return esc(t.fromName || t.from); } },
+        { key: 'to', label: 'To', render: function (t) { return esc(t.toName || t.to); } },
+        { key: 'memo', label: 'Note', render: function (t) { return esc(t.memo || '—'); } },
+        { key: 'amount', label: 'Amount', num: true, money: true }
+      ],
+      rows: transfers, pageSize: 8, exportName: 'master-bank-transfers.csv', totalKey: 'amount',
+      actions: canCreate() ? [{ icon: 'trash', title: 'Delete (reverses balances)', onClick: function (t) { deleteTransfer(t); } }] : [],
+      empty: { icon: 'arrow-left-right', title: 'No transfers yet', hint: 'Move money between accounts with Transfer.' }
+    });
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [el('h3', { html: ui.icon('arrow-left-right') + ' Bank Transfers' }),
+        canCreate() ? el('button.btn.btn-sm.btn-primary', { style: { marginLeft: 'auto' }, html: ui.icon('plus-lg') + ' New Transfer', onclick: transferForm }) : null]),
+      el('div.card-body', null, [tt.el])
+    ]));
+
+    function editBank(b) {
+      EPAL.formModal({
+        title: b ? 'Edit Account' : 'Add Account', icon: 'bank', record: b || { type: 'Bank', companyId: selCo === 'all' ? 'group' : selCo },
+        fields: [
+          { key: 'type', label: 'Account type', type: 'select', required: true, default: 'Bank', options: ['Bank', 'bKash', 'Nagad', 'Cash Box', 'Card'] },
+          { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. BRAC Bank / Office bKash / Main cash', col2: true },
+          { key: 'branch', label: 'Branch / holder', type: 'text', placeholder: 'e.g. Gulshan Avenue · or who holds it' },
+          { key: 'account', label: 'Account / wallet number', type: 'text', pattern: /^\d{4,18}$/,
+            hint: '4–18 digits · masked everywhere else', placeholder: '15XXXXXXXX',
+            showIf: function (x) { return x.type !== 'Cash Box'; } },
+          { key: 'companyId', label: 'Owned By', type: 'select', required: true,
+            options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+          { key: 'balance', label: 'Current Balance (৳)', type: 'money', required: true, min: 0 }
+        ],
+        onSave: function (vals) {
+          var rec = Object.assign({}, b || { id: 'BNK-' + Date.now().toString().slice(-5), created: TODAY_STR }, vals);
+          rec.type = vals.type || 'Bank';
+          if (rec.type === 'Cash Box' && !rec.account) rec.account = '0000';
+          db.save('banks', rec);
+          ui.toast('Account saved', 'success'); EPAL.router.render();
+        }
+      });
+    }
+    function transferForm() {
+      var all = db.col('banks');
+      if (all.length < 2) { ui.toast('Need at least two accounts to transfer', 'error'); return; }
+      var opts = all.map(function (b) { return [b.id, (b.type && b.type !== 'Bank' ? b.type + ' · ' : '') + b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; });
+      EPAL.formModal({
+        title: 'Transfer Between Accounts', icon: 'arrow-left-right', size: 'md', record: { date: TODAY_STR },
+        fields: [
+          { key: 'from', label: 'From account', type: 'select', required: true, options: opts },
+          { key: 'to', label: 'To account', type: 'select', required: true, options: opts },
+          { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+          { key: 'date', label: 'Date', type: 'date', default: TODAY_STR },
+          { key: 'memo', label: 'Note', type: 'text', col2: true }
+        ],
+        saveLabel: 'Transfer',
+        onSave: function (v) {
+          if (v.from === v.to) { ui.toast('Pick two different accounts', 'error'); return false; }
+          var amt = +v.amount || 0;
+          var from = all.filter(function (b) { return b.id === v.from; })[0];
+          var to = all.filter(function (b) { return b.id === v.to; })[0];
+          if (!from || !to) { ui.toast('Account not found', 'error'); return false; }
+          from.balance = (+from.balance || 0) - amt; to.balance = (+to.balance || 0) + amt;
+          db.save('banks', from); db.save('banks', to);
+          S.upsert('bank_transfers', { id: 'BT-' + Date.now().toString(36).toUpperCase(), from: from.id, fromName: from.name, to: to.id, toName: to.name, amount: amt, date: v.date, memo: v.memo || '' });
+          ui.toast('Transferred ' + ui.money(amt), 'success'); EPAL.router.render(); return true;
+        }
+      });
+    }
+    function deleteTransfer(t) {
+      ui.confirm({ title: 'Delete this transfer?', text: ui.money(t.amount) + ' will move back ' + (t.toName || t.to) + ' → ' + (t.fromName || t.from) + '.', danger: true, confirmLabel: 'Delete & Reverse' })
+        .then(function (ok) {
+          if (!ok) return;
+          var all = db.col('banks');
+          var from = all.filter(function (b) { return b.id === t.from; })[0];
+          var to = all.filter(function (b) { return b.id === t.to; })[0];
+          if (from) { from.balance = (+from.balance || 0) + (+t.amount || 0); db.save('banks', from); }
+          if (to) { to.balance = (+to.balance || 0) - (+t.amount || 0); db.save('banks', to); }
+          S.removeFrom('bank_transfers', t.id);
+          ui.toast('Transfer deleted & reversed', 'success'); EPAL.router.render();
+        });
+    }
   }
 
 })(window.EPAL = window.EPAL || {});

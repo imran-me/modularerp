@@ -58,11 +58,12 @@
       var HORIZON = 0xdce9f6;
       var scene = new THREE.Scene();
       scene.fog = new THREE.Fog(HORIZON, 1000, 2800);
-      // REFERENCE COMPOSITION: elevated 3/4 view from the south — the whole
-      // field fills the frame edge-to-edge, horizon high in the frame so a
-      // band of SKY (clouds + the plane parade) stays visible on top
+      // OWNER-MARKED COMPOSITION: terminal + car park anchored at the very
+      // bottom edge, runways big in the middle, tree belt at the horizon and
+      // ~30% sky on top (bottom ground cutoff lands at z≈175, right on the
+      // car park; the horizon sits ~30% down the frame)
       var camera = new THREE.PerspectiveCamera(44, 1, 1, 9000);
-      camera.position.set(-40, 205, 480); camera.lookAt(25, 0, -120);
+      camera.position.set(0, 120, 376); camera.lookAt(30, 0, -400);
 
       var SUN = new THREE.Vector3(-380, 420, -260);
       scene.add(buildSky(THREE));
@@ -283,14 +284,15 @@
     function jit(v) { return v * rnd(0.8, 1.2); }
     function pickOf(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-    // ---- zone constants (from the reference pictures) ---------------------
-    var RT = { z: -150, x1: -120, x2: 260, w: 26 };        // TAKE-OFF runway (top)
-    var RL = { z: -92, x1: -100, x2: 260, w: 26 };         // LANDING runway (below)
+    // ---- zone constants (from the reference pictures; compacted so the
+    // south block sits tight under the runways — no dead grass bands) -------
+    var RT = { z: -150, x1: -120, x2: 260, w: 30 };        // TAKE-OFF runway (top)
+    var RL = { z: -92, x1: -100, x2: 260, w: 30 };         // LANDING runway (below)
     var CONN = { x: -140 };                                 // left vertical connector
-    var APR_TOP = { z: 25 };                                // remote apron lane
-    var APR_GATE = { z: 78 };                               // gate row
+    var APR_TOP = { z: -5 };                                // remote apron lane
+    var APR_GATE = { z: 48 };                               // gate row
     var GATES_X = [40, 70, 100, 130, 160, 190, 220];
-    var TERM = { z: 130 };                                  // terminal band
+    var TERM = { z: 100 };                                  // terminal band
     var GY = 4.6;
 
     /* ---- ground ----------------------------------------------------------*/
@@ -340,7 +342,7 @@
     // TERMINAL — centre entrance block + two wings, rooftop plant, blue title
     (function () {
       var g = new THREE.Group(); g.position.set(130, 0, TERM.z);
-      [[-78, 66, 13], [78, 66, 13], [0, 54, 17]].forEach(function (b, bi) {
+      [[-84, 78, 13], [84, 78, 13], [0, 62, 18]].forEach(function (b, bi) {
         var blk = new THREE.Mesh(new THREE.BoxGeometry(b[1], b[2], 26), bi === 2 ? M.bldg2 : M.bldg);
         blk.position.set(b[0], b[2] / 2, 0); blk.castShadow = true; g.add(blk);
         var band = new THREE.Mesh(new THREE.BoxGeometry(b[1] + 0.4, 3.2, 26.4), M.win); band.position.set(b[0], 5.4, 0); g.add(band);
@@ -364,19 +366,20 @@
       m2.map = m2.map.clone(); m2.map.needsUpdate = true; m2.map.center.set(0.5, 0.5); m2.map.rotation = Math.PI / 2; m2.map.repeat.set(1, 9);
       var road2 = new THREE.Mesh(new THREE.PlaneGeometry(330, 12), m2);
       road2.rotation.x = -Math.PI / 2; road2.position.set(90, 0.012, TERM.z + 32); road2.receiveShadow = true; scene.add(road2);
-      [[52, 0], [176, 0]].forEach(function (lp) {
+      [[30, 0], [124, 0]].forEach(function (lp) {
         var pad2 = new THREE.Mesh(new THREE.PlaneGeometry(92, 26), new THREE.MeshStandardMaterial({ map: carParkTex(THREE), roughness: 0.95, metalness: 0.04 }));
         pad2.rotation.x = -Math.PI / 2; pad2.position.set(lp[0] + 40, 0.01, TERM.z + 52); pad2.receiveShadow = true; scene.add(pad2);
       });
       var CAR_COLS = [0xc0392b, 0x2e86c1, 0xf4d03f, 0xecf0f1, 0x27ae60, 0x8e44ad, 0x1c2833, 0xe67e22, 0x76d7c4, 0xd35400, 0x5dade2, 0xf7dc6f];
-      for (var cc = 0; cc < 22; cc++) {
+      for (var cc = 0; cc < 44; cc++) {                     // both lots packed
         var car = new THREE.Group();
         var cb = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.85, 1.2), M.mat(CAR_COLS[cc % CAR_COLS.length], 0.5, 0.3)); cb.position.y = 0.7; car.add(cb);
         var ct = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.6, 1.1), M.win); ct.position.set(-0.1, 1.4, 0); car.add(ct);
-        car.position.set(52 + (cc % 11) * 8.4, 0, TERM.z + 46 + Math.floor(cc / 11) * 12);
+        var lotBase = cc < 22 ? 32 : 126, ci2 = cc % 22;
+        car.position.set(lotBase + (ci2 % 11) * 8.4, 0, TERM.z + 46 + Math.floor(ci2 / 11) * 12);
         scene.add(car);
       }
-      [[36, 0xE8B93C], [230, 0x3B7DD8]].forEach(function (bp) {
+      [[20, 0xE8B93C], [180, 0x3B7DD8]].forEach(function (bp) {
         var bus = new THREE.Group();
         var bb = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 2.4), M.mat(bp[1], 0.5, 0.2)); bb.position.y = 1.5; bb.castShadow = true; bus.add(bb);
         var bw = new THREE.Mesh(new THREE.BoxGeometry(9.1, 0.8, 2.45), M.win); bw.position.y = 2.1; bus.add(bw);
@@ -386,19 +389,19 @@
 
     // CONTROL TOWER — right of the aprons (white, red bands, glass cab)
     (function () {
-      var g = new THREE.Group(); g.position.set(238, 0, 40);
+      var g = new THREE.Group(); g.position.set(238, 0, 20);
       var shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 4.4, 58, 12), M.bldg2); shaft.position.y = 29; shaft.castShadow = true; g.add(shaft);
       [[16, 4.0], [30, 3.6]].forEach(function (b) { var band = new THREE.Mesh(new THREE.CylinderGeometry(b[1], b[1] + 0.08, 5, 12), M.red); band.position.y = b[0]; g.add(band); });
       var deck = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 5.2, 3, 12), M.bldg); deck.position.y = 56; g.add(deck);
       var cab = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 6.2, 6, 12), M.glass); cab.position.y = 61; g.add(cab);
       var roof = new THREE.Mesh(new THREE.ConeGeometry(6.4, 3.2, 12), M.bldg2); roof.position.y = 66; g.add(roof);
       scene.add(g);
-      scene.add(at(light(THREE, M, 0xff2a2a, 3.2, 'beacon', 0.7, 0), 238, 68.5, 40));
+      scene.add(at(light(THREE, M, 0xff2a2a, 3.2, 'beacon', 0.7, 0), 238, 68.5, 20));
     })();
 
     // RADAR STATION — far top-right corner (building + dome + tiny lot)
     (function () {
-      var g = new THREE.Group(); g.position.set(215, 0, -215);
+      var g = new THREE.Group(); g.position.set(215, 0, -192);
       var b = new THREE.Mesh(new THREE.BoxGeometry(26, 9, 14), M.bldg); b.position.y = 4.5; b.castShadow = true; g.add(b);
       var band = new THREE.Mesh(new THREE.BoxGeometry(26.4, 2.4, 14.4), M.win); band.position.y = 4.5; g.add(band);
       var sign2 = new THREE.Mesh(new THREE.PlaneGeometry(12, 3), new THREE.MeshBasicMaterial({ map: textTex(THREE, 'Radar', '#ffffff', '#2b6cd4', 256, 64, 34), transparent: true })); sign2.position.set(0, 6.5, 7.3); g.add(sign2);
@@ -406,11 +409,11 @@
       var dome = new THREE.Mesh(new THREE.SphereGeometry(4.6, 14, 10), M.bldg2); dome.position.set(10, 19, -2); dome.castShadow = true; g.add(dome);
       var lot = new THREE.Mesh(new THREE.PlaneGeometry(30, 12), M.asphalt); lot.rotation.x = -Math.PI / 2; lot.position.set(0, 0.01, 14); g.add(lot);
       scene.add(g);
-      scene.add(at(light(THREE, M, 0xff2a2a, 2.4, 'beacon', 0.6, 1.2), 225, 24.5, -217));
+      scene.add(at(light(THREE, M, 0xff2a2a, 2.4, 'beacon', 0.6, 1.2), 225, 24.5, -194));
     })();
 
     // THREE WHITE QUONSET SHEDS — between the runways' north side
-    [[-20, -196], [22, -196], [64, -196]].forEach(function (q) {
+    [[-20, -182], [22, -182], [64, -182]].forEach(function (q) {
       var sh2 = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 20, 14, 1, true, 0, Math.PI), M.bldg2);
       sh2.rotation.z = Math.PI / 2; sh2.position.set(q[0], 0.2, q[1]); sh2.castShadow = true; scene.add(sh2);
       var back2 = new THREE.Mesh(new THREE.CircleGeometry(7, 14, 0, Math.PI), M.bldg); back2.position.set(q[0] - 10, 0.2, q[1]); back2.rotation.y = Math.PI / 2; scene.add(back2);
@@ -506,11 +509,13 @@
      * deciduous puffs plus conifers, right up to the frame edges -------------*/
     (function () {
       var CLUSTERS = [
-        [-40, -215, 34], [110, -215, 44], [-190, -232, 36], [160, -125, 26, true], [10, -122, 62, true],
+        [-40, -215, 34], [110, -225, 40], [-190, -232, 36], [160, -121, 12, true], [10, -121, 13, true],
         [-60, -60, 28], [-230, -50, 24], [-170, 100, 28], [-60, 130, 32], [-20, 60, 26],
-        [240, -40, 22], [120, -62, 48, true], [-120, -172, 18], [252, 120, 20], [-240, -190, 22],
+        [240, -40, 22], [120, -45, 22, true], [-120, -172, 18], [262, 110, 16], [-240, -190, 22],
         [-315, 40, 40], [-300, -120, 40], [300, -180, 44], [300, 60, 36], [60, -238, 40],
-        [-150, 190, 44], [10, 210, 30], [150, -252, 36], [-300, 175, 26], [320, -60, 30]
+        [-150, 168, 26], [-20, 182, 18], [150, -252, 36], [-300, 175, 26], [320, -60, 30],
+        [0, -262, 40], [-100, -252, 36], [250, -262, 40], [350, -240, 44],
+        [340, 20, 36], [345, 140, 40], [250, 182, 20], [-140, 180, 24]
       ];
       var pts = [];
       CLUSTERS.forEach(function (cl) {
@@ -638,7 +643,7 @@
     })();
     // small statics parked at the apron's far-east end (the "air parking"
     // corner) — clear of the z≈29 taxi-in sweep, which only runs x ≤ 220
-    [[232, 0.35, 36], [248, -0.25, 30], [240, 0.1, 14]].forEach(function (rp, ri) {
+    [[232, 0.35, 6], [248, -0.25, 0], [240, 0.1, -16]].forEach(function (rp, ri) {
       var stat2 = buildAirliner(THREE, M, 1.1, false, LIVERIES[(ri * 2 + 2) % LIVERIES.length]);
       stat2.position.set(rp[0], 3, rp[2]); stat2.rotation.y = rp[1];
       stat2.traverse(function (o) { if (o.isMesh) o.castShadow = true; }); scene.add(stat2);
@@ -683,15 +688,15 @@
     function easeOut(k) { return 1 - (1 - k) * (1 - k); }
 
     var PLANE_SPECS = [
-      { livery: LIVERIES[8], scale: 1.95, cfg: {} },
-      { livery: LIVERIES[8], scale: 1.8, cfg: { stretch: 1.14 } },
-      { livery: LIVERIES[5], scale: 1.6, cfg: {} },
-      { livery: LIVERIES[6], scale: 1.55, cfg: {} }
+      { livery: LIVERIES[8], scale: 2.1, cfg: {} },
+      { livery: LIVERIES[8], scale: 1.95, cfg: { stretch: 1.14 } },
+      { livery: LIVERIES[5], scale: 1.75, cfg: {} },
+      { livery: LIVERIES[6], scale: 1.7, cfg: {} }
     ];
     // three extra static jets fill the gate row like the reference picture
     [[1, 2], [3, 1], [5, 7]].forEach(function (gg) {
       var g2 = gates[gg[0]]; g2.taken = true;
-      var stat = buildAirliner(THREE, M, 1.6, false, LIVERIES[gg[1]]);
+      var stat = buildAirliner(THREE, M, 1.75, false, LIVERIES[gg[1]]);
       stat.position.copy(g2.p); stat.rotation.y = Math.PI;   // nose to the terminal
       stat.traverse(function (o) { if (o.isMesh) o.castShadow = true; }); scene.add(stat);
       var shd = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.28, depthWrite: false, fog: false }));
@@ -715,7 +720,7 @@
       function freeGate() { if (st.gate) { st.gate.taken = false; st.gate = null; } }
       function claimGate() { var free = gates.filter(function (g2) { return !g2.taken; }); var g3 = free.length ? pickOf(free) : gates[0]; g3.taken = true; st.gate = g3; return g3; }
       function cruiseCircle() {
-        var cx = rnd(-180, 180), cy = rnd(190, 280), cz = rnd(-620, -380), r = rnd(260, 400), pts = [];
+        var cx = rnd(-180, 180), cy = rnd(150, 210), cz = rnd(-620, -380), r = rnd(260, 400), pts = [];
         for (var i = 0; i < 10; i++) { var a2 = i / 10 * 6.2832; pts.push(V(cx + Math.cos(a2) * r, cy + Math.sin(a2 * 2) * 8, cz + Math.sin(a2) * r * 0.55)); }
         return new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
       }
@@ -739,7 +744,7 @@
               V(craft.position.x - 30, GY, (APR_TOP.z + APR_GATE.z) / 2 + 2),
               V(-80, GY, (APR_TOP.z + APR_GATE.z) / 2 + 2),
               V(CONN.x + 10, GY, APR_TOP.z),
-              V(CONN.x, GY, 0),
+              V(CONN.x, GY, -50),
               V(CONN.x, GY, RT.z + 30),
               V(CONN.x + 14, GY, RT.z),
               V(RT.x1 + 4, GY, RT.z)
@@ -890,16 +895,16 @@
       cr.userData.gear.visible = false;
       var trail = (fi % 2 === 0) ? makeTrail(12) : null;
       legMover(cr, function () {
-        // parade band: above the camera's horizon so it reads as SKY traffic
-        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(245, 430), z1 = rnd(-240, -480), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
+        // parade band: inside the 0-13° sky window above the low camera
+        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(150, 270), z1 = rnd(-260, -460), z2 = z1 + rnd(-90, 90), bob = rnd(0, 12);
         return { dur: rnd(24, 48), gap: rnd(1, 9),
           path: function (u) { return V(dir * (-800 + u * 1600), alt + Math.sin(u * Math.PI) * bob, z1 + (z2 - z1) * u); },
-          tick: trail ? function (u, t) { trail(cr.position, t, alt > 280); } : null };
+          tick: trail ? function (u, t) { trail(cr.position, t, alt > 200); } : null };
       });
     });
     var cargo = buildAirliner(THREE, M, 2.4, true); cargo.userData.gear.visible = false;
     legMover(cargo, function () {
-      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(290, 390), z = rnd(-500, -700);
+      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(180, 280), z = rnd(-500, -700);
       return { dur: rnd(48, 78), gap: rnd(8, 30), path: function (u) { return V(dir * (820 - u * 1640), alt, z); } };
     });
     var LAYOUTS = [
@@ -915,7 +920,7 @@
     }
     legMover(fteam, function () {
       var L = pickOf(LAYOUTS), squad = Math.random() < 0.55 ? jetsA : jetsB, other = (squad === jetsA) ? jetsB : jetsA;
-      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(250, 340), arc = rnd(10, 38), zb = rnd(-360, -520), wig = rnd(14, 36);
+      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(150, 240), arc = rnd(10, 34), zb = rnd(-360, -520), wig = rnd(14, 36);
       return { dur: rnd(12, 19), gap: rnd(5, 18),
         init: function () {
           for (var i = 0; i < other.length; i++) other[i].visible = false;
