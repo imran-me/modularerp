@@ -343,10 +343,22 @@
     /* ---- PLANE PARKING — right-bottom apron + angled stands ---------------*/
     var apron = new THREE.Mesh(new THREE.PlaneGeometry(96, 92), M.apron);
     apron.rotation.x = -Math.PI / 2; apron.position.set(WX(168), 0.01, WZ(58)); apron.receiveShadow = true; scene.add(apron);
-    GRID.stands.forEach(function (st) {
+    var standLights = [];
+    GRID.stands.forEach(function (st, si) {
       var line = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 12), new THREE.MeshBasicMaterial({ color: 0xe8c53a }));
       line.rotation.x = -Math.PI / 2; line.rotation.z = -Math.PI / 4;
       line.position.set(WX(st.x) - 5, 0.02, WZ(st.z) - 5); scene.add(line);
+      // painted stand number on the apron
+      var nc = document.createElement('canvas'); nc.width = nc.height = 64; var ng = nc.getContext('2d');
+      ng.clearRect(0, 0, 64, 64); ng.strokeStyle = '#e8c53a'; ng.lineWidth = 4; ng.beginPath(); ng.arc(32, 32, 26, 0, 6.3); ng.stroke();
+      ng.fillStyle = '#eef2fa'; ng.font = 'bold 34px Arial'; ng.textAlign = 'center'; ng.textBaseline = 'middle'; ng.fillText(String(si + 1), 32, 34);
+      var num = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc), transparent: true }));
+      num.rotation.x = -Math.PI / 2; num.position.set(WX(st.x) - 11, 0.025, WZ(st.z) - 11); scene.add(num);
+      // DOCKING STATUS light on a mast — GREEN when the stand is free, AMBER
+      // pulsing while an aircraft occupies it (wired to the live state machine)
+      var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 5, 6), M.gun); mast.position.set(WX(st.x) + 8, 2.5, WZ(st.z) + 6); scene.add(mast);
+      var sl = light(THREE, M, 0x35e07a, 1.15, 'steady'); sl.position.set(WX(st.x) + 8, 5.4, WZ(st.z) + 6); scene.add(sl);
+      standLights.push(sl);
     });
 
     /* ---- lamp fields (single draw call each) ------------------------------*/
@@ -424,6 +436,36 @@
     shine.scale.set(GRID.lake.rx * 1.2, GRID.lake.rz * 1.45, 1);
     shine.rotation.x = -Math.PI / 2; shine.position.set(WX(GRID.lake.x), 0.05, WZ(GRID.lake.z)); scene.add(shine);
     updaters.push(function (t) { shine.material.opacity = 0.1 + 0.07 * (0.5 + 0.5 * Math.sin(t * 0.7)); shine.rotation.z = t * 0.02; });
+    // lake life: an arched FOOTBRIDGE, a pulsing fountain, and drifting ducks
+    (function () {
+      var bx = WX(GRID.lake.x), bz = WZ(GRID.lake.z);
+      var deck = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.35, GRID.lake.rz * 1.55 * 2.3), M.wood);
+      deck.position.set(bx + GRID.lake.rx * 0.5, 2.1, bz); deck.castShadow = true; scene.add(deck);
+      [-1, 1].forEach(function (d) {
+        var rail = new THREE.Mesh(new THREE.TorusGeometry(GRID.lake.rz * 1.55 * 1.15, 0.16, 6, 16, Math.PI), M.wood);
+        rail.rotation.y = Math.PI / 2; rail.rotation.z = Math.PI;
+        rail.position.set(bx + GRID.lake.rx * 0.5 + d * 1.6, 2.2, bz); scene.add(rail);
+      });
+      [-0.8, 0.8].forEach(function (dz) { [-1, 1].forEach(function (d) {
+        var post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 2.4, 6), M.wood);
+        post.position.set(bx + GRID.lake.rx * 0.5 + d * 1.6, 1.0, bz + dz * GRID.lake.rz * 1.55); scene.add(post);
+      }); });
+      var spray = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: 0xeaf6ff, transparent: true, opacity: 0.7, depthWrite: false, fog: false }));
+      spray.position.set(bx - GRID.lake.rx * 0.5, 3, bz); scene.add(spray);
+      var ducks = [];
+      for (var dk = 0; dk < 3; dk++) {
+        var duck = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false, fog: false }));
+        duck.scale.set(1.5, 1.1, 1); scene.add(duck); ducks.push({ s: duck, ph: Math.random() * 6.28, r: 0.35 + Math.random() * 0.4, sp: 0.05 + Math.random() * 0.05 });
+      }
+      updaters.push(function (t) {
+        var k = 0.6 + 0.4 * Math.abs(Math.sin(t * 1.6));
+        spray.scale.set(3.2 * k, 5.5 * k, 1); spray.material.opacity = 0.45 + 0.3 * k;
+        ducks.forEach(function (d2) {
+          var a2 = t * d2.sp + d2.ph;
+          d2.s.position.set(bx + Math.cos(a2) * GRID.lake.rx * 1.28 * d2.r, 0.7, bz + Math.sin(a2) * GRID.lake.rz * 1.55 * d2.r);
+        });
+      });
+    })();
     function tree(gx, gz, s2) {
       var g2 = new THREE.Group();
       var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 4, 6), M.trunk); tr.position.y = 2; g2.add(tr);
@@ -465,6 +507,10 @@
           var cap = new THREE.Mesh(new THREE.ConeGeometry(3.2, 2.6, 8), M.bldg2); cap.rotation.x = Math.PI; cap.position.set(cx, 15.2, cz); g.add(cap);
         });
       }
+      // warm lamp string under the canopy edge — the terminal glows at its rim
+      var lp = [], lc = [];
+      for (var lx = -56; lx <= 56; lx += 8) { lp.push(WX(GRID.terminal.x) + lx, 15.4, WZ(GRID.terminal.z) + 21); lc.push(1, 0.88, 0.62); lp.push(WX(GRID.terminal.x) + lx, 15.4, WZ(GRID.terminal.z) - 21); lc.push(1, 0.88, 0.62); }
+      var strT = pointCloud(THREE, M, lp, lc, 1.1, false); scene.add(strT.g);
       scene.add(g);
     })();
 
@@ -499,6 +545,45 @@
       var sock = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.6, 8, 1, true), M.mat(0xf07030, 0.7, 0.05));
       sock.rotation.z = Math.PI / 2; sock.position.set(WX(24) + 1.9, 6.6, WZ(168)); scene.add(sock);
       updaters.push(function (t) { sock.rotation.y = Math.sin(t * 0.5) * 0.35; sock.rotation.x = Math.sin(t * 1.7) * 0.06; });
+    })();
+
+    // PAPI — the 4-lamp glide-slope unit beside RWY1's landing threshold
+    (function () {
+      for (var i = 0; i < 4; i++) {
+        scene.add(at(light(THREE, M, i < 2 ? 0xffffff : 0xff4030, 1.3, 'steady'), WX(GRID.rwy1.x) - GRID.rwy1.w * 1.28 / 2 - 10 - i * 4, 0.8, WZ(-150)));
+      }
+    })();
+    // TAXI GUIDANCE SIGNS — yellow-on-black boards at the junctions
+    (function () {
+      function board(gx, gz, txt) {
+        var c = document.createElement('canvas'); c.width = 128; c.height = 48; var g = c.getContext('2d');
+        g.fillStyle = '#141414'; g.fillRect(0, 0, 128, 48);
+        g.fillStyle = '#f2c744'; g.font = 'bold 26px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 64, 26);
+        var b = new THREE.Mesh(new THREE.BoxGeometry(6.5, 2.4, 0.3), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(c), roughness: 0.6, metalness: 0.1 }));
+        b.position.set(WX(gx), 1.6, WZ(gz)); scene.add(b);
+        var leg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 1, 6), M.gun); leg2.position.set(WX(gx), 0.4, WZ(gz)); scene.add(leg2);
+      }
+      board(GRID.rwy1.x + 32, GRID.linkN.z - 14, 'A1 →');
+      board(GRID.corridor.x + 10, GRID.linkS.z - 12, '← 14-32');
+      board(GRID.corridor.x + 10, GRID.linkN.z + 12, 'APRON');
+      board(GRID.rwy2.x - 30, GRID.linkS.z + 12, 'RWY 2');
+    })();
+    // CARGO CORNER — colourful LD3 airline containers + pallet + loader
+    (function () {
+      var COLS = [0xc8ccd6, 0x2e86c1, 0xc0392b, 0xe6b93c, 0x9aa2b1, 0x27ae60];
+      for (var i = 0; i < 6; i++) {
+        var box = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.4, 3.4), M.mat(COLS[i], 0.55, 0.15));
+        box.position.set(WX(146) + (i % 3) * 6, 1.7, WZ(102) + Math.floor(i / 3) * 5.4);
+        box.rotation.y = (i % 2) * 0.12; box.castShadow = true; scene.add(box);
+      }
+      var pallet = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, 5), M.wood); pallet.position.set(WX(164), 0.3, WZ(103)); scene.add(pallet);
+      var loader = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 2.6), M.soft); loader.position.set(WX(170), 1.2, WZ(100)); loader.castShadow = true; scene.add(loader);
+    })();
+    // EPAL TRAVELS billboard greeting the entrance road
+    (function () {
+      var bb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 26), new THREE.MeshStandardMaterial({ map: signTex(THREE), roughness: 0.6, metalness: 0.1 }));
+      bb.position.set(WX(140), 9, WZ(134)); bb.rotation.y = Math.PI / 2.25; bb.castShadow = true; scene.add(bb);
+      [-9, 9].forEach(function (dz) { var post = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 6, 8), M.gun); post.position.set(WX(140), 3, WZ(134) + dz); scene.add(post); });
     })();
 
     /* ---- orientation helpers ---------------------------------------------*/
@@ -546,6 +631,26 @@
     });
 
     var stands = GRID.stands.map(function (st) { return { p: V(WX(st.x), GY, WZ(st.z)), taken: false }; });
+    // stand docking lights follow LIVE occupancy: green = free, amber pulse = taken
+    updaters.push(function (t) {
+      for (var i = 0; i < standLights.length && i < stands.length; i++) {
+        if (stands[i].taken) { standLights[i].material.color.setHex(0xffb020); standLights[i].material.opacity = 0.55 + 0.45 * Math.abs(Math.sin(t * 2.2 + i)); }
+        else { standLights[i].material.color.setHex(0x35e07a); standLights[i].material.opacity = 1; }
+      }
+    });
+    // CONTRAILS — a pooled ribbon of fading puffs behind high/climbing aircraft
+    function makeTrail(n) {
+      var segs = [];
+      for (var i = 0; i < n; i++) {
+        var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+        s.scale.set(3.4, 3.4, 1); scene.add(s); segs.push({ s: s, t: -9 });
+      }
+      var idx = 0, lastDrop = -9;
+      return function (pos, t, active) {
+        if (active && t - lastDrop > 0.28) { lastDrop = t; var sg = segs[idx++ % n]; sg.s.position.set(pos.x, pos.y - 1.0, pos.z); sg.t = t; }
+        for (var i2 = 0; i2 < n; i2++) { var sg2 = segs[i2]; var a2 = t - sg2.t; sg2.s.material.opacity = (a2 >= 0 && a2 < 4.2) ? 0.3 * (1 - a2 / 4.2) : 0; }
+      };
+    }
     var PLANE_SPECS = [
       { livery: LIVERIES[8], scale: 1.8, cfg: {} },                            // Biman
       { livery: LIVERIES[8], scale: 1.6, cfg: { stretch: 1.14 } },             // Biman (stretched)
@@ -559,6 +664,7 @@
       var craft = buildAirliner(THREE, M, spec.scale, false, spec.livery, spec.cfg);
       craft.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
       addShadow(craft, 16 * spec.scale);
+      var trail = makeTrail(16);
       scene.add(craft);
       var st = { name: 'INIT', t0: 0, dur: 0.1, curve: null, ease: null, stand: null, nose: null, laps: 1 };
       // stagger the fleet: half start parked, half start in the cruise loop
@@ -657,7 +763,8 @@
           if (st.nose) place(craft, p, V(p.x + st.nose.x, p.y, p.z + st.nose.z), 0);   // pushback: nose held
           else place(craft, p, p2, (p.y > 8 ? bankOf(p0, p, p2) : 0));
           if (sh) { sh.visible = true; sh.position.set(p.x, 0.24, p.z); var f = Math.max(0, 1 - p.y / 150); sh.material.opacity = 0.3 * f * f; }
-        } else if (sh) { sh.visible = true; sh.position.set(craft.position.x, 0.24, craft.position.z); sh.material.opacity = 0.3; }
+          trail(p, t, (st.name === 'CLIMB' && p.y > 55) || st.name === 'CRUISE');      // contrail ribbons (climb + sky circles)
+        } else { trail(craft.position, t, false); if (sh) { sh.visible = true; sh.position.set(craft.position.x, 0.24, craft.position.z); sh.material.opacity = 0.3; } }
       });
     });
 
@@ -737,13 +844,15 @@
       { scale: 1.75, livery: LIVERIES[4], cfg: { engines: 4, stretch: 1.24 } },
       { scale: 1.45, livery: LIVERIES[0], cfg: {} }
     ];
-    FLEET.forEach(function (spec) {
+    FLEET.forEach(function (spec, fi) {
       var cr = buildAirliner(THREE, M, spec.scale, false, spec.livery, spec.cfg);
       cr.userData.gear.visible = false;
+      var trail = (fi % 2 === 0) ? makeTrail(12) : null;      // every other cruiser draws a contrail
       legMover(cr, function () {
         var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(110, 240), z1 = rnd(-260, -620), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
         return { dur: rnd(24, 48), gap: rnd(1, 9),
-          path: function (u) { return V(dir * (-720 + u * 1440), alt + Math.sin(u * Math.PI) * bob, z1 + (z2 - z1) * u); } };
+          path: function (u) { return V(dir * (-720 + u * 1440), alt + Math.sin(u * Math.PI) * bob, z1 + (z2 - z1) * u); },
+          tick: trail ? function (u, t) { trail(cr.position, t, alt > 150); } : null };
       });
     });
     // cargo heavy — high, slow, rare
@@ -774,18 +883,34 @@
         },
         path: function (u) { return V(dir * (-720 + u * 1440), alt + Math.sin(u * Math.PI) * arc, zb + Math.sin(u * Math.PI * 2) * wig); } };
     });
-    // birds
-    for (var bd = 0; bd < 3; bd++) {
-      (function (bi) {
+    // BIRDS — a proper V-formation of five, drifting across on a wavy line
+    (function () {
+      var flock = new THREE.Group();
+      [[0, 0], [-4, 4], [4, 4], [-8, 8], [8, 8]].forEach(function (o2) {
         var bird = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, color: 0x2a3242, transparent: true, opacity: 0.8, depthWrite: false }));
-        bird.scale.set(2.2, 1.1, 1);
-        legMover(bird, function () {
-          var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(100, 150), z = rnd(-180, -380), wob = rnd(4, 10);
-          return { dur: rnd(50, 85), gap: rnd(8, 30), flat: true,
-            path: function (u) { return V(dir * (-740 + u * 1480), alt + Math.sin(u * 40 + bi) * wob * 0.2 + Math.sin(u * 6.3) * wob, z); } };
-        });
-      })(bd);
-    }
+        bird.scale.set(2.2, 1.1, 1); bird.position.set(o2[0], (Math.random() - 0.5) * 1.5, o2[1]); flock.add(bird);
+      });
+      legMover(flock, function () {
+        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(100, 150), z = rnd(-200, -380), wob = rnd(4, 10);
+        return { dur: rnd(55, 90), gap: rnd(10, 34), flat: true,
+          path: function (u) { return V(dir * (-740 + u * 1480), alt + Math.sin(u * 6.3) * wob, z); } };
+      });
+    })();
+
+    // FIRE TRUCK — the rare RESCUE-9 perimeter patrol (red body, blue+red flash)
+    (function () {
+      var ft = buildTruck(THREE, M, 0xc0392b);
+      ft.add(at(light(THREE, M, 0x3070ff, 1.1, 'strobe', 1.6, 0.5), -1, 3.3, 0));
+      addShadow(ft, 9);
+      var P1 = V(WX(-172), 0, WZ(150)), P2 = V(WX(-176), 0, WZ(-40)), P3 = V(WX(-150), 0, WZ(-160)), P4 = V(WX(-60), 0, WZ(-176));
+      legMover(ft, function () {
+        var back = Math.random() < 0.5;
+        var pts = back ? [P4, P3, P2, P1] : [P1, P2, P3, P4];
+        var c2 = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.4);
+        return { dur: jit(42), gap: rnd(55, 150),
+          path: function (u) { var p = c2.getPointAt(Math.min(0.999, u)); p.y = 0; return p; } };
+      });
+    })();
     // ground errands: follow-me + fuel truck serve OCCUPIED stands (10s stop)
     var fm = buildFollowMe(THREE, M); addShadow(fm, 7);
     var GARAGE = V(WX(GRID.hangar2.x + 8), 0.9, WZ(GRID.hangar2.z + 18));
@@ -953,11 +1078,11 @@
     g.add(at(light(THREE, M, 0xffb020, 1.0, 'beacon', 1.4, Math.random() * 3), 0, 2.5, 0));
     return g;
   }
-  function buildTruck(THREE, M) {
+  function buildTruck(THREE, M, color) {
     var g = new THREE.Group();
-    var body = new THREE.Mesh(new THREE.BoxGeometry(6, 2.4, 3), M.soft); body.position.y = 1.6; body.castShadow = true; g.add(body);
+    var body = new THREE.Mesh(new THREE.BoxGeometry(6, 2.4, 3), color ? M.mat(color, 0.5, 0.2) : M.soft); body.position.y = 1.6; body.castShadow = true; g.add(body);
     var cab = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2.8), M.bldg2); cab.position.set(2.6, 1.4, 0); g.add(cab);
-    g.add(at(light(THREE, M, 0xffb020, 0.9, 'beacon', 1.2, Math.random() * 3), 0, 3.2, 0));
+    g.add(at(light(THREE, M, color ? 0xff3020 : 0xffb020, 0.9, 'beacon', 1.2, Math.random() * 3), 0, 3.2, 0));
     g.scale.setScalar(1.1); return g;
   }
 
