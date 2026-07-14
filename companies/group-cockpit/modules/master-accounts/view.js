@@ -70,17 +70,9 @@
     });
   }
   function cats() { return S.list('exp_categories'); }
+  // AUDIT FIX: one mapper for every screen — the ledger owns the head mapping.
   function expenseAccountFor(cat) {
-    var c = String(cat || '').toLowerCase();
-    if (/rent|lease/.test(c)) return '5200';
-    if (/salary|payroll|wage|staff/.test(c)) return '5100';
-    if (/utility|electric|internet|wifi|gas|water|phone|bill/.test(c)) return '5300';
-    if (/market|ad\b|promo|campaign|boost|sms|design/.test(c)) return '5400';
-    if (/bank|charge|fee|license|iata|software/.test(c)) return '6000';
-    if (/adm|penalt|fine/.test(c)) return '5900';
-    if (/food|lunch|tea|snack|entertain|canteen/.test(c)) return '5550';
-    if (/office|stationer|clean|repair|furniture/.test(c)) return '5500';
-    if (/conveyance|travel|transport|fuel/.test(c)) return '5600';
+    if (EPAL.ledger && EPAL.ledger.expenseAccountFor) return EPAL.ledger.expenseAccountFor(cat);
     return '5800';
   }
   function kpi(label, value, icon, tone) {

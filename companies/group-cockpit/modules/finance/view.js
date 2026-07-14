@@ -1531,6 +1531,47 @@
   }
 
   /* ---- Consolidated Trial Balance -----------------------------------------*/
+  /* ---- SUBLEDGER RECONCILIATION (the auditor's artifact): per concern, does
+   * each CONTROL ACCOUNT equal the sum of its party-tagged movements? A DIFF
+   * means money is sitting in a control account with no party attached. ------*/
+  function renderSubledgerRecon(page) {
+    if (!hasLedger()) return;
+    var CTRLS = [ ['1200', 'Customer AR'], ['1150', 'Agent Receivable'], ['2000', 'Vendor Payable'], ['2100', 'Salary Payable'] ];
+    var body = el('div.card-body');
+    activeCompanies().forEach(function (co) {
+      var entries = LED().entries({ companyId: co.id });
+      var rows = CTRLS.map(function (ct) {
+        var tagged = 0, untagged = 0;
+        entries.forEach(function (e) {
+          (e.lines || []).forEach(function (l) {
+            if (l.account !== ct[0]) return;
+            var amt = (+l.dr || 0) - (+l.cr || 0);
+            if (e.party) tagged += amt; else untagged += amt;
+          });
+        });
+        var acct = LED().account(ct[0]);
+        var sign = (acct && acct.normal === 'credit') ? -1 : 1;      // report liabilities positive
+        var control = Math.round(LED().balance(ct[0], { companyId: co.id }));
+        var ok = Math.abs(untagged) < 1;                             // everything carries a party tag
+        return { code: ct[0], name: ct[1], control: control, tagged: Math.round(sign * tagged), untagged: Math.round(sign * untagged), ok: ok };
+      }).filter(function (r) { return r.control || r.tagged || r.untagged; });
+      if (!rows.length) return;
+      body.appendChild(el('div.fw-600.mt-2', { text: co.short }));
+      rows.forEach(function (r) {
+        body.appendChild(el('div.data-row', null, [
+          el('div.flex-1.sm', { text: r.code + ' · ' + r.name }),
+          el('div.num.sm.text-mute', { text: 'control ' + ui.money(r.control) }),
+          el('div.num.sm', { text: 'sub-ledger ' + ui.money(r.tagged) }),
+          r.ok ? el('span.badge.badge-good', { text: 'RECONCILED' }) : el('span.badge.badge-bad', { text: 'UNTAGGED ' + ui.money(r.untagged) })
+        ]));
+      });
+    });
+    page.appendChild(el('div.card.mb-3', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('clipboard2-check') + ' Subledger Reconciliation' }),
+        el('span.card-sub', { text: 'control account vs party-tagged movements — audit control' }) ]),
+      body ]));
+  }
+
   function renderTrialBalance(page) {
     var tb = hasLedger() ? LED().trialBalance() : [];
     var totDr = 0, totCr = 0;
@@ -1542,6 +1583,7 @@
       el('button.btn.btn-ghost', { html: ui.icon('download') + ' Export (CSV)', onclick: function () { exportTrialBalance(tb); } })
     ]));
     page.appendChild(pills('trial-balance'));
+    renderSubledgerRecon(page);
     if (!hasLedger()) { page.appendChild(ledgerMissing()); return; }
 
     page.appendChild(el('div.kpi-grid', null, [

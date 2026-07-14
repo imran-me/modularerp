@@ -31,17 +31,26 @@
       var visaProfit = apps.reduce(function (a, x){ return a + ((x.sale||0) - (x.cost||0)); }, 0);
       var approved = apps.filter(function (x){ return x.stage==='Approved'; }).length;
       var pending = apps.filter(function (x){ return ['New','Documents','Submitted','Under Process'].indexOf(x.stage)>=0; }).length;
-      var officeCash = 0;
-      try { officeCash = Math.round(EPAL.ledger.balance('1000',{companyId:'travels'}) + EPAL.ledger.balance('1010',{companyId:'travels'})); } catch (x) {}
-      var accEntries = (db.col ? db.col('acc_entries') : []).filter(function(e){ return e.companyId==='travels'; });
-      var accIncome = accEntries.reduce(function(a,e){ return a + (e.kind==='Income' ? (+e.amount||0) : 0); }, 0);
-      var accExpense = accEntries.reduce(function(a,e){ return a + (e.kind==='Expense' ? (+e.amount||0) : 0); }, 0);
-      var netResult = f.profit;
+      // ONE SOURCE OF TRUTH (audit fix): the headline money tiles read the
+      // double-entry LEDGER — the same book Accounts, Ledgers and the Group
+      // consolidation read — never the operational financials series (which
+      // stays for trends only). Before this, dashboard vs books diverged 7-21%.
+      var officeCash = 0, glIncome = 0, glExpense = 0;
+      try {
+        officeCash = Math.round(EPAL.ledger.balance('1000',{companyId:'travels'}) + EPAL.ledger.balance('1010',{companyId:'travels'}));
+        EPAL.ledger.accounts().forEach(function (a) {
+          if (a.type === 'income') glIncome += EPAL.ledger.balance(a.code, { companyId: 'travels' });
+          else if (a.type === 'expense') glExpense += EPAL.ledger.balance(a.code, { companyId: 'travels' });
+        });
+      } catch (x) {}
+      glIncome = Math.round(glIncome); glExpense = Math.round(glExpense);
+      var netResult = glIncome - glExpense;
+      var marginPct = glIncome ? (netResult / glIncome * 100) : 0;
       page.appendChild(el('div.kpi-grid.stagger', null, [
         kpi('Office Cash & Bank', ui.money(officeCash,{compact:true}), 'bank', officeCash>=0?'up':'down', 'cash book', 'travels/accounts/cashbook'),
-        kpi('Income', ui.money(f.revenue,{compact:true}), 'graph-up-arrow', 'up', ui.pct(db.momRevenue('travels')), 'travels/accounts/income'),
-        kpi('Expense', ui.money(f.expense,{compact:true}), 'wallet2', 'flat', 'by head', 'travels/accounts/expenses'),
-        kpi(netResult>=0?'Net Profit':'Net Loss', ui.money(Math.abs(netResult),{compact:true}), 'cash-stack', netResult>=0?'up':'down', ui.pct(f.margin)+' margin', 'travels/accounts'),
+        kpi('Income', ui.money(glIncome,{compact:true}), 'graph-up-arrow', 'up', 'per the books', 'travels/accounts/income'),
+        kpi('Expense', ui.money(glExpense,{compact:true}), 'wallet2', 'flat', 'per the books', 'travels/accounts/expenses'),
+        kpi(netResult>=0?'Net Profit':'Net Loss', ui.money(Math.abs(netResult),{compact:true}), 'cash-stack', netResult>=0?'up':'down', ui.pct(marginPct)+' margin', 'travels/accounts'),
         kpi('Visa Pipeline', String(pending), 'passport', 'flat', pending+' in process', 'travels/visa-processing/application-board'),
         kpi('Visa Sales Value', ui.money(visaRevenue,{compact:true}), 'cash-coin', 'up', ui.money(visaProfit,{compact:true})+' profit', 'travels/visa-processing/manage-sales')
       ]));

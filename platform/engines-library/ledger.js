@@ -537,6 +537,7 @@
     balanceSheet: balanceSheet,
     consolidatedTrialBalance: consolidatedTrialBalance,
     postIntercompany: postIntercompany,
+    expenseAccountFor: expenseAccountFor, isAgentParty: isAgentParty,
     // remove one journal by id (used when a mirrored quick-entry is deleted, so
     // the GL doesn't keep an orphaned posting). Prefer reversal entries for real
     // audit trails; this exists for the mirrored-entry lifecycle.
@@ -569,6 +570,28 @@
     if (/contract/.test(s)) return '4050';           // contract flights & files — own P&L line
     if (/air|ticket|emd|reissue|re-issue|void|flight|bsp|sector|pnr/.test(s)) return '4010';
     return '4000';
+  }
+  // THE single expense-head mapper (audit: two screens had diverging copies).
+  // Every quick-expense mirror — travels Accounts AND group Master Accounts —
+  // resolves its GL head through this one function.
+  function expenseAccountFor(text) {
+    var c = String(text || '').toLowerCase();
+    if (/rent|lease/.test(c)) return '5200';
+    if (/salary|payroll|wage|staff/.test(c)) return '5100';
+    if (/utility|electric|internet|wifi|gas|water|phone|bill/.test(c)) return '5300';
+    if (/market|ad\b|promo|campaign|boost|sms|design/.test(c)) return '5400';
+    if (/bank|charge|fee|license|iata|software/.test(c)) return '6000';
+    if (/adm|penalt|fine/.test(c)) return '5900';
+    if (/food|lunch|tea|snack|entertain|canteen/.test(c)) return '5550';
+    if (/office|stationer|clean|repair|furniture/.test(c)) return '5500';
+    if (/conveyance|travel|transport|fuel/.test(c)) return '5600';
+    return '5800';
+  }
+  // is this party one of our SUB-AGENTS? (their receivables belong in 1150,
+  // not in customer AR 1200 — audit finding: agent money was mixed into 1200)
+  function isAgentParty(name) {
+    if (!name) return false;
+    try { return S.list('tv_agents').some(function (a) { return a.name === name; }); } catch (e) { return false; }
   }
   // ensure the categorised accounts exist for already-seeded installs
   function ensureExtraAccounts() {
@@ -705,8 +728,42 @@
     return false;
   }
 
+  // one-time AUDIT RECLASS: agent-tagged balances that historically landed in
+  // customer AR (1200) move to Agent Receivable (1150) via explicit reclass
+  // journals — visible, dated, party-tagged; never a silent rewrite.
+  function reclassAgentReceivables() {
+    if (S.get('agent_reclass_v1', false)) return;
+    try {
+      var agents = {}; S.list('tv_agents').forEach(function (a) { if (a.name) agents[a.name] = 0; });
+      var byCo = {};
+      S.list(GL_KEY).forEach(function (e) {
+        if (!e.party || agents[e.party] === undefined) return;
+        (e.lines || []).forEach(function (l) {
+          if (l.account === '1200') {
+            var k = e.companyId + '|' + e.party;
+            byCo[k] = (byCo[k] || 0) + ((+l.dr || 0) - (+l.cr || 0));
+          }
+        });
+      });
+      var n = 0;
+      Object.keys(byCo).forEach(function (k) {
+        var amt = Math.round(byCo[k]);
+        if (Math.abs(amt) < 1) return;
+        var parts = k.split('|');
+        post({ id: 'GL-RECLASS-AG-' + (++n), date: new Date().toISOString().slice(0, 10), companyId: parts[0],
+          ref: 'RECLASS-AGENT', memo: 'Reclass: agent receivable moved 1200 → 1150 · ' + parts[1],
+          source: 'opening', party: parts[1], override: true,
+          lines: amt > 0
+            ? [ { account: '1150', dr: amt, cr: 0 }, { account: '1200', dr: 0, cr: amt } ]
+            : [ { account: '1200', dr: -amt, cr: 0 }, { account: '1150', dr: 0, cr: -amt } ] });
+      });
+    } catch (e) {}
+    S.set('agent_reclass_v1', true);
+  }
+
   function boot() {
     ensureExtraAccounts();
+    reclassAgentReceivables();
     var postedKeys = {};
     // pre-load keys from any already-posted sale entries
     var existing = S.list(GL_KEY);
@@ -724,7 +781,9 @@
       var amount = +rec.amount || 0, cost = +rec.cost || 0;
       var incAcct = incomeAccountFor(rec);
       var paid = rec.paid === true || rec.payStatus === 'Paid';
-      var debit = paid ? '1010' : '1200';          // cash if the customer has paid, else receivable
+      // cash if paid; else the RIGHT receivable for the party class (audit fix:
+      // sub-agent sales go to 1150 Agent Receivable, not customer AR)
+      var debit = paid ? '1010' : (isAgentParty(rec.customer) ? '1150' : '1200');
       try {
         // revenue leg — categorised income, party = customer
         post({ id: 'GL-S' + (rec.id || key), date: rec.date, companyId: rec.companyId,

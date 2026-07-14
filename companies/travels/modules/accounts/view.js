@@ -421,15 +421,12 @@
         memo: rec.desc || rec.category || (rec.kind + ' entry'), source: 'manual', party: rec.party || '', lines: lines });
     } catch (e) { /* mirror is best-effort — never block the quick entry */ }
   }
+  // AUDIT FIX: the head mapping is owned by the ledger (one mapper for every
+  // screen). The local copy defaulted misc spends into 5300 Utilities and
+  // missed food/office/conveyance entirely — misclassifying the P&L by head.
   function expenseAccountFor(cat) {
-    var c = String(cat || '').toLowerCase();
-    if (/rent|lease/.test(c)) return '5200';
-    if (/salary|payroll|wage|staff/.test(c)) return '5100';
-    if (/utility|electric|internet|wifi|gas|water|bill/.test(c)) return '5300';
-    if (/market|ad\b|promo|campaign/.test(c)) return '5400';
-    if (/bank|charge|fee/.test(c)) return '6000';
-    if (/adm|penalt|fine/.test(c)) return '5900';
-    return '5300';
+    if (EPAL.ledger && EPAL.ledger.expenseAccountFor) return EPAL.ledger.expenseAccountFor(cat);
+    return '5800';
   }
 
   /* ======================================================= JOURNALS (GL) */

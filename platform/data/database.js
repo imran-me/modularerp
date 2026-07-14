@@ -598,17 +598,17 @@
         // settle ONLY when this ref genuinely sits in AR (posted as a receivable
         // sale) — never for cash sales, and never for legacy records that were
         // saved before finance posting existed
-        var arSale = false, cash = false;
+        var arAcct = null, cash = false;
         S.list('gl_entries').forEach(function (e) {
           if (e.source === 'sale' && e.ref === ref) (e.lines || []).forEach(function (l) {
-            if (l.dr > 0) { if (l.account === '1200') arSale = true; if (l.account === '1010') cash = true; }
+            if (l.dr > 0) { if (l.account === '1200' || l.account === '1150') arAcct = l.account; if (l.account === '1010') cash = true; }
           });
         });
-        if (!arSale || cash || !(+amount > 0)) return;
+        if (!arAcct || cash || !(+amount > 0)) return;
         try {
           EPAL.ledger.post({ id: id, date: new Date().toISOString().slice(0, 10), companyId: companyId,
             ref: ref, memo: 'Customer payment received · ' + ref, source: 'payment', party: party || '',
-            lines: [ { account: '1010', dr: +amount, cr: 0 }, { account: '1200', dr: 0, cr: +amount } ] });
+            lines: [ { account: '1010', dr: +amount, cr: 0 }, { account: arAcct, dr: 0, cr: +amount } ] });   // settle the SAME control account the sale debited
         } catch (e) {}
       } else if (EPAL.ledger.remove) { try { EPAL.ledger.remove(id); } catch (e) {} }
     },

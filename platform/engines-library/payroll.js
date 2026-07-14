@@ -273,12 +273,25 @@
   function accrueSlip(s, cid, ym) {
     var adjPos = Math.max(0, s.adjustment || 0), adjNeg = Math.max(0, -(s.adjustment || 0));
     var recovered = (s.otherDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + adjNeg;
-    var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + adjPos;
+    // AUDIT FIX: recovered deductions REDUCE salary cost — they are not income.
+    // (Booking them to 4900 Other Income inflated the group's topline.)
+    // Net expense = earned + OT + bonus + adj⁺ − recovered = tax + pf + payable,
+    // so the entry balances by construction with just three credit lines.
+    var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + adjPos - recovered;
     var payable = slipPayable(s);
-    var lines = [{ account: '5100', dr: expense, cr: 0 }];
-    if (s.tax) lines.push({ account: '2120', dr: 0, cr: s.tax });
-    if (s.pf) lines.push({ account: '2110', dr: 0, cr: s.pf });
-    if (recovered) lines.push({ account: '4900', dr: 0, cr: recovered });
+    var lines;
+    if (expense >= 0) {
+      lines = [{ account: '5100', dr: expense, cr: 0 }];
+      if (s.tax) lines.push({ account: '2120', dr: 0, cr: s.tax });
+      if (s.pf) lines.push({ account: '2110', dr: 0, cr: s.pf });
+    } else {
+      // degenerate case (recoveries exceed the month's pay): keep the books
+      // legal with the old other-income form rather than a negative debit
+      lines = [{ account: '5100', dr: expense + recovered, cr: 0 }];
+      if (s.tax) lines.push({ account: '2120', dr: 0, cr: s.tax });
+      if (s.pf) lines.push({ account: '2110', dr: 0, cr: s.pf });
+      lines.push({ account: '4900', dr: 0, cr: recovered });
+    }
     lines.push({ account: '2100', dr: 0, cr: payable });
     glPost('GL-PAYA-' + s.empId + '-' + ym, ym + '-01', cid, 'PAY-' + ym, 'Salary accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
     if (s.encashAmt > 0) glPost('GL-ENC-' + s.empId + '-' + ym, ym + '-01', cid, 'ENC-' + ym, 'Leave encashment accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId,
