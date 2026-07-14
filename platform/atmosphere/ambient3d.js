@@ -51,7 +51,10 @@
 
       var canvas = document.createElement('canvas');
       canvas.id = 'ambient3d'; canvas.setAttribute('aria-hidden', 'true');
-      canvas.style.cssText = 'position:absolute;left:0;right:0;bottom:0;top:var(--topbar-h,62px);width:auto;height:auto;z-index:0;pointer-events:none;display:block;';
+      // FIXED to the viewport: spans from .main's left edge to the WINDOW's right
+      // edge (there is a layout gutter right of .main that used to show through —
+      // "background not full at the right"). left is set live in resize().
+      canvas.style.cssText = 'position:fixed;right:0;bottom:0;top:var(--topbar-h,62px);z-index:0;pointer-events:none;display:block;';
       main.insertBefore(canvas, main.firstChild);
 
       var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
@@ -78,8 +81,19 @@
       var M = makeMaterials(THREE);
       var updaters = buildAirfield(THREE, M, scene);
 
-      function resize() { var w = main.clientWidth || window.innerWidth, h = Math.max(140, (main.clientHeight || window.innerHeight) - 62); renderer.setSize(w, h, false); camera.aspect = (w / h) || 1; camera.updateProjectionMatrix(); }
+      function resize() {
+        var left = 0;
+        try { left = Math.max(0, Math.round(main.getBoundingClientRect().left)); } catch (e) {}
+        var top = 62; try { top = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--topbar-h')) || 62; } catch (e) {}
+        var w = Math.max(120, window.innerWidth - left);          // .main's left → viewport's right: no gutter
+        var h = Math.max(140, window.innerHeight - top);
+        canvas.style.left = left + 'px';
+        canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+        renderer.setSize(w, h, false); camera.aspect = (w / h) || 1; camera.updateProjectionMatrix();
+      }
       resize(); window.addEventListener('resize', resize);
+      // sidebar collapse / scrollbars move .main without a window resize — observe it
+      if (window.ResizeObserver) { try { new ResizeObserver(resize).observe(main); } catch (e) {} }
 
       var running = false, t0 = (window.performance && performance.now()) || 0, raf;
       function loop(now) { if (!running) return; var t = (now - t0) / 1000; for (var i = 0; i < updaters.length; i++) updaters[i](t); renderer.render(scene, camera); raf = window.requestAnimationFrame(loop); }
@@ -151,6 +165,10 @@
     scene.add(at(light(THREE, M, 0xff2a2a, 2.4, 'beacon', 0.7, 0.0), 120, 53, -120));   // tower obstruction beacon
     scene.add(at(light(THREE, M, 0xff2a2a, 2.6, 'beacon', 0.6, 1.7), 150, 50, -232));    // skyline obstruction beacon
     var parked = buildAirliner(THREE, M, 2.0, false, LIVERIES[0]); parked.position.set(-70, 4.8, -66); parked.rotation.y = Math.PI / 2; scene.add(parked);
+    // second jet on stand (different livery) with a stairs truck at its door —
+    // straight from the owner's reference photos of busy gate aprons
+    var parked2 = buildAirliner(THREE, M, 1.7, false, LIVERIES[2]); parked2.position.set(-104, 4.1, -54); parked2.rotation.y = -Math.PI / 2.15; scene.add(parked2);
+    scene.add(buildStairs(THREE, M, V(-96, 0, -47)));
     scene.add(buildTruck(THREE, M, V(-52, 0, -60)));
     scene.add(buildTruck(THREE, M, V(40, 0, -120)));
 
@@ -173,51 +191,124 @@
       });
     }
 
-    // ---- TAKE-OFF: gear down on the roll, retracts just after rotation ----
+    /* ================== RANDOMISED TRAFFIC — never reads as a loop ==========
+     * Every craft flies LEGS. Each leg draws fresh random parameters (route,
+     * altitude, speed, drift, direction) and is followed by a random idle gap
+     * with the craft hidden — so no two passes are alike and nothing repeats
+     * on a visible cycle. */
+    function rnd(a, b) { return a + Math.random() * (b - a); }
+    function pickOf(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function legMover(obj, makeLeg) {
+      var o = obj.g || obj; scene.add(o);
+      var leg = null, start = 0, idleUntil = -1;
+      updaters.push(function (t) {
+        if (idleUntil >= 0) { if (t < idleUntil) return; leg = null; idleUntil = -1; }
+        if (!leg) { leg = makeLeg(); start = t; o.visible = true; if (leg.init) leg.init(); }
+        var u = (t - start) / leg.dur;
+        if (u >= 1) { idleUntil = t + (leg.gap || 0.01); o.visible = false; return; }
+        var du = 0.006, p = leg.path(u), p2 = leg.path(Math.min(0.9999, u + du)), p0 = leg.path(Math.max(0, u - du));
+        place(o, p, p2, bankOf(p0, p, p2) + (leg.bank || 0));
+        if (leg.tick) leg.tick(u, t);
+      });
+    }
+
+    // TAKE-OFF — each departure differs: climb gradient, drift, distance, pause
     var toP = buildAirliner(THREE, M, 1.9, false, LIVERIES[0]);
-    mover(toP, 21, function (u) {
-      if (u < 0.42) return V(4, 4.6, 40 - (u / 0.42) * 190);
-      var k = (u - 0.42) / 0.58, e = k * k; return V(4 + e * 60, 4.6 + e * 110, -150 - e * 340);
+    legMover(toP, function () {
+      var climb = rnd(85, 155), drift = rnd(-80, 90), dist = rnd(280, 430);
+      return { dur: rnd(16, 25), gap: rnd(3, 15),
+        path: function (u) {
+          if (u < 0.42) return V(4, 4.6, 40 - (u / 0.42) * 190);
+          var k = (u - 0.42) / 0.58, e = k * k; return V(4 + e * drift, 4.6 + e * climb, -150 - e * dist);
+        },
+        tick: function (u) { toP.userData.gear.visible = u < 0.52; } };
     });
-    updaters.push(function (t) { toP.userData.gear.visible = ((t % 21) / 21) < 0.52; });
-    // ---- LANDING: descend, flare, touch down, roll out (gear down) --------
+    // LANDING — random glide height, flare point and rollout, then a pause
     var laP = buildAirliner(THREE, M, 1.9, false, LIVERIES[1]);
-    mover(laP, 24, function (u) {
-      if (u < 0.62) { var e = u / 0.62; return V(-4, 80 - e * e * 75.4, -360 + e * 320); }
-      var k = (u - 0.62) / 0.38; return V(-4, 4.6, -40 + k * 74);
+    legMover(laP, function () {
+      var glide = rnd(60, 100), flare = rnd(0.55, 0.68), roll = rnd(60, 95);
+      return { dur: rnd(20, 30), gap: rnd(4, 16),
+        path: function (u) {
+          if (u < flare) { var e = u / flare; return V(-4, glide - e * e * (glide - 4.6), -360 + e * 320); }
+          var k = (u - flare) / (1 - flare); return V(-4, 4.6, -40 + k * roll);
+        } };
     });
-    // ---- TAXIING airliner (gear down) ------------------------------------
+    // TAXI — random direction, speed and an occasional hold-short pause
     var txP = buildAirliner(THREE, M, 1.7, false, LIVERIES[2]);
-    mover(txP, 40, function (u) { return V(52, 4.1, -230 + u * 200); });
-    // ---- CRUISE pair overhead (gear up) ----------------------------------
-    var cr1 = buildAirliner(THREE, M, 1.5, false, LIVERIES[3]); cr1.userData.gear.visible = false;
-    mover(cr1, 30, function (u) { return V(-420 + u * 840, 108, -200); });
-    var cr2 = buildAirliner(THREE, M, 1.5, false, LIVERIES[4]); cr2.userData.gear.visible = false;
-    mover(cr2, 34, function (u) { return V(430 - u * 860, 138, -300); });
-    // ---- high CARGO freighter (gear up) ----------------------------------
+    legMover(txP, function () {
+      var dir = Math.random() < 0.5 ? 1 : -1, hold = Math.random() < 0.35;
+      return { dur: rnd(30, 52), gap: rnd(4, 18),
+        path: function (u) {
+          if (hold) { u = u < 0.4 ? u / 0.4 * 0.45 : (u < 0.58 ? 0.45 : 0.45 + (u - 0.58) / 0.42 * 0.55); }
+          var z = dir > 0 ? (-230 + u * 200) : (-30 - u * 200);
+          return V(52, 4.1, z);
+        } };
+    });
+    // CRUISERS — a pool of four different liveries/sizes; each pass picks its own
+    // altitude, depth, heading, bob and speed, with staggered random gaps
+    for (var ci = 0; ci < 4; ci++) {
+      (function (idx) {
+        var cr = buildAirliner(THREE, M, rnd(1.3, 1.7), false, LIVERIES[(idx + 1) % LIVERIES.length]);
+        cr.userData.gear.visible = false;
+        legMover(cr, function () {
+          var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(95, 215), z1 = rnd(-160, -500), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
+          return { dur: rnd(22, 46), gap: rnd(2, 18),
+            path: function (u) { return V(dir * (-430 + u * 860), alt + Math.sin(u * Math.PI) * bob, z1 + (z2 - z1) * u); } };
+        });
+      })(ci);
+    }
+    // CARGO freighter — high, slow, rare
     var cargo = buildAirliner(THREE, M, 2.4, true); cargo.userData.gear.visible = false;
-    mover(cargo, 52, function (u) { return V(460 - u * 920, 186, -420); });
+    legMover(cargo, function () {
+      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(165, 235), z = rnd(-360, -520);
+      return { dur: rnd(40, 70), gap: rnd(8, 30),
+        path: function (u) { return V(dir * (460 - u * 920), alt, z) ; } };
+    });
 
-    // ---- HELICOPTER crossing ---------------------------------------------
-    var heli = buildHeli(THREE, M); scene.add(heli.g);
-    updaters.push(function (t) { var cy = 26, u = (t % cy) / cy; var p = V(-360 + u * 720, 66, -120), p2 = V(-360 + (u + 0.004) * 720, 66, -120); place(heli.g, p, p2, 0); heli.rotor.rotation.y = t * 22; heli.tail.rotation.x = t * 30; });
+    // HELICOPTER — random diagonal crossings at random heights
+    var heli = buildHeli(THREE, M);
+    legMover(heli, function () {
+      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(42, 95), z1 = rnd(-60, -260), z2 = rnd(-60, -260), bob = rnd(2, 8);
+      return { dur: rnd(18, 34), gap: rnd(5, 22),
+        path: function (u) { return V(dir * (-380 + u * 760), alt + Math.sin(u * 6.3) * bob, z1 + (z2 - z1) * u); },
+        tick: function (u, t) { heli.rotor.rotation.y = t * 22; heli.tail.rotation.x = t * 30; } };
+    });
 
-    // ---- FIGHTER-JET show: banked passes, re-forming ---------------------
+    // FIGHTER-JET show — an occasional EVENT, not a metronome: random formation,
+    // altitude, arc and direction, with long random silences between passes
     var LAYOUTS = [
       [[0, 0, 0], [-9, -1.5, -9], [9, -1.5, -9], [-18, -3, -18], [18, -3, -18]],
       [[0, 0, 0], [-9, 0, -9], [9, 0, -9], [0, 0, -18]],
       [[0, 0, 0], [10, -1.5, -8], [20, -3, -16], [30, -4.5, -24]],
       [[0, 0, 0], [-12, 0, 0], [12, 0, 0], [-24, 0, 0], [24, 0, 0]]
     ];
-    var fteam = new THREE.Group(); scene.add(fteam);
+    var fteam = new THREE.Group();
     var jets = []; for (var j = 0; j < 5; j++) { var jt = buildFighter(THREE, M); fteam.add(jt); jets.push(jt); }
-    function fpath(u) { return V(-430 + u * 860, 118 + Math.sin(u * Math.PI) * 26, -170 + Math.sin(u * Math.PI * 2) * 30); }
-    var lastPass = -1;
-    updaters.push(function (t) {
-      var cy = 15, pass = Math.floor(t / cy), u = (t % cy) / cy;
-      if (pass !== lastPass) { lastPass = pass; var L = LAYOUTS[pass % LAYOUTS.length]; for (var i = 0; i < jets.length; i++) { var s = L[i]; if (s) { jets[i].visible = true; jets[i].position.set(s[0], s[1], s[2]); } else jets[i].visible = false; } }
-      var du = 0.006, p = fpath(u), p2 = fpath(Math.min(0.9999, u + du)), p0 = fpath(Math.max(0, u - du));
-      place(fteam, p, p2, bankOf(p0, p, p2));
+    legMover(fteam, function () {
+      var L = pickOf(LAYOUTS), dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(100, 155), arc = rnd(10, 38), zb = rnd(-140, -270), wig = rnd(14, 36);
+      return { dur: rnd(11, 18), gap: rnd(12, 42),
+        init: function () { for (var i = 0; i < jets.length; i++) { var s = L[i]; if (s) { jets[i].visible = true; jets[i].position.set(s[0], s[1], s[2]); } else jets[i].visible = false; } },
+        path: function (u) { return V(dir * (-430 + u * 860), alt + Math.sin(u * Math.PI) * arc, zb + Math.sin(u * Math.PI * 2) * wig); } };
+    });
+
+    // FOLLOW-ME car — yellow-checker airport car darting between apron waypoints
+    var fm = buildFollowMe(THREE, M);
+    var FM_WP = [V(-66, 0.9, -46), V(-20, 0.9, -88), V(30, 0.9, -52), V(52, 0.9, -118), V(-42, 0.9, -102), V(8, 0.9, -66)];
+    legMover(fm, function () {
+      var a = pickOf(FM_WP), b = pickOf(FM_WP); while (b === a) b = pickOf(FM_WP);
+      var mx = (a.x + b.x) / 2 + rnd(-24, 24), mz = (a.z + b.z) / 2 + rnd(-24, 24);
+      return { dur: rnd(10, 20), gap: rnd(5, 20),
+        path: function (u) { var w = 1 - u; return V(w * w * a.x + 2 * w * u * mx + u * u * b.x, 0.9, w * w * a.z + 2 * w * u * mz + u * u * b.z); } };
+    });
+    // BAGGAGE TRAIN — tug + carts shuttling terminal ↔ stands, alternating runs
+    var bt = buildBaggageTrain(THREE, M);
+    var btFlip = false;
+    legMover(bt, function () {
+      btFlip = !btFlip;
+      var a = btFlip ? V(-88, 0.85, -56) : V(-52, 0.85, -70), b = btFlip ? V(-52, 0.85, -70) : V(-88, 0.85, -56);
+      var mx = (a.x + b.x) / 2 + rnd(-10, 10), mz = (a.z + b.z) / 2 + rnd(-10, 10);
+      return { dur: rnd(11, 17), gap: rnd(7, 24),
+        path: function (u) { var w = 1 - u; return V(w * w * a.x + 2 * w * u * mx + u * u * b.x, 0.85, w * w * a.z + 2 * w * u * mz + u * u * b.z); } };
     });
 
     // ---- puffy white clouds ----------------------------------------------
@@ -355,6 +446,11 @@
   function buildTower(THREE, M, pos) {
     var g = new THREE.Group(); g.position.copy(pos);
     var shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.2, 40, 10), M.bldg); shaft.position.y = 20; g.add(shaft);
+    // red/white banding on the shaft (the striped control tower in the references)
+    [[10, 3.02], [20, 2.82], [30, 2.62]].forEach(function (b) {
+      var band = new THREE.Mesh(new THREE.CylinderGeometry(b[1], b[1] + 0.06, 2.4, 10), M.red);
+      band.position.y = b[0]; g.add(band);
+    });
     var cab = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 4.4, 6, 10), M.bldg2); cab.position.y = 42; g.add(cab);
     var glass = new THREE.Mesh(new THREE.CylinderGeometry(5.3, 4.5, 3.4, 10, 1, true), M.glass); glass.position.y = 42.4; g.add(glass);
     var roof = new THREE.Mesh(new THREE.ConeGeometry(5.6, 3, 10), M.bldg); roof.position.y = 46.6; g.add(roof);
@@ -387,6 +483,39 @@
     var body = new THREE.Mesh(new THREE.BoxGeometry(6, 2.4, 3), M.soft); body.position.y = 1.6; g.add(body);
     var cab = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2.8), M.bldg2); cab.position.set(2.6, 1.4, 0); g.add(cab);
     g.scale.setScalar(1.2); return g;
+  }
+  // FOLLOW-ME car — the yellow-checker airport car from the reference collection
+  function buildFollowMe(THREE, M) {
+    var g = new THREE.Group();
+    var body = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.4, 1.9), M.accent); body.position.y = 1.0; g.add(body);
+    var check = new THREE.Mesh(new THREE.BoxGeometry(3.44, 0.38, 1.94), M.dark); check.position.y = 1.32; g.add(check);
+    var sign = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 0.28), M.dark); sign.position.y = 2.0; g.add(sign);
+    [-1.1, 1.1].forEach(function (x) { [-0.72, 0.72].forEach(function (z) {
+      var w = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.3, 10), M.tire); w.rotation.z = Math.PI / 2; w.position.set(x, 0.34, z); g.add(w);
+    }); });
+    g.add(at(light(THREE, M, 0xffb020, 1.0, 'beacon', 1.4, Math.random() * 3), 0, 2.5, 0));   // amber roof beacon
+    return g;
+  }
+  // baggage TRAIN — tug pulling three carts (reference: apron baggage dollies)
+  function buildBaggageTrain(THREE, M) {
+    var g = new THREE.Group();
+    var tug = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.3, 1.8), M.soft); tug.position.set(0, 0.95, 1.6); g.add(tug);
+    var cabin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.6), M.bldg2); cabin.position.set(0, 1.9, 2.0); g.add(cabin);
+    for (var i = 0; i < 3; i++) {
+      var cart = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.1, 2.2), i % 2 ? M.grey : M.blue);
+      cart.position.set(0, 0.85, -1.2 - i * 2.8); g.add(cart);
+    }
+    g.add(at(light(THREE, M, 0xffb020, 0.8, 'beacon', 1.2, Math.random() * 3), 0, 2.1, 1.6));
+    return g;
+  }
+  // mobile STAIRS truck at a parked jet's door (reference: passenger boarding stairs)
+  function buildStairs(THREE, M, pos) {
+    var g = new THREE.Group(); g.position.copy(pos);
+    var base = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.0, 2.0), M.bldg2); base.position.y = 0.7; g.add(base);
+    var ramp = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.35, 1.7), M.white); ramp.rotation.z = 0.42; ramp.position.set(-0.4, 2.6, 0); g.add(ramp);
+    var rail = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.1, 0.1), M.dark); rail.rotation.z = 0.42; rail.position.set(-0.4, 3.5, 0.8); g.add(rail);
+    var top = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.3, 1.9), M.white); top.position.set(-3.2, 4.4, 0); g.add(top);
+    return g;
   }
   function buildRadar(THREE, M, pos) {
     var g = new THREE.Group(); g.position.copy(pos);
