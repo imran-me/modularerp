@@ -33,8 +33,13 @@
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
   var TODAY_STR = '2026-07-05';
   var METHODS = ['Bank', 'Cash', 'bKash', 'Nagad', 'Debit Card', 'Credit Card', 'Cheque'];
-  var SECTIONS = [['expenses', 'All Expenses'], ['categories', 'Categories'], ['budget', 'Budget Setup'], ['report', 'Expense Report'],
-    ['accounts', 'Manage Accounts'], ['journals', 'Manage Journals'], ['schedules', 'Payment Schedules'], ['party-types', 'Party Types'], ['payroll', 'Master Payroll'], ['banks', 'Manage Banks']];
+  // OWNER LAYOUT: the group's operational expenses live in ONE section — all
+  // expenses, budget setup, the D/W/M/custom report and the combined
+  // category + sub-category screen switch with buttons at the top of it.
+  var SECTIONS = [['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'], ['journals', 'Manage Journals'],
+    ['schedules', 'Payment Schedules'], ['party-types', 'Party Types'], ['payroll', 'Master Payroll'], ['banks', 'Manage Banks']];
+  var EXP_TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Category & Sub-category']];
+  var expTab = 'all';                                 // active button inside Operational Expenses
   var selCo = 'all';                                  // the company switcher state
   var reportMode = 'daily';                           // expense-report bucket
   var reportFrom = '2026-07-01', reportTo = TODAY_STR;
@@ -89,6 +94,8 @@
   EPAL.view('group/master-accounts', {
     render: function (ctx) {
       var sub = ctx.subId || 'expenses';
+      // legacy deep-links from the pre-consolidation layout land on the right tab
+      if (sub === 'categories' || sub === 'budget' || sub === 'report') { expTab = sub; sub = 'expenses'; }
       if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'expenses';
       var page = el('div.page');
       var titles = {}; SECTIONS.forEach(function (s) { titles[s[0]] = s[1]; });
@@ -110,8 +117,18 @@
       });
       page.appendChild(swWrap);
       if (sub === 'payroll' && (selCo === 'all')) selCo = 'travels';
-      ({ expenses: expensesView, categories: categoriesView, budget: budgetView, report: reportView,
-         accounts: accountsView, journals: journalsView, schedules: schedulesView, 'party-types': partyTypesView, payroll: payrollView, banks: banksView }[sub])(page);
+      if (sub === 'expenses') {
+        // buttons at the top of the ONE expenses section (owner directive)
+        var tb = el('div.pill-tab.mb-3');
+        EXP_TABS.forEach(function (t) {
+          tb.appendChild(el('button' + (expTab === t[0] ? '.active' : ''), { text: t[1], onclick: function () { expTab = t[0]; EPAL.router.render(); } }));
+        });
+        page.appendChild(tb);
+        ({ all: expensesView, budget: budgetView, report: reportView, categories: categoriesView }[expTab] || expensesView)(page);
+      } else {
+        ({ accounts: accountsView, journals: journalsView, schedules: schedulesView,
+           'party-types': partyTypesView, payroll: payrollView, banks: banksView }[sub])(page);
+      }
       ctx.mount.appendChild(page);
     }
   });
@@ -149,7 +166,7 @@
   }
   function expenseForm(rec) {
     var catList = cats();
-    var catOpts = catList.map(function (c) { return c.name; });
+    var catOpts = catList.filter(function (c) { return c.active !== false; }).map(function (c) { return c.name; });
     function subsOf(name) { var c = catList.filter(function (x) { return x.name === name; })[0]; return (c && c.subs && c.subs.length) ? c.subs : []; }
     EPAL.formModal({
       title: rec ? 'Edit Expense' : 'New Expense', icon: 'wallet2', size: 'md',
@@ -186,28 +203,108 @@
     });
   }
 
-  /* ======================================================= CATEGORIES */
+  /* ======================================================= CATEGORY & SUB-CATEGORY
+   * Production parity: the Category list and the Sub Category list (parent
+   * badge · usage · status) live in ONE screen, stacked. */
   function categoriesView(page) {
     var list = cats();
-    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Category', onclick: function () { categoryForm(null); } })]));
+    var subRows = [];
+    list.forEach(function (c) { (c.subs || []).forEach(function (s) { subRows.push({ id: c.id + '::' + s, name: s, parent: c.name, parentId: c.id }); }); });
+    var activeN = list.filter(function (c) { return c.active !== false; }).length;
+    function usedBy(catName, subName) {
+      return db.col('acc_entries').filter(function (e) { return e.category === catName && (subName == null || (e.subCategory || '') === subName); }).length;
+    }
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Categories', String(list.length), 'folder'),
+      kpi('Active', String(activeN), 'check-circle'),
+      kpi('Inactive', String(list.length - activeN), 'slash-circle'),
+      kpi('Sub-categories', String(subRows.length), 'tags')
+    ]));
+    if (canCreate()) page.appendChild(el('div.flex.gap-1.mb-2', null, [
+      el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-lg') + ' Add Category', onclick: function () { categoryForm(null); } }),
+      el('button.btn.btn-sm.btn-outline', { html: ui.icon('plus-lg') + ' Add Sub-category', onclick: function () { subCategoryForm(null); } })
+    ]));
+
+    // ---- 1) Expense Category List -------------------------------------------
     var tbl = EPAL.table({
       columns: [
-        { key: 'name', label: 'Category', render: function (c) { return '<span class="strong">' + esc(c.name) + '</span>'; } },
+        { key: 'name', label: 'Category', render: function (c) { return '<span class="strong' + (c.active === false ? ' text-mute' : '') + '">' + esc(c.name) + '</span>'; } },
         { key: 'subs', label: 'Sub-categories', render: function (c) { return (c.subs || []).length ? (c.subs || []).map(function (s) { return '<span class="badge">' + esc(s) + '</span>'; }).join(' ') : '—'; }, exportVal: function (c) { return (c.subs || []).join('; '); } },
-        { key: 'used', label: 'Entries', num: true, sortVal: function (c) { return db.col('acc_entries').filter(function (e) { return e.category === c.name; }).length; }, render: function (c) { return String(db.col('acc_entries').filter(function (e) { return e.category === c.name; }).length); } }
+        { key: 'used', label: 'Entries', num: true, sortVal: function (c) { return usedBy(c.name); }, render: function (c) { return String(usedBy(c.name)); } },
+        { key: 'active', label: 'Status', render: function (c) { return c.active === false ? '<span class="badge">Inactive</span>' : '<span class="badge badge-good">Active</span>'; }, exportVal: function (c) { return c.active === false ? 'Inactive' : 'Active'; } }
       ],
       rows: list, searchKeys: ['name'], pageSize: 12, exportName: 'expense-categories.csv',
-      actions: ui.actions({
-        edit: canCreate() ? function (c) { categoryForm(c); } : null,
-        del: canCreate() ? function (c) {
-          var used = db.col('acc_entries').some(function (e) { return e.category === c.name; });
-          if (used) { ui.toast('In use by expenses — rename instead of deleting', 'error'); return; }
+      actions: canCreate() ? [
+        { icon: 'pencil', title: 'Edit', onClick: function (c) { categoryForm(c); } },
+        { icon: 'power', title: 'Activate / deactivate', onClick: function (c) {
+          c.active = c.active === false;                 // toggle; inactive heads leave the pickers
+          S.upsert('exp_categories', c);
+          ui.toast('Category ' + (c.active === false ? 'deactivated' : 'reactivated'), 'success'); EPAL.router.render();
+        } },
+        { icon: 'trash', title: 'Delete', onClick: function (c) {
+          if (usedBy(c.name)) { ui.toast('In use by expenses — rename or deactivate instead', 'error'); return; }
           ui.confirm({ title: 'Delete category "' + c.name + '"?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { S.removeFrom('exp_categories', c.id); ui.toast('Deleted', 'success'); EPAL.router.render(); } });
-        } : null
-      }),
+        } }
+      ] : [],
       empty: { icon: 'folder', title: 'No categories' }
     });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('folder') + ' Expense Categories & Sub-Categories' })]), el('div.card-body', null, [tbl.el])]));
+    page.appendChild(el('div.card.mb-2', null, [el('div.card-head', null, [el('h3', { html: ui.icon('folder') + ' Expense Category List' })]), el('div.card-body', null, [tbl.el])]));
+
+    // ---- 2) Sub Category List (parent badge, like the production screen) ----
+    var st = EPAL.table({
+      columns: [
+        { key: 'name', label: 'Sub Category', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } },
+        { key: 'parent', label: 'Parent Category', render: function (r) { return '<span class="badge badge-info">' + esc(r.parent) + '</span>'; } },
+        { key: 'used', label: 'Entries', num: true, sortVal: function (r) { return usedBy(r.parent, r.name); }, render: function (r) { return String(usedBy(r.parent, r.name)); } }
+      ],
+      rows: subRows, searchKeys: ['name', 'parent'], pageSize: 12, exportName: 'expense-sub-categories.csv',
+      filters: [{ key: 'parent', label: 'Parent' }],
+      actions: canCreate() ? [
+        { icon: 'pencil', title: 'Edit / move', onClick: function (r) { subCategoryForm(r); } },
+        { icon: 'trash', title: 'Delete', onClick: function (r) {
+          if (usedBy(r.parent, r.name)) { ui.toast('In use by expenses — rename instead', 'error'); return; }
+          ui.confirm({ title: 'Delete sub-category "' + r.name + '"?', danger: true, confirmLabel: 'Delete' }).then(function (ok) {
+            if (!ok) return;
+            var c = cats().filter(function (x) { return x.id === r.parentId; })[0];
+            if (c) { c.subs = (c.subs || []).filter(function (s) { return s !== r.name; }); S.upsert('exp_categories', c); }
+            ui.toast('Deleted', 'success'); EPAL.router.render();
+          });
+        } }
+      ] : [],
+      empty: { icon: 'tags', title: 'No sub-categories', hint: 'Add one with Add Sub-category.' }
+    });
+    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('tags') + ' Sub Category List' })]), el('div.card-body', null, [st.el])]));
+  }
+  function subCategoryForm(row) {
+    var list = cats();
+    if (!list.length) { ui.toast('Create a category first', 'error'); return; }
+    EPAL.formModal({
+      title: row ? 'Edit Sub-category' : 'Add Sub-category', icon: 'tags', size: 'sm',
+      record: row ? { parentId: row.parentId, name: row.name } : { parentId: list[0].id },
+      fields: [
+        { key: 'parentId', label: 'Parent category', type: 'select', required: true, options: list.map(function (c) { return [c.id, c.name]; }) },
+        { key: 'name', label: 'Sub-category name', type: 'text', required: true }
+      ],
+      saveLabel: row ? 'Save' : 'Add',
+      onSave: function (v) {
+        var name = (v.name || '').trim(); if (!name) { ui.toast('Enter a name', 'error'); return false; }
+        var target = list.filter(function (c) { return c.id === v.parentId; })[0];
+        if (!target) { ui.toast('Pick a parent category', 'error'); return false; }
+        var dupe = (target.subs || []).some(function (s) { return s.toLowerCase() === name.toLowerCase() && !(row && row.parentId === target.id && row.name === s); });
+        if (dupe) { ui.toast('"' + name + '" already exists under ' + target.name, 'error'); return false; }
+        if (row) {
+          // remove from the old parent + cascade the rename/move onto expenses
+          var old = list.filter(function (c) { return c.id === row.parentId; })[0];
+          if (old) { old.subs = (old.subs || []).filter(function (s) { return s !== row.name; }); S.upsert('exp_categories', old); }
+          db.col('acc_entries').forEach(function (e) {
+            if (e.category === row.parent && (e.subCategory || '') === row.name) { e.category = target.name; e.subCategory = name; db.save('acc_entries', e); }
+          });
+        }
+        target.subs = (target.subs || []).concat([name]);
+        S.upsert('exp_categories', target);
+        ui.toast('Sub-category saved', 'success'); EPAL.router.render(); return true;
+      }
+    });
   }
   function categoryForm(c) {
     EPAL.formModal({
@@ -263,7 +360,7 @@
       title: 'Set Budget', icon: 'bullseye', size: 'sm', record: b || { period: 'Monthly', companyId: selCo === 'all' ? 'group' : selCo },
       fields: [
         { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
-        { key: 'category', label: 'Category', type: 'select', required: true, options: cats().map(function (c) { return c.name; }) },
+        { key: 'category', label: 'Category', type: 'select', required: true, options: cats().filter(function (c) { return c.active !== false; }).map(function (c) { return c.name; }) },
         { key: 'period', label: 'Period', type: 'select', options: ['Weekly', 'Monthly', 'Quarterly', 'Annual'], default: 'Monthly' },
         { key: 'amount', label: 'Budget amount (৳)', type: 'money', required: true, min: 0 },
         { key: 'threshold', label: 'Warning threshold (%)', type: 'number', min: 1, max: 100, default: 80, hint: 'Flag "Near Limit" once usage passes this.' }
