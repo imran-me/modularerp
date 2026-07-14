@@ -63,7 +63,7 @@
       // ~30% sky on top (bottom ground cutoff lands at z≈175, right on the
       // car park; the horizon sits ~30% down the frame)
       var camera = new THREE.PerspectiveCamera(44, 1, 1, 9000);
-      camera.position.set(0, 120, 376); camera.lookAt(30, 0, -400);
+      camera.position.set(0, 120, 330); camera.lookAt(30, 0, -446);
 
       var SUN = new THREE.Vector3(-380, 420, -260);
       scene.add(buildSky(THREE));
@@ -286,8 +286,8 @@
 
     // ---- zone constants (from the reference pictures; compacted so the
     // south block sits tight under the runways — no dead grass bands) -------
-    var RT = { z: -150, x1: -120, x2: 260, w: 30 };        // TAKE-OFF runway (top)
-    var RL = { z: -92, x1: -100, x2: 260, w: 30 };         // LANDING runway (below)
+    var RT = { z: -150, x1: -120, x2: 420, w: 34 };        // TAKE-OFF runway — runs off the right frame edge
+    var RL = { z: -92, x1: -100, x2: 420, w: 34 };         // LANDING runway (below)
     var CONN = { x: -140 };                                 // left vertical connector
     var APR_TOP = { z: -5 };                                // remote apron lane
     var APR_GATE = { z: 48 };                               // gate row
@@ -360,32 +360,8 @@
       scene.add(g);
     })();
 
-    // CAR ROAD AND PARKING — road band + two painted lots + cars + buses
-    (function () {
-      var m2 = new THREE.MeshStandardMaterial({ map: roadTex(THREE), roughness: 0.95, metalness: 0.04 });
-      m2.map = m2.map.clone(); m2.map.needsUpdate = true; m2.map.center.set(0.5, 0.5); m2.map.rotation = Math.PI / 2; m2.map.repeat.set(1, 9);
-      var road2 = new THREE.Mesh(new THREE.PlaneGeometry(330, 12), m2);
-      road2.rotation.x = -Math.PI / 2; road2.position.set(90, 0.012, TERM.z + 32); road2.receiveShadow = true; scene.add(road2);
-      [[30, 0], [124, 0]].forEach(function (lp) {
-        var pad2 = new THREE.Mesh(new THREE.PlaneGeometry(92, 26), new THREE.MeshStandardMaterial({ map: carParkTex(THREE), roughness: 0.95, metalness: 0.04 }));
-        pad2.rotation.x = -Math.PI / 2; pad2.position.set(lp[0] + 40, 0.01, TERM.z + 52); pad2.receiveShadow = true; scene.add(pad2);
-      });
-      var CAR_COLS = [0xc0392b, 0x2e86c1, 0xf4d03f, 0xecf0f1, 0x27ae60, 0x8e44ad, 0x1c2833, 0xe67e22, 0x76d7c4, 0xd35400, 0x5dade2, 0xf7dc6f];
-      for (var cc = 0; cc < 44; cc++) {                     // both lots packed
-        var car = new THREE.Group();
-        var cb = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.85, 1.2), M.mat(CAR_COLS[cc % CAR_COLS.length], 0.5, 0.3)); cb.position.y = 0.7; car.add(cb);
-        var ct = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.6, 1.1), M.win); ct.position.set(-0.1, 1.4, 0); car.add(ct);
-        var lotBase = cc < 22 ? 32 : 126, ci2 = cc % 22;
-        car.position.set(lotBase + (ci2 % 11) * 8.4, 0, TERM.z + 46 + Math.floor(ci2 / 11) * 12);
-        scene.add(car);
-      }
-      [[20, 0xE8B93C], [180, 0x3B7DD8]].forEach(function (bp) {
-        var bus = new THREE.Group();
-        var bb = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 2.4), M.mat(bp[1], 0.5, 0.2)); bb.position.y = 1.5; bb.castShadow = true; bus.add(bb);
-        var bw = new THREE.Mesh(new THREE.BoxGeometry(9.1, 0.8, 2.45), M.win); bw.position.y = 2.1; bus.add(bw);
-        bus.position.set(bp[0], 0, TERM.z + 32); bus.rotation.y = Math.PI / 2; scene.add(bus);
-      });
-    })();
+    // (car road + parking removed on the owner's mark-up — the terminal band
+    // now anchors the very bottom of the frame)
 
     // CONTROL TOWER — right of the aprons (white, red bands, glass cab)
     (function () {
@@ -488,8 +464,8 @@
         lbl.rotation.x = -Math.PI / 2; if (rotZ) lbl.rotation.z = rotZ;
         lbl.position.set(x, 0.055, z); scene.add(lbl); return lbl;
       }
-      groundLabel('TAKE OFF RUNWAY', 70, RT.z, 170);
-      groundLabel('LANDING RUNWAY', 80, RL.z, 170);
+      groundLabel('TAKE OFF RUNWAY', 120, RT.z, 230);
+      groundLabel('LANDING RUNWAY', 130, RL.z, 230);
       groundLabel('TRANSPORT ROAD', -208, -70, 92, Math.PI / 2);
       groundLabel('FIGHTER PLANE', -96, -30, 100, Math.PI / 2);
       groundLabel('PARKED PLANE', -262, 49, 46, Math.PI / 2, '#1B2A4A');
@@ -515,7 +491,9 @@
         [-315, 40, 40], [-300, -120, 40], [300, -180, 44], [300, 60, 36], [60, -238, 40],
         [-150, 168, 26], [-20, 182, 18], [150, -252, 36], [-300, 175, 26], [320, -60, 30],
         [0, -262, 40], [-100, -252, 36], [250, -262, 40], [350, -240, 44],
-        [340, 20, 36], [345, 140, 40], [250, 182, 20], [-140, 180, 24]
+        [340, 20, 36], [345, 140, 40], [250, 182, 20], [-140, 180, 24],
+        [-275, 95, 20], [-200, 165, 20], [-90, 150, 26], [60, 185, 22],
+        [150, 190, 24], [330, 190, 28], [400, 120, 36], [470, -120, 40], [460, 20, 36]
       ];
       var pts = [];
       CLUSTERS.forEach(function (cl) {
@@ -752,12 +730,12 @@
             break;
           case 'TAXI_OUT': setState('HOLD', jit(5), null); break;
           case 'HOLD':
-            setState('ROLL', jit(10), curveOf([V(RT.x1 + 4, GY, RT.z), V(RT.x1 + 190, GY, RT.z)]), easeIn);
+            setState('ROLL', jit(11), curveOf([V(RT.x1 + 4, GY, RT.z), V(RT.x1 + 260, GY, RT.z)]), easeIn);
             break;
           case 'ROLL':
             st.circle = cruiseCircle();
             var c0 = st.circle.getPointAt(0);
-            setState('CLIMB', jit(15), curveOf([V(RT.x1 + 190, GY, RT.z), V(RT.x1 + 330, 55, RT.z + rnd(-16, 6)), V((RT.x1 + 430 + c0.x) / 2, (55 + c0.y) / 2 + 26, (RT.z + c0.z) / 2), c0]), easeIn);
+            setState('CLIMB', jit(15), curveOf([V(RT.x1 + 260, GY, RT.z), V(RT.x1 + 430, 55, RT.z + rnd(-16, 6)), V((RT.x1 + 540 + c0.x) / 2, (55 + c0.y) / 2 + 26, (RT.z + c0.z) / 2), c0]), easeIn);
             break;
           case 'CLIMB':
             craft.userData.gear.visible = false;
@@ -976,18 +954,7 @@
           path: function (u) { var p = c2.getPointAt(Math.min(0.999, u)); p.y = 0; return p; } };
       });
     })();
-    // an airport shuttle bus cruising the car road
-    (function () {
-      var bus = new THREE.Group();
-      var bb = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 2.4), M.mat(0xE8B93C, 0.5, 0.2)); bb.position.y = 1.5; bb.castShadow = true; bus.add(bb);
-      var bw = new THREE.Mesh(new THREE.BoxGeometry(9.1, 0.8, 2.45), M.win); bw.position.y = 2.1; bus.add(bw);
-      addShadow(bus, 10);
-      legMover(bus, function () {
-        var dir = Math.random() < 0.5 ? 1 : -1;
-        return { dur: jit(26), gap: rnd(14, 40), flat: true,
-          path: function (u) { return V(dir > 0 ? (-70 + u * 330) : (260 - u * 330), 0, TERM.z + 32); } };
-      });
-    })();
+    // (shuttle bus removed with the car road)
 
     /* ---- clouds ------------------------------------------------------------*/
     var cloudTexv = softSprite(THREE), clouds = [];
