@@ -499,7 +499,7 @@
       STAGES.forEach(function(s){var o=el('option',{value:s.id,text:'Stage → '+s.id});if(s.id===a.stage)o.selected=true;moveSel.appendChild(o);});
       body.appendChild(el('div.flex.gap-1.flex-wrap', null, [
         moveSel,
-        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(a.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ a.payStatus=a.payStatus==='Paid'?'Due':'Paid'; db.saveVisaApp(a); if(a.payStatus==='Paid') postVisaToFinance(a); redraw(); refresh(); }}),
+        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(a.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ a.payStatus=a.payStatus==='Paid'?'Due':'Paid'; db.saveVisaApp(a); if(a.payStatus==='Paid') postVisaToFinance(a); db.settleSale('travels', a.id, (fees(a).customerTotal||a.sale||0), a.applicant||'', a.payStatus==='Paid'); redraw(); refresh(); }}),
         el('button.btn.btn-sm.btn-ghost',{html:ui.icon('file-earmark-text')+' Cover Sheet',onclick:function(){ openCoverSheet(a); }}),
         el('button.btn.btn-sm.btn-danger',{html:ui.icon('trash')+' Delete',onclick:function(){ ui.confirm({title:'Delete application?',danger:true,confirmLabel:'Delete'}).then(function(ok){ if(ok){ S.removeFrom('visaApps',a.id); EPAL.bus.emit('data:changed',{store:'visaApps',action:'delete'}); m.close(); refresh(); ui.toast('Application deleted','success'); } }); }})
       ]));

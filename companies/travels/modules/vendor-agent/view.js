@@ -589,6 +589,15 @@
           provisionPartyUser(rec, 'vendor', val.loginPassword);
         }
         db.save('vendors', rec);
+        // the opening balance lands in the BOOKS too (party statement + AP aging),
+        // not just on the record — stable id, so edits update rather than duplicate
+        var ob = +val.openingBalance || 0;
+        try {
+          if (EPAL.ledger && EPAL.ledger.post) {
+            if (ob > 0) EPAL.ledger.post({ id: 'GL-OPVD-' + rec.id, date: new Date().toISOString().slice(0, 10), companyId: 'travels', ref: 'OPEN-' + rec.id, memo: 'Opening balance · ' + rec.name, source: 'opening', party: rec.name, override: true, lines: [ { account: '3100', dr: ob, cr: 0 }, { account: '2000', dr: 0, cr: ob } ] });
+            else if (EPAL.ledger.remove) EPAL.ledger.remove('GL-OPVD-' + rec.id);
+          }
+        } catch (e) {}
         ui.toast('Vendor "' + rec.name + '" saved' + (val.createLogin ? ' · ERP login provisioned' : ''), 'success');
         EPAL.router.render();
         return true;
@@ -692,6 +701,14 @@
         rec.responsible = { name: val.respName || '', designation: val.respDesignation || '', phone: val.respPhone || '', email: val.respEmail || '' };
         if (val.createLogin && (val.loginEmail || rec.email)) { rec.login = { email: val.loginEmail || rec.email, role: 'agent', enabled: true }; provisionPartyUser(rec, 'agent', val.loginPassword); }
         db.save('tv_agents', rec);
+        // agent opening balance (receivable) lands in the books as well
+        var ob2 = +val.balance || 0;
+        try {
+          if (EPAL.ledger && EPAL.ledger.post) {
+            if (ob2 > 0) EPAL.ledger.post({ id: 'GL-OPAG-' + rec.id, date: new Date().toISOString().slice(0, 10), companyId: 'travels', ref: 'OPEN-' + rec.id, memo: 'Opening balance · ' + rec.name, source: 'opening', party: rec.name, override: true, lines: [ { account: '1150', dr: ob2, cr: 0 }, { account: '3100', dr: 0, cr: ob2 } ] });
+            else if (EPAL.ledger.remove) EPAL.ledger.remove('GL-OPAG-' + rec.id);
+          }
+        } catch (e) {}
         ui.toast('Agent "' + rec.name + '" saved', 'success');
         EPAL.router.render();
         return true;

@@ -586,6 +586,28 @@
       return companyId ? s.filter(function (x) { return x.companyId === companyId; }) : s;
     },
 
+    /* Customer-payment SETTLEMENT for a sale that was posted as a receivable:
+     * flipping a ticket/visa to Paid posts DR Cash / CR AR under a stable id
+     * (GL-SET-<ref>), and flipping back to Due removes that same entry — so the
+     * record's payment status and the BOOKS can never drift apart.
+     * ==> LARAVEL: a payments table row + posted journal, deleted on reversal. */
+    settleSale: function (companyId, ref, amount, party, paid) {
+      if (!EPAL.ledger || !EPAL.ledger.post) return;
+      var id = 'GL-SET-' + ref;
+      if (paid) {
+        // no-op when the original sale already went straight to cash
+        var origCash = S.list('gl_entries').some(function (e) {
+          return e.source === 'sale' && e.ref === ref && (e.lines || []).some(function (l) { return l.account === '1010' && l.dr > 0; });
+        });
+        if (origCash || !(+amount > 0)) return;
+        try {
+          EPAL.ledger.post({ id: id, date: new Date().toISOString().slice(0, 10), companyId: companyId,
+            ref: ref, memo: 'Customer payment received · ' + ref, source: 'payment', party: party || '',
+            lines: [ { account: '1010', dr: +amount, cr: 0 }, { account: '1200', dr: 0, cr: +amount } ] });
+        } catch (e) {}
+      } else if (EPAL.ledger.remove) { try { EPAL.ledger.remove(id); } catch (e) {} }
+    },
+
     /* --- mutations (all emit events → live sync) --------------------------*/
     saveTask: function (empId, task) {
       var arr = this.tasksFor(empId);

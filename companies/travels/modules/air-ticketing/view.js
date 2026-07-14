@@ -1261,7 +1261,7 @@
       STATUSES.forEach(function(s){ var o=el('option',{value:s.id,text:'Status → '+s.id}); if(s.id===t.status)o.selected=true; moveSel.appendChild(o); });
       body.appendChild(el('div.flex.gap-1.flex-wrap', null, [
         moveSel,
-        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(t.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ t.payStatus=t.payStatus==='Paid'?'Due':'Paid'; db.saveAirTicket(t); redraw(); refresh&&refresh(); }}),
+        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(t.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ t.payStatus=t.payStatus==='Paid'?'Due':'Paid'; db.saveAirTicket(t); db.settleSale('travels', t.id, t.sale||0, t.customer||t.passenger||'', t.payStatus==='Paid'); redraw(); refresh&&refresh(); }}),
         el('button.btn.btn-sm.btn-outline',{html:ui.icon('arrow-repeat')+' Reissue',onclick:function(){ m.close(); reissueTicket(t, refresh); }}),
         el('button.btn.btn-sm.btn-outline',{html:ui.icon('x-octagon')+' Void',onclick:function(){ m.close(); voidTicket(t, refresh); }}),
         el('button.btn.btn-sm.btn-outline',{html:ui.icon('arrow-counterclockwise')+' Refund',onclick:function(){ m.close(); refundFromTicket(t, refresh); }}),
