@@ -95,10 +95,16 @@
       // sidebar collapse / scrollbars move .main without a window resize — observe it
       if (window.ResizeObserver) { try { new ResizeObserver(resize).observe(main); } catch (e) {} }
 
-      var running = false, t0 = (window.performance && performance.now()) || 0, raf;
+      // scene clock: t must be CONTINUOUS across tab hides — resetting it made
+      // every scheduled leg/mutex timestamp invalid (aircraft froze mid-runway).
+      var running = false, t0 = (window.performance && performance.now()) || 0, pausedAt = 0, raf;
       function loop(now) { if (!running) return; var t = (now - t0) / 1000; for (var i = 0; i < updaters.length; i++) updaters[i](t); renderer.render(scene, camera); raf = window.requestAnimationFrame(loop); }
-      function startL() { if (running || reduce) return; running = true; t0 = (window.performance && performance.now()) || 0; raf = window.requestAnimationFrame(loop); }
-      function stopL() { running = false; if (raf) window.cancelAnimationFrame(raf); }
+      function startL() {
+        if (running || reduce) return; running = true;
+        if (pausedAt) { t0 += ((window.performance && performance.now()) || 0) - pausedAt; pausedAt = 0; }   // shift, never reset
+        raf = window.requestAnimationFrame(loop);
+      }
+      function stopL() { if (running) pausedAt = (window.performance && performance.now()) || 0; running = false; if (raf) window.cancelAnimationFrame(raf); }
       if (reduce) { for (var i = 0; i < updaters.length; i++) updaters[i](7); renderer.render(scene, camera); } else startL();
       document.addEventListener('visibilitychange', function () { if (document.hidden) stopL(); else startL(); });
     } catch (e) { /* atmosphere is optional — never break the app */ }
@@ -119,6 +125,8 @@
       nacelle: S(0x3c4658, 0.45, 0.5), fan: S(0xaebbd6, 0.35, 0.65), win: S(0x0e1830, 0.2, 0.5),
       tire: S(0x14161c, 0.85, 0.05), strut: S(0x8a94a8, 0.5, 0.5),
       accent: S(0xf4b740, 0.5, 0.2), red: S(0xf0506e, 0.5, 0.2),
+      water: S(0x3d7ec2, 0.12, 0.65), wood: S(0x8a6b46, 0.8, 0.05),
+      treeTop: S(0x3f6b3a, 0.9, 0.02), trunk: S(0x6d5230, 0.9, 0.02),
       lightTex: lightSprite(THREE), shadowT: shadowTex(THREE), mat: mat, THREE: THREE
     };
   }
@@ -147,8 +155,94 @@
     // ---- ground (grass), runway, taxiway, apron --------------------------
     var ground = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), M.grass); ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.15, -420); ground.userData.noOutline = true; scene.add(ground);
     var runway = new THREE.Mesh(new THREE.PlaneGeometry(46, 620), new THREE.MeshStandardMaterial({ map: runwayTex(THREE), roughness: 0.94, metalness: 0.04 })); runway.rotation.x = -Math.PI / 2; runway.position.set(0, 0, -250); scene.add(runway);
-    var taxi = new THREE.Mesh(new THREE.PlaneGeometry(18, 360), new THREE.MeshStandardMaterial({ map: taxiTex(THREE), roughness: 0.94, metalness: 0.04 })); taxi.rotation.x = -Math.PI / 2; taxi.position.set(52, 0.01, -150); scene.add(taxi);
+    // TAKE-OFF RUNWAY (the old yellow-lined strip, upgraded to real asphalt)
+    var rw2 = new THREE.Mesh(new THREE.PlaneGeometry(30, 500), new THREE.MeshStandardMaterial({ map: runwayTex(THREE), roughness: 0.94, metalness: 0.04 }));
+    rw2.rotation.x = -Math.PI / 2; rw2.position.set(60, 0.005, -170); scene.add(rw2);
+    // curved-feel CONNECTING taxiway between the two runways (yellow guide line)
+    var conn = new THREE.Mesh(new THREE.PlaneGeometry(96, 14), new THREE.MeshStandardMaterial({ map: connTex(THREE), roughness: 0.94, metalness: 0.04 }));
+    conn.rotation.x = -Math.PI / 2; conn.position.set(26, 0.012, 42); scene.add(conn);
     var apron = new THREE.Mesh(new THREE.PlaneGeometry(120, 70), M.apron); apron.rotation.x = -Math.PI / 2; apron.position.set(-66, 0.01, -66); scene.add(apron);
+
+    /* ============= ZONING (the owner's sketch, zone by zone) ============= */
+    var roadMat = new THREE.MeshStandardMaterial({ map: roadTex(THREE), roughness: 0.95, metalness: 0.04 });
+    function roadStrip(x1, z1, x2, z2, w) {
+      var dx = x2 - x1, dz = z2 - z1, len = Math.sqrt(dx * dx + dz * dz);
+      var m2 = roadMat.clone(); m2.map = roadMat.map.clone(); m2.map.needsUpdate = true; m2.map.repeat.set(1, len / 34);
+      var r = new THREE.Mesh(new THREE.PlaneGeometry(w || 9, len), m2);
+      r.rotation.x = -Math.PI / 2; r.rotation.z = Math.atan2(dx, dz);
+      r.position.set((x1 + x2) / 2, 0.014, (z1 + z2) / 2); scene.add(r); return r;
+    }
+    // ROADS & FLOW: heliport → hangar → apron → parking → city
+    roadStrip(-168, 6, -156, -108, 10);                      // hangar road (bottom-left)
+    roadStrip(-156, -108, -128, -128, 10);
+    roadStrip(74, 42, 118, -18, 9);                          // connector-east to the aprons
+    roadStrip(118, -18, 150, -70, 9);                        // down to the car park
+    roadStrip(150, -70, 152, -216, 9);                       // on to the city block
+
+    // HELIPORT — round pad, white H, ring lights, at the end of the hangar road
+    var pad = new THREE.Mesh(new THREE.CircleGeometry(11, 26), new THREE.MeshStandardMaterial({ map: heliPadTex(THREE), transparent: true, roughness: 0.9, metalness: 0.04 }));
+    pad.rotation.x = -Math.PI / 2; pad.position.set(-172, 0.02, 16); scene.add(pad);
+    for (var hl = 0; hl < 8; hl++) { var an = hl / 8 * 6.2832; scene.add(at(light(THREE, M, 0xfff2c8, 0.8, 'steady'), -172 + Math.cos(an) * 10.4, 0.5, 16 + Math.sin(an) * 10.4)); }
+
+    // LAKE + landscape between the hangar and the landing runway
+    var lake = new THREE.Mesh(new THREE.CircleGeometry(22, 26), M.water);
+    lake.rotation.x = -Math.PI / 2; lake.scale.x = 1.45; lake.position.set(-84, 0.02, -178); scene.add(lake);
+    var shine = new THREE.Mesh(new THREE.CircleGeometry(21, 26), new THREE.MeshBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.14, depthWrite: false }));
+    shine.rotation.x = -Math.PI / 2; shine.scale.x = 1.42; shine.position.set(-84, 0.05, -178); scene.add(shine);
+    updaters.push(function (t) { shine.material.opacity = 0.1 + 0.07 * (0.5 + 0.5 * Math.sin(t * 0.7)); shine.rotation.z = t * 0.02; });
+    var walk = new THREE.Mesh(new THREE.RingGeometry(23.5, 27, 26), M.apron);
+    walk.rotation.x = -Math.PI / 2; walk.scale.x = 1.42; walk.position.set(-84, 0.015, -178); scene.add(walk);
+    function tree(x, z, s2) { var g2 = new THREE.Group(); var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 4, 6), M.trunk); tr.position.y = 2; g2.add(tr); var top = new THREE.Mesh(new THREE.ConeGeometry(3.4, 7.5, 8), M.treeTop); top.position.y = 8; g2.add(top); g2.position.set(x, 0, z); g2.scale.setScalar(s2 || 1); scene.add(g2); }
+    tree(-122, -158, 1.1); tree(-116, -196, 0.9); tree(-52, -200, 1.2); tree(-48, -162, 0.85); tree(-84, -218, 1.0); tree(-118, -178, 0.8);
+    for (var bu = 0; bu < 6; bu++) { var ba = bu / 6 * 6.2832; var bush = new THREE.Mesh(new THREE.IcosahedronGeometry(1.6, 0), M.treeTop); bush.position.set(-84 + Math.cos(ba) * 44, 1.0, -178 + Math.sin(ba) * 31); scene.add(bush); }
+    for (var fl = 0; fl < 42; fl++) { var fa = Math.random() * 6.2832, fr = 33 + Math.random() * 9; scene.add(at(light(THREE, M, [0xff8fb2, 0xffd45e, 0xffffff, 0xb28fff][fl % 4], 0.55, 'steady'), -84 + Math.cos(fa) * fr * 1.42, 0.5, -178 + Math.sin(fa) * fr * 0.98)); }
+    [[-84, -145, 0], [-116, -186, 1.2], [-53, -186, -1.2]].forEach(function (bp) {
+      var bench = new THREE.Group();
+      var seat = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.3, 1.1), M.wood); seat.position.y = 1.1; bench.add(seat);
+      var back = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 0.22), M.wood); back.position.set(0, 1.8, -0.5); bench.add(back);
+      bench.position.set(bp[0], 0, bp[1]); bench.rotation.y = bp[2]; scene.add(bench);
+      var lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 4.4, 6), M.gun); lamp.position.set(bp[0] + 2.6, 2.2, bp[1]); scene.add(lamp);
+      scene.add(at(light(THREE, M, 0xffe2a8, 1.1, 'steady'), bp[0] + 2.6, 4.6, bp[1]));
+    });
+
+    // PLANE PARKING apron (right of the take-off runway) + props
+    var apron2 = new THREE.Mesh(new THREE.PlaneGeometry(58, 40), M.apron);
+    apron2.rotation.x = -Math.PI / 2; apron2.position.set(116, 0.01, -136); scene.add(apron2);
+    [[100, -126, -0.55, 2], [116, -138, -0.55, 3], [132, -150, -0.55, 1]].forEach(function (ps) {
+      var pp = buildAirliner(THREE, M, 1.05, false, LIVERIES[ps[3]]);
+      pp.position.set(ps[0], 2.6, ps[1]); pp.rotation.y = ps[2]; scene.add(pp);
+      var sp2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.26, depthWrite: false, fog: false }));
+      sp2.scale.set(15, 9, 1); sp2.position.set(ps[0], 0.24, ps[1]); scene.add(sp2);
+      var line = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 10), new THREE.MeshBasicMaterial({ color: 0xe8c53a }));
+      line.rotation.x = -Math.PI / 2; line.rotation.z = ps[2]; line.position.set(ps[0] + 4, 0.02, ps[1] + 4); scene.add(line);
+    });
+    scene.add(buildTruck(THREE, M, V(96, 0, -148)));
+    var cart2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 1.6), M.blue); cart2.position.set(104, 0.8, -152); scene.add(cart2);
+
+    // CAR PARKING (grid + colourful low-poly cars), joined to the city road
+    var carPad = new THREE.Mesh(new THREE.PlaneGeometry(36, 27), new THREE.MeshStandardMaterial({ map: carParkTex(THREE), roughness: 0.95, metalness: 0.04 }));
+    carPad.rotation.x = -Math.PI / 2; carPad.position.set(152, 0.018, -86); scene.add(carPad);
+    var CAR_COLS = [0xc0392b, 0x2e86c1, 0xf4d03f, 0xecf0f1, 0x27ae60, 0x8e44ad, 0x1c2833, 0xe67e22, 0x76d7c4];
+    for (var cc = 0; cc < 9; cc++) {
+      var car = new THREE.Group();
+      var cb = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 1.3), M.mat(CAR_COLS[cc], 0.5, 0.3)); cb.position.y = 0.75; car.add(cb);
+      var ct = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.65, 1.2), M.win); ct.position.set(-0.1, 1.5, 0); car.add(ct);
+      car.position.set(141 + (cc % 3) * 10.5, 0, -78 - Math.floor(cc / 3) * 7.5); car.rotation.y = Math.PI / 2; scene.add(car);
+    }
+
+    // WINDSOCK near the landing threshold
+    var sockPole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 7, 6), M.gun); sockPole.position.set(34, 3.5, 56); scene.add(sockPole);
+    var sock = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.6, 8, 1, true), M.mat(0xf07030, 0.7, 0.05));
+    sock.rotation.z = Math.PI / 2; sock.position.set(35.8, 6.6, 56); scene.add(sock);
+    updaters.push(function (t) { sock.rotation.y = Math.sin(t * 0.5) * 0.35; sock.rotation.x = Math.sin(t * 1.7) * 0.06; });
+
+    // SECOND (smaller) hangar + EPAL TRAVELS signage + rooftop details
+    var h2 = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 24, 16, 1, true, 0, Math.PI), M.bldg2);
+    h2.rotation.z = Math.PI / 2; h2.position.set(-150, 0.2, -110); scene.add(h2);
+    var h2m = new THREE.Mesh(new THREE.CircleGeometry(8.6, 16, 0, Math.PI), M.dark); h2m.position.set(-138.2, 0.2, -110); h2m.rotation.y = Math.PI / 2; scene.add(h2m);
+    var sign = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.2, 22), new THREE.MeshStandardMaterial({ map: signTex(THREE), roughness: 0.6, metalness: 0.1 }));
+    sign.position.set(-127.6, 12.5, -150); scene.add(sign);
+    [[-158, -142], [-144, -156]].forEach(function (vp) { var vent = new THREE.Mesh(new THREE.BoxGeometry(3, 1.6, 3), M.grey); vent.position.set(vp[0], 16.6, vp[1]); scene.add(vent); });
 
     // ---- airport lighting: small twinkling edge/taxi lamps + sequenced approach
     var edgeL = buildEdgeLights(THREE, M); scene.add(edgeL.g); updaters.push(edgeL.update);
@@ -215,6 +309,9 @@
     }
     function legMover(obj, makeLeg) {
       var o = obj.g || obj; scene.add(o);
+      // hidden until the FIRST leg starts — a craft waiting on the runway mutex
+      // used to sit visible at its spawn origin, mid-runway ("plane stuck")
+      o.visible = false;
       var leg = null, start = 0, idleUntil = -1;
       updaters.push(function (t) {
         var sh = o.userData.shadowS;
@@ -224,9 +321,14 @@
           if (!leg) { idleUntil = t + 1.2 + Math.random(); return; }     // e.g. runway busy → retry shortly
           start = t; o.visible = true; if (leg.init) leg.init();
         }
-        var u = (t - start) / leg.dur;
-        if (u >= 1) { idleUntil = t + (leg.gap || 0.01); o.visible = false; if (sh) sh.visible = false; return; }
+        var u = Math.max(0, (t - start) / leg.dur);
+        if (u >= 1) {
+          idleUntil = t + (leg.gap || 0.01);
+          if (!leg.stay) { o.visible = false; if (sh) sh.visible = false; }   // stay:true = rest in place (heliport pad)
+          return;
+        }
         var du = 0.006, p = leg.path(u), p2 = leg.path(Math.min(0.9999, u + du)), p0 = leg.path(Math.max(0, u - du));
+        if (leg.flat) { p2 = V(p2.x, p.y, p2.z); p0 = V(p0.x, p.y, p0.z); }   // level attitude (helicopter, birds)
         // aircraft bank INTO turns only in the air — on the ground they stay flat
         // (the "nearly crashing" lean during runway exits came from ground banking)
         var bank = (p.y > 7) ? bankOf(p0, p, p2) : 0;
@@ -266,16 +368,16 @@
             if (u < 0.82) return bez(RO, V(-26, 4.6, 50), X1, (u - 0.62) / 0.20);                              // wide slow vacate
             return bez(X1, V((X1.x + gate.x) / 2 - 16, 4.6, -48), gate, (u - 0.82) / 0.18);                    // to own gate
           } };
-        } else {                                    // DEPART: gate → strip → sky
-          var climb = rnd(110, 190), drift = rnd(-140, 150), dist = rnd(640, 860);
-          var T1 = V(52, 4.6, -66), T2 = V(52, 4.6, 22), R = V(4, 4.6, 36), RE = V(4, 4.6, -150);
-          var E = V(4 + drift, 4.6 + climb, -150 - dist);
-          dur = rnd(40, 58);
+        } else {                                    // DEPART: gate → connector → TAKE-OFF runway → sky
+          var climb = rnd(110, 190), drift = rnd(-140, 150), dist = rnd(620, 840);
+          var C1 = V(-6, 4.6, 42), C2 = V(54, 4.6, 42), R = V(60, 4.6, 26), RE = V(60, 4.6, -190);
+          var E = V(60 + drift, 4.6 + climb, -190 - dist);
+          dur = rnd(42, 60);
           leg = { dur: dur, gap: rnd(6, 24), path: function (u) {
-            if (u < 0.16) return bez(gate, V(gate.x + 44, 4.6, -54), T1, u / 0.16);
-            if (u < 0.40) return lerpV(T1, T2, (u - 0.16) / 0.24);
-            if (u < 0.48) return bez(T2, V(44, 4.6, 42), R, (u - 0.40) / 0.08);
-            if (u < 0.70) { var k = (u - 0.48) / 0.22; return lerpV(R, RE, k * k); }         // accelerating roll
+            if (u < 0.16) return bez(gate, V(gate.x + 30, 4.6, 8), C1, u / 0.16);           // out to the connector
+            if (u < 0.38) return lerpV(C1, C2, (u - 0.16) / 0.22);                          // along the yellow line
+            if (u < 0.46) return bez(C2, V(60, 4.6, 40), R, (u - 0.38) / 0.08);             // turn onto the strip
+            if (u < 0.70) { var k = (u - 0.46) / 0.24; return lerpV(R, RE, k * k); }        // accelerating roll
             var e2 = (u - 0.70) / 0.30; e2 = e2 * e2;
             return V(RE.x + e2 * (E.x - RE.x), RE.y + e2 * (E.y - RE.y), RE.z + e2 * (E.z - RE.z));
           }, tick: function (u) { craft.userData.gear.visible = u < 0.76; } };
@@ -342,12 +444,43 @@
 
     // HELICOPTER — random diagonal crossings at random heights
     var heli = buildHeli(THREE, M);
+    // …it lives at the HELIPORT now: lifts off the H, flies a wide errand out of
+    // frame, returns, sets down on the pad and RESTS there (visible, rotor still).
+    addShadow(heli, 13);
+    var PAD = V(-172, 1.8, 16), heliOut = false;
+    function rotorTick(u, t) { heli.rotor.rotation.y = t * 22; heli.tail.rotation.x = t * 30; }
     legMover(heli, function () {
-      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(42, 95), z1 = rnd(-60, -260), z2 = rnd(-60, -260), bob = rnd(2, 8);
-      return { dur: rnd(22, 38), gap: rnd(5, 24),
-        path: function (u) { return V(dir * (-700 + u * 1400), alt + Math.sin(u * 6.3) * bob, z1 + (z2 - z1) * u); },
-        tick: function (u, t) { heli.rotor.rotation.y = t * 22; heli.tail.rotation.x = t * 30; } };
+      heliOut = !heliOut;
+      if (heliOut) {                                     // depart the pad → off frame
+        var alt = rnd(55, 95), ez = rnd(-240, -60);
+        return { dur: rnd(20, 30), gap: rnd(3, 8), flat: true, tick: rotorTick,
+          path: function (u) {
+            if (u < 0.22) { var k = u / 0.22; return V(PAD.x, PAD.y + k * k * (alt - PAD.y), PAD.z + k * 5); }   // vertical lift
+            var k2 = (u - 0.22) / 0.78;
+            return bez(V(PAD.x, alt, PAD.z + 5), V(-420, alt + 12, (PAD.z + ez) / 2), V(-760, alt, ez), k2);
+          } };
+      }
+      var alt2 = rnd(55, 95), iz = rnd(-240, -60);       // return → hover-descend → REST on the H
+      return { dur: rnd(24, 34), gap: rnd(14, 30), stay: true, flat: true, tick: rotorTick,
+        path: function (u) {
+          if (u < 0.72) { var k = u / 0.72; return bez(V(-760, alt2, iz), V(-420, alt2 + 10, (iz + PAD.z) / 2), V(PAD.x, alt2, PAD.z + 5), k); }
+          var k2 = (u - 0.72) / 0.28;
+          return V(PAD.x, alt2 - (alt2 - PAD.y) * k2 * k2, PAD.z + 5 - 5 * k2);
+        } };
     });
+
+    // a few BIRDS drifting across (tiny dark flecks on wavy paths)
+    for (var bd = 0; bd < 3; bd++) {
+      (function (bi) {
+        var bird = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, color: 0x2a3242, transparent: true, opacity: 0.8, depthWrite: false }));
+        bird.scale.set(2.2, 1.1, 1);
+        legMover(bird, function () {
+          var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(95, 145), z = rnd(-120, -320), wob = rnd(4, 10);
+          return { dur: rnd(50, 85), gap: rnd(8, 30), flat: true,
+            path: function (u) { return V(dir * (-740 + u * 1480), alt + Math.sin(u * 40 + bi) * wob * 0.2 + Math.sin(u * 6.3) * wob, z); } };
+        });
+      })(bd);
+    }
 
     // FIGHTER-JET show — an occasional EVENT, not a metronome: random formation,
     // altitude, arc and direction, with long random silences between passes
@@ -700,12 +833,14 @@
     var pos = [], col = [], zEnd = -560, zThr = 60, white = [1, 0.95, 0.8], green = [0.2, 1, 0.4], red = [1, 0.2, 0.2];
     for (var z = zThr; z >= zEnd; z -= 14) { var c = (z > zThr - 6) ? green : (z < zEnd + 6) ? red : white; pos.push(-24, 0.5, z); col.push(c[0], c[1], c[2]); pos.push(24, 0.5, z); col.push(c[0], c[1], c[2]); }
     for (var z2 = zThr - 10; z2 >= zEnd + 10; z2 -= 16) { pos.push(0, 0.45, z2); col.push(1, 0.95, 0.85); }   // centreline
+    // the TAKE-OFF runway's edge rows (white, same twinkle)
+    for (var z3 = 74; z3 >= -414; z3 -= 14) { pos.push(44, 0.5, z3); col.push(1, 0.95, 0.8); pos.push(76, 0.5, z3); col.push(1, 0.95, 0.8); }
     return pointCloud(THREE, M, pos, col, 1.5, true);
   }
-  // small twinkling blue taxiway edge lights
+  // small twinkling blue lights along the runway CONNECTOR taxiway
   function buildTaxiLights(THREE, M) {
     var pos = [], col = [], blue = [0.3, 0.55, 1];
-    for (var z = -322; z <= 24; z += 16) { pos.push(45, 0.5, z); col.push(blue[0], blue[1], blue[2]); pos.push(59, 0.5, z); col.push(blue[0], blue[1], blue[2]); }
+    for (var x = -18; x <= 72; x += 12) { pos.push(x, 0.5, 34); col.push(blue[0], blue[1], blue[2]); pos.push(x, 0.5, 50); col.push(blue[0], blue[1], blue[2]); }
     return pointCloud(THREE, M, pos, col, 1.2, true);
   }
   // SEQUENCED FLASHING approach lights ("the rabbit") + REIL threshold strobes
@@ -763,6 +898,53 @@
     g.fillStyle = '#f2f5fc'; for (var y = 40; y < 984; y += 70) g.fillRect(60, y, 7, 44);
     g.fillStyle = '#eef2fa'; for (var i = 0; i < 7; i++) { g.fillRect(20 + i * 13, 16, 8, 64); g.fillRect(20 + i * 13, 944, 8, 64); }
     g.fillStyle = '#e9edf5';[150, 848].forEach(function (yy) { g.fillRect(30, yy, 14, 26); g.fillRect(84, yy, 14, 26); });
+    // painted runway numbers at both thresholds (09 / 27)
+    g.fillStyle = '#eef2fa'; g.font = 'bold 46px Arial'; g.textAlign = 'center';
+    g.save(); g.translate(64, 236); g.fillText('09', 0, 0); g.restore();
+    g.save(); g.translate(64, 795); g.rotate(Math.PI); g.fillText('27', 0, 0); g.restore();
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
+  }
+  // dashed grey service ROAD (repeats along its length)
+  function roadTex(THREE) {
+    var c = document.createElement('canvas'); c.width = 64; c.height = 256; var g = c.getContext('2d');
+    g.fillStyle = '#4a4e57'; g.fillRect(0, 0, 64, 256);
+    for (var k = 0; k < 260; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (52 + v * 24 | 0) + ',' + (56 + v * 24 | 0) + ',' + (62 + v * 24 | 0) + ',0.5)'; g.fillRect(Math.random() * 64, Math.random() * 256, 2, 2); }
+    g.fillStyle = '#dfe4ee'; for (var y = 12; y < 244; y += 56) g.fillRect(29, y, 6, 26);
+    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+  }
+  // taxiway CONNECTOR: asphalt with the yellow guide line
+  function connTex(THREE) {
+    var c = document.createElement('canvas'); c.width = 256; c.height = 64; var g = c.getContext('2d');
+    g.fillStyle = '#4d525c'; g.fillRect(0, 0, 256, 64);
+    for (var k = 0; k < 300; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (56 + v * 22 | 0) + ',' + (60 + v * 22 | 0) + ',' + (66 + v * 22 | 0) + ',0.5)'; g.fillRect(Math.random() * 256, Math.random() * 64, 2, 2); }
+    g.fillStyle = '#e8c53a'; g.fillRect(0, 29, 256, 5);
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+  }
+  // circular HELIPORT pad with the white H
+  function heliPadTex(THREE) {
+    var c = document.createElement('canvas'); c.width = c.height = 256; var g = c.getContext('2d');
+    g.clearRect(0, 0, 256, 256);
+    g.fillStyle = '#5a5f6a'; g.beginPath(); g.arc(128, 128, 124, 0, 6.3); g.fill();
+    g.strokeStyle = '#eef2fa'; g.lineWidth = 10; g.beginPath(); g.arc(128, 128, 106, 0, 6.3); g.stroke();
+    g.fillStyle = '#f2f5fc'; g.font = 'bold 120px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', 128, 134);
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
+  }
+  // car-park grid of white bays
+  function carParkTex(THREE) {
+    var c = document.createElement('canvas'); c.width = 256; c.height = 192; var g = c.getContext('2d');
+    g.fillStyle = '#565b66'; g.fillRect(0, 0, 256, 192);
+    g.strokeStyle = '#e6ebf5'; g.lineWidth = 4;
+    for (var x = 16; x <= 240; x += 45) { g.beginPath(); g.moveTo(x, 12); g.lineTo(x, 84); g.stroke(); g.beginPath(); g.moveTo(x, 108); g.lineTo(x, 180); g.stroke(); }
+    g.strokeRect(16, 12, 224, 72); g.strokeRect(16, 108, 224, 72);
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+  }
+  // EPAL TRAVELS signage — navy board, gold lettering (brand)
+  function signTex(THREE) {
+    var c = document.createElement('canvas'); c.width = 512; c.height = 96; var g = c.getContext('2d');
+    g.fillStyle = '#1B2A4A'; g.fillRect(0, 0, 512, 96);
+    g.strokeStyle = '#C9A227'; g.lineWidth = 5; g.strokeRect(6, 6, 500, 84);
+    g.fillStyle = '#C9A227'; g.font = 'bold 52px Georgia'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('EPAL TRAVELS', 256, 52);
     var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
   }
   function taxiTex(THREE) {
