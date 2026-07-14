@@ -1,25 +1,21 @@
 /* ============================================================================
  * EPAL GROUP ERP  ·  platform/atmosphere/ambient3d.js
  * ----------------------------------------------------------------------------
- * THE TRAVELS 3D AIRPORT — full MASTER-PLAN implementation (owner's brief),
- * styled after Hazrat Shahjalal Int'l (VGHS/DAC): runway 14/32, HSIA-style
- * white-canopy terminal, Biman Bangladesh liveries.
+ * THE TRAVELS 3D AIRPORT — rebuilt to the owner's REFERENCE DIORAMA images:
+ * a high aerial view of two horizontal parallel runways (TAKE-OFF above,
+ * LANDING below), the terminal + gate apron + car parking at bottom-right,
+ * the striped control tower on the right, a corner radar station top-right,
+ * three white quonset sheds between, and the LEFT CAMPUS — radar+hangar
+ * building, blue mini ATC tower, heliport inside the hangar-road loop, the
+ * fighter-plane lane with parked jets, the transport road and parked-plane
+ * sheds — with a small pond in the middle and conifer forest everywhere.
  *
- *  1. LAYOUT grid (400×400 world, single source of truth) — every object sits
- *     in its zone; nothing is placed ad-hoc. toWorld() maps grid → scene.
- *  2. Operational logic — LANDING only on RWY1 (approach from the far side,
- *     rolls toward the viewer); TAKE-OFF only on RWY2 (rolls away); one-way
- *     links (north = runway EXIT, south = runway ENTRY) so nothing meets
- *     head-on; per-runway locks so aircraft can never touch.
- *  3. Aircraft STATE MACHINE — PARKED → PUSHBACK → TAXI → HOLD → ROLL →
- *     CLIMB → CRUISE-LOOP (Catmull-Rom circles) → APPROACH → FLARE+TOUCH
- *     (smoke puff) → ROLLOUT → TAXI-TO-STAND → PARKED, 4 staggered aircraft
- *     with ±20% jitter on every duration.
- *  4. Visual layers — charcoal asphalt runways w/ crisp markings + "14/32",
- *     patchy realistic turf, deeper sky, sun shadows (one 2048 map), lake
- *     shimmer, EPAL-branded hangars, windsock, radar, twinkling lamp fields.
- *  5. Budget — lamp fields are single-draw shader point clouds; animation is
- *     clock-continuous across tab hides; the whole scene no-ops without WebGL.
+ * The aircraft STATE MACHINE from the master plan carries over onto the new
+ * geography: PARKED at a gate → PUSHBACK → TAXI west and up the left
+ * connector → HOLD → ROLL east down the TAKE-OFF runway → CLIMB (contrail)
+ * → CRUISE circles → long final from the west onto the LANDING runway →
+ * FLARE + smoke → ROLLOUT → S-exit down into the apron → free gate → PARKED.
+ * Per-runway locks: nothing can ever touch. Gate status lights stay live.
  * ==========================================================================*/
 
 (function () {
@@ -54,32 +50,32 @@
       var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       if (THREE.ACESFilmicToneMapping) renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.04;
+      renderer.toneMappingExposure = 1.05;
       if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-      var HORIZON = 0xd9e7f4;
+      var HORIZON = 0xdae8f5;
       var scene = new THREE.Scene();
-      scene.fog = new THREE.Fog(HORIZON, 560, 1900);
-      var camera = new THREE.PerspectiveCamera(46, 1, 1, 8000);
-      camera.position.set(14, 56, 178); camera.lookAt(10, 12, -190);
+      scene.fog = new THREE.Fog(HORIZON, 900, 2600);
+      // HIGH AERIAL camera — the reference diorama angle
+      var camera = new THREE.PerspectiveCamera(45, 1, 1, 9000);
+      camera.position.set(25, 330, 330); camera.lookAt(15, 0, -60);
 
-      var SUN = new THREE.Vector3(-340, 300, -380);
+      var SUN = new THREE.Vector3(-380, 420, -260);
       scene.add(buildSky(THREE));
       scene.add(buildSun(THREE, SUN));
 
-      scene.add(new THREE.HemisphereLight(0xbdd8f6, 0x5f7048, 0.9));
-      var key = new THREE.DirectionalLight(0xfff1cf, 1.45); key.position.copy(SUN);
+      scene.add(new THREE.HemisphereLight(0xbdd8f6, 0x64784c, 0.92));
+      var key = new THREE.DirectionalLight(0xfff3d4, 1.4); key.position.copy(SUN);
       key.castShadow = true;
       key.shadow.mapSize.set(2048, 2048);
-      key.shadow.camera.left = -420; key.shadow.camera.right = 420;
-      key.shadow.camera.top = 420; key.shadow.camera.bottom = -420;
-      key.shadow.camera.near = 60; key.shadow.camera.far = 1400;
+      key.shadow.camera.left = -520; key.shadow.camera.right = 520;
+      key.shadow.camera.top = 520; key.shadow.camera.bottom = -520;
+      key.shadow.camera.near = 60; key.shadow.camera.far = 1600;
       key.shadow.bias = -0.001;
       scene.add(key);
-      var fill = new THREE.DirectionalLight(0xcfe0ff, 0.28); fill.position.set(160, 60, 80); scene.add(fill);
-      var rim = new THREE.DirectionalLight(0xffffff, 0.35); rim.position.set(40, 40, 240); scene.add(rim);
+      var fill = new THREE.DirectionalLight(0xcfe0ff, 0.3); fill.position.set(220, 140, 160); scene.add(fill);
 
       var M = makeMaterials(THREE);
       var updaters = buildAirport(THREE, M, scene);
@@ -97,7 +93,6 @@
       resize(); window.addEventListener('resize', resize);
       if (window.ResizeObserver) { try { new ResizeObserver(resize).observe(main); } catch (e) {} }
 
-      // continuous scene clock (shifts across tab hides — never resets)
       var running = false, t0 = (window.performance && performance.now()) || 0, pausedAt = 0, raf;
       function loop(now) { if (!running) return; var t = (now - t0) / 1000; for (var i = 0; i < updaters.length; i++) updaters[i](t); renderer.render(scene, camera); raf = window.requestAnimationFrame(loop); }
       function startL() {
@@ -112,29 +107,7 @@
   }
 
   /* ==========================================================================
-   * THE LAYOUT GRID — single source of truth (owner's master plan, 400×400)
-   * ========================================================================*/
-  var GRID = {
-    rwy1:   { x: 0,   w: 52,  z1: -180, z2: 180 },     // LANDING 14/32 (centre)
-    rwy2:   { x: 80,  w: 40,  z1: -180, z2: 180 },     // TAKE-OFF (right, parallel)
-    linkN:  { z: -60 },                                // one-way: runway EXIT
-    linkS:  { z: 120 },                                // one-way: runway ENTRY
-    corridor: { x: 112 },                              // N–S taxilane east of RWY2
-    stands: [ { x: 150, z: 40 }, { x: 168, z: 52 }, { x: 186, z: 64 }, { x: 158, z: 78 } ],  // plane parking — RIGHT-BOTTOM
-    hangar1: { x: -138, z: -118 }, hangar2: { x: -102, z: -146 },
-    lake:   { x: -112, z: 0, rx: 46, rz: 30 },
-    heli:   { x: -140, z: 128, r: 12 },
-    carpark:{ x: 148, z: 118, w: 42, d: 30 },
-    terminal:{ x: 152, z: 158 },                       // HSIA-style canopy, behind stands
-    tower:  { x: 118, z: 150 },
-    city:   { x: 196, z: 172 }
-  };
-  // grid → world (camera looks down −z; grid z=+180 is nearest the viewer)
-  function WX(gx) { return gx * 1.28; }
-  function WZ(gz) { return (gz - 180) * 1.55; }
-
-  /* ==========================================================================
-   * MATERIALS + CANVAS TEXTURES (charcoal asphalt, patchy turf, brand sign)
+   * MATERIALS + TEXTURES
    * ========================================================================*/
   function makeMaterials(THREE) {
     var cache = {};
@@ -142,90 +115,87 @@
     function mat(c, r, m) { var k = c + '|' + r + '|' + m; return cache[k] || (cache[k] = S(c, r, m)); }
     return {
       grass: new THREE.MeshStandardMaterial({ map: grassTex(THREE), roughness: 1, metalness: 0 }),
-      apron: new THREE.MeshStandardMaterial({ color: 0x4a4e57, roughness: 0.93, metalness: 0.05 }),
-      bldg: S(0xd3dcea, 0.82, 0.06), bldg2: S(0xe6ecf6, 0.8, 0.06), glass: S(0x7fa6d8, 0.24, 0.55),
-      white: S(0xaebfe2, 0.48, 0.22), blue: S(0x1c53b8, 0.4, 0.32), soft: S(0x5f7ac9, 0.5, 0.22),
+      apron: new THREE.MeshStandardMaterial({ map: apronTex(THREE), roughness: 0.93, metalness: 0.05 }),
+      asphalt: S(0x3a3d45, 0.95, 0.04),
+      bldg: S(0xdde4f0, 0.82, 0.06), bldg2: S(0xeef2f9, 0.8, 0.06), glass: S(0x7fa6d8, 0.24, 0.55),
+      shed: S(0x8e97a8, 0.85, 0.08), shedRoof: S(0x767f92, 0.85, 0.08),
+      white: S(0xaebfe2, 0.48, 0.22), blue: S(0x2b6cd4, 0.4, 0.32), soft: S(0x5f7ac9, 0.5, 0.22),
       grey: S(0x8996b4, 0.5, 0.25), gun: S(0x566078, 0.5, 0.34), dark: S(0x232d47, 0.5, 0.4), cockpit: S(0x14203a, 0.22, 0.6),
       nacelle: S(0x3c4658, 0.45, 0.5), fan: S(0xaebbd6, 0.35, 0.65), win: S(0x0e1830, 0.2, 0.5),
       tire: S(0x14161c, 0.85, 0.05), strut: S(0x8a94a8, 0.5, 0.5),
-      accent: S(0xf4b740, 0.5, 0.2), red: S(0xf0506e, 0.5, 0.2),
-      water: S(0x2f6fb4, 0.1, 0.7), wood: S(0x8a6b46, 0.8, 0.05),
-      treeTop: S(0x39603a, 0.9, 0.02), trunk: S(0x6d5230, 0.9, 0.02),
+      accent: S(0xf4b740, 0.5, 0.2), red: S(0xc4453a, 0.55, 0.15),
+      water: S(0x2f86c8, 0.12, 0.6), wood: S(0x8a6b46, 0.8, 0.05),
+      treeTop: S(0x2f5d33, 0.9, 0.02), treeTop2: S(0x3e7040, 0.9, 0.02), trunk: S(0x6d5230, 0.9, 0.02),
       lightTex: lightSprite(THREE), shadowT: shadowTex(THREE), mat: mat, THREE: THREE
     };
   }
 
-  // CHARCOAL asphalt runway — 30% darker, speckled aggregate, crisp white
-  // thresholds/centreline/TDZ and painted runway numbers (DAC's 14 / 32)
-  function runwayTex(THREE, numbers) {
-    var c = document.createElement('canvas'); c.width = 128; c.height = 1024; var g = c.getContext('2d');
-    g.fillStyle = '#26282c'; g.fillRect(0, 0, 128, 1024);
-    for (var k = 0; k < 3200; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (30 + v * 26 | 0) + ',' + (31 + v * 26 | 0) + ',' + (35 + v * 28 | 0) + ',0.6)'; g.fillRect(Math.random() * 128, Math.random() * 1024, 2, 2); }
-    g.fillStyle = 'rgba(10,10,12,0.5)'; g.fillRect(22, 118, 84, 66); g.fillRect(22, 840, 84, 66);   // rubber
-    g.fillStyle = '#eef1f7'; g.fillRect(10, 0, 5, 1024); g.fillRect(113, 0, 5, 1024);               // edge lines
-    g.fillStyle = '#f4f7fd'; for (var y = 40; y < 984; y += 70) g.fillRect(60, y, 7, 44);           // centreline
-    g.fillStyle = '#f0f4fb'; for (var i = 0; i < 7; i++) { g.fillRect(20 + i * 13, 16, 8, 64); g.fillRect(20 + i * 13, 944, 8, 64); }  // thresholds
-    g.fillStyle = '#eef1f7';[150, 848].forEach(function (yy) { g.fillRect(30, yy, 14, 26); g.fillRect(84, yy, 14, 26); });             // TDZ
-    if (numbers !== false) {
-      g.fillStyle = '#f2f5fc'; g.font = 'bold 46px Arial'; g.textAlign = 'center';
-      g.save(); g.translate(64, 238); g.fillText('32', 0, 0); g.restore();
-      g.save(); g.translate(64, 793); g.rotate(Math.PI); g.fillText('14', 0, 0); g.restore();
-    }
+  // charcoal asphalt runway, HORIZONTAL use (white edge lines + dashed centre)
+  function runwayTex(THREE) {
+    var c = document.createElement('canvas'); c.width = 1024; c.height = 128; var g = c.getContext('2d');
+    g.fillStyle = '#26282c'; g.fillRect(0, 0, 1024, 128);
+    for (var k = 0; k < 3200; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (30 + v * 26 | 0) + ',' + (31 + v * 26 | 0) + ',' + (35 + v * 28 | 0) + ',0.6)'; g.fillRect(Math.random() * 1024, Math.random() * 128, 2, 2); }
+    g.fillStyle = '#eef1f7'; g.fillRect(0, 8, 1024, 5); g.fillRect(0, 115, 1024, 5);
+    g.fillStyle = '#f4f7fd'; for (var x = 30; x < 994; x += 64) g.fillRect(x, 60, 40, 8);
+    g.fillStyle = '#f0f4fb'; for (var i = 0; i < 7; i++) { g.fillRect(12, 18 + i * 13, 56, 8); g.fillRect(956, 18 + i * 13, 56, 8); }
     var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
   }
-  // taxiway/link asphalt with the continuous YELLOW guide line
-  function taxiTex(THREE, vertical) {
-    var c = document.createElement('canvas'); c.width = vertical ? 64 : 256; c.height = vertical ? 256 : 64; var g = c.getContext('2d');
-    g.fillStyle = '#2b2d32'; g.fillRect(0, 0, c.width, c.height);
-    for (var k = 0; k < 320; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (36 + v * 22 | 0) + ',' + (38 + v * 22 | 0) + ',' + (42 + v * 22 | 0) + ',0.55)'; g.fillRect(Math.random() * c.width, Math.random() * c.height, 2, 2); }
-    g.fillStyle = '#e8c53a';
-    if (vertical) g.fillRect(29, 0, 6, 256); else g.fillRect(0, 29, 256, 6);
-    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+  function taxiTexV(THREE) {
+    var c = document.createElement('canvas'); c.width = 64; c.height = 256; var g = c.getContext('2d');
+    g.fillStyle = '#2e3036'; g.fillRect(0, 0, 64, 256);
+    for (var k = 0; k < 300; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (38 + v * 22 | 0) + ',' + (40 + v * 22 | 0) + ',' + (44 + v * 22 | 0) + ',0.55)'; g.fillRect(Math.random() * 64, Math.random() * 256, 2, 2); }
+    g.fillStyle = '#e8c53a'; g.fillRect(29, 0, 6, 256);
+    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
   }
-  // REALISTIC turf: layered tone patches + mow bands + fine noise
-  function grassTex(THREE) {
+  function apronTex(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 512; var g = c.getContext('2d');
-    g.fillStyle = '#57683d'; g.fillRect(0, 0, 512, 512);
-    for (var p = 0; p < 26; p++) {                                       // big soft patches
-      var px = Math.random() * 512, py = Math.random() * 512, pr = 50 + Math.random() * 110;
-      var gr = g.createRadialGradient(px, py, 4, px, py, pr);
-      var tone = ['rgba(74,92,52,0.5)', 'rgba(96,116,66,0.45)', 'rgba(64,80,46,0.5)', 'rgba(106,124,72,0.4)'][p % 4];
-      gr.addColorStop(0, tone); gr.addColorStop(1, 'rgba(0,0,0,0)');
-      g.fillStyle = gr; g.beginPath(); g.arc(px, py, pr, 0, 6.3); g.fill();
-    }
-    for (var i = 0; i < 512; i += 42) { g.fillStyle = (i / 42) % 2 ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.04)'; g.fillRect(0, i, 512, 42); }
-    for (var k = 0; k < 2200; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (56 + v * 30 | 0) + ',' + (74 + v * 34 | 0) + ',' + (40 + v * 22 | 0) + ',0.5)'; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
-    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(20, 20); t.anisotropy = 4; return t;
+    g.fillStyle = '#4a4e57'; g.fillRect(0, 0, 512, 512);
+    for (var k = 0; k < 1400; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (56 + v * 20 | 0) + ',' + (60 + v * 20 | 0) + ',' + (66 + v * 20 | 0) + ',0.5)'; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
+    g.strokeStyle = 'rgba(232,197,58,0.8)'; g.lineWidth = 3;
+    for (var i2 = 0; i2 < 6; i2++) { g.beginPath(); g.moveTo(20 + i2 * 84, 0); g.quadraticCurveTo(40 + i2 * 84, 256, 20 + i2 * 84, 512); g.stroke(); }
+    g.strokeStyle = 'rgba(230,235,245,0.5)'; g.setLineDash([14, 12]); g.beginPath(); g.moveTo(0, 40); g.lineTo(512, 40); g.stroke(); g.setLineDash([]);
+    var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
   }
   function roadTex(THREE) {
     var c = document.createElement('canvas'); c.width = 64; c.height = 256; var g = c.getContext('2d');
-    g.fillStyle = '#42454d'; g.fillRect(0, 0, 64, 256);
+    g.fillStyle = '#3d4048'; g.fillRect(0, 0, 64, 256);
     for (var k = 0; k < 260; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (48 + v * 22 | 0) + ',' + (52 + v * 22 | 0) + ',' + (58 + v * 22 | 0) + ',0.5)'; g.fillRect(Math.random() * 64, Math.random() * 256, 2, 2); }
-    g.fillStyle = '#dfe4ee'; for (var y = 12; y < 244; y += 56) g.fillRect(29, y, 6, 26);
+    g.fillStyle = '#e8ecf4'; for (var y = 12; y < 244; y += 46) g.fillRect(29, y, 6, 22);
     var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t;
+  }
+  function grassTex(THREE) {
+    var c = document.createElement('canvas'); c.width = c.height = 512; var g = c.getContext('2d');
+    g.fillStyle = '#5c7a42'; g.fillRect(0, 0, 512, 512);
+    for (var p = 0; p < 24; p++) {
+      var px = Math.random() * 512, py = Math.random() * 512, pr = 50 + Math.random() * 110;
+      var gr = g.createRadialGradient(px, py, 4, px, py, pr);
+      var tone = ['rgba(80,104,56,0.5)', 'rgba(104,128,72,0.45)', 'rgba(70,92,50,0.5)', 'rgba(114,136,78,0.4)'][p % 4];
+      gr.addColorStop(0, tone); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(px, py, pr, 0, 6.3); g.fill();
+    }
+    for (var k = 0; k < 2200; k++) { var v = Math.random(); g.fillStyle = 'rgba(' + (64 + v * 30 | 0) + ',' + (86 + v * 34 | 0) + ',' + (46 + v * 22 | 0) + ',0.5)'; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); }
+    var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(18, 18); t.anisotropy = 4; return t;
   }
   function heliPadTex(THREE) {
     var c = document.createElement('canvas'); c.width = c.height = 256; var g = c.getContext('2d');
     g.clearRect(0, 0, 256, 256);
-    g.fillStyle = '#4f545e'; g.beginPath(); g.arc(128, 128, 124, 0, 6.3); g.fill();
+    g.fillStyle = '#2f3238'; g.beginPath(); g.arc(128, 128, 124, 0, 6.3); g.fill();
     g.strokeStyle = '#eef2fa'; g.lineWidth = 10; g.beginPath(); g.arc(128, 128, 106, 0, 6.3); g.stroke();
     g.fillStyle = '#f2f5fc'; g.font = 'bold 120px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', 128, 134);
     var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
   }
   function carParkTex(THREE) {
-    var c = document.createElement('canvas'); c.width = 256; c.height = 192; var g = c.getContext('2d');
-    g.fillStyle = '#4a4e57'; g.fillRect(0, 0, 256, 192);
-    g.strokeStyle = '#e6ebf5'; g.lineWidth = 4;
-    for (var x = 16; x <= 240; x += 45) { g.beginPath(); g.moveTo(x, 12); g.lineTo(x, 84); g.stroke(); g.beginPath(); g.moveTo(x, 108); g.lineTo(x, 180); g.stroke(); }
-    g.strokeRect(16, 12, 224, 72); g.strokeRect(16, 108, 224, 72);
+    var c = document.createElement('canvas'); c.width = 256; c.height = 128; var g = c.getContext('2d');
+    g.fillStyle = '#43464e'; g.fillRect(0, 0, 256, 128);
+    g.strokeStyle = '#e6ebf5'; g.lineWidth = 3;
+    for (var x = 12; x <= 244; x += 24) { g.beginPath(); g.moveTo(x, 8); g.lineTo(x, 56); g.stroke(); g.beginPath(); g.moveTo(x, 72); g.lineTo(x, 120); g.stroke(); }
     var t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
   }
-  function signTex(THREE) {
-    var c = document.createElement('canvas'); c.width = 512; c.height = 96; var g = c.getContext('2d');
-    g.fillStyle = '#1B2A4A'; g.fillRect(0, 0, 512, 96);
-    g.strokeStyle = '#C9A227'; g.lineWidth = 5; g.strokeRect(6, 6, 500, 84);
-    g.fillStyle = '#C9A227'; g.font = 'bold 52px Georgia'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('EPAL TRAVELS', 256, 52);
+  function textTex(THREE, txt, fg, bg, w, h, size) {
+    var c = document.createElement('canvas'); c.width = w || 512; c.height = h || 96; var g = c.getContext('2d');
+    if (bg) { g.fillStyle = bg; g.fillRect(0, 0, c.width, c.height); } else g.clearRect(0, 0, c.width, c.height);
+    g.fillStyle = fg; g.font = 'bold ' + (size || 56) + 'px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(txt, c.width / 2, c.height / 2 + 2);
     var t = new THREE.CanvasTexture(c); t.anisotropy = 8; return t;
   }
   function shadowTex(THREE) {
@@ -256,7 +226,6 @@
     return new THREE.CanvasTexture(c);
   }
 
-  /* ------------------------------------------------- animated point-lights */
   function light(THREE, M, color, size, pat, rate, phase) {
     var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: color, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     s.scale.set(size, size, 1); s.userData.light = { pat: pat || 'steady', rate: rate || 1, phase: phase || 0 };
@@ -270,7 +239,6 @@
   }
   function at(o, x, y, z) { o.position.set(x, y, z); return o; }
 
-  // one-draw-call lamp field with per-lamp organic twinkle
   function pointCloud(THREE, M, pos, col, size, twinkle) {
     var geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -290,7 +258,7 @@
         '  vA = mix(1.0, 0.4 + 0.6 * tw, uTw);\n' +
         '  vC = aCol;\n' +
         '  vec4 mv = modelViewMatrix * vec4(position, 1.0);\n' +
-        '  gl_PointSize = uSize * (260.0 / -mv.z);\n' +
+        '  gl_PointSize = uSize * (420.0 / -mv.z);\n' +
         '  gl_Position = projectionMatrix * mv;\n' +
         '}',
       fragmentShader:
@@ -302,89 +270,264 @@
   }
 
   /* ==========================================================================
-   * SCENE ASSEMBLY
+   * THE AIRPORT (reference-image layout, world units)
    * ========================================================================*/
   function buildAirport(THREE, M, scene) {
     var V = function (x, y, z) { return new THREE.Vector3(x, y, z); };
     var updaters = [];
     function rnd(a, b) { return a + Math.random() * (b - a); }
-    function jit(v) { return v * rnd(0.8, 1.2); }           // ±20% jitter (spec)
+    function jit(v) { return v * rnd(0.8, 1.2); }
     function pickOf(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-    /* ---- ground plane (patchy turf) --------------------------------------*/
-    var ground = new THREE.Mesh(new THREE.PlaneGeometry(3400, 3400), M.grass);
-    ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.15, -400);
+    // ---- zone constants (from the reference pictures) ---------------------
+    var RT = { z: -150, x1: -120, x2: 260, w: 26 };        // TAKE-OFF runway (top)
+    var RL = { z: -92, x1: -100, x2: 260, w: 26 };         // LANDING runway (below)
+    var CONN = { x: -140 };                                 // left vertical connector
+    var APR_TOP = { z: 25 };                                // remote apron lane
+    var APR_GATE = { z: 78 };                               // gate row
+    var GATES_X = [40, 70, 100, 130, 160, 190, 220];
+    var TERM = { z: 130 };                                  // terminal band
+    var GY = 4.6;
+
+    /* ---- ground ----------------------------------------------------------*/
+    var ground = new THREE.Mesh(new THREE.PlaneGeometry(4200, 4200), M.grass);
+    ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.15, -150);
     ground.receiveShadow = true; scene.add(ground);
 
-    /* ---- RUNWAYS (charcoal asphalt, DAC 14/32) + one-way links -----------*/
-    function strip(gx, w, gz1, gz2, tex, y) {
-      var len = Math.abs(WZ(gz2) - WZ(gz1));
-      var m2 = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0.04 });
-      var r = new THREE.Mesh(new THREE.PlaneGeometry(w, len), m2);
-      r.rotation.x = -Math.PI / 2; r.position.set(WX(gx), y || 0, (WZ(gz1) + WZ(gz2)) / 2);
+    /* ---- runways (horizontal) + labels-free clean strips -------------------*/
+    function hstrip(zc, x1, x2, w, y) {
+      var m2 = new THREE.MeshStandardMaterial({ map: runwayTex(THREE), roughness: 0.95, metalness: 0.04 });
+      var r = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(x2 - x1), w), m2);
+      r.rotation.x = -Math.PI / 2; r.position.set((x1 + x2) / 2, y || 0, zc);
       r.receiveShadow = true; scene.add(r); return r;
     }
-    strip(GRID.rwy1.x, GRID.rwy1.w * 1.28, GRID.rwy1.z1, GRID.rwy1.z2, runwayTex(THREE, true), 0);
-    strip(GRID.rwy2.x, GRID.rwy2.w * 1.28, GRID.rwy2.z1, GRID.rwy2.z2, runwayTex(THREE, true), 0.004);
-    function linkStrip(gz) {
-      var x1 = WX(GRID.rwy1.x), x2 = WX(GRID.corridor.x + 6);
-      var m2 = new THREE.MeshStandardMaterial({ map: taxiTex(THREE, false), roughness: 0.95, metalness: 0.04 });
-      var r = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(x2 - x1), 17), m2);
-      r.rotation.x = -Math.PI / 2; r.position.set((x1 + x2) / 2, 0.012, WZ(gz));
-      r.receiveShadow = true; scene.add(r);
-    }
-    linkStrip(GRID.linkN.z);        // EXIT link
-    linkStrip(GRID.linkS.z);        // ENTRY link
-    // N–S taxil corridor east of RWY2 (serves the stands)
-    var corr = new THREE.Mesh(new THREE.MeshStandardMaterial ? new THREE.PlaneGeometry(15, Math.abs(WZ(96) - WZ(GRID.linkN.z))) : null, new THREE.MeshStandardMaterial({ map: taxiTex(THREE, true), roughness: 0.95, metalness: 0.04 }));
-    corr.rotation.x = -Math.PI / 2; corr.position.set(WX(GRID.corridor.x), 0.012, (WZ(GRID.linkN.z) + WZ(96)) / 2);
-    corr.receiveShadow = true; scene.add(corr);
+    hstrip(RT.z, RT.x1, RT.x2, RT.w, 0);
+    hstrip(RL.z, RL.x1, RL.x2, RL.w, 0.004);
 
-    /* ---- PLANE PARKING — right-bottom apron + angled stands ---------------*/
-    var apron = new THREE.Mesh(new THREE.PlaneGeometry(96, 92), M.apron);
-    apron.rotation.x = -Math.PI / 2; apron.position.set(WX(168), 0.01, WZ(58)); apron.receiveShadow = true; scene.add(apron);
-    var standLights = [];
-    GRID.stands.forEach(function (st, si) {
-      var line = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 12), new THREE.MeshBasicMaterial({ color: 0xe8c53a }));
-      line.rotation.x = -Math.PI / 2; line.rotation.z = -Math.PI / 4;
-      line.position.set(WX(st.x) - 5, 0.02, WZ(st.z) - 5); scene.add(line);
-      // painted stand number on the apron
-      var nc = document.createElement('canvas'); nc.width = nc.height = 64; var ng = nc.getContext('2d');
-      ng.clearRect(0, 0, 64, 64); ng.strokeStyle = '#e8c53a'; ng.lineWidth = 4; ng.beginPath(); ng.arc(32, 32, 26, 0, 6.3); ng.stroke();
-      ng.fillStyle = '#eef2fa'; ng.font = 'bold 34px Arial'; ng.textAlign = 'center'; ng.textBaseline = 'middle'; ng.fillText(String(si + 1), 32, 34);
-      var num = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc), transparent: true }));
-      num.rotation.x = -Math.PI / 2; num.position.set(WX(st.x) - 11, 0.025, WZ(st.z) - 11); scene.add(num);
-      // DOCKING STATUS light on a mast — GREEN when the stand is free, AMBER
-      // pulsing while an aircraft occupies it (wired to the live state machine)
-      var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 5, 6), M.gun); mast.position.set(WX(st.x) + 8, 2.5, WZ(st.z) + 6); scene.add(mast);
-      var sl = light(THREE, M, 0x35e07a, 1.15, 'steady'); sl.position.set(WX(st.x) + 8, 5.4, WZ(st.z) + 6); scene.add(sl);
-      standLights.push(sl);
+    function taxiV(xc, z1, z2, w) {
+      var m2 = new THREE.MeshStandardMaterial({ map: taxiTexV(THREE), roughness: 0.95, metalness: 0.04 });
+      m2.map = m2.map.clone(); m2.map.needsUpdate = true; m2.map.repeat.set(1, Math.abs(z2 - z1) / 40);
+      var r = new THREE.Mesh(new THREE.PlaneGeometry(w || 15, Math.abs(z2 - z1)), m2);
+      r.rotation.x = -Math.PI / 2; r.position.set(xc, 0.012, (z1 + z2) / 2);
+      r.receiveShadow = true; scene.add(r); return r;
+    }
+    function taxiH(zc, x1, x2, w) {
+      var m2 = new THREE.MeshStandardMaterial({ map: taxiTexV(THREE), roughness: 0.95, metalness: 0.04 });
+      m2.map = m2.map.clone(); m2.map.needsUpdate = true; m2.map.center.set(0.5, 0.5); m2.map.rotation = Math.PI / 2; m2.map.repeat.set(1, Math.abs(x2 - x1) / 40);
+      var r = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(x2 - x1), w || 15), m2);
+      r.rotation.x = -Math.PI / 2; r.position.set((x1 + x2) / 2, 0.012, zc);
+      r.receiveShadow = true; scene.add(r); return r;
+    }
+    // left connector: joins both runway west ends, runs south to the aprons
+    taxiV(CONN.x, RT.z - 10, APR_GATE.z + 10);
+    taxiH((RT.z + RL.z) / 2, CONN.x - 8, RT.x1 + 30, 14);   // stub between runways
+    taxiH(APR_TOP.z, CONN.x - 8, 250, 14);                  // remote apron lane
+    taxiH((APR_TOP.z + APR_GATE.z) / 2 + 2, 20, 250, 13);   // gate feeder lane
+    // two S-exits from the landing runway down to the apron lane (like the sketch)
+    taxiV(70, RL.z + 12, APR_TOP.z + 6, 13);
+    taxiV(170, RL.z + 12, APR_TOP.z + 6, 13);
+
+    /* ---- aprons + terminal + car park (bottom-right) -----------------------*/
+    var apron1 = new THREE.Mesh(new THREE.PlaneGeometry(250, 34), M.apron);
+    apron1.rotation.x = -Math.PI / 2; apron1.position.set(130, 0.008, APR_TOP.z + 2); apron1.receiveShadow = true; scene.add(apron1);
+    var apron2 = new THREE.Mesh(new THREE.PlaneGeometry(240, 46), M.apron);
+    apron2.rotation.x = -Math.PI / 2; apron2.position.set(135, 0.008, APR_GATE.z + 6); apron2.receiveShadow = true; scene.add(apron2);
+
+    // TERMINAL — centre entrance block + two wings, rooftop plant, blue title
+    (function () {
+      var g = new THREE.Group(); g.position.set(130, 0, TERM.z);
+      [[-78, 66, 13], [78, 66, 13], [0, 54, 17]].forEach(function (b, bi) {
+        var blk = new THREE.Mesh(new THREE.BoxGeometry(b[1], b[2], 26), bi === 2 ? M.bldg2 : M.bldg);
+        blk.position.set(b[0], b[2] / 2, 0); blk.castShadow = true; g.add(blk);
+        var band = new THREE.Mesh(new THREE.BoxGeometry(b[1] + 0.4, 3.2, 26.4), M.win); band.position.set(b[0], 5.4, 0); g.add(band);
+        var band2 = new THREE.Mesh(new THREE.BoxGeometry(b[1] + 0.4, 2.6, 26.4), M.win); band2.position.set(b[0], 9.6, 0); g.add(band2);
+        var roofBox = new THREE.Mesh(new THREE.BoxGeometry(10, 2.4, 8), M.grey); roofBox.position.set(b[0] + (bi === 0 ? -12 : bi === 1 ? 12 : 0), b[2] + 1.2, -4); g.add(roofBox);
+      });
+      var title = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), new THREE.MeshBasicMaterial({ map: textTex(THREE, 'TERMINAL', '#2b6cd4', null, 512, 80, 58), transparent: true }));
+      title.position.set(0, 12.5, 13.3); g.add(title);
+      // jet-bridge stubs up to the gate row
+      GATES_X.forEach(function (gx) {
+        var br = new THREE.Mesh(new THREE.BoxGeometry(3, 3.4, 26), M.bldg2); br.position.set(gx - 130, 3.2, -26); br.castShadow = true; g.add(br);
+      });
+      scene.add(g);
+    })();
+
+    // CAR ROAD AND PARKING — road band + two painted lots + cars + buses
+    (function () {
+      var m2 = new THREE.MeshStandardMaterial({ map: roadTex(THREE), roughness: 0.95, metalness: 0.04 });
+      m2.map = m2.map.clone(); m2.map.needsUpdate = true; m2.map.center.set(0.5, 0.5); m2.map.rotation = Math.PI / 2; m2.map.repeat.set(1, 9);
+      var road2 = new THREE.Mesh(new THREE.PlaneGeometry(330, 12), m2);
+      road2.rotation.x = -Math.PI / 2; road2.position.set(90, 0.012, TERM.z + 32); road2.receiveShadow = true; scene.add(road2);
+      [[52, 0], [176, 0]].forEach(function (lp) {
+        var pad2 = new THREE.Mesh(new THREE.PlaneGeometry(92, 26), new THREE.MeshStandardMaterial({ map: carParkTex(THREE), roughness: 0.95, metalness: 0.04 }));
+        pad2.rotation.x = -Math.PI / 2; pad2.position.set(lp[0] + 40, 0.01, TERM.z + 52); pad2.receiveShadow = true; scene.add(pad2);
+      });
+      var CAR_COLS = [0xc0392b, 0x2e86c1, 0xf4d03f, 0xecf0f1, 0x27ae60, 0x8e44ad, 0x1c2833, 0xe67e22, 0x76d7c4, 0xd35400, 0x5dade2, 0xf7dc6f];
+      for (var cc = 0; cc < 22; cc++) {
+        var car = new THREE.Group();
+        var cb = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.85, 1.2), M.mat(CAR_COLS[cc % CAR_COLS.length], 0.5, 0.3)); cb.position.y = 0.7; car.add(cb);
+        var ct = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.6, 1.1), M.win); ct.position.set(-0.1, 1.4, 0); car.add(ct);
+        car.position.set(52 + (cc % 11) * 8.4, 0, TERM.z + 46 + Math.floor(cc / 11) * 12);
+        scene.add(car);
+      }
+      [[36, 0xE8B93C], [230, 0x3B7DD8]].forEach(function (bp) {
+        var bus = new THREE.Group();
+        var bb = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 2.4), M.mat(bp[1], 0.5, 0.2)); bb.position.y = 1.5; bb.castShadow = true; bus.add(bb);
+        var bw = new THREE.Mesh(new THREE.BoxGeometry(9.1, 0.8, 2.45), M.win); bw.position.y = 2.1; bus.add(bw);
+        bus.position.set(bp[0], 0, TERM.z + 32); bus.rotation.y = Math.PI / 2; scene.add(bus);
+      });
+    })();
+
+    // CONTROL TOWER — right of the aprons (white, red bands, glass cab)
+    (function () {
+      var g = new THREE.Group(); g.position.set(238, 0, 40);
+      var shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 4.4, 58, 12), M.bldg2); shaft.position.y = 29; shaft.castShadow = true; g.add(shaft);
+      [[16, 4.0], [30, 3.6]].forEach(function (b) { var band = new THREE.Mesh(new THREE.CylinderGeometry(b[1], b[1] + 0.08, 5, 12), M.red); band.position.y = b[0]; g.add(band); });
+      var deck = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 5.2, 3, 12), M.bldg); deck.position.y = 56; g.add(deck);
+      var cab = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 6.2, 6, 12), M.glass); cab.position.y = 61; g.add(cab);
+      var roof = new THREE.Mesh(new THREE.ConeGeometry(6.4, 3.2, 12), M.bldg2); roof.position.y = 66; g.add(roof);
+      scene.add(g);
+      scene.add(at(light(THREE, M, 0xff2a2a, 3.2, 'beacon', 0.7, 0), 238, 68.5, 40));
+    })();
+
+    // RADAR STATION — far top-right corner (building + dome + tiny lot)
+    (function () {
+      var g = new THREE.Group(); g.position.set(215, 0, -215);
+      var b = new THREE.Mesh(new THREE.BoxGeometry(26, 9, 14), M.bldg); b.position.y = 4.5; b.castShadow = true; g.add(b);
+      var band = new THREE.Mesh(new THREE.BoxGeometry(26.4, 2.4, 14.4), M.win); band.position.y = 4.5; g.add(band);
+      var sign2 = new THREE.Mesh(new THREE.PlaneGeometry(12, 3), new THREE.MeshBasicMaterial({ map: textTex(THREE, 'Radar', '#ffffff', '#2b6cd4', 256, 64, 34), transparent: true })); sign2.position.set(0, 6.5, 7.3); g.add(sign2);
+      var mastB = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 8, 8), M.bldg2); mastB.position.set(10, 13, -2); g.add(mastB);
+      var dome = new THREE.Mesh(new THREE.SphereGeometry(4.6, 14, 10), M.bldg2); dome.position.set(10, 19, -2); dome.castShadow = true; g.add(dome);
+      var lot = new THREE.Mesh(new THREE.PlaneGeometry(30, 12), M.asphalt); lot.rotation.x = -Math.PI / 2; lot.position.set(0, 0.01, 14); g.add(lot);
+      scene.add(g);
+      scene.add(at(light(THREE, M, 0xff2a2a, 2.4, 'beacon', 0.6, 1.2), 225, 24.5, -217));
+    })();
+
+    // THREE WHITE QUONSET SHEDS — between the runways' north side
+    [[-20, -196], [22, -196], [64, -196]].forEach(function (q) {
+      var sh2 = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 20, 14, 1, true, 0, Math.PI), M.bldg2);
+      sh2.rotation.z = Math.PI / 2; sh2.position.set(q[0], 0.2, q[1]); sh2.castShadow = true; scene.add(sh2);
+      var back2 = new THREE.Mesh(new THREE.CircleGeometry(7, 14, 0, Math.PI), M.bldg); back2.position.set(q[0] - 10, 0.2, q[1]); back2.rotation.y = Math.PI / 2; scene.add(back2);
     });
 
-    /* ---- lamp fields (single draw call each) ------------------------------*/
+    /* ---- LEFT CAMPUS -------------------------------------------------------*/
+    // hangar-road U-loop around the heliport (flat ring arc)
     (function () {
-      var pos = [], col = [], W1 = GRID.rwy1.w * 1.28 / 2, W2 = GRID.rwy2.w * 1.28 / 2;
-      for (var gz = 176; gz >= -176; gz -= 9) {
-        var z = WZ(gz), c = gz > 168 ? [0.2, 1, 0.4] : gz < -168 ? [1, 0.2, 0.2] : [1, 0.95, 0.8];
-        pos.push(WX(GRID.rwy1.x) - W1, 0.5, z); col.push(c[0], c[1], c[2]);
-        pos.push(WX(GRID.rwy1.x) + W1, 0.5, z); col.push(c[0], c[1], c[2]);
-        pos.push(WX(GRID.rwy2.x) - W2, 0.5, z); col.push(1, 0.95, 0.8);
-        pos.push(WX(GRID.rwy2.x) + W2, 0.5, z); col.push(1, 0.95, 0.8);
-      }
-      for (var gz2 = 170; gz2 >= -170; gz2 -= 12) { pos.push(WX(GRID.rwy1.x), 0.45, WZ(gz2)); col.push(1, 0.95, 0.85); }
-      var lamps = pointCloud(THREE, M, pos, col, 1.5, true); scene.add(lamps.g); updaters.push(lamps.update);
-      var bpos = [], bcol = [];
-      [GRID.linkN.z, GRID.linkS.z].forEach(function (gz3) {
-        for (var gx = GRID.rwy1.x + 8; gx <= GRID.corridor.x; gx += 9) { bpos.push(WX(gx), 0.5, WZ(gz3) - 8); bcol.push(0.3, 0.55, 1); bpos.push(WX(gx), 0.5, WZ(gz3) + 8); bcol.push(0.3, 0.55, 1); }
-      });
-      for (var gzc = GRID.linkN.z; gzc <= 92; gzc += 10) { bpos.push(WX(GRID.corridor.x) - 8, 0.5, WZ(gzc)); bcol.push(0.3, 0.55, 1); bpos.push(WX(GRID.corridor.x) + 8, 0.5, WZ(gzc)); bcol.push(0.3, 0.55, 1); }
-      var blues = pointCloud(THREE, M, bpos, bcol, 1.2, true); scene.add(blues.g); updaters.push(blues.update);
+      var ring = new THREE.Mesh(new THREE.RingGeometry(30, 44, 32, 1, 0, Math.PI), M.asphalt);
+      ring.rotation.x = -Math.PI / 2; ring.position.set(-178, 0.01, -170); ring.receiveShadow = true; scene.add(ring);
+      taxiV(-208, -170, 40, 12);                             // TRANSPORT ROAD (west, dashed)
+      taxiV(-148, -170, -100, 12);                           // loop east leg down to connector top
+      // heliport inside the loop
+      var pad = new THREE.Mesh(new THREE.CircleGeometry(12, 26), new THREE.MeshStandardMaterial({ map: heliPadTex(THREE), transparent: true, roughness: 0.9, metalness: 0.04 }));
+      pad.rotation.x = -Math.PI / 2; pad.position.set(-178, 0.03, -196); pad.receiveShadow = true; scene.add(pad);
+      for (var hl = 0; hl < 8; hl++) { var an = hl / 8 * 6.2832; scene.add(at(light(THREE, M, 0xfff2c8, 1.1, 'steady'), -178 + Math.cos(an) * 11, 0.5, -196 + Math.sin(an) * 11)); }
+      // painted H circle on the grass, bottom-left (second pad marking)
+      var h2 = new THREE.Mesh(new THREE.CircleGeometry(11, 26), new THREE.MeshStandardMaterial({ map: heliPadTex(THREE), transparent: true, roughness: 0.9, metalness: 0.04 }));
+      h2.rotation.x = -Math.PI / 2; h2.position.set(-128, 0.03, 128); scene.add(h2);
     })();
-    // approach "rabbit" + REIL on RWY1's landing threshold (far side)
+    // RADAR + HANGER building (white/blue) + blue mini ATC tower
     (function () {
-      var g = new THREE.Group(), N = 14, fl = [], zt = WZ(-180);
-      for (var i = 0; i < N; i++) { var s = light(THREE, M, 0xffffff, 2.0, 'steady'); s.position.set(WX(GRID.rwy1.x), 0.8, zt - 16 - i * 11); s.material.opacity = 0; g.add(s); fl.push(s); }
-      var rA = at(light(THREE, M, 0xffffff, 2.2, 'steady'), WX(GRID.rwy1.x) - 34, 0.9, zt), rB = at(light(THREE, M, 0xffffff, 2.2, 'steady'), WX(GRID.rwy1.x) + 34, 0.9, zt);
+      var g = new THREE.Group(); g.position.set(-222, 0, -140);
+      var hall = new THREE.Mesh(new THREE.BoxGeometry(34, 12, 18), M.bldg2); hall.position.y = 6; hall.castShadow = true; g.add(hall);
+      var hall2 = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 16), M.bldg); hall2.position.set(24, 4, 2); hall2.castShadow = true; g.add(hall2);
+      for (var wx = -12; wx <= 12; wx += 8) { var w2 = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3, 0.4), M.blue); w2.position.set(wx, 7, 9.2); g.add(w2); }
+      var door = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 0.4), M.blue); door.position.set(24, 3, 10.2); g.add(door);
+      var domeM = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.6, 6, 8), M.bldg2); domeM.position.set(-14, 15, -4); g.add(domeM);
+      var dome2 = new THREE.Mesh(new THREE.SphereGeometry(4.2, 14, 10), M.bldg2); dome2.position.set(-14, 20.5, -4); dome2.castShadow = true; g.add(dome2);
+      scene.add(g);
+      // blue mini ATC tower by the loop
+      var tg = new THREE.Group(); tg.position.set(-152, 0, -152);
+      var shaft2 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.2, 18, 10), M.bldg2); shaft2.position.y = 9; shaft2.castShadow = true; tg.add(shaft2);
+      var cab2 = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.0, 4.2, 8), M.blue); cab2.position.y = 20; tg.add(cab2);
+      var roof2 = new THREE.Mesh(new THREE.ConeGeometry(4, 2.2, 8), M.bldg2); roof2.position.y = 23.4; tg.add(roof2);
+      scene.add(tg);
+      scene.add(at(light(THREE, M, 0xff2a2a, 2.0, 'beacon', 0.8, 0.6), -152, 25, -152));
+      // EPAL brand on the hangar hall
+      var brand = new THREE.Mesh(new THREE.PlaneGeometry(22, 3.4), new THREE.MeshBasicMaterial({ map: textTex(THREE, 'EPAL TRAVELS', '#C9A227', '#1B2A4A', 512, 84, 46), transparent: true }));
+      brand.position.set(-222, 10.4, -130.7); scene.add(brand);
+    })();
+    // FIGHTER LANE — dashed lane + open sheds + parked fighters (diagonal)
+    (function () {
+      taxiV(-96, -130, 60, 13);                              // fighter-plane lane
+      for (var i = 0; i < 6; i++) {
+        var z = -112 + i * 30;
+        var sh3 = new THREE.Mesh(new THREE.BoxGeometry(16, 6.4, 12), M.shed); sh3.position.set(-121, 3.2, z); sh3.castShadow = true; scene.add(sh3);
+        var ro = new THREE.Mesh(new THREE.BoxGeometry(17.4, 1.2, 13.4), M.shedRoof); ro.position.set(-121, 7, z); scene.add(ro);
+        var jet = buildFighter(THREE, M, i % 3 === 2 ? 'white' : undefined);
+        jet.position.set(-100, 2.2, z + 8); jet.rotation.y = -0.8; jet.traverse(function (o) { if (o.isMesh) o.castShadow = true; }); scene.add(jet);
+      }
+    })();
+    // PARKED-PLANE SHEDS west of the transport road + white airliners between
+    (function () {
+      [[-238, 20], [-238, 78], [-238, 136]].forEach(function (sp2, si) {
+        var s4 = new THREE.Mesh(new THREE.BoxGeometry(22, 9, 20), M.shed); s4.position.set(sp2[0], 4.5, sp2[1]); s4.castShadow = true; scene.add(s4);
+        var r4 = new THREE.Mesh(new THREE.BoxGeometry(23.6, 1.4, 21.6), M.shedRoof); r4.position.set(sp2[0], 9.7, sp2[1]); scene.add(r4);
+        if (si < 2) {
+          var pk = buildAirliner(THREE, M, 1.15, false, LIVERIES[0]);
+          pk.position.set(sp2[0] + 20, 3, sp2[1] + 28); pk.rotation.y = 0.5; pk.traverse(function (o) { if (o.isMesh) o.castShadow = true; }); scene.add(pk);
+          var shd = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.26, depthWrite: false, fog: false }));
+          shd.scale.set(17, 10, 1); shd.position.set(sp2[0] + 20, 0.24, sp2[1] + 28); scene.add(shd);
+        }
+      });
+    })();
+
+    /* ---- POND (small blue blob, centre) ------------------------------------*/
+    var pond = new THREE.Mesh(new THREE.CircleGeometry(15, 24), M.water);
+    pond.scale.x = 1.3; pond.rotation.x = -Math.PI / 2; pond.position.set(-18, 0.02, -30); scene.add(pond);
+    var shine = new THREE.Mesh(new THREE.CircleGeometry(13, 24), new THREE.MeshBasicMaterial({ color: 0xd6ecff, transparent: true, opacity: 0.16, depthWrite: false }));
+    shine.scale.x = 1.28; shine.rotation.x = -Math.PI / 2; shine.position.set(-18, 0.05, -30); scene.add(shine);
+    updaters.push(function (t) { shine.material.opacity = 0.1 + 0.08 * (0.5 + 0.5 * Math.sin(t * 0.7)); shine.rotation.z = t * 0.02; });
+
+    /* ---- CONIFER FOREST (instanced — the reference is full of trees) -------*/
+    (function () {
+      var CLUSTERS = [
+        [-40, -215, 30], [110, -215, 40], [-190, -230, 34], [160, -125, 26, true], [10, -122, 60, true],
+        [-60, -60, 26], [-230, -50, 22], [-170, 100, 26], [-60, 120, 30], [-20, 60, 24],
+        [240, -40, 20], [120, -60, 46, true], [-120, -170, 16], [250, 120, 18], [-240, -190, 20]
+      ];
+      var pts = [];
+      CLUSTERS.forEach(function (cl) {
+        var n = cl[3] ? 5 : 9;
+        for (var i = 0; i < n; i++) {
+          var a2 = Math.random() * 6.2832, r2 = Math.sqrt(Math.random()) * cl[2];
+          pts.push([cl[0] + Math.cos(a2) * r2, cl[1] + Math.sin(a2) * r2 * 0.8, 0.8 + Math.random() * 0.7]);
+        }
+      });
+      var topGeo = new THREE.ConeGeometry(2.6, 7.4, 7), trGeo = new THREE.CylinderGeometry(0.4, 0.55, 2.6, 5);
+      var tops = new THREE.InstancedMesh(topGeo, M.treeTop, pts.length);
+      var tops2Count = Math.floor(pts.length / 3);
+      var trunks = new THREE.InstancedMesh(trGeo, M.trunk, pts.length);
+      var m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), s4 = new THREE.Vector3(), p4 = new THREE.Vector3();
+      pts.forEach(function (pt, i) {
+        var s = pt[2];
+        p4.set(pt[0], 1.3 * s, pt[1]); s4.set(s, s, s); q4.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * 6.28);
+        m4.compose(p4, q4, s4); trunks.setMatrixAt(i, m4);
+        p4.set(pt[0], (2.6 + 3.7) * s, pt[1]); m4.compose(p4, q4, s4); tops.setMatrixAt(i, m4);
+      });
+      tops.castShadow = true;
+      scene.add(tops); scene.add(trunks);
+    })();
+
+    /* ---- lamp fields --------------------------------------------------------*/
+    (function () {
+      var pos = [], col = [];
+      [RT, RL].forEach(function (R) {
+        for (var x = R.x1 + 6; x <= R.x2 - 4; x += 12) {
+          pos.push(x, 0.5, R.z - R.w / 2); col.push(1, 0.95, 0.8);
+          pos.push(x, 0.5, R.z + R.w / 2); col.push(1, 0.95, 0.8);
+        }
+      });
+      var lamps = pointCloud(THREE, M, pos, col, 1.4, true); scene.add(lamps.g); updaters.push(lamps.update);
+      var bpos = [], bcol = [];
+      for (var z = RT.z; z <= APR_GATE.z; z += 12) { bpos.push(CONN.x - 8, 0.5, z); bcol.push(0.3, 0.55, 1); bpos.push(CONN.x + 8, 0.5, z); bcol.push(0.3, 0.55, 1); }
+      for (var x2 = -120; x2 <= 250; x2 += 14) { bpos.push(x2, 0.5, APR_TOP.z - 8); bcol.push(0.3, 0.55, 1); }
+      var blues = pointCloud(THREE, M, bpos, bcol, 1.1, true); scene.add(blues.g); updaters.push(blues.update);
+    })();
+    // approach rabbit + REIL, west of the landing threshold
+    (function () {
+      var g = new THREE.Group(), N = 12, fl = [];
+      for (var i = 0; i < N; i++) { var s = light(THREE, M, 0xffffff, 2.2, 'steady'); s.position.set(RL.x1 - 16 - i * 12, 0.8, RL.z); s.material.opacity = 0; g.add(s); fl.push(s); }
+      var rA = at(light(THREE, M, 0xffffff, 2.4, 'steady'), RL.x1, 0.9, RL.z - 20), rB = at(light(THREE, M, 0xffffff, 2.4, 'steady'), RL.x1, 0.9, RL.z + 20);
       rA.material.opacity = 0; rB.material.opacity = 0; g.add(rA); g.add(rB);
       scene.add(g);
       updaters.push(function (t) {
@@ -392,201 +535,24 @@
         for (var i = 0; i < N; i++) { var d = lead - (N - 1 - i); fl[i].material.opacity = (d >= 0 && d < 1.4) ? (1 - d / 1.4) : 0; }
         var on = ((t * 1.0) % 1) < 0.06 ? 1 : 0; rA.material.opacity = on; rB.material.opacity = on;
       });
+      for (var pi2 = 0; pi2 < 4; pi2++) scene.add(at(light(THREE, M, pi2 < 2 ? 0xffffff : 0xff4030, 1.5, 'steady'), RL.x1 + 24 + pi2 * 5, 0.8, RL.z + 22));
     })();
-
-    /* ---- zones: hangars + EPAL brand, lake & garden, heliport, car park,
-     *      HSIA-style terminal, tower, city, perimeter roads ---------------*/
-    var roadM = new THREE.MeshStandardMaterial({ map: roadTex(THREE), roughness: 0.95, metalness: 0.04 });
-    function road(gx1, gz1, gx2, gz2, w) {
-      var x1 = WX(gx1), z1 = WZ(gz1), x2 = WX(gx2), z2 = WZ(gz2);
-      var dx = x2 - x1, dz = z2 - z1, len = Math.sqrt(dx * dx + dz * dz);
-      var m2 = roadM.clone(); m2.map = roadM.map.clone(); m2.map.needsUpdate = true; m2.map.repeat.set(1, len / 34);
-      var r = new THREE.Mesh(new THREE.PlaneGeometry(w || 9, len), m2);
-      r.rotation.x = -Math.PI / 2; r.rotation.z = Math.atan2(dx, dz);
-      r.position.set((x1 + x2) / 2, 0.014, (z1 + z2) / 2); r.receiveShadow = true; scene.add(r);
-    }
-    // perimeter: heliport → hangars → (north) → east behind runways is kept
-    // clear of the strips; right side: stands → car park → city
-    road(GRID.heli.x, GRID.heli.z - 12, GRID.hangar1.x - 4, GRID.hangar1.z + 26, 10);
-    road(GRID.hangar1.x - 4, GRID.hangar1.z + 26, GRID.hangar2.x, GRID.hangar2.z + 24, 10);
-    road(168, 96, GRID.carpark.x, GRID.carpark.z - 6, 9);
-    road(GRID.carpark.x, GRID.carpark.z - 6, GRID.city.x - 18, GRID.city.z - 8, 9);
-
-    function hangar(gx, gz, len, r) {
-      var g = new THREE.Group(); g.position.set(WX(gx), 0, WZ(gz));
-      var arch = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 18, 1, true, 0, Math.PI), M.bldg2);
-      arch.rotation.z = Math.PI / 2; arch.position.y = 0.2; arch.castShadow = true; g.add(arch);
-      var back = new THREE.Mesh(new THREE.CircleGeometry(r, 18, 0, Math.PI), M.bldg); back.position.set(-len / 2, 0.2, 0); back.rotation.y = Math.PI / 2; g.add(back);
-      var mouth = new THREE.Mesh(new THREE.CircleGeometry(r * 0.96, 18, 0, Math.PI), M.dark); mouth.position.set(len / 2 - 0.4, 0.2, 0); mouth.rotation.y = Math.PI / 2; g.add(mouth);
-      for (var i = -1; i <= 1; i++) { var rib = new THREE.Mesh(new THREE.TorusGeometry(r + 0.15, 0.3, 6, 16, Math.PI), M.grey); rib.rotation.y = Math.PI / 2; rib.position.set(i * len * 0.3, 0.2, 0); g.add(rib); }
-      scene.add(g); return g;
-    }
-    hangar(GRID.hangar1.x, GRID.hangar1.z, 42, 15);
-    hangar(GRID.hangar2.x, GRID.hangar2.z, 28, 10);
-    var sign = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.4, 24), new THREE.MeshStandardMaterial({ map: signTex(THREE), roughness: 0.6, metalness: 0.1 }));
-    sign.position.set(WX(GRID.hangar1.x) + 22, 12.5, WZ(GRID.hangar1.z)); scene.add(sign);
-    // a resident craft inside hangar 1's mouth
-    var hangared = buildAirliner(THREE, M, 1.5, false, LIVERIES[4]); hangared.position.set(WX(GRID.hangar1.x) + 6, 3.7, WZ(GRID.hangar1.z)); hangared.rotation.y = Math.PI / 2; hangared.castShadow = true; scene.add(hangared);
-
-    // LAKE + garden
-    var lake = new THREE.Mesh(new THREE.CircleGeometry(1, 30), M.water);
-    lake.scale.set(GRID.lake.rx * 1.28, GRID.lake.rz * 1.55, 1);
-    lake.rotation.x = -Math.PI / 2; lake.position.set(WX(GRID.lake.x), 0.02, WZ(GRID.lake.z)); scene.add(lake);
-    var shine = new THREE.Mesh(new THREE.CircleGeometry(1, 30), new THREE.MeshBasicMaterial({ color: 0xd6ecff, transparent: true, opacity: 0.14, depthWrite: false }));
-    shine.scale.set(GRID.lake.rx * 1.2, GRID.lake.rz * 1.45, 1);
-    shine.rotation.x = -Math.PI / 2; shine.position.set(WX(GRID.lake.x), 0.05, WZ(GRID.lake.z)); scene.add(shine);
-    updaters.push(function (t) { shine.material.opacity = 0.1 + 0.07 * (0.5 + 0.5 * Math.sin(t * 0.7)); shine.rotation.z = t * 0.02; });
-    // lake life: an arched FOOTBRIDGE, a pulsing fountain, and drifting ducks
+    // windsock near the landing runway
     (function () {
-      var bx = WX(GRID.lake.x), bz = WZ(GRID.lake.z);
-      var deck = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.35, GRID.lake.rz * 1.55 * 2.3), M.wood);
-      deck.position.set(bx + GRID.lake.rx * 0.5, 2.1, bz); deck.castShadow = true; scene.add(deck);
-      [-1, 1].forEach(function (d) {
-        var rail = new THREE.Mesh(new THREE.TorusGeometry(GRID.lake.rz * 1.55 * 1.15, 0.16, 6, 16, Math.PI), M.wood);
-        rail.rotation.y = Math.PI / 2; rail.rotation.z = Math.PI;
-        rail.position.set(bx + GRID.lake.rx * 0.5 + d * 1.6, 2.2, bz); scene.add(rail);
-      });
-      [-0.8, 0.8].forEach(function (dz) { [-1, 1].forEach(function (d) {
-        var post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 2.4, 6), M.wood);
-        post.position.set(bx + GRID.lake.rx * 0.5 + d * 1.6, 1.0, bz + dz * GRID.lake.rz * 1.55); scene.add(post);
-      }); });
-      var spray = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: 0xeaf6ff, transparent: true, opacity: 0.7, depthWrite: false, fog: false }));
-      spray.position.set(bx - GRID.lake.rx * 0.5, 3, bz); scene.add(spray);
-      var ducks = [];
-      for (var dk = 0; dk < 3; dk++) {
-        var duck = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false, fog: false }));
-        duck.scale.set(1.5, 1.1, 1); scene.add(duck); ducks.push({ s: duck, ph: Math.random() * 6.28, r: 0.35 + Math.random() * 0.4, sp: 0.05 + Math.random() * 0.05 });
-      }
-      updaters.push(function (t) {
-        var k = 0.6 + 0.4 * Math.abs(Math.sin(t * 1.6));
-        spray.scale.set(3.2 * k, 5.5 * k, 1); spray.material.opacity = 0.45 + 0.3 * k;
-        ducks.forEach(function (d2) {
-          var a2 = t * d2.sp + d2.ph;
-          d2.s.position.set(bx + Math.cos(a2) * GRID.lake.rx * 1.28 * d2.r, 0.7, bz + Math.sin(a2) * GRID.lake.rz * 1.55 * d2.r);
-        });
-      });
-    })();
-    function tree(gx, gz, s2) {
-      var g2 = new THREE.Group();
-      var tr = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 4, 6), M.trunk); tr.position.y = 2; g2.add(tr);
-      var top = new THREE.Mesh(new THREE.ConeGeometry(3.4, 7.5, 8), M.treeTop); top.position.y = 8; top.castShadow = true; g2.add(top);
-      g2.position.set(WX(gx), 0, WZ(gz)); g2.scale.setScalar(s2 || 1); scene.add(g2);
-    }
-    [[-150, -18, 1.1], [-146, 22, 0.9], [-78, 26, 1.2], [-72, -22, 0.85], [-112, 38, 1.0], [-118, -34, 0.8], [-166, 96, 0.9], [-118, 148, 1.0]].forEach(function (tp) { tree(tp[0], tp[1], tp[2]); });
-    for (var fl2 = 0; fl2 < 40; fl2++) {
-      var fa = Math.random() * 6.2832, frx = (GRID.lake.rx + rnd(4, 10)) * 1.28, frz = (GRID.lake.rz + rnd(3, 8)) * 1.55;
-      scene.add(at(light(THREE, M, [0xff8fb2, 0xffd45e, 0xffffff, 0xb28fff][fl2 % 4], 0.55, 'steady'), WX(GRID.lake.x) + Math.cos(fa) * frx, 0.5, WZ(GRID.lake.z) + Math.sin(fa) * frz));
-    }
-
-    // HELIPORT
-    var pad = new THREE.Mesh(new THREE.CircleGeometry(GRID.heli.r * 1.28, 26), new THREE.MeshStandardMaterial({ map: heliPadTex(THREE), transparent: true, roughness: 0.9, metalness: 0.04 }));
-    pad.rotation.x = -Math.PI / 2; pad.position.set(WX(GRID.heli.x), 0.02, WZ(GRID.heli.z)); pad.receiveShadow = true; scene.add(pad);
-    for (var hl = 0; hl < 8; hl++) { var an = hl / 8 * 6.2832; scene.add(at(light(THREE, M, 0xfff2c8, 0.8, 'steady'), WX(GRID.heli.x) + Math.cos(an) * GRID.heli.r * 1.28 * 0.95, 0.5, WZ(GRID.heli.z) + Math.sin(an) * GRID.heli.r * 1.28 * 0.95)); }
-
-    // CAR PARK + cars
-    var carPad = new THREE.Mesh(new THREE.PlaneGeometry(GRID.carpark.w * 1.28, GRID.carpark.d * 1.55), new THREE.MeshStandardMaterial({ map: carParkTex(THREE), roughness: 0.95, metalness: 0.04 }));
-    carPad.rotation.x = -Math.PI / 2; carPad.position.set(WX(GRID.carpark.x), 0.016, WZ(GRID.carpark.z)); carPad.receiveShadow = true; scene.add(carPad);
-    var CAR_COLS = [0xc0392b, 0x2e86c1, 0xf4d03f, 0xecf0f1, 0x27ae60, 0x8e44ad, 0x1c2833, 0xe67e22, 0x76d7c4];
-    for (var cc = 0; cc < 9; cc++) {
-      var car = new THREE.Group();
-      var cb = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 1.3), M.mat(CAR_COLS[cc], 0.5, 0.3)); cb.position.y = 0.75; cb.castShadow = true; car.add(cb);
-      var ct = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.65, 1.2), M.win); ct.position.set(-0.1, 1.5, 0); car.add(ct);
-      car.position.set(WX(GRID.carpark.x - 14) + (cc % 3) * 12, 0, WZ(GRID.carpark.z - 8) + Math.floor(cc / 3) * 12);
-      car.rotation.y = Math.PI / 2; scene.add(car);
-    }
-
-    // TERMINAL — HSIA Terminal-3 style: long white canopy on column rows + glass
-    (function () {
-      var g = new THREE.Group(); g.position.set(WX(GRID.terminal.x), 0, WZ(GRID.terminal.z));
-      var roof = new THREE.Mesh(new THREE.BoxGeometry(120, 2.4, 40), M.bldg2); roof.position.y = 17; roof.castShadow = true; g.add(roof);
-      var lip = new THREE.Mesh(new THREE.BoxGeometry(124, 0.9, 44), M.white); lip.position.y = 15.6; g.add(lip);
-      var hall = new THREE.Mesh(new THREE.BoxGeometry(104, 11, 28), M.glass); hall.position.y = 5.6; g.add(hall);
-      for (var cx = -48; cx <= 48; cx += 16) {
-        [-14, 14].forEach(function (cz) {
-          var colm = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.4, 15.6, 8), M.bldg); colm.position.set(cx, 7.8, cz); colm.castShadow = true; g.add(colm);
-          var cap = new THREE.Mesh(new THREE.ConeGeometry(3.2, 2.6, 8), M.bldg2); cap.rotation.x = Math.PI; cap.position.set(cx, 15.2, cz); g.add(cap);
-        });
-      }
-      // warm lamp string under the canopy edge — the terminal glows at its rim
-      var lp = [], lc = [];
-      for (var lx = -56; lx <= 56; lx += 8) { lp.push(WX(GRID.terminal.x) + lx, 15.4, WZ(GRID.terminal.z) + 21); lc.push(1, 0.88, 0.62); lp.push(WX(GRID.terminal.x) + lx, 15.4, WZ(GRID.terminal.z) - 21); lc.push(1, 0.88, 0.62); }
-      var strT = pointCloud(THREE, M, lp, lc, 1.1, false); scene.add(strT.g);
-      scene.add(g);
-    })();
-
-    // CONTROL TOWER (striped) + radar + city towers
-    (function () {
-      var g = new THREE.Group(); g.position.set(WX(GRID.tower.x), 0, WZ(GRID.tower.z));
-      var shaft = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.2, 40, 10), M.bldg); shaft.position.y = 20; shaft.castShadow = true; g.add(shaft);
-      [[10, 3.02], [20, 2.82], [30, 2.62]].forEach(function (b) { var band = new THREE.Mesh(new THREE.CylinderGeometry(b[1], b[1] + 0.06, 2.4, 10), M.red); band.position.y = b[0]; g.add(band); });
-      var cab = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 4.4, 6, 10), M.bldg2); cab.position.y = 42; g.add(cab);
-      var glass = new THREE.Mesh(new THREE.CylinderGeometry(5.3, 4.5, 3.4, 10, 1, true), M.glass); glass.position.y = 42.4; g.add(glass);
-      var roof = new THREE.Mesh(new THREE.ConeGeometry(5.6, 3, 10), M.bldg); roof.position.y = 46.6; g.add(roof);
-      var head = new THREE.Group(); head.position.y = 49.4;
-      var dish = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.4, 7), M.bldg2); dish.rotation.z = 0.32; head.add(dish);
-      g.add(head);
-      updaters.push(function (t) { head.rotation.y = t * 1.1; });
-      scene.add(g);
-      scene.add(at(light(THREE, M, 0xff2a2a, 2.4, 'beacon', 0.7, 0.0), WX(GRID.tower.x), 51, WZ(GRID.tower.z)));
-    })();
-    (function () {
-      var hs = [30, 46, 22, 38, 26];
-      for (var i = 0; i < hs.length; i++) {
-        var h = hs[i], bx = WX(GRID.city.x - 24) + i * 15, bz = WZ(GRID.city.z + (i % 2 ? -8 : 6));
-        var b = new THREE.Mesh(new THREE.BoxGeometry(12, h, 12), i % 2 ? M.bldg2 : M.bldg); b.position.set(bx, h / 2, bz); b.castShadow = true; scene.add(b);
-        for (var wy = 4; wy < h - 3; wy += 5.5) { var w = new THREE.Mesh(new THREE.BoxGeometry(12.2, 1.5, 12.2), M.win); w.position.set(bx, wy, bz); scene.add(w); }
-      }
-      scene.add(at(light(THREE, M, 0xff2a2a, 2.4, 'beacon', 0.6, 1.7), WX(GRID.city.x - 24) + 15, 48, WZ(GRID.city.z)));
-    })();
-
-    // WINDSOCK by RWY1 (near-side threshold)
-    (function () {
-      var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 7, 6), M.gun); pole.position.set(WX(24), 3.5, WZ(168)); scene.add(pole);
-      var sock = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.6, 8, 1, true), M.mat(0xf07030, 0.7, 0.05));
-      sock.rotation.z = Math.PI / 2; sock.position.set(WX(24) + 1.9, 6.6, WZ(168)); scene.add(sock);
+      var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 8, 6), M.gun); pole.position.set(-60, 4, RL.z + 26); scene.add(pole);
+      var sock = new THREE.Mesh(new THREE.ConeGeometry(1.0, 4, 8, 1, true), M.mat(0xf07030, 0.7, 0.05));
+      sock.rotation.z = Math.PI / 2; sock.position.set(-58, 7.6, RL.z + 26); scene.add(sock);
       updaters.push(function (t) { sock.rotation.y = Math.sin(t * 0.5) * 0.35; sock.rotation.x = Math.sin(t * 1.7) * 0.06; });
     })();
-
-    // PAPI — the 4-lamp glide-slope unit beside RWY1's landing threshold
+    // equipment canopy + LD3 cargo containers on the remote apron's west end
     (function () {
-      for (var i = 0; i < 4; i++) {
-        scene.add(at(light(THREE, M, i < 2 ? 0xffffff : 0xff4030, 1.3, 'steady'), WX(GRID.rwy1.x) - GRID.rwy1.w * 1.28 / 2 - 10 - i * 4, 0.8, WZ(-150)));
-      }
-    })();
-    // TAXI GUIDANCE SIGNS — yellow-on-black boards at the junctions
-    (function () {
-      function board(gx, gz, txt) {
-        var c = document.createElement('canvas'); c.width = 128; c.height = 48; var g = c.getContext('2d');
-        g.fillStyle = '#141414'; g.fillRect(0, 0, 128, 48);
-        g.fillStyle = '#f2c744'; g.font = 'bold 26px Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, 64, 26);
-        var b = new THREE.Mesh(new THREE.BoxGeometry(6.5, 2.4, 0.3), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(c), roughness: 0.6, metalness: 0.1 }));
-        b.position.set(WX(gx), 1.6, WZ(gz)); scene.add(b);
-        var leg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 1, 6), M.gun); leg2.position.set(WX(gx), 0.4, WZ(gz)); scene.add(leg2);
-      }
-      board(GRID.rwy1.x + 32, GRID.linkN.z - 14, 'A1 →');
-      board(GRID.corridor.x + 10, GRID.linkS.z - 12, '← 14-32');
-      board(GRID.corridor.x + 10, GRID.linkN.z + 12, 'APRON');
-      board(GRID.rwy2.x - 30, GRID.linkS.z + 12, 'RWY 2');
-    })();
-    // CARGO CORNER — colourful LD3 airline containers + pallet + loader
-    (function () {
-      var COLS = [0xc8ccd6, 0x2e86c1, 0xc0392b, 0xe6b93c, 0x9aa2b1, 0x27ae60];
-      for (var i = 0; i < 6; i++) {
-        var box = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.4, 3.4), M.mat(COLS[i], 0.55, 0.15));
-        box.position.set(WX(146) + (i % 3) * 6, 1.7, WZ(102) + Math.floor(i / 3) * 5.4);
-        box.rotation.y = (i % 2) * 0.12; box.castShadow = true; scene.add(box);
-      }
-      var pallet = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, 5), M.wood); pallet.position.set(WX(164), 0.3, WZ(103)); scene.add(pallet);
-      var loader = new THREE.Mesh(new THREE.BoxGeometry(5, 2, 2.6), M.soft); loader.position.set(WX(170), 1.2, WZ(100)); loader.castShadow = true; scene.add(loader);
-    })();
-    // EPAL TRAVELS billboard greeting the entrance road
-    (function () {
-      var bb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 26), new THREE.MeshStandardMaterial({ map: signTex(THREE), roughness: 0.6, metalness: 0.1 }));
-      bb.position.set(WX(140), 9, WZ(134)); bb.rotation.y = Math.PI / 2.25; bb.castShadow = true; scene.add(bb);
-      [-9, 9].forEach(function (dz) { var post = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 6, 8), M.gun); post.position.set(WX(140), 3, WZ(134) + dz); scene.add(post); });
+      var canopy = new THREE.Mesh(new THREE.BoxGeometry(18, 0.8, 14), M.accent); canopy.position.set(24, 6, APR_TOP.z); canopy.castShadow = true; scene.add(canopy);
+      [[18, -4], [30, -4], [18, 4], [30, 4]].forEach(function (cp) { var pl2 = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 6), M.gun); pl2.position.set(cp[0], 3, APR_TOP.z + cp[1]); scene.add(pl2); });
+      var COLS = [0xc8ccd6, 0x2e86c1, 0xc0392b, 0xe6b93c, 0x9aa2b1];
+      for (var i = 0; i < 5; i++) { var box = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3, 3), M.mat(COLS[i], 0.55, 0.15)); box.position.set(42 + i * 4.6, 1.5, APR_TOP.z + 8); box.castShadow = true; scene.add(box); }
     })();
 
-    /* ---- orientation helpers ---------------------------------------------*/
+    /* ---- orientation helpers ----------------------------------------------*/
     var UP = V(0, 1, 0), rt = new THREE.Vector3(), up = new THREE.Vector3(), fw = new THREE.Vector3(), mtx = new THREE.Matrix4();
     function place(obj, p, p2, bank) {
       fw.copy(p2).sub(p); if (fw.lengthSq() < 1e-8) fw.set(0, 0, -1); fw.normalize();
@@ -604,17 +570,35 @@
       return sp;
     }
 
-    /* ======================================================================
-     * THE PLANE STATE MACHINE — 4 aircraft (2 Biman + toy + orange), one
-     * lifecycle each, staggered; per-runway locks; splines for every move.
-     * ====================================================================*/
-    var rwy1FreeAt = 0, rwy2FreeAt = 0;
-    var GY = 4.6;                                        // ground fuselage height
-    function curveOf(pts) { return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.35); }
-    function easeIn(k) { return k * k; }
-    function easeOut(k) { return 1 - (1 - k) * (1 - k); }
+    /* ---- GATES + status lights ---------------------------------------------*/
+    var standLights = [];
+    var gates = GATES_X.map(function (gx, gi) {
+      var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 6, 6), M.gun); mast.position.set(gx + 9, 3, APR_GATE.z); scene.add(mast);
+      var sl = light(THREE, M, 0x35e07a, 1.4, 'steady'); sl.position.set(gx + 9, 6.4, APR_GATE.z); scene.add(sl); standLights.push(sl);
+      var num = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), new THREE.MeshBasicMaterial({ map: textTex(THREE, String(gi + 1), '#eef2fa', null, 64, 64, 40), transparent: true }));
+      num.rotation.x = -Math.PI / 2; num.position.set(gx - 8, 0.02, APR_GATE.z + 12); scene.add(num);
+      return { p: V(gx, GY, APR_GATE.z), taken: false };
+    });
+    updaters.push(function (t) {
+      for (var i = 0; i < standLights.length; i++) {
+        if (gates[i].taken) { standLights[i].material.color.setHex(0xffb020); standLights[i].material.opacity = 0.55 + 0.45 * Math.abs(Math.sin(t * 2.2 + i)); }
+        else { standLights[i].material.color.setHex(0x35e07a); standLights[i].material.opacity = 1; }
+      }
+    });
 
-    // touchdown smoke puffs (pooled sprites)
+    /* ---- contrails + smoke pool --------------------------------------------*/
+    function makeTrail(n) {
+      var segs = [];
+      for (var i = 0; i < n; i++) {
+        var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+        s.scale.set(3.6, 3.6, 1); scene.add(s); segs.push({ s: s, t: -9 });
+      }
+      var idx = 0, lastDrop = -9;
+      return function (pos, t, active) {
+        if (active && t - lastDrop > 0.28) { lastDrop = t; var sg = segs[idx++ % n]; sg.s.position.set(pos.x, pos.y - 1.0, pos.z); sg.t = t; }
+        for (var i2 = 0; i2 < n; i2++) { var sg2 = segs[i2]; var a2 = t - sg2.t; sg2.s.material.opacity = (a2 >= 0 && a2 < 4.2) ? 0.3 * (1 - a2 / 4.2) : 0; }
+      };
+    }
     var puffs = [];
     for (var pf = 0; pf < 2; pf++) {
       var puff = new THREE.Sprite(new THREE.SpriteMaterial({ map: softSprite(THREE), color: 0xdfe5ee, transparent: true, opacity: 0, depthWrite: false, fog: false }));
@@ -630,89 +614,85 @@
       });
     });
 
-    var stands = GRID.stands.map(function (st) { return { p: V(WX(st.x), GY, WZ(st.z)), taken: false }; });
-    // stand docking lights follow LIVE occupancy: green = free, amber pulse = taken
-    updaters.push(function (t) {
-      for (var i = 0; i < standLights.length && i < stands.length; i++) {
-        if (stands[i].taken) { standLights[i].material.color.setHex(0xffb020); standLights[i].material.opacity = 0.55 + 0.45 * Math.abs(Math.sin(t * 2.2 + i)); }
-        else { standLights[i].material.color.setHex(0x35e07a); standLights[i].material.opacity = 1; }
-      }
-    });
-    // CONTRAILS — a pooled ribbon of fading puffs behind high/climbing aircraft
-    function makeTrail(n) {
-      var segs = [];
-      for (var i = 0; i < n; i++) {
-        var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
-        s.scale.set(3.4, 3.4, 1); scene.add(s); segs.push({ s: s, t: -9 });
-      }
-      var idx = 0, lastDrop = -9;
-      return function (pos, t, active) {
-        if (active && t - lastDrop > 0.28) { lastDrop = t; var sg = segs[idx++ % n]; sg.s.position.set(pos.x, pos.y - 1.0, pos.z); sg.t = t; }
-        for (var i2 = 0; i2 < n; i2++) { var sg2 = segs[i2]; var a2 = t - sg2.t; sg2.s.material.opacity = (a2 >= 0 && a2 < 4.2) ? 0.3 * (1 - a2 / 4.2) : 0; }
-      };
-    }
+    /* ======================================================================
+     * PLANE STATE MACHINE on the reference layout
+     * ====================================================================*/
+    var rwyTOFreeAt = 0, rwyLAFreeAt = 0;
+    function curveOf(pts) { return new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.35); }
+    function easeIn(k) { return k * k; }
+    function easeOut(k) { return 1 - (1 - k) * (1 - k); }
+
     var PLANE_SPECS = [
-      { livery: LIVERIES[8], scale: 1.8, cfg: {} },                            // Biman
-      { livery: LIVERIES[8], scale: 1.6, cfg: { stretch: 1.14 } },             // Biman (stretched)
-      { livery: LIVERIES[5], scale: 1.45, cfg: {} },                           // toy yellow/blue
-      { livery: LIVERIES[6], scale: 1.4, cfg: {} }                             // orange
+      { livery: LIVERIES[8], scale: 1.7, cfg: {} },
+      { livery: LIVERIES[8], scale: 1.55, cfg: { stretch: 1.14 } },
+      { livery: LIVERIES[5], scale: 1.4, cfg: {} },
+      { livery: LIVERIES[6], scale: 1.35, cfg: {} }
     ];
-    var corridorX = WX(GRID.corridor.x);
-    var rw2X = WX(GRID.rwy2.x), rw1X = WX(GRID.rwy1.x);
+    // three extra static jets fill the gate row like the reference picture
+    [[1, 2], [3, 1], [5, 7]].forEach(function (gg) {
+      var g2 = gates[gg[0]]; g2.taken = true;
+      var stat = buildAirliner(THREE, M, 1.45, false, LIVERIES[gg[1]]);
+      stat.position.copy(g2.p); stat.rotation.y = Math.PI;   // nose to the terminal
+      stat.traverse(function (o) { if (o.isMesh) o.castShadow = true; }); scene.add(stat);
+      var shd = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, transparent: true, opacity: 0.28, depthWrite: false, fog: false }));
+      shd.scale.set(20, 12, 1); shd.position.set(g2.p.x, 0.24, g2.p.z); scene.add(shd);
+    });
 
     PLANE_SPECS.forEach(function (spec, pi) {
       var craft = buildAirliner(THREE, M, spec.scale, false, spec.livery, spec.cfg);
       craft.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
-      addShadow(craft, 16 * spec.scale);
+      addShadow(craft, 15 * spec.scale);
       var trail = makeTrail(16);
       scene.add(craft);
-      var st = { name: 'INIT', t0: 0, dur: 0.1, curve: null, ease: null, stand: null, nose: null, laps: 1 };
-      // stagger the fleet: half start parked, half start in the cruise loop
+      var st = { name: 'INIT', t0: 0, dur: 0.1, curve: null, ease: null, gate: null, nose: null, laps: 1, circle: null };
       var startParked = pi < 2;
-      if (startParked) { st.stand = stands[pi]; st.stand.taken = true; }
+      if (startParked) {
+        var free0 = gates.filter(function (g2) { return !g2.taken; });
+        st.gate = free0[pi] || free0[0]; st.gate.taken = true;
+      }
 
       function setState(name, dur, curve, ease, nose) { st.name = name; st.dur = dur; st.curve = curve; st.ease = ease || null; st.nose = nose || null; }
-      function freeStand() { if (st.stand) { st.stand.taken = false; st.stand = null; } }
-      function claimStand() { var free = stands.filter(function (s2) { return !s2.taken; }); var s3 = free.length ? pickOf(free) : stands[0]; s3.taken = true; st.stand = s3; return s3; }
-
+      function freeGate() { if (st.gate) { st.gate.taken = false; st.gate = null; } }
+      function claimGate() { var free = gates.filter(function (g2) { return !g2.taken; }); var g3 = free.length ? pickOf(free) : gates[0]; g3.taken = true; st.gate = g3; return g3; }
       function cruiseCircle() {
-        var cx = rnd(-160, 160), cy = rnd(140, 210), cz = rnd(-560, -320), r = rnd(260, 400), pts = [];
+        var cx = rnd(-180, 180), cy = rnd(150, 220), cz = rnd(-620, -380), r = rnd(260, 400), pts = [];
         for (var i = 0; i < 10; i++) { var a2 = i / 10 * 6.2832; pts.push(V(cx + Math.cos(a2) * r, cy + Math.sin(a2 * 2) * 8, cz + Math.sin(a2) * r * 0.55)); }
-        var c2 = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
-        return c2;
+        return new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
       }
 
       function next(t) {
-        var stand;
         switch (st.name) {
           case 'INIT':
-            if (startParked) { craft.visible = true; setState('PARKED', jit(30), null); place(craft, st.stand.p, V(st.stand.p.x - 1, GY, st.stand.p.z - 1), 0); }
-            else { st.circle = cruiseCircle(); craft.visible = true; craft.userData.gear.visible = false; setState('CRUISE', jit(70) + pi * 17, st.circle); }
+            if (startParked) { craft.visible = true; place(craft, st.gate.p, V(st.gate.p.x, GY, st.gate.p.z + 2), 0); setState('PARKED', jit(28) + pi * 8, null); }
+            else { st.circle = cruiseCircle(); craft.visible = true; craft.userData.gear.visible = false; setState('CRUISE', jit(70) + pi * 19, st.circle); }
             break;
           case 'PARKED':
-            if (t < rwy2FreeAt) { setState('PARKED', 6, null); break; }        // wait for the strip
-            rwy2FreeAt = t + 75;                                               // own RWY2 + entry link
-            var sp = st.stand.p;
-            setState('PUSHBACK', jit(8), curveOf([sp, V(corridorX, GY, sp.z), V(corridorX, GY, sp.z + 8)]), easeOut, V(-1, 0, -0.2));
+            if (t < rwyTOFreeAt) { setState('PARKED', 6, null); break; }
+            rwyTOFreeAt = t + 78;
+            var gp = st.gate.p;
+            setState('PUSHBACK', jit(8), curveOf([gp, V(gp.x, GY, gp.z - 16), V(gp.x - 6, GY, gp.z - 22)]), easeOut, V(0, 0, 1));
             break;
           case 'PUSHBACK':
-            freeStand();
-            setState('TAXI_OUT', jit(24), curveOf([
-              V(corridorX, GY, craft.position.z),
-              V(corridorX, GY, WZ(GRID.linkS.z)),
-              V(WX(GRID.rwy2.x + 12), GY, WZ(GRID.linkS.z)),
-              V(rw2X, GY, WZ(140)),
-              V(rw2X, GY, WZ(168))
+            freeGate();
+            setState('TAXI_OUT', jit(26), curveOf([
+              V(craft.position.x, GY, craft.position.z),
+              V(craft.position.x - 30, GY, (APR_TOP.z + APR_GATE.z) / 2 + 2),
+              V(-80, GY, (APR_TOP.z + APR_GATE.z) / 2 + 2),
+              V(CONN.x + 10, GY, APR_TOP.z),
+              V(CONN.x, GY, 0),
+              V(CONN.x, GY, RT.z + 30),
+              V(CONN.x + 14, GY, RT.z),
+              V(RT.x1 + 4, GY, RT.z)
             ]));
             break;
           case 'TAXI_OUT': setState('HOLD', jit(5), null); break;
           case 'HOLD':
-            setState('ROLL', jit(10), curveOf([V(rw2X, GY, WZ(168)), V(rw2X, GY, WZ(-30))]), easeIn);
+            setState('ROLL', jit(10), curveOf([V(RT.x1 + 4, GY, RT.z), V(RT.x1 + 190, GY, RT.z)]), easeIn);
             break;
           case 'ROLL':
             st.circle = cruiseCircle();
             var c0 = st.circle.getPointAt(0);
-            setState('CLIMB', jit(15), curveOf([V(rw2X, GY, WZ(-30)), V(rw2X + rnd(-30, 30), 60, WZ(-150)), V((rw2X + c0.x) / 2, (60 + c0.y) / 2 + 30, (WZ(-190) + c0.z) / 2), c0]), easeIn);
+            setState('CLIMB', jit(15), curveOf([V(RT.x1 + 190, GY, RT.z), V(RT.x1 + 330, 55, RT.z + rnd(-16, 6)), V((RT.x1 + 430 + c0.x) / 2, (55 + c0.y) / 2 + 26, (RT.z + c0.z) / 2), c0]), easeIn);
             break;
           case 'CLIMB':
             craft.userData.gear.visible = false;
@@ -720,31 +700,31 @@
             setState('CRUISE', jit(70) * st.laps, st.circle);
             break;
           case 'CRUISE':
-            if (t < rwy1FreeAt) { setState('CRUISE', 22, st.circle); break; }  // extend a lap
-            rwy1FreeAt = t + 62;                                               // own RWY1 + exit link
+            if (t < rwyLAFreeAt) { setState('CRUISE', 22, st.circle); break; }
+            rwyLAFreeAt = t + 64;
             var cp = st.circle.getPointAt(0);
-            setState('APPROACH', jit(20), curveOf([cp, V(rw1X + rnd(-20, 20), 120, WZ(-320)), V(rw1X, 60, WZ(-250)), V(rw1X, 14, WZ(-188)), V(rw1X, 6.2, WZ(-168))]), easeOut);
             craft.userData.gear.visible = true;
+            setState('APPROACH', jit(20), curveOf([cp, V(-560, 130, RL.z + rnd(-14, 14)), V(-320, 66, RL.z), V(-150, 15, RL.z), V(RL.x1 + 8, 6.4, RL.z)]), easeOut);
             break;
           case 'APPROACH':
-            setState('FLARE', jit(2.6), curveOf([V(rw1X, 6.2, WZ(-168)), V(rw1X, GY + 0.4, WZ(-156)), V(rw1X, GY, WZ(-148))]));
+            setState('FLARE', jit(2.6), curveOf([V(RL.x1 + 8, 6.4, RL.z), V(RL.x1 + 34, GY + 0.4, RL.z), V(RL.x1 + 52, GY, RL.z)]));
             break;
           case 'FLARE':
             firePuff(craft.position);
-            setState('ROLLOUT', jit(9), curveOf([V(rw1X, GY, WZ(-148)), V(rw1X, GY, WZ(GRID.linkN.z))]), easeOut);
+            setState('ROLLOUT', jit(9), curveOf([V(RL.x1 + 52, GY, RL.z), V(150, GY, RL.z)]), easeOut);
             break;
           case 'ROLLOUT':
-            stand = claimStand();
+            var gate = claimGate();
             setState('TAXI_IN', jit(22), curveOf([
-              V(rw1X, GY, WZ(GRID.linkN.z)),
-              V(WX(50), GY, WZ(GRID.linkN.z)),
-              V(corridorX, GY, WZ(GRID.linkN.z)),
-              V(corridorX, GY, stand.p.z - 14),
-              V((corridorX + stand.p.x) / 2, GY, stand.p.z - 6),
-              stand.p
+              V(150, GY, RL.z),
+              V(170, GY, RL.z + 14),
+              V(170, GY, APR_TOP.z - 4),
+              V(Math.max(gate.p.x, 60), GY, APR_TOP.z + 4),
+              V(gate.p.x, GY, (APR_TOP.z + APR_GATE.z) / 2 + 2),
+              gate.p
             ]));
             break;
-          case 'TAXI_IN': setState('PARKED', jit(40), null); break;
+          case 'TAXI_IN': place(craft, st.gate.p, V(st.gate.p.x, GY, st.gate.p.z + 2), 0); setState('PARKED', jit(38), null); break;
         }
         st.t0 = t;
       }
@@ -756,33 +736,34 @@
         var sh = craft.userData.shadowS;
         if (st.curve) {
           var k = st.ease ? st.ease(Math.min(1, u)) : Math.min(1, u);
-          if (st.name === 'CRUISE') k = (u * st.laps) % 1;                    // loop the circle
+          if (st.name === 'CRUISE') k = (u * st.laps) % 1;
           var p = st.curve.getPointAt(Math.max(0, Math.min(0.9999, k)));
           var p2 = st.curve.getPointAt(Math.max(0, Math.min(0.9999, k + 0.004)));
           var p0 = st.curve.getPointAt(Math.max(0, Math.min(0.9999, k - 0.004)));
-          if (st.nose) place(craft, p, V(p.x + st.nose.x, p.y, p.z + st.nose.z), 0);   // pushback: nose held
+          if (st.nose) place(craft, p, V(p.x + st.nose.x, p.y, p.z + st.nose.z), 0);
           else place(craft, p, p2, (p.y > 8 ? bankOf(p0, p, p2) : 0));
-          if (sh) { sh.visible = true; sh.position.set(p.x, 0.24, p.z); var f = Math.max(0, 1 - p.y / 150); sh.material.opacity = 0.3 * f * f; }
-          trail(p, t, (st.name === 'CLIMB' && p.y > 55) || st.name === 'CRUISE');      // contrail ribbons (climb + sky circles)
+          if (sh) { sh.visible = true; sh.position.set(p.x, 0.24, p.z); var f = Math.max(0, 1 - p.y / 170); sh.material.opacity = 0.3 * f * f; }
+          trail(p, t, (st.name === 'CLIMB' && p.y > 50) || st.name === 'CRUISE');
         } else { trail(craft.position, t, false); if (sh) { sh.visible = true; sh.position.set(craft.position.x, 0.24, craft.position.z); sh.material.opacity = 0.3; } }
       });
     });
 
-    /* ---- HELICOPTER — heliport resident: spool-up, lift, city tour, land */
+    /* ---- HELICOPTER on its loop pad ----------------------------------------*/
     var heli = buildHeli(THREE, M);
     heli.g.traverse(function (o) { if (o.isMesh) o.castShadow = true; });
     scene.add(heli.g); addShadow(heli.g, 13);
     (function () {
-      var PADP = V(WX(GRID.heli.x), 1.8, WZ(GRID.heli.z));
+      var PADP = V(-178, 1.8, -196);
       var hs = { name: 'IDLE', t0: 0, dur: jit(24), curve: null, rotor: 0 };
       place(heli.g, PADP, V(PADP.x + 1, PADP.y, PADP.z), 0);
       function tour() {
         return curveOf([
-          V(PADP.x, rnd(55, 85), PADP.z - 20),
-          V(WX(GRID.lake.x), rnd(60, 95), WZ(GRID.lake.z)),
-          V(WX(40), rnd(70, 100), WZ(-120)),
-          V(WX(GRID.city.x - 30), rnd(60, 95), WZ(GRID.city.z - 60)),
-          V(PADP.x + 30, rnd(50, 80), PADP.z + 10),
+          V(PADP.x, rnd(55, 85), PADP.z + 24),
+          V(-18, rnd(60, 95), -30),
+          V(130, rnd(70, 100), TERM.z - 40),
+          V(238, rnd(60, 90), 20),
+          V(-40, rnd(55, 85), 150),
+          V(PADP.x + 26, rnd(45, 70), PADP.z + 30),
           V(PADP.x, 30, PADP.z)
         ]);
       }
@@ -791,7 +772,7 @@
         if (u >= 1) {
           if (hs.name === 'IDLE') { hs.name = 'SPOOL'; hs.dur = jit(5); }
           else if (hs.name === 'SPOOL') { hs.name = 'LIFT'; hs.dur = jit(8); }
-          else if (hs.name === 'LIFT') { hs.name = 'TOUR'; hs.dur = jit(45); hs.curve = tour(); }
+          else if (hs.name === 'LIFT') { hs.name = 'TOUR'; hs.dur = jit(48); hs.curve = tour(); }
           else if (hs.name === 'TOUR') { hs.name = 'LAND'; hs.dur = jit(8); }
           else if (hs.name === 'LAND') { hs.name = 'IDLE'; hs.dur = jit(30); }
           hs.t0 = t; u = 0;
@@ -810,7 +791,7 @@
       });
     })();
 
-    /* ---- legMover: the random SKY traffic + ground errands ---------------*/
+    /* ---- legMover: sky traffic + ground errands ----------------------------*/
     function legMover(obj, makeLeg) {
       var o = obj.g || obj; scene.add(o);
       o.visible = false;
@@ -829,17 +810,17 @@
         if (leg.flat) { p2 = V(p2.x, p.y, p2.z); p0 = V(p0.x, p.y, p0.z); }
         var bank = (p.y > 7) ? bankOf(p0, p, p2) : 0;
         place(o, p, p2, bank + (leg.bank || 0));
-        if (sh) { sh.visible = o.visible; sh.position.set(p.x, 0.24, p.z); var f = Math.max(0, 1 - p.y / 150); sh.material.opacity = 0.3 * f * f; }
+        if (sh) { sh.visible = o.visible; sh.position.set(p.x, 0.24, p.z); var f = Math.max(0, 1 - p.y / 170); sh.material.opacity = 0.3 * f * f; }
         if (leg.tick) leg.tick(u, t);
       });
     }
 
-    // busy random sky: seven colourful cruisers, short random gaps
+    // colourful cruisers high above (the sky stays busy + random)
     var FLEET = [
       { scale: 1.9, livery: LIVERIES[3], cfg: { stretch: 1.18 } },
       { scale: 1.35, livery: LIVERIES[7], cfg: {} },
       { scale: 1.5, livery: LIVERIES[1], cfg: {} },
-      { scale: 1.45, livery: LIVERIES[8], cfg: {} },                           // Biman up high too
+      { scale: 1.45, livery: LIVERIES[8], cfg: {} },
       { scale: 1.4, livery: LIVERIES[2], cfg: {} },
       { scale: 1.75, livery: LIVERIES[4], cfg: { engines: 4, stretch: 1.24 } },
       { scale: 1.45, livery: LIVERIES[0], cfg: {} }
@@ -847,21 +828,19 @@
     FLEET.forEach(function (spec, fi) {
       var cr = buildAirliner(THREE, M, spec.scale, false, spec.livery, spec.cfg);
       cr.userData.gear.visible = false;
-      var trail = (fi % 2 === 0) ? makeTrail(12) : null;      // every other cruiser draws a contrail
+      var trail = (fi % 2 === 0) ? makeTrail(12) : null;
       legMover(cr, function () {
-        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(110, 240), z1 = rnd(-260, -620), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
+        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(150, 260), z1 = rnd(-380, -700), z2 = z1 + rnd(-90, 90), bob = rnd(0, 14);
         return { dur: rnd(24, 48), gap: rnd(1, 9),
-          path: function (u) { return V(dir * (-720 + u * 1440), alt + Math.sin(u * Math.PI) * bob, z1 + (z2 - z1) * u); },
-          tick: trail ? function (u, t) { trail(cr.position, t, alt > 150); } : null };
+          path: function (u) { return V(dir * (-800 + u * 1600), alt + Math.sin(u * Math.PI) * bob, z1 + (z2 - z1) * u); },
+          tick: trail ? function (u, t) { trail(cr.position, t, alt > 170); } : null };
       });
     });
-    // cargo heavy — high, slow, rare
     var cargo = buildAirliner(THREE, M, 2.4, true); cargo.userData.gear.visible = false;
     legMover(cargo, function () {
-      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(180, 250), z = rnd(-420, -600);
-      return { dur: rnd(48, 78), gap: rnd(8, 30), path: function (u) { return V(dir * (740 - u * 1480), alt, z); } };
+      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(200, 270), z = rnd(-500, -700);
+      return { dur: rnd(48, 78), gap: rnd(8, 30), path: function (u) { return V(dir * (820 - u * 1640), alt, z); } };
     });
-    // fighter squads — occasional event
     var LAYOUTS = [
       [[0, 0, 0], [-9, -1.5, -9], [9, -1.5, -9], [-18, -3, -18], [18, -3, -18]],
       [[0, 0, 0], [-9, 0, -9], [9, 0, -9], [0, 0, -18]],
@@ -875,77 +854,88 @@
     }
     legMover(fteam, function () {
       var L = pickOf(LAYOUTS), squad = Math.random() < 0.55 ? jetsA : jetsB, other = (squad === jetsA) ? jetsB : jetsA;
-      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(120, 180), arc = rnd(10, 38), zb = rnd(-240, -380), wig = rnd(14, 36);
+      var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(140, 200), arc = rnd(10, 38), zb = rnd(-360, -520), wig = rnd(14, 36);
       return { dur: rnd(12, 19), gap: rnd(5, 18),
         init: function () {
           for (var i = 0; i < other.length; i++) other[i].visible = false;
           for (var i2 = 0; i2 < squad.length; i2++) { var s = L[i2]; if (s) { squad[i2].visible = true; squad[i2].position.set(s[0], s[1], s[2]); } else squad[i2].visible = false; }
         },
-        path: function (u) { return V(dir * (-720 + u * 1440), alt + Math.sin(u * Math.PI) * arc, zb + Math.sin(u * Math.PI * 2) * wig); } };
+        path: function (u) { return V(dir * (-800 + u * 1600), alt + Math.sin(u * Math.PI) * arc, zb + Math.sin(u * Math.PI * 2) * wig); } };
     });
-    // BIRDS — a proper V-formation of five, drifting across on a wavy line
+    // V-formation birds
     (function () {
       var flock = new THREE.Group();
       [[0, 0], [-4, 4], [4, 4], [-8, 8], [8, 8]].forEach(function (o2) {
         var bird = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.shadowT, color: 0x2a3242, transparent: true, opacity: 0.8, depthWrite: false }));
-        bird.scale.set(2.2, 1.1, 1); bird.position.set(o2[0], (Math.random() - 0.5) * 1.5, o2[1]); flock.add(bird);
+        bird.scale.set(2.4, 1.2, 1); bird.position.set(o2[0], (Math.random() - 0.5) * 1.5, o2[1]); flock.add(bird);
       });
       legMover(flock, function () {
-        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(100, 150), z = rnd(-200, -380), wob = rnd(4, 10);
+        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(120, 170), z = rnd(-320, -520), wob = rnd(4, 10);
         return { dur: rnd(55, 90), gap: rnd(10, 34), flat: true,
-          path: function (u) { return V(dir * (-740 + u * 1480), alt + Math.sin(u * 6.3) * wob, z); } };
+          path: function (u) { return V(dir * (-820 + u * 1640), alt + Math.sin(u * 6.3) * wob, z); } };
       });
     })();
-
-    // FIRE TRUCK — the rare RESCUE-9 perimeter patrol (red body, blue+red flash)
-    (function () {
-      var ft = buildTruck(THREE, M, 0xc0392b);
-      ft.add(at(light(THREE, M, 0x3070ff, 1.1, 'strobe', 1.6, 0.5), -1, 3.3, 0));
-      addShadow(ft, 9);
-      var P1 = V(WX(-172), 0, WZ(150)), P2 = V(WX(-176), 0, WZ(-40)), P3 = V(WX(-150), 0, WZ(-160)), P4 = V(WX(-60), 0, WZ(-176));
-      legMover(ft, function () {
-        var back = Math.random() < 0.5;
-        var pts = back ? [P4, P3, P2, P1] : [P1, P2, P3, P4];
-        var c2 = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.4);
-        return { dur: jit(42), gap: rnd(55, 150),
-          path: function (u) { var p = c2.getPointAt(Math.min(0.999, u)); p.y = 0; return p; } };
-      });
-    })();
-    // ground errands: follow-me + fuel truck serve OCCUPIED stands (10s stop)
-    var fm = buildFollowMe(THREE, M); addShadow(fm, 7);
-    var GARAGE = V(WX(GRID.hangar2.x + 8), 0.9, WZ(GRID.hangar2.z + 18));
+    // ground errands — follow-me + fuel truck out to occupied gates
+    var GARAGE = V(30, 0.9, APR_TOP.z + 8);
     function bez(a, c, b, u) { var w = 1 - u; return V(w * w * a.x + 2 * w * u * c.x + u * u * b.x, a.y, w * w * a.z + 2 * w * u * c.z + u * u * b.z); }
-    function serviceLeg(vehicle, y) {
+    function serviceLeg(y) {
       return function () {
-        var taken = stands.filter(function (s2) { return s2.taken; });
-        var tgt = taken.length ? pickOf(taken).p : V(WX(150), y, WZ(96));
-        var stop = V(tgt.x - 9, y, tgt.z + 7), stop2 = V(stop.x + rnd(-1, 1), y, stop.z + rnd(-1, 1));
-        var c1 = V((GARAGE.x + stop.x) / 2 + rnd(-24, 24), y, (GARAGE.z + stop.z) / 2 + rnd(-24, 24));
-        return { dur: jit(30), gap: rnd(8, 26),
+        var taken = gates.filter(function (g2) { return g2.taken; });
+        var tgt = taken.length ? pickOf(taken).p : V(130, y, APR_GATE.z);
+        var stop = V(tgt.x - 12, y, tgt.z - 6), stop2 = V(stop.x + rnd(-1, 1), y, stop.z + rnd(-1, 1));
+        var c1 = V((GARAGE.x + stop.x) / 2 + rnd(-16, 16), y, (GARAGE.z + stop.z) / 2 + rnd(-10, 10));
+        return { dur: jit(28), gap: rnd(8, 26),
           path: function (u) {
             if (u < 0.34) return bez(V(GARAGE.x, y, GARAGE.z), c1, stop, u / 0.34);
-            if (u < 0.62) return V(stop.x + (stop2.x - stop.x) * ((u - 0.34) / 0.28), y, stop.z + (stop2.z - stop.z) * ((u - 0.34) / 0.28));   // 10s service
+            if (u < 0.62) return V(stop.x + (stop2.x - stop.x) * ((u - 0.34) / 0.28), y, stop.z + (stop2.z - stop.z) * ((u - 0.34) / 0.28));
             return bez(stop2, c1, V(GARAGE.x, y, GARAGE.z), (u - 0.62) / 0.38);
           } };
       };
     }
-    legMover(fm, serviceLeg(fm, 0.9));
+    var fm = buildFollowMe(THREE, M); addShadow(fm, 7);
+    legMover(fm, serviceLeg(0.9));
     var fuel = buildTruck(THREE, M); addShadow(fuel, 9);
-    legMover(fuel, serviceLeg(fuel, 0));
+    legMover(fuel, serviceLeg(0));
+    // RESCUE-9 fire patrol down the transport road
+    (function () {
+      var ft = buildTruck(THREE, M, 0xc0392b);
+      ft.add(at(light(THREE, M, 0x3070ff, 1.1, 'strobe', 1.6, 0.5), -1, 3.3, 0));
+      addShadow(ft, 9);
+      var P1 = V(-208, 0, -150), P2 = V(-208, 0, 30), P3 = V(-160, 0, 120), P4 = V(-60, 0, 160);
+      legMover(ft, function () {
+        var back = Math.random() < 0.5;
+        var pts = back ? [P4, P3, P2, P1] : [P1, P2, P3, P4];
+        var c2 = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.4);
+        return { dur: jit(40), gap: rnd(55, 150),
+          path: function (u) { var p = c2.getPointAt(Math.min(0.999, u)); p.y = 0; return p; } };
+      });
+    })();
+    // an airport shuttle bus cruising the car road
+    (function () {
+      var bus = new THREE.Group();
+      var bb = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 2.4), M.mat(0xE8B93C, 0.5, 0.2)); bb.position.y = 1.5; bb.castShadow = true; bus.add(bb);
+      var bw = new THREE.Mesh(new THREE.BoxGeometry(9.1, 0.8, 2.45), M.win); bw.position.y = 2.1; bus.add(bw);
+      addShadow(bus, 10);
+      legMover(bus, function () {
+        var dir = Math.random() < 0.5 ? 1 : -1;
+        return { dur: jit(26), gap: rnd(14, 40), flat: true,
+          path: function (u) { return V(dir > 0 ? (-70 + u * 330) : (260 - u * 330), 0, TERM.z + 32); } };
+      });
+    })();
 
-    /* ---- clouds ----------------------------------------------------------*/
+    /* ---- clouds ------------------------------------------------------------*/
     var cloudTexv = softSprite(THREE), clouds = [];
-    for (var c = 0; c < 11; c++) {
-      var mm = new THREE.SpriteMaterial({ map: cloudTexv, color: [0xffffff, 0xfbfdff, 0xeef4ff][c % 3], transparent: true, opacity: 0.5 + Math.random() * 0.32, depthWrite: false, fog: false });
-      var sp = new THREE.Sprite(mm); var sz = 180 + Math.random() * 240;
-      sp.scale.set(sz, sz * 0.58, 1);
-      sp.position.set((Math.random() - 0.5) * 1100, 170 + Math.random() * 190, -460 - Math.random() * 560);
+    for (var c = 0; c < 12; c++) {
+      var mm = new THREE.SpriteMaterial({ map: cloudTexv, color: [0xffffff, 0xfbfdff, 0xeef4ff][c % 3], transparent: true, opacity: 0.5 + Math.random() * 0.3, depthWrite: false, fog: false });
+      var sp = new THREE.Sprite(mm); var sz = 200 + Math.random() * 260;
+      sp.scale.set(sz, sz * 0.55, 1);
+      sp.position.set((Math.random() - 0.5) * 1400, 240 + Math.random() * 200, -560 - Math.random() * 620);
       sp.userData = { vx: (0.05 + Math.random() * 0.07) * (Math.random() < 0.5 ? -1 : 1) };
       scene.add(sp); clouds.push(sp);
     }
-    updaters.push(function () { for (var k = 0; k < clouds.length; k++) { var s = clouds[k]; s.position.x += s.userData.vx; if (s.position.x > 640) s.position.x = -640; else if (s.position.x < -640) s.position.x = 640; } });
+    updaters.push(function () { for (var k = 0; k < clouds.length; k++) { var s = clouds[k]; s.position.x += s.userData.vx; if (s.position.x > 760) s.position.x = -760; else if (s.position.x < -760) s.position.x = 760; } });
 
-    /* ---- drive every blinking light --------------------------------------*/
+    /* ---- blinking lights ----------------------------------------------------*/
     var lights = []; scene.traverse(function (o) { if (o.userData && o.userData.light && o.userData.light.pat !== 'steady' && o.material) lights.push(o); });
     updaters.push(function (t) { for (var i = 0; i < lights.length; i++) lights[i].material.opacity = lightLevel(lights[i].userData.light, t); });
 
@@ -953,7 +943,7 @@
   }
 
   /* ==========================================================================
-   * CRAFT + PROP BUILDERS
+   * CRAFT BUILDERS
    * ========================================================================*/
   var LIVERIES = [
     { body: 0xdbe3ef, accent: 0x1846b0, tail: 0x1a43bf },
@@ -961,10 +951,10 @@
     { body: 0xe7dfe4, accent: 0x9c2f5c, tail: 0xc23c66 },
     { body: 0xdedcec, accent: 0x3a2f8f, tail: 0x4a3fb0 },
     { body: 0xece4d1, accent: 0xa9741c, tail: 0xe0a020 },
-    { body: 0xf3c62e, accent: 0x1e86c8, tail: 0x1e86c8, wing: 0x2496d8 },      // toy
-    { body: 0xe07a2a, accent: 0xb85a12, tail: 0xe07a2a },                      // orange
-    { body: 0x24457e, accent: 0xdde5f2, tail: 0x24457e, wing: 0x30528c },      // navy
-    { body: 0xf2f6f2, accent: 0xda291c, tail: 0x006a4e }                       // BIMAN — white, red cheat, bottle-green tail
+    { body: 0xf3c62e, accent: 0x1e86c8, tail: 0x1e86c8, wing: 0x2496d8 },
+    { body: 0xe07a2a, accent: 0xb85a12, tail: 0xe07a2a },
+    { body: 0x24457e, accent: 0xdde5f2, tail: 0x24457e, wing: 0x30528c },
+    { body: 0xf2f6f2, accent: 0xda291c, tail: 0x006a4e }
   ];
 
   function buildAirliner(THREE, M, scale, cargo, livery, cfg) {
@@ -1055,9 +1045,9 @@
   }
   function buildHeli(THREE, M) {
     var g = new THREE.Group();
-    var body = new THREE.Mesh(new THREE.SphereGeometry(1.1, 14, 10), M.red); body.scale.set(1, 0.9, 1.5); g.add(body);
+    var body = new THREE.Mesh(new THREE.SphereGeometry(1.1, 14, 10), M.gun); body.scale.set(1, 0.9, 1.5); g.add(body);
     var glass = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 8), M.cockpit); glass.scale.set(1, 0.8, 1.2); glass.position.set(0, 0.2, 1.1); g.add(glass);
-    var boom = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.12, 3.4, 10), M.red); boom.rotation.x = Math.PI / 2; boom.position.z = -2.4; g.add(boom);
+    var boom = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.12, 3.4, 10), M.gun); boom.rotation.x = Math.PI / 2; boom.position.z = -2.4; g.add(boom);
     var mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.6, 8), M.dark); mast.position.y = 1.1; g.add(mast);
     var rotor = new THREE.Group();
     [0, 1].forEach(function (i) { var b = new THREE.Mesh(new THREE.BoxGeometry(7, 0.05, 0.35), M.dark); b.rotation.y = i * Math.PI / 2; rotor.add(b); });
@@ -1065,7 +1055,7 @@
     var tail = new THREE.Group(); [0, 1].forEach(function (i) { var b = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.16), M.dark); b.rotation.z = i * Math.PI / 2; tail.add(b); }); tail.position.set(0.25, 0, -4); g.add(tail);
     g.add(at(light(THREE, M, 0xff3020, 1.1, 'beacon', 0.9, Math.random() * 3), 0, -0.9, 0));
     g.add(at(light(THREE, M, 0xffffff, 0.8, 'strobe', 1.1, Math.random() * 3), 0, 0, -4));
-    g.scale.setScalar(1.6); return { g: g, rotor: rotor, tail: tail };
+    g.scale.setScalar(1.7); return { g: g, rotor: rotor, tail: tail };
   }
   function buildFollowMe(THREE, M) {
     var g = new THREE.Group();
@@ -1089,19 +1079,19 @@
   /* ---- sky dome + sun -----------------------------------------------------*/
   function buildSky(THREE) {
     var mat = new THREE.ShaderMaterial({
-      uniforms: { top: { value: new THREE.Color(0x3f7cd0) }, mid: { value: new THREE.Color(0x8fb8e8) }, bottom: { value: new THREE.Color(0xdfeafa) } },
+      uniforms: { top: { value: new THREE.Color(0x3f7cd0) }, mid: { value: new THREE.Color(0x8fb8e8) }, bottom: { value: new THREE.Color(0xe2ecfa) } },
       vertexShader: 'varying vec3 vW; void main(){ vec4 wp = modelMatrix * vec4(position,1.0); vW = wp.xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 bottom; varying vec3 vW; void main(){ float h = normalize(vW).y; vec3 col = h < 0.14 ? mix(bottom, mid, clamp(h/0.14,0.0,1.0)) : mix(mid, top, pow(clamp((h-0.14)/0.86,0.0,1.0), 0.85)); gl_FragColor = vec4(col, 1.0); }',
       side: THREE.BackSide, depthWrite: false, fog: false
     });
-    var dome = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 20), mat); dome.renderOrder = -1; return dome;
+    var dome = new THREE.Mesh(new THREE.SphereGeometry(3600, 32, 20), mat); dome.renderOrder = -1; return dome;
   }
   function buildSun(THREE, SUN) {
-    var g = new THREE.Group(); var to = SUN.clone().normalize().multiplyScalar(2500);
+    var g = new THREE.Group(); var to = SUN.clone().normalize().multiplyScalar(3000);
     var glowS = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTex(THREE, 'rgba(255,247,214,0.9)', 'rgba(255,236,180,0)'), transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
-    glowS.scale.set(1000, 1000, 1); glowS.position.copy(to); g.add(glowS);
+    glowS.scale.set(1100, 1100, 1); glowS.position.copy(to); g.add(glowS);
     var disc = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTex(THREE, 'rgba(255,253,240,1)', 'rgba(255,248,224,0)', 0.55), transparent: true, opacity: 1, depthWrite: false, fog: false }));
-    disc.scale.set(260, 260, 1); disc.position.copy(to); g.add(disc);
+    disc.scale.set(280, 280, 1); disc.position.copy(to); g.add(disc);
     g.renderOrder = -1; return g;
   }
 
