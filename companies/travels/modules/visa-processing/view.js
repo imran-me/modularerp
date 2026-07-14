@@ -339,7 +339,11 @@
     function recompute() {
       var em = +val('embassyFee')||0, vf = +val('vfsCharge')||0, sf = +val('serviceFee')||0;
       var total = em + vf + sf; var profit = sf;
-      ui.$('#vp-readout').innerHTML = 'Embassy '+ui.money(em)+' + VFS '+ui.money(vf)+' + Service '+ui.money(sf)+
+      // scope to the form (it may still be detached during build, or already
+      // torn down after navigation) — never assume the readout is in document
+      var out = b.querySelector('#vp-readout') || ui.$('#vp-readout');
+      if (!out) return;
+      out.innerHTML = 'Embassy '+ui.money(em)+' + VFS '+ui.money(vf)+' + Service '+ui.money(sf)+
         ' = Customer total <strong>'+ui.money(total)+'</strong> · profit <strong class="text-good">'+ui.money(profit)+'</strong>';
     }
     function applyCat(c) {
