@@ -458,29 +458,195 @@
     ]));
   }
 
-  /* ======================================================= MANAGE JOURNALS */
+  /* ======================================================= MANAGE JOURNALS
+   * Production parity (JournalController): Credit Journal (money IN — the
+   * bank is debited), Debit Journal (money OUT — the bank is credited),
+   * Opening Balance entries vs Retained Earnings that auto-create payment
+   * schedules, per-entry debit/credit totals with a Balanced badge, and a
+   * printable voucher per entry. */
   function journalsView(page) {
     var L = EPAL.ledger;
     if (!L || !L.entries) { page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Ledger unavailable.' })])); return; }
     var list = L.entries(selCo === 'all' ? {} : { companyId: selCo }).slice().reverse();
-    function glTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.dr || 0; }); return t; }
-    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-primary', { html: ui.icon('journal-plus') + ' New Journal', onclick: function () { EPAL.router.navigate('group/finance/journal'); } })]));
+    function drTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.dr || 0; }); return t; }
+    function crTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.cr || 0; }); return t; }
+    var sumDr = 0, sumCr = 0, balancedN = 0;
+    list.forEach(function (e) { var d = drTotal(e), c = crTotal(e); sumDr += d; sumCr += c; if (Math.abs(d - c) < 0.01) balancedN++; });
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Total Entries', String(list.length), 'journal-text'),
+      kpi('Total Debit', ui.money(sumDr, { compact: true }), 'arrow-up-circle'),
+      kpi('Total Credit', ui.money(sumCr, { compact: true }), 'arrow-down-circle'),
+      kpi('Balanced', balancedN + ' / ' + list.length, 'check-circle', balancedN === list.length ? 'text-good' : 'text-warn')
+    ]));
+    if (canCreate()) {
+      page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
+        el('button.btn.btn-sm.btn-primary', { html: ui.icon('arrow-down-circle') + ' Credit Journal (Money In)', onclick: function () { bankJournalForm('credit'); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('arrow-up-circle') + ' Debit Journal (Money Out)', onclick: function () { bankJournalForm('debit'); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('layers') + ' Opening Receivable', onclick: function () { openingPartyForm('Receivable'); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('layers') + ' Opening Payable', onclick: function () { openingPartyForm('Payable'); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('layers-half') + ' Opening Asset', onclick: function () { openingAssetForm(); } })
+      ]));
+    }
     var cols = [
-      { key: 'date', label: 'Date', date: true }, { key: 'id', label: 'JV', render: function (e) { return '<span class="mono xs text-mute">' + esc(e.id) + '</span>'; } },
-      { key: 'memo', label: 'Narration', render: function (e) { return esc(e.memo || e.ref || '—'); } },
-      { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', opening: 'accent', payroll: 'warn', refund: 'bad', intercompany: 'accent' } },
-      { key: 'party', label: 'Party', render: function (e) { return (EPAL.people && EPAL.people.resolve && EPAL.people.resolve(e.party)) ? EPAL.people.linkify(EPAL.people.resolve(e.party).name, EPAL.people.resolve(e.party).id) : esc(e.party || '—'); } },
-      { key: 'amount', label: 'Amount', num: true, sortVal: glTotal, render: function (e) { return '<span class="num">' + ui.money(glTotal(e)) + '</span>'; }, exportVal: glTotal }
+      { key: 'date', label: 'Date', date: true },
+      { key: 'ref', label: 'Reference', render: function (e) { return '<span class="mono xs text-mute">' + esc(e.ref || e.id) + '</span>'; } },
+      { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', opening: 'accent', payroll: 'warn', refund: 'bad', intercompany: 'accent', bank: 'info', payment: 'good' } },
+      { key: 'memo', label: 'Description', render: function (e) { return esc(e.memo || '—'); } },
+      { key: 'dr', label: 'Total Debit', num: true, sortVal: drTotal, render: function (e) { return '<span class="num">' + ui.money(drTotal(e)) + '</span>'; }, exportVal: drTotal },
+      { key: 'cr', label: 'Total Credit', num: true, sortVal: crTotal, render: function (e) { return '<span class="num">' + ui.money(crTotal(e)) + '</span>'; }, exportVal: crTotal },
+      { key: 'bal', label: 'Balanced', render: function (e) { return Math.abs(drTotal(e) - crTotal(e)) < 0.01 ? '<span class="badge badge-good">✓ Yes</span>' : '<span class="badge badge-bad">No</span>'; }, exportVal: function (e) { return Math.abs(drTotal(e) - crTotal(e)) < 0.01 ? 'Yes' : 'No'; } }
     ];
     if (selCo === 'all') cols.splice(1, 0, { key: 'companyId', label: 'Company', render: function (e) { return coCell(e.companyId); }, exportVal: function (e) { return e.companyId; } });
     var tbl = EPAL.table({
       columns: cols, rows: list, searchKeys: ['id', 'ref', 'memo', 'party', 'source'], quickFilter: 'source', filterPanel: true,
-      filters: selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : [], dateKey: 'date', totalKey: 'amount',
+      filters: selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : [], dateKey: 'date',
       pageSize: 15, exportName: 'master-journals.csv', pdfTitle: 'Master Journals — ' + coName(selCo),
       onRow: function (e) { journalDetail(e); },
+      actions: [
+        { icon: 'eye', title: 'View lines', onClick: function (e) { journalDetail(e); } },
+        { icon: 'printer', title: 'Print voucher', onClick: function (e) { journalVoucherPrint(e); } }
+      ],
       empty: { icon: 'journal-text', title: 'No journal entries in this scope' }
     });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('journal-text') + ' Manage Journals — ' + coName(selCo) }), el('span.card-sub', { text: 'filter by Source to see its total' })]), el('div.card-body', null, [tbl.el])]));
+    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('journal-text') + ' Journal Entries — ' + coName(selCo) }), el('span.card-sub', { text: 'filter by Source to see its total' })]), el('div.card-body', null, [tbl.el])]));
+  }
+  // Credit Journal (money IN): DR bank control / CR income-liability-equity.
+  // Debit Journal (money OUT): DR expense-asset / CR bank control.
+  function bankJournalForm(kind, presetBankId) {
+    var isCr = kind === 'credit';
+    var banks = db.col('banks').filter(function (b) { return (b.status || 'Active') !== 'Inactive'; });
+    if (!banks.length) { ui.toast('Add a bank account first (Manage Banks)', 'error'); return; }
+    var accts = EPAL.ledger.accounts().filter(function (a) {
+      return a.active !== false && (isCr ? (a.type === 'income' || a.type === 'liability' || a.type === 'equity')
+                                          : (a.type === 'expense' || a.type === 'asset'));
+    });
+    EPAL.formModal({
+      title: isCr ? 'Credit Journal — Money In' : 'Debit Journal — Money Out', icon: isCr ? 'arrow-down-circle' : 'arrow-up-circle', size: 'md',
+      record: { date: TODAY_STR, companyId: selCo === 'all' ? 'group' : selCo, bankId: presetBankId || banks[0].id },
+      fields: [
+        { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+        { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
+        { key: 'bankId', label: 'Bank', type: 'select', required: true, options: banks.map(function (b) { return [b.id, b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; }) },
+        { key: 'account', label: isCr ? 'Credit account' : 'Debit account', type: 'select', required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
+        { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+        { key: 'ref', label: 'Reference', type: 'text', placeholder: 'e.g. JV-001' },
+        { key: 'desc', label: 'Description', type: 'textarea', col2: true }
+      ],
+      saveLabel: isCr ? 'Save Credit Journal' : 'Save Debit Journal',
+      onSave: function (v) {
+        var amt = +v.amount || 0; if (amt <= 0) { ui.toast('Enter an amount', 'error'); return false; }
+        var bank = db.col('banks').filter(function (b) { return b.id === v.bankId; })[0];
+        if (!bank) { ui.toast('Pick a bank', 'error'); return false; }
+        if (!isCr && (+bank.balance || 0) < amt) { ui.toast('Insufficient balance — available ' + ui.money(bank.balance), 'error'); return false; }
+        var memo = (isCr ? 'Deposit to ' : 'Withdrawal from ') + bank.name + (v.desc ? ' — ' + v.desc : '');
+        var glId = 'GL-BK-' + ui.uid('').slice(-6).toUpperCase();
+        try {
+          EPAL.ledger.post({ id: glId, date: v.date, companyId: v.companyId,
+            ref: v.ref || ('BANK-' + (isCr ? 'DEP' : 'WDR')), memo: memo, source: 'bank',
+            lines: isCr ? [{ account: '1010', dr: amt, cr: 0 }, { account: v.account, dr: 0, cr: amt }]
+                        : [{ account: v.account, dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt }] });
+        } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); return false; }
+        bankTxnApply(bank, isCr ? 'deposit' : 'withdraw', amt, v.date, memo, v.ref || '', glId);
+        ui.toast((isCr ? 'Credit' : 'Debit') + ' journal posted', 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+  // Opening Receivable / Payable — party rows against Retained Earnings (3100);
+  // rows with a due date auto-create payment schedules (production behaviour).
+  function openingPartyForm(kind) {
+    var isRcv = kind === 'Receivable';
+    EPAL.formModal({
+      title: 'Opening ' + kind + ' Balances', icon: 'layers', size: 'md',
+      record: { date: '2026-07-01', companyId: selCo === 'all' ? 'group' : selCo },
+      fields: [
+        { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+        { key: 'date', label: 'As-of date', type: 'date', required: true },
+        { key: 'items', type: 'items', label: kind + ' rows (a due date auto-creates a payment schedule)', required: true, min: 1, addLabel: 'Add party',
+          columns: [
+            { key: 'party', label: 'Party name', type: 'text', width: '1.6fr' },
+            { key: 'amount', label: 'Amount', type: 'money', width: '1fr' },
+            { key: 'due', label: 'Due date', type: 'date', width: '1fr' }
+          ] }
+      ],
+      saveLabel: 'Post Opening ' + kind,
+      onSave: function (v) {
+        var rows = (v.items || []).map(function (i) { return { party: (i.party || '').trim(), amount: +i.amount || 0, due: i.due || '' }; })
+          .filter(function (i) { return i.party && i.amount > 0; });
+        if (!rows.length) { ui.toast('Add at least one party row', 'error'); return false; }
+        try {
+          rows.forEach(function (r) {
+            var ctrl = isRcv ? (EPAL.ledger.isAgentParty && EPAL.ledger.isAgentParty(r.party) ? '1150' : '1200') : '2000';
+            EPAL.ledger.post({ id: 'GL-OP' + (isRcv ? 'RC' : 'PY') + '-' + ui.uid('').slice(-6).toUpperCase(), date: v.date,
+              companyId: v.companyId, ref: 'OPENING', memo: 'Opening ' + kind.toLowerCase() + ' · ' + r.party,
+              source: 'opening', party: r.party, override: true,
+              lines: isRcv ? [{ account: ctrl, dr: r.amount, cr: 0 }, { account: '3100', dr: 0, cr: r.amount }]
+                           : [{ account: '3100', dr: r.amount, cr: 0 }, { account: ctrl, dr: 0, cr: r.amount }] });
+            if (r.due) db.save('acc_schedules', { id: 'SCH-' + ui.uid('').slice(-5).toUpperCase(), companyId: v.companyId,
+              party: r.party, kind: kind, amount: r.amount, due: r.due, status: 'Pending', priority: 'medium',
+              desc: 'Opening ' + kind.toLowerCase() + ' balance' });
+          });
+        } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); return false; }
+        ui.toast('Opening ' + kind.toLowerCase() + ' posted (' + rows.length + ' parties)', 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+  // Opening Asset — asset rows in one balanced entry against 3100.
+  function openingAssetForm() {
+    var assets = EPAL.ledger.accounts().filter(function (a) { return a.type === 'asset' && a.active !== false; });
+    EPAL.formModal({
+      title: 'Opening Asset Balances', icon: 'layers-half', size: 'md',
+      record: { date: '2026-07-01', companyId: selCo === 'all' ? 'group' : selCo },
+      fields: [
+        { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+        { key: 'date', label: 'As-of date', type: 'date', required: true },
+        { key: 'items', type: 'items', label: 'Asset rows', required: true, min: 1, addLabel: 'Add asset',
+          columns: [
+            { key: 'account', label: 'Asset account', type: 'select', options: assets.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }), width: '1.6fr' },
+            { key: 'amount', label: 'Amount', type: 'money', width: '1fr' }
+          ] }
+      ],
+      saveLabel: 'Post Opening Assets',
+      onSave: function (v) {
+        var rows = (v.items || []).map(function (i) { return { account: i.account, amount: +i.amount || 0 }; }).filter(function (i) { return i.account && i.amount > 0; });
+        if (!rows.length) { ui.toast('Add at least one asset row', 'error'); return false; }
+        var total = rows.reduce(function (a, r) { return a + r.amount; }, 0);
+        var lines = rows.map(function (r) { return { account: r.account, dr: r.amount, cr: 0 }; });
+        lines.push({ account: '3100', dr: 0, cr: total });
+        try {
+          EPAL.ledger.post({ id: 'GL-OPAS-' + ui.uid('').slice(-6).toUpperCase(), date: v.date, companyId: v.companyId,
+            ref: 'OPENING', memo: 'Opening asset balances', source: 'opening', override: true, lines: lines });
+        } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); return false; }
+        ui.toast('Opening assets posted ' + ui.money(total), 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+  // printable JOURNAL VOUCHER (production journals.voucher)
+  function journalVoucherPrint(e) {
+    var acc = {}; (EPAL.ledger.accounts() || []).forEach(function (a) { acc[a.code] = a.name; });
+    var dr = 0, cr = 0;
+    var rows = (e.lines || []).map(function (l) {
+      dr += +l.dr || 0; cr += +l.cr || 0;
+      return '<tr><td>' + esc(l.account) + ' · ' + esc(acc[l.account] || '') + '</td>' +
+        '<td class="num">' + (l.dr ? ui.money(l.dr) : '—') + '</td><td class="num">' + (l.cr ? ui.money(l.cr) : '—') + '</td></tr>';
+    }).join('');
+    var html = '<html><head><title>Journal Voucher ' + esc(e.id) + '</title><style>' +
+      'body{font-family:Arial,sans-serif;color:#111;margin:36px;font-size:13px}' +
+      'h1{font-size:19px;margin:0}.mut{color:#555}.head{display:flex;justify-content:space-between;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}' +
+      'table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #999;padding:6px 9px;text-align:left}' +
+      'th{background:#eef1f6}.num{text-align:right;font-variant-numeric:tabular-nums}tfoot td{font-weight:700;background:#f4f6fa}' +
+      '.sig{display:flex;justify-content:space-between;margin-top:64px}.sig div{border-top:1px solid #333;width:30%;text-align:center;padding-top:6px}' +
+      '</style></head><body>' +
+      '<div class="head"><div><h1>EPAL GROUP</h1><div class="mut">' + esc(coName(e.companyId)) + '</div></div>' +
+      '<div style="text-align:right"><h1>JOURNAL VOUCHER</h1><div class="mut">' + esc(e.id) + '</div></div></div>' +
+      '<div><b>Date:</b> ' + ui.date(e.date) + ' &nbsp; <b>Reference:</b> ' + esc(e.ref || '—') + ' &nbsp; <b>Source:</b> ' + esc(e.source || '—') +
+      (e.party ? ' &nbsp; <b>Party:</b> ' + esc(e.party) : '') + '</div>' +
+      (e.memo ? '<div class="mut" style="margin-top:6px">' + esc(e.memo) + '</div>' : '') +
+      '<table><thead><tr><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody><tfoot><tr><td>Totals</td><td class="num">' + ui.money(dr) + '</td><td class="num">' + ui.money(cr) + '</td></tr></tfoot></table>' +
+      '<div class="sig"><div>Prepared By</div><div>Checked By</div><div>Approved By</div></div>' +
+      '<script>window.print()<\/script></body></html>';
+    var w = window.open('', '_blank'); if (!w) { ui.toast('Allow pop-ups to print', 'error'); return; }
+    w.document.write(html); w.document.close();
   }
   function journalDetail(e) {
     var body = el('div');
@@ -500,37 +666,84 @@
     ])]));
   }
 
-  /* ======================================================= PAYMENT SCHEDULES */
+  /* ======================================================= PAYMENT SCHEDULES
+   * Production parity (PaymentScheduleController): RECEIVABLE and PAYABLE as
+   * two stacked sections with their own totals; TODAY / OVERDUE chips;
+   * approve · reschedule (count + reason) · cancel · payment-done (partial
+   * spawns a remainder schedule) actions per row; inline priority. */
   function schedulesView(page) {
     var list = db.col('acc_schedules').filter(function (s) { return selCo === 'all' ? true : s.companyId === selCo; })
       .slice().sort(function (a, b) { return (a.due || '') < (b.due || '') ? -1 : 1; });
-    var open = list.filter(function (s) { return s.status !== 'Paid'; });
+    var open = list.filter(function (s) { return s.status !== 'Paid' && s.status !== 'Cancelled'; });
+    var dueToday = open.filter(function (s) { return s.due === TODAY_STR; });
+    var overdue = open.filter(function (s) { return (s.due || '') < TODAY_STR; });
     page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
       kpi('Open Schedules', String(open.length), 'calendar2-week'),
-      kpi('Payable', ui.money(open.filter(function (s) { return s.kind === 'Payable'; }).reduce(function (a, s) { return a + (+s.amount || 0); }, 0), { compact: true }), 'arrow-up-right-circle', 'text-warn'),
-      kpi('Receivable', ui.money(open.filter(function (s) { return s.kind === 'Receivable'; }).reduce(function (a, s) { return a + (+s.amount || 0); }, 0), { compact: true }), 'arrow-down-left-circle', 'text-good'),
+      kpi('Due Today', ui.money(dueToday.reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0), { compact: true }), 'alarm', dueToday.length ? 'text-warn' : null),
+      kpi('Overdue', ui.money(overdue.reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0), { compact: true }), 'exclamation-octagon', overdue.length ? 'text-bad' : null),
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
-    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-primary', { html: ui.icon('calendar2-plus') + ' Add Schedule', onclick: function () { masterScheduleForm(null); } })]));
-    var cols = [
-      { key: 'party', label: 'Party', render: function (s) { return '<span class="strong">' + esc(s.party) + '</span>'; } },
-      { key: 'kind', label: 'Type', badge: { Payable: 'bad', Receivable: 'good' } },
-      { key: 'priority', label: 'Priority', render: function (s) { var p = s.priority || 'medium'; return '<span class="badge badge-' + (p === 'high' ? 'bad' : p === 'low' ? '' : 'warn') + '">' + esc(p) + '</span>'; }, exportVal: function (s) { return s.priority || 'medium'; } },
-      { key: 'due', label: 'Due', date: true, render: function (s) { return ui.date(s.due) + (s.rescheduleCount ? ' <span class="badge badge-warn" title="' + esc(s.rescheduleReason || '') + '">↻' + s.rescheduleCount + '</span>' : ''); } },
-      { key: 'amount', label: 'Amount', num: true, money: true },
-      { key: 'paidAmount', label: 'Paid', num: true, render: function (s) { return s.paidAmount ? '<span class="text-good">' + ui.money(s.paidAmount) + '</span>' : '—'; }, sortVal: function (s) { return s.paidAmount || 0; } },
-      { key: 'status', label: 'Status', badge: { Paid: 'good', Partial: 'warn', Pending: 'bad' } }
-    ];
-    if (selCo === 'all') cols.splice(1, 0, { key: 'companyId', label: 'Company', render: function (s) { return coCell(s.companyId); }, exportVal: function (s) { return s.companyId; } });
-    var tbl = EPAL.table({
-      columns: cols, rows: list, searchKeys: ['party', 'desc'], quickFilter: 'status', filterPanel: true,
-      filters: [{ key: 'kind', label: 'Type' }, { key: 'priority', label: 'Priority' }].concat(selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : []),
-      dateKey: 'due', totalKey: 'amount', pageSize: 12, exportName: 'master-schedules.csv', pdfTitle: 'Payment Schedules — ' + coName(selCo),
-      onRow: function (s) { masterScheduleDetail(s); },
-      actions: ui.actions({ edit: canCreate() ? function (s) { masterScheduleForm(s); } : null }),
-      empty: { icon: 'calendar2-week', title: 'No schedules in this scope' }
-    });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('calendar2-week') + ' Payment Schedules — ' + coName(selCo) }), el('span.card-sub', { text: 'click a row: pay (partial → auto-remainder) · reschedule · priority' })]), el('div.card-body', null, [tbl.el])]));
+    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-sm.btn-primary', { html: ui.icon('calendar2-plus') + ' Add Schedule', onclick: function () { masterScheduleForm(null); } })]));
+
+    function section(kind, icon, sub) {
+      var rows = list.filter(function (s) { return (s.kind || 'Payable') === kind; });
+      var openTotal = rows.filter(function (s) { return s.status !== 'Paid' && s.status !== 'Cancelled'; })
+        .reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0);
+      var cols = [
+        { key: 'party', label: 'Party', render: function (s) { return '<span class="strong">' + esc(s.party) + '</span>' + (s.partyType ? '<div class="text-mute xs">' + esc(s.partyType) + '</div>' : ''); } },
+        { key: 'id', label: 'Reference', render: function (s) { return '<span class="mono xs text-mute">' + esc(s.ref || s.id) + '</span>'; } },
+        { key: 'due', label: 'Scheduled Date', date: true, render: function (s) {
+          var chip = '';
+          if (s.status !== 'Paid' && s.status !== 'Cancelled') {
+            if (s.due === TODAY_STR) chip = ' <span class="badge badge-warn">TODAY</span>';
+            else if ((s.due || '') < TODAY_STR) chip = ' <span class="badge badge-bad">OVERDUE</span>';
+          }
+          return ui.date(s.due) + chip + (s.rescheduleCount ? ' <span class="badge" title="' + esc(s.rescheduleReason || '') + '">↻' + s.rescheduleCount + '</span>' : '');
+        } },
+        { key: 'desc', label: 'Note', render: function (s) { return s.desc ? '<span class="text-mute sm">' + esc(String(s.desc).slice(0, 60)) + '</span>' : '—'; } },
+        { key: 'priority', label: 'Priority', render: function (s) { var p = s.priority || 'medium'; return '<span class="badge badge-' + (p === 'high' ? 'bad' : p === 'low' ? '' : 'warn') + '">' + esc(p) + '</span>'; }, exportVal: function (s) { return s.priority || 'medium'; } },
+        { key: 'status', label: 'Status', badge: { Paid: 'good', Partial: 'warn', Pending: 'bad', Approved: 'info', Cancelled: '' } },
+        { key: 'amount', label: 'Amount (৳)', num: true, sortVal: function (s) { return +s.amount || 0; }, render: function (s) {
+          var due = (+s.amount || 0) - (+s.paidAmount || 0);
+          return '<span class="num strong">' + ui.money(s.amount) + '</span>' +
+            (s.paidAmount && due > 0.001 ? '<div class="text-mute xs num">Due: ' + ui.money(due) + '</div>' : '');
+        }, exportVal: function (s) { return s.amount; } }
+      ];
+      if (selCo === 'all') cols.splice(1, 0, { key: 'companyId', label: 'Company', render: function (s) { return coCell(s.companyId); }, exportVal: function (s) { return s.companyId; } });
+      var openActs = function (s) { return s.status !== 'Paid' && s.status !== 'Cancelled'; };
+      var tbl = EPAL.table({
+        columns: cols, rows: rows, searchKeys: ['party', 'desc'], quickFilter: 'status', filterPanel: true,
+        filters: [{ key: 'priority', label: 'Priority' }].concat(selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : []),
+        dateKey: 'due', totalKey: 'amount', pageSize: 10,
+        exportName: kind.toLowerCase() + '-schedules.csv', pdfTitle: kind + ' Schedules — ' + coName(selCo),
+        onRow: function (s) { masterScheduleDetail(s); },
+        actions: canCreate() ? [
+          { icon: 'file-earmark-text', title: 'Details', onClick: function (s) { masterScheduleDetail(s); } },
+          { icon: 'check-lg', title: 'Approve', onClick: function (s) {
+            if (!openActs(s) || s.status === 'Approved') { ui.toast('Nothing to approve', 'error'); return; }
+            s.status = 'Approved'; s.approvedAt = TODAY_STR; db.save('acc_schedules', s);
+            ui.toast('Approved', 'success'); EPAL.router.render();
+          } },
+          { icon: 'cash-coin', title: 'Payment done', onClick: function (s) { if (openActs(s)) schedulePayForm(s); else ui.toast('Already settled', 'error'); } },
+          { icon: 'calendar2-plus', title: 'Reschedule', onClick: function (s) { if (openActs(s)) rescheduleForm(s); else ui.toast('Already settled', 'error'); } },
+          { icon: 'x-circle', title: 'Cancel', onClick: function (s) {
+            if (!openActs(s)) { ui.toast('Already settled', 'error'); return; }
+            ui.confirm({ title: 'Cancel this schedule?', text: s.party + ' · ' + ui.money(s.amount), danger: true, confirmLabel: 'Cancel Schedule' })
+              .then(function (ok) { if (ok) { s.status = 'Cancelled'; db.save('acc_schedules', s); ui.toast('Cancelled', 'success'); EPAL.router.render(); } });
+          } }
+        ] : [{ icon: 'file-earmark-text', title: 'Details', onClick: function (s) { masterScheduleDetail(s); } }],
+        empty: { icon: 'calendar2-week', title: 'No ' + kind.toLowerCase() + ' schedules' }
+      });
+      page.appendChild(el('div.card.mb-2', null, [
+        el('div.card-head', null, [
+          el('h3', { html: ui.icon(icon) + ' ' + (kind === 'Receivable' ? 'Receivable — amounts to collect' : 'Payable — amounts due to suppliers / vendors') }),
+          el('span.strong.num.' + (kind === 'Receivable' ? 'text-good' : 'text-warn'), { style: { marginLeft: 'auto' }, text: 'Open total ' + ui.money(openTotal) })
+        ]),
+        el('div.card-body', null, [tbl.el])
+      ]));
+    }
+    section('Receivable', 'arrow-down-left-circle');
+    section('Payable', 'arrow-up-right-circle');
   }
   // detail with the production ERP's lifecycle: Payment Done (partial pay spawns an
   // auto-REMAINDER schedule), Reschedule (keeps count + reason), priority setter.
@@ -538,14 +751,14 @@
     var body = el('div');
     var m = ui.modal({ title: s.party + ' · ' + ui.money(s.amount), icon: 'calendar2-week', size: 'md', body: body, footer: false });
     var acts = el('div.flex.gap-1.flex-wrap', { style: { marginLeft: 'auto' } });
-    if (canCreate() && s.status !== 'Paid') {
+    if (canCreate() && s.status !== 'Paid' && s.status !== 'Cancelled') {
       acts.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('cash-coin') + ' Payment Done', onclick: function () { m.close(); schedulePayForm(s); } }));
       acts.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('calendar2-plus') + ' Reschedule', onclick: function () { m.close(); rescheduleForm(s); } }));
     }
     body.appendChild(el('div.card', null, [el('div.card-body', null, [
       el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
         el('div.flex-1', null, [el('div.fw-700', { text: s.party }), el('div.text-mute.sm', { text: (s.kind || '') + ' · ' + coName(s.companyId) + (s.partyType ? ' · ' + s.partyType : '') })]),
-        el('span.badge.badge-' + (s.status === 'Paid' ? 'good' : s.status === 'Partial' ? 'warn' : 'bad'), { text: s.status }), acts]),
+        el('span.badge.badge-' + (s.status === 'Paid' ? 'good' : s.status === 'Partial' ? 'warn' : s.status === 'Approved' ? 'info' : s.status === 'Cancelled' ? '' : 'bad'), { text: s.status }), acts]),
       el('div.data-list', null, [
         el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Amount / Paid' }), el('div.strong', { text: ui.money(s.amount) + (s.paidAmount ? ' · paid ' + ui.money(s.paidAmount) : '') })]),
         el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Due' }), el('div.strong', { text: ui.date(s.due) + (s.rescheduleCount ? ' (rescheduled ×' + s.rescheduleCount + (s.rescheduleReason ? ' — ' + s.rescheduleReason : '') + ')' : '') })]),
@@ -613,7 +826,7 @@
         { key: 'kind', label: 'Kind', type: 'select', options: ['Payable', 'Receivable'], default: 'Payable' },
         { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
         { key: 'due', label: 'Due date', type: 'date', required: true },
-        { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'Partial', 'Paid'], default: 'Pending' },
+        { key: 'status', label: 'Status', type: 'select', options: ['Pending', 'Approved', 'Partial', 'Paid', 'Cancelled'], default: 'Pending' },
         { key: 'desc', label: 'Note', type: 'textarea', col2: true }
       ],
       saveLabel: s ? 'Save' : 'Add',
@@ -627,30 +840,66 @@
     });
   }
 
-  /* ======================================================= PARTY TYPES */
+  /* ======================================================= PARTY TYPES
+   * Production parity (PartyTypeController): party types are PER COMPANY with
+   * an auto slug and a "Maps To" binding — Customer, Supplier, or free text
+   * ("Others"). Duplicate slug per company is rejected. */
+  function ptSlug(name) { return String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); }
   function partyTypesView(page) {
     var list = S.list('party_types');
-    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Party Type', onclick: function () { partyTypeForm(null); } })]));
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Party Types', String(list.length), 'tags'),
+      kpi('Mapped', String(list.filter(function (p) { return p.mapsTo; }).length), 'link-45deg'),
+      kpi('Free text', String(list.filter(function (p) { return !p.mapsTo; }).length), 'pencil'),
+      kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
+    ]));
+    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-lg') + ' Add New', onclick: function () { partyTypeForm(null); } })]));
+    var rows = list.filter(function (p) { return selCo === 'all' ? true : (p.companyId || 'group') === selCo; });
+    var cols = [
+      { key: 'companyId', label: 'Company', render: function (p) { return coCell(p.companyId || 'group'); }, exportVal: function (p) { return p.companyId || 'group'; } },
+      { key: 'name', label: 'Name', render: function (p) { return '<span class="strong">' + esc(p.name) + '</span>'; } },
+      { key: 'slug', label: 'Slug', render: function (p) { return '<span class="mono xs text-mute">' + esc(p.slug || ptSlug(p.name)) + '</span>'; }, exportVal: function (p) { return p.slug || ptSlug(p.name); } },
+      { key: 'mapsTo', label: 'Maps To', render: function (p) {
+        return p.mapsTo === 'Customer' ? '<span class="badge badge-info">Customer</span>'
+          : p.mapsTo === 'Supplier' ? '<span class="badge badge-warn">Supplier</span>'
+          : '<span class="badge">Free text</span>';
+      }, exportVal: function (p) { return p.mapsTo || 'Free text'; } },
+      { key: 'used', label: 'Schedules', num: true, render: function (p) { return String(db.col('acc_schedules').filter(function (s) { return s.partyType === p.name; }).length); }, sortVal: function (p) { return db.col('acc_schedules').filter(function (s) { return s.partyType === p.name; }).length; } }
+    ];
     var tbl = EPAL.table({
-      columns: [
-        { key: 'name', label: 'Party Type', render: function (p) { return '<span class="strong">' + esc(p.name) + '</span>'; } },
-        { key: 'used', label: 'Schedules using it', num: true, render: function (p) { return String(db.col('acc_schedules').filter(function (s) { return s.partyType === p.name; }).length); }, sortVal: function (p) { return db.col('acc_schedules').filter(function (s) { return s.partyType === p.name; }).length; } }
-      ],
-      rows: list, pageSize: 10, exportName: 'party-types.csv',
+      columns: cols, rows: rows, pageSize: 15, searchKeys: ['name', 'slug'], exportName: 'party-types.csv',
+      filters: selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : [],
       actions: ui.actions({
         edit: canCreate() ? function (p) { partyTypeForm(p); } : null,
         del: canCreate() ? function (p) { ui.confirm({ title: 'Delete party type "' + p.name + '"?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { S.removeFrom('party_types', p.id); ui.toast('Deleted', 'success'); EPAL.router.render(); } }); } : null
       }),
-      empty: { icon: 'tags', title: 'No party types' }
+      empty: { icon: 'tags', title: 'No party types in scope' }
     });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('tags') + ' Party Types' }), el('span.card-sub', { text: 'used on schedules & party records' })]), el('div.card-body', null, [tbl.el])]));
+    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('tags') + ' Party Types — ' + coName(selCo) }), el('span.card-sub', { text: 'used on schedules & party records' })]), el('div.card-body', null, [tbl.el])]));
   }
   function partyTypeForm(p) {
     EPAL.formModal({
-      title: p ? 'Edit Party Type' : 'New Party Type', icon: 'tags', size: 'sm', record: p || {},
-      fields: [{ key: 'name', label: 'Name', type: 'text', required: true }],
+      title: p ? 'Edit Party Type' : 'New Party Type', icon: 'tags', size: 'sm',
+      record: p ? { name: p.name, companyId: p.companyId || 'group', mapsTo: p.mapsTo || '' }
+                : { companyId: selCo === 'all' ? 'group' : selCo, mapsTo: '' },
+      fields: [
+        { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+        { key: 'name', label: 'Name', type: 'text', required: true, hint: 'The slug is generated automatically.' },
+        { key: 'mapsTo', label: 'Maps to', type: 'select', options: [['', '— None (Free text / Others) —'], ['Customer', 'Customer'], ['Supplier', 'Supplier']] }
+      ],
       saveLabel: p ? 'Save' : 'Add',
-      onSave: function (v) { var r = p || { id: 'PT-' + ui.uid('').slice(-5).toUpperCase() }; r.name = (v.name || '').trim(); S.upsert('party_types', r); ui.toast('Saved', 'success'); EPAL.router.render(); return true; }
+      onSave: function (v) {
+        var name = (v.name || '').trim(); if (!name) { ui.toast('Enter a name', 'error'); return false; }
+        var slug = ptSlug(name);
+        var dupe = S.list('party_types').some(function (x) {
+          return (x.companyId || 'group') === v.companyId && (x.slug || ptSlug(x.name)) === slug && (!p || x.id !== p.id);
+        });
+        if (dupe) { ui.toast('A party type with this name already exists for ' + coName(v.companyId), 'error'); return false; }
+        var r = p || { id: 'PT-' + ui.uid('').slice(-5).toUpperCase() };
+        r.name = name; r.slug = slug; r.companyId = v.companyId; r.mapsTo = v.mapsTo || '';
+        S.upsert('party_types', r);
+        ui.toast('Party type saved', 'success'); EPAL.router.render(); return true;
+      }
     });
   }
 
@@ -779,57 +1028,130 @@
   }
 
   /* ======================================================= MANAGE BANKS
-   * Full bank desk INSIDE Master Accounts — dashboard, all banks (add / edit /
-   * remove) and transfers (record / delete-reverse). Same 'banks' +
-   * 'bank_transfers' stores as Group Finance, so both stay in sync. */
+   * Production parity (BankControllerV2): a Bank Accounts DASHBOARD (total
+   * position + per-company cards + a combined Recent Bank Transactions ledger
+   * with running balances and reversals), ALL BANKS (branch · owner · acc
+   * type · routing · full account no · status) and BANK TRANSFERS. Deposits
+   * and withdrawals are journal-integrated (source 'bank' via the Credit /
+   * Debit journal flow) and every movement lands in the 'bank_txns' log. */
+  function bankTxnApply(bank, type, amt, date, desc, ref, glId, extra) {
+    var isIn = type === 'deposit' || type === 'transfer-in';
+    bank.balance = (+bank.balance || 0) + (isIn ? amt : -amt);
+    bank.lastTxnDate = date; bank.lastTxnAmount = amt; bank.lastTxnType = isIn ? 'credit' : 'debit';
+    db.save('banks', bank);
+    S.upsert('bank_txns', Object.assign({ id: 'BTX-' + ui.uid('').slice(-7).toUpperCase(), bankId: bank.id, bankName: bank.name,
+      type: type, amount: amt, date: date, desc: desc || '', ref: ref || '', glId: glId || '' }, extra || {}));
+  }
   function banksView(page) {
-    var banks = db.col('banks').filter(function (b) { return selCo === 'all' ? true : (b.companyId || 'group') === selCo; });
+    var allBanks = db.col('banks');
+    var banks = allBanks.filter(function (b) { return selCo === 'all' ? true : (b.companyId || 'group') === selCo; });
     var total = banks.reduce(function (a, b) { return a + (+b.balance || 0); }, 0);
-    var largest = banks.slice().sort(function (a, b) { return (b.balance || 0) - (a.balance || 0); })[0];
 
     // ---- 1) BANK ACCOUNTS DASHBOARD -----------------------------------------
     page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
-      kpi('Cash Position', ui.money(total, { compact: true }), 'safe2'),
+      kpi('Total Balance', ui.money(total, { compact: true }), 'safe2'),
       kpi('Accounts', String(banks.length), 'bank'),
-      kpi('Largest', largest ? ui.money(largest.balance, { compact: true }) : '—', 'trophy'),
+      kpi('Active', String(banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length), 'check-circle'),
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
+    // per-company cards, like the production dashboard header
+    (function () {
+      var byCo = {};
+      allBanks.forEach(function (b) { var k = b.companyId || 'group'; byCo[k] = byCo[k] || { total: 0, n: 0 }; byCo[k].total += +b.balance || 0; byCo[k].n++; });
+      var strip = el('div.flex.gap-2.flex-wrap.mb-2');
+      Object.keys(byCo).forEach(function (k) {
+        strip.appendChild(el('div.card', { style: { padding: '10px 14px', cursor: 'pointer', minWidth: '170px' }, onclick: function () { selCo = k; EPAL.router.render(); } }, [
+          el('div.fw-600.sm', { text: coName(k) }),
+          el('div.strong.num' + (byCo[k].total < 0 ? '.text-bad' : ''), { text: ui.money(byCo[k].total) }),
+          el('div.text-mute.xs', { text: byCo[k].n + ' account' + (byCo[k].n === 1 ? '' : 's') + ' · filter' })
+        ]));
+      });
+      page.appendChild(strip);
+    })();
     if (canCreate()) {
-      page.appendChild(el('div.flex.gap-1.mb-2', null, [
-        el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-lg') + ' Add Account', onclick: function () { editBank(null); } }),
+      page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
+        el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-lg') + ' Add New Bank', onclick: function () { editBank(null); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('arrow-down-circle') + ' Deposit', onclick: function () { bankJournalForm('credit'); } }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('arrow-up-circle') + ' Withdraw', onclick: function () { bankJournalForm('debit'); } }),
         el('button.btn.btn-sm.btn-outline', { html: ui.icon('arrow-left-right') + ' Transfer', onclick: transferForm }),
         el('a.btn.btn-sm.btn-outline', { href: '#/group/finance/banks', html: ui.icon('pie-chart') + ' Charts view' })
       ]));
     }
 
-    // ---- 2) ALL BANKS --------------------------------------------------------
+    // ---- 2) ALL BANKS (production columns + filters) -------------------------
     var cols = [
-      { key: 'name', label: 'Account', render: function (b) { return '<span class="strong">' + esc(b.name) + '</span>'; } },
-      { key: 'type', label: 'Type', render: function (b) { return '<span class="badge">' + esc(b.type || 'Bank') + '</span>'; }, exportVal: function (b) { return b.type || 'Bank'; } },
-      { key: 'branch', label: 'Branch / holder', render: function (b) { return esc(b.branch || '—'); } },
-      { key: 'account', label: 'Number', render: function (b) { return '<span class="num text-mute">•••• ' + esc(String(b.account || '').slice(-4)) + '</span>'; }, exportVal: function (b) { return '****' + String(b.account || '').slice(-4); } },
-      { key: 'balance', label: 'Balance', num: true, money: true }
+      { key: 'name', label: 'Name', render: function (b) { return '<span class="strong">' + esc(b.name) + '</span>' + (b.type && b.type !== 'Bank' ? ' <span class="badge">' + esc(b.type) + '</span>' : ''); } },
+      { key: 'branch', label: 'Branch', render: function (b) { return esc(b.branch || '—'); } },
+      { key: 'accountName', label: 'Account', render: function (b) { return esc(b.accountName || coName(b.companyId || 'group')); }, exportVal: function (b) { return b.accountName || coName(b.companyId || 'group'); } },
+      { key: 'accType', label: 'Acc Type', render: function (b) { return '<span class="badge badge-info">' + esc(b.accType || 'Current') + '</span>'; }, exportVal: function (b) { return b.accType || 'Current'; } },
+      { key: 'routing', label: 'Routing No.', render: function (b) { return '<span class="mono xs text-mute">' + esc(b.routing || '—') + '</span>'; } },
+      { key: 'account', label: 'Account No.', render: function (b) { return '<span class="mono xs">' + esc(b.account || '—') + '</span>'; } },
+      { key: 'balance', label: 'Balance', num: true, sortVal: function (b) { return +b.balance || 0; }, render: function (b) { return '<span class="num strong' + ((+b.balance || 0) < 0 ? ' text-bad' : '') + '">' + ui.money(b.balance) + '</span>'; }, exportVal: function (b) { return b.balance; } },
+      { key: 'status', label: 'Status', render: function (b) { return (b.status || 'Active') === 'Inactive' ? '<span class="badge">Inactive</span>' : '<span class="badge badge-good">Active</span>'; }, exportVal: function (b) { return b.status || 'Active'; } }
     ];
     if (selCo === 'all') cols.splice(1, 0, { key: 'companyId', label: 'Company', render: function (b) { return coCell(b.companyId || 'group'); }, exportVal: function (b) { return b.companyId; } });
     var tbl = EPAL.table({
       columns: cols, rows: banks, pageSize: 10, totalKey: 'balance', exportName: 'master-banks.csv',
-      searchKeys: ['name', 'branch'],
+      searchKeys: ['name', 'branch', 'account'], filterPanel: true,
+      filters: [{ key: 'accType', label: 'Acc Type' }, { key: 'status', label: 'Status' }].concat(selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : []),
       onRow: canCreate() ? function (b) { editBank(b); } : null,
       actions: canCreate() ? [
         { icon: 'pencil', title: 'Edit', onClick: function (b) { editBank(b); } },
+        { icon: 'arrow-down-circle', title: 'Deposit', onClick: function (b) { bankJournalForm('credit', b.id); } },
+        { icon: 'arrow-up-circle', title: 'Withdraw', onClick: function (b) { bankJournalForm('debit', b.id); } },
         { icon: 'trash', title: 'Remove', onClick: function (b) {
           ui.confirm({ title: 'Remove ' + b.name + ' account?', text: 'Balance ' + ui.money(b.balance) + ' will leave the cash position.', danger: true, confirmLabel: 'Remove' })
             .then(function (ok) { if (ok) { db.remove('banks', b.id); ui.toast('Bank account removed', 'success'); EPAL.router.render(); } });
         } }
       ] : [],
-      empty: { icon: 'bank', title: 'No accounts in scope', hint: 'Add the first account with Add Account.' }
+      empty: { icon: 'bank', title: 'No accounts in scope', hint: 'Add the first account with Add New Bank.' }
     });
     page.appendChild(el('div.card.mb-2', null, [
       el('div.card-head', null, [el('h3', { html: ui.icon('bank') + ' All Banks — ' + coName(selCo) })]),
       el('div.card-body', null, [tbl.el])
     ]));
 
-    // ---- 3) BANK TRANSFERS ---------------------------------------------------
+    // ---- 3) RECENT BANK TRANSACTIONS (running balance per bank) --------------
+    (function () {
+      var scopeIds = {}; banks.forEach(function (b) { scopeIds[b.id] = b; });
+      var txns = S.list('bank_txns').filter(function (t) { return !!scopeIds[t.bankId]; });
+      // derive the balance AFTER each txn by walking each bank backward from
+      // its live balance (newest txn's after-balance = the current balance)
+      var byBank = {};
+      txns.forEach(function (t, i) { t._seq = i; (byBank[t.bankId] = byBank[t.bankId] || []).push(t); });
+      Object.keys(byBank).forEach(function (bid) {
+        var rows = byBank[bid].slice().sort(function (a, b) { return (a.date === b.date) ? b._seq - a._seq : (a.date < b.date ? 1 : -1); });
+        var bal = +(scopeIds[bid].balance) || 0;
+        rows.forEach(function (t) {
+          t._after = bal;
+          bal -= (t.type === 'deposit' || t.type === 'transfer-in') ? (+t.amount || 0) : -(+t.amount || 0);
+        });
+      });
+      var recent = txns.slice().sort(function (a, b) { return (a.date === b.date) ? b._seq - a._seq : (a.date < b.date ? 1 : -1); }).slice(0, 50);
+      var tt2 = EPAL.table({
+        columns: [
+          { key: 'date', label: 'Date', date: true },
+          { key: 'bankName', label: 'Bank', render: function (t) {
+            var b = scopeIds[t.bankId] || {};
+            return '<span class="strong">' + esc(t.bankName) + '</span><div class="text-mute xs">' + esc(b.account || '') + ' · ' + esc(coName(b.companyId || 'group')) + '</div>';
+          } },
+          { key: 'desc', label: 'Description', render: function (t) { return esc(t.desc || t.type); } },
+          { key: 'in', label: 'Debit', num: true, render: function (t) { return (t.type === 'deposit' || t.type === 'transfer-in') ? '<span class="num text-good">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return (t.type === 'deposit' || t.type === 'transfer-in') ? +t.amount : 0; }, exportVal: function (t) { return (t.type === 'deposit' || t.type === 'transfer-in') ? t.amount : ''; } },
+          { key: 'out', label: 'Credit', num: true, render: function (t) { return (t.type === 'withdraw' || t.type === 'transfer-out') ? '<span class="num text-bad">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return (t.type === 'withdraw' || t.type === 'transfer-out') ? +t.amount : 0; }, exportVal: function (t) { return (t.type === 'withdraw' || t.type === 'transfer-out') ? t.amount : ''; } },
+          { key: 'bal', label: 'Balance', num: true, render: function (t) { var v = +t._after || 0; return '<span class="num ' + (v < 0 ? 'text-bad' : '') + '">' + ui.money(Math.abs(v)) + ' ' + (v < 0 ? 'Cr' : 'Dr') + '</span>'; }, sortVal: function (t) { return +t._after || 0; }, exportVal: function (t) { return t._after; } }
+        ],
+        rows: recent, pageSize: 10, exportName: 'bank-transactions.csv',
+        searchKeys: ['bankName', 'desc', 'ref'],
+        actions: canCreate() ? [{ icon: 'arrow-counterclockwise', title: 'Reverse this transaction', onClick: function (t) { reverseTxn(t); } }] : [],
+        empty: { icon: 'clock-history', title: 'No bank transactions yet', hint: 'Deposits, withdrawals and transfers appear here.' }
+      });
+      page.appendChild(el('div.card.mb-2', null, [
+        el('div.card-head', null, [el('h3', { html: ui.icon('clock-history') + ' Recent Bank Transactions' }), el('span.card-sub', { text: 'all accounts in scope — newest first' })]),
+        el('div.card-body', null, [tt2.el])
+      ]));
+    })();
+
+    // ---- 4) BANK TRANSFERS ---------------------------------------------------
     var transfers = S.list('bank_transfers').slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
     var tt = EPAL.table({
       columns: [
@@ -849,32 +1171,66 @@
       el('div.card-body', null, [tt.el])
     ]));
 
+    // reverse a deposit/withdrawal: opposite GL entry + opposite txn row,
+    // exactly like production's "Reversal of: …" rows
+    function reverseTxn(t) {
+      if (t.type !== 'deposit' && t.type !== 'withdraw') { ui.toast('Transfers are reversed from the Transfers card', 'error'); return; }
+      if (t.reversed) { ui.toast('Already reversed', 'error'); return; }
+      if (t.reversal) { ui.toast('This row IS a reversal', 'error'); return; }
+      ui.confirm({ title: 'Reverse this transaction?', text: (t.desc || t.type) + ' · ' + ui.money(t.amount), danger: true, confirmLabel: 'Reverse' })
+        .then(function (ok) {
+          if (!ok) return;
+          var bank = db.col('banks').filter(function (b) { return b.id === t.bankId; })[0];
+          if (!bank) { ui.toast('Bank not found', 'error'); return; }
+          var isDep = t.type === 'deposit';
+          if (t.glId) {
+            var orig = (EPAL.ledger.entries({}) || []).filter(function (e2) { return e2.id === t.glId; })[0];
+            if (orig) {
+              try {
+                EPAL.ledger.post({ id: 'GL-BKR-' + ui.uid('').slice(-6).toUpperCase(), date: TODAY_STR, companyId: orig.companyId,
+                  ref: 'REV-' + (orig.ref || orig.id), memo: 'Reversal of: ' + (orig.memo || t.desc), source: 'bank', override: true,
+                  lines: (orig.lines || []).map(function (l) { return { account: l.account, dr: +l.cr || 0, cr: +l.dr || 0 }; }) });
+              } catch (e) { ui.toast(e.message || 'Ledger reversal failed', 'error'); return; }
+            }
+          }
+          bankTxnApply(bank, isDep ? 'withdraw' : 'deposit', +t.amount || 0, TODAY_STR, 'Reversal of: ' + (t.desc || t.type), 'REV-' + (t.ref || t.id), '', { reversal: true });
+          t.reversed = true; S.upsert('bank_txns', t);
+          ui.toast('Transaction reversed', 'success'); EPAL.router.render();
+        });
+    }
     function editBank(b) {
       EPAL.formModal({
-        title: b ? 'Edit Account' : 'Add Account', icon: 'bank', record: b || { type: 'Bank', companyId: selCo === 'all' ? 'group' : selCo },
+        title: b ? 'Edit Bank' : 'Add New Bank', icon: 'bank', size: 'md',
+        record: b || { type: 'Bank', accType: 'Current', bankType: 'National', status: 'Active', companyId: selCo === 'all' ? 'group' : selCo },
         fields: [
-          { key: 'type', label: 'Account type', type: 'select', required: true, default: 'Bank', options: ['Bank', 'bKash', 'Nagad', 'Cash Box', 'Card'] },
-          { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'e.g. BRAC Bank / Office bKash / Main cash', col2: true },
-          { key: 'branch', label: 'Branch / holder', type: 'text', placeholder: 'e.g. Gulshan Avenue · or who holds it' },
-          { key: 'account', label: 'Account / wallet number', type: 'text', pattern: /^\d{4,18}$/,
-            hint: '4–18 digits · masked everywhere else', placeholder: '15XXXXXXXX',
+          { key: 'name', label: 'Bank / account name', type: 'text', required: true, placeholder: 'e.g. BRAC Bank (Travels)', col2: true },
+          { key: 'type', label: 'Payment type', type: 'select', required: true, default: 'Bank', options: ['Bank', 'bKash', 'Nagad', 'Cash Box', 'Card'] },
+          { key: 'branch', label: 'Branch', type: 'text', placeholder: 'e.g. Shantinagar Branch, Dhaka' },
+          { key: 'accountName', label: 'Account holder / entity', type: 'text', placeholder: 'e.g. EPAL TRAVELS & CONSULTANCY' },
+          { key: 'accType', label: 'Account type', type: 'select', options: ['Current', 'Savings', 'Fixed'], default: 'Current' },
+          { key: 'bankType', label: 'Bank type', type: 'select', options: ['National', 'International'], default: 'National' },
+          { key: 'routing', label: 'Routing number', type: 'text', placeholder: 'e.g. 060274289', showIf: function (x) { return x.type === 'Bank'; } },
+          { key: 'account', label: 'Account / wallet number', type: 'text', pattern: /^\d{4,20}$/,
+            hint: '4–20 digits', placeholder: '15XXXXXXXX',
             showIf: function (x) { return x.type !== 'Cash Box'; } },
           { key: 'companyId', label: 'Owned By', type: 'select', required: true,
             options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
-          { key: 'balance', label: 'Current Balance (৳)', type: 'money', required: true, min: 0 }
+          { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Inactive'], default: 'Active' },
+          { key: 'balance', label: 'Current Balance (৳)', type: 'money', required: true }
         ],
         onSave: function (vals) {
           var rec = Object.assign({}, b || { id: 'BNK-' + Date.now().toString().slice(-5), created: TODAY_STR }, vals);
           rec.type = vals.type || 'Bank';
           if (rec.type === 'Cash Box' && !rec.account) rec.account = '0000';
+          if (!rec.accountName) rec.accountName = coName(rec.companyId || 'group');
           db.save('banks', rec);
-          ui.toast('Account saved', 'success'); EPAL.router.render();
+          ui.toast('Bank saved', 'success'); EPAL.router.render();
         }
       });
     }
     function transferForm() {
-      var all = db.col('banks');
-      if (all.length < 2) { ui.toast('Need at least two accounts to transfer', 'error'); return; }
+      var all = db.col('banks').filter(function (b) { return (b.status || 'Active') !== 'Inactive'; });
+      if (all.length < 2) { ui.toast('Need at least two active accounts to transfer', 'error'); return; }
       var opts = all.map(function (b) { return [b.id, (b.type && b.type !== 'Bank' ? b.type + ' · ' : '') + b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; });
       EPAL.formModal({
         title: 'Transfer Between Accounts', icon: 'arrow-left-right', size: 'md', record: { date: TODAY_STR },
@@ -892,9 +1248,10 @@
           var from = all.filter(function (b) { return b.id === v.from; })[0];
           var to = all.filter(function (b) { return b.id === v.to; })[0];
           if (!from || !to) { ui.toast('Account not found', 'error'); return false; }
-          from.balance = (+from.balance || 0) - amt; to.balance = (+to.balance || 0) + amt;
-          db.save('banks', from); db.save('banks', to);
-          S.upsert('bank_transfers', { id: 'BT-' + Date.now().toString(36).toUpperCase(), from: from.id, fromName: from.name, to: to.id, toName: to.name, amount: amt, date: v.date, memo: v.memo || '' });
+          var tid = 'BT-' + Date.now().toString(36).toUpperCase();
+          bankTxnApply(from, 'transfer-out', amt, v.date, 'Transfer to ' + to.name + (v.memo ? ' — ' + v.memo : ''), tid);
+          bankTxnApply(to, 'transfer-in', amt, v.date, 'Transfer from ' + from.name + (v.memo ? ' — ' + v.memo : ''), tid);
+          S.upsert('bank_transfers', { id: tid, from: from.id, fromName: from.name, to: to.id, toName: to.name, amount: amt, date: v.date, memo: v.memo || '' });
           ui.toast('Transferred ' + ui.money(amt), 'success'); EPAL.router.render(); return true;
         }
       });
@@ -906,8 +1263,8 @@
           var all = db.col('banks');
           var from = all.filter(function (b) { return b.id === t.from; })[0];
           var to = all.filter(function (b) { return b.id === t.to; })[0];
-          if (from) { from.balance = (+from.balance || 0) + (+t.amount || 0); db.save('banks', from); }
-          if (to) { to.balance = (+to.balance || 0) - (+t.amount || 0); db.save('banks', to); }
+          if (from) bankTxnApply(from, 'transfer-in', +t.amount || 0, TODAY_STR, 'Reversal of: Transfer to ' + (t.toName || t.to), 'REV-' + t.id, '', { reversal: true });
+          if (to) bankTxnApply(to, 'transfer-out', +t.amount || 0, TODAY_STR, 'Reversal of: Transfer from ' + (t.fromName || t.from), 'REV-' + t.id, '', { reversal: true });
           S.removeFrom('bank_transfers', t.id);
           ui.toast('Transfer deleted & reversed', 'success'); EPAL.router.render();
         });
