@@ -566,14 +566,22 @@
     if (/visa/.test(s)) return '4020';
     if (/package|tour|umrah|hajj|holiday/.test(s)) return '4030';
     if (/hotel|room/.test(s)) return '4040';
+    if (/contract/.test(s)) return '4050';           // contract flights & files — own P&L line
     if (/air|ticket|emd|reissue|re-issue|void|flight|bsp|sector|pnr/.test(s)) return '4010';
     return '4000';
   }
-  // ensure the categorised income accounts exist for already-seeded installs
+  // ensure the categorised accounts exist for already-seeded installs
   function ensureExtraAccounts() {
-    var extra = [['4010', 'Air Ticket Sales'], ['4020', 'Visa Services'], ['4030', 'Package & Tour'], ['4040', 'Hotel & Other Travel']];
+    var extra = [
+      { code: '4010', name: 'Air Ticket Sales', type: 'income', group: 'Revenue' },
+      { code: '4020', name: 'Visa Services', type: 'income', group: 'Revenue' },
+      { code: '4030', name: 'Package & Tour', type: 'income', group: 'Revenue' },
+      { code: '4040', name: 'Hotel & Other Travel', type: 'income', group: 'Revenue' },
+      { code: '4050', name: 'Contract Flights & Files', type: 'income', group: 'Revenue' },
+      { code: '5350', name: 'Agent Commission', type: 'expense', group: 'Selling Expenses' }
+    ];
     var coa = S.list(COA_KEY); if (!coa.length) return; var have = {}; coa.forEach(function (a) { have[a.code] = true; });
-    var add = false; extra.forEach(function (x) { if (!have[x[0]]) { coa.push(withNormal({ code: x[0], name: x[1], type: 'income', group: 'Revenue' })); add = true; } });
+    var add = false; extra.forEach(function (x) { if (!have[x.code]) { coa.push(withNormal({ code: x.code, name: x.name, type: x.type, group: x.group })); add = true; } });
     if (add) S.set(COA_KEY, coa);
   }
   function saleEntry(sale, idx) {

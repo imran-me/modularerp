@@ -884,7 +884,13 @@
       var v=form.values(), items=(v.items||[]).filter(function(r){ return (r.passenger||'').trim() || (+r.sale||0)>0; });
       if(!items.length){ ui.toast('Add at least one item','error'); return; }
       var n=130450090000+Date.now()%900000;
-      items.forEach(function(r,i){ S.upsert('air_emd', { id:ui.uid('EMD'), emdNo:r.emdNo||String(n+i), date:v.issueDate, passenger:r.passenger, ticketRef:r.emdNo||'', serviceType:r.serviceType, vendor:r.vendor, description:r.serviceType, cost:+r.cost||0, sale:+r.sale||0, payStatus:v.payStatus||'Due', created:Date.now() }); });
+      items.forEach(function(r,i){
+        var rid = ui.uid('EMD');
+        S.upsert('air_emd', { id:rid, emdNo:r.emdNo||String(n+i), date:v.issueDate, passenger:r.passenger, ticketRef:r.emdNo||'', serviceType:r.serviceType, vendor:r.vendor, description:r.serviceType, cost:+r.cost||0, sale:+r.sale||0, payStatus:v.payStatus||'Due', created:Date.now() });
+        // EMDs are BOOKED, not just tracked: categorised income + vendor payable
+        // + cash-or-receivable by pay status (settled later via the Paid toggle)
+        db.postSale('travels', { amount:+r.sale||0, cost:+r.cost||0, ref:rid, desc:'EMD '+(r.serviceType||'')+' · '+(r.passenger||''), customer:r.passenger||'', category:'emd', vendor:r.vendor||'', payStatus:v.payStatus||'Due' });
+      });
       ui.toast(items.length+' EMD item'+(items.length===1?'':'s')+' saved','success'); EPAL.router.navigate('travels/air-ticketing/emd');
     }));
   }
@@ -1974,6 +1980,7 @@
         { label:'Close', variant:'ghost' },
         { label: (r.payStatus==='Paid'?'Mark Due':'Mark Paid'), variant:'outline', onClick:function(){
             r.payStatus = r.payStatus==='Paid' ? 'Due' : 'Paid'; db.save('air_emd', r);
+            db.settleSale('travels', r.id, r.sale||0, r.passenger||'', r.payStatus==='Paid');   // books follow the toggle
             ui.toast('Payment status updated','success'); EPAL.router.render(); } },
         { label:'Print Receipt', variant:'primary', onClick:function(){ emdReceipt([r], r.emdNo, r.passenger, r.sale||0, r.cost||0); return true; } }
       ] });

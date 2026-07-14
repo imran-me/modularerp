@@ -595,11 +595,16 @@
       if (!EPAL.ledger || !EPAL.ledger.post) return;
       var id = 'GL-SET-' + ref;
       if (paid) {
-        // no-op when the original sale already went straight to cash
-        var origCash = S.list('gl_entries').some(function (e) {
-          return e.source === 'sale' && e.ref === ref && (e.lines || []).some(function (l) { return l.account === '1010' && l.dr > 0; });
+        // settle ONLY when this ref genuinely sits in AR (posted as a receivable
+        // sale) — never for cash sales, and never for legacy records that were
+        // saved before finance posting existed
+        var arSale = false, cash = false;
+        S.list('gl_entries').forEach(function (e) {
+          if (e.source === 'sale' && e.ref === ref) (e.lines || []).forEach(function (l) {
+            if (l.dr > 0) { if (l.account === '1200') arSale = true; if (l.account === '1010') cash = true; }
+          });
         });
-        if (origCash || !(+amount > 0)) return;
+        if (!arSale || cash || !(+amount > 0)) return;
         try {
           EPAL.ledger.post({ id: id, date: new Date().toISOString().slice(0, 10), companyId: companyId,
             ref: ref, memo: 'Customer payment received · ' + ref, source: 'payment', party: party || '',

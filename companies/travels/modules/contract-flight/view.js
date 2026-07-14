@@ -299,8 +299,9 @@
 
         db.postSale('travels', {
           amount: qty * price, cost: qty * (+cur.costSeat || 0),
-          ref: cur.id, desc:'Contract seats ' + cur.route + ' (' + qty + '×)',
-          customer: (v.customer || '').trim()
+          ref: cur.id + '-' + Date.now().toString(36), desc:'Contract seats ' + cur.route + ' (' + qty + '×)',
+          customer: (v.customer || '').trim(),
+          category: 'contract', vendor: cur.airline || cur.counterparty || ''   // own P&L line (4050) + AP sub-ledger
         });
 
         ui.toast(qty + ' seat' + (qty === 1 ? '' : 's') + ' sold · ' + ui.money(qty * price), 'success');

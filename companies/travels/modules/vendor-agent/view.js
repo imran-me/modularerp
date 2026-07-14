@@ -1144,13 +1144,45 @@
   }
 
   /* ======================================================= COMMISSION */
+  // real PAYOUTS: what we've actually paid an agent (tv_comm_paid rows, each one
+  // posted to the books as DR 5350 Agent Commission / CR cash, party-tagged)
+  function commissionPaid(agentKey) {
+    return S.list('tv_comm_paid').filter(function (p) { return p.agent === agentKey; })
+      .reduce(function (a, p) { return a + (+p.amount || 0); }, 0);
+  }
+  function payCommissionForm(r) {
+    var out = r.outstanding;
+    EPAL.formModal({
+      title: 'Pay Commission — ' + r.name, icon: 'percent', size: 'sm', record: { amount: out, date: '2026-07-05', method: 'Bank' },
+      fields: [
+        { key: 'amount', label: 'Payout (৳)', type: 'money', required: true, min: 1, max: out, hint: 'Outstanding commission ' + ui.money(out) + '.' },
+        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Nagad', 'Cheque'], default: 'Bank' },
+        { key: 'date', label: 'Date', type: 'date', default: '2026-07-05' },
+        { key: 'note', label: 'Note', type: 'text' }
+      ],
+      saveLabel: 'Pay Commission',
+      onSave: function (v) {
+        var amt = Math.min(+v.amount || 0, out);
+        if (amt <= 0) { ui.toast('Enter the payout amount', 'error'); return false; }
+        try {
+          if (EPAL.ledger && EPAL.ledger.post) EPAL.ledger.post({
+            id: 'GL-COMM-' + ui.uid('').slice(-6), date: v.date, companyId: 'travels', ref: 'COMM-' + (r.id || r.name),
+            memo: 'Agent commission payout · ' + r.name + (v.note ? ' · ' + v.note : ''), source: 'payment', party: r.name,
+            lines: [ { account: '5350', dr: amt, cr: 0 }, { account: v.method === 'Cash' ? '1000' : '1010', dr: 0, cr: amt } ] });
+          S.upsert('tv_comm_paid', { id: 'CP-' + ui.uid('').slice(-6), agent: r.id || r.name, name: r.name, amount: amt, date: v.date, method: v.method, note: v.note || '' });
+          ui.toast('Paid ' + ui.money(amt) + ' commission to ' + r.name, 'success'); EPAL.router.render(); return true;
+        } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; }
+      }
+    });
+  }
   function commissionView(page) {
     var list = agents().map(function (a) {
       var expected = Math.round((a.totalSales || 0) * ((a.commission || 0) / 100));
       var received = Math.round(expected * receivedRatio(a.id || a.name));
+      var paidOut = commissionPaid(a.id || a.name);
       return { id: a.id, name: a.name, agency: a.agency, commission: a.commission || 0,
-        totalSales: a.totalSales || 0, expected: expected, received: received,
-        outstanding: Math.max(0, expected - received), tier: tierFor(a.totalSales || 0), status: a.status };
+        totalSales: a.totalSales || 0, expected: expected, received: received, paidOut: paidOut,
+        outstanding: Math.max(0, expected - received - paidOut), tier: tierFor(a.totalSales || 0), status: a.status };
     });
     var totExp = 0, totRec = 0, totOut = 0;
     list.forEach(function (r) { totExp += r.expected; totRec += r.received; totOut += r.outstanding; });
@@ -1179,15 +1211,16 @@
         { key: 'commission', label: 'Rate', num: true, render: function (r) { return r.commission + '%'; }, sortVal: function (r) { return r.commission; } },
         { key: 'expected', label: 'Expected', num: true, money: true },
         { key: 'received', label: 'Received', num: true, render: function (r) { return '<span class="text-good">' + ui.money(r.received) + '</span>'; }, sortVal: function (r) { return r.received; } },
+        { key: 'paidOut', label: 'Paid Out', num: true, render: function (r) { return r.paidOut ? '<span class="text-good">' + ui.money(r.paidOut) + '</span>' : '—'; }, sortVal: function (r) { return r.paidOut; } },
         { key: 'outstanding', label: 'Outstanding', num: true, render: function (r) { return r.outstanding > 0 ? '<span class="text-bad">' + ui.money(r.outstanding) + '</span>' : '—'; }, sortVal: function (r) { return r.outstanding; } }
       ],
       rows: list, searchKeys: ['name', 'agency'],
       filterPanel: true, filters: [], pageSize: 12, exportName: 'agent-commission.csv', pdfTitle: 'Agent Commission',
       onRow: function (r) { openLedgerModal(metaFromAgent(agentRec(r) || { name: r.name, commission: r.commission, totalSales: r.totalSales }), r); },
-      actions: ui.actions({
+      actions: (canCreate() ? [{ icon: 'cash-coin', title: 'Pay out commission (posts to the books)', onClick: function (r) { if (r.outstanding > 0) payCommissionForm(r); else ui.toast('Nothing outstanding for ' + r.name, 'info'); } }] : []).concat(ui.actions({
         wa:    function (r) { var a = agentRec(r); return { phone: a && a.phone, text: commissionMsg(r) }; },
         gmail: function (r) { var a = agentRec(r); return { to: a && a.email, subject: 'Commission — Epal Travels', body: commissionMsg(r) }; }
-      }),
+      })),
       empty: { icon: 'percent', title: 'No agents yet', hint: 'Add sub-agents to track commission.' }
     });
 
@@ -1214,6 +1247,23 @@
     page.appendChild(tierGrid);
     page.appendChild(el('div.section-label', { text: 'Agent Commission Ledger' }));
     page.appendChild(el('div.card', null, [ el('div.card-body', null, [ t.el ]) ]));
+
+    // PAYOUT HISTORY — every commission actually paid, individually dated
+    var payouts = S.list('tv_comm_paid').slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
+    if (payouts.length) {
+      var pt = EPAL.table({
+        columns: [
+          { key: 'date', label: 'Paid on', date: true },
+          { key: 'name', label: 'Agent', render: function (p) { return '<span class="strong">' + ui.escapeHtml(p.name) + '</span>'; } },
+          { key: 'method', label: 'Method', badge: {} },
+          { key: 'note', label: 'Note', render: function (p) { return ui.escapeHtml(p.note || '—'); } },
+          { key: 'amount', label: 'Paid', num: true, money: true }
+        ],
+        rows: payouts, pageSize: 8, totalKey: 'amount', exportName: 'commission-payouts.csv', pdfTitle: 'Commission Payout History',
+        empty: { icon: 'cash-coin', title: 'No payouts yet' }
+      });
+      page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash-coin') + ' Payout History' }), el('span.card-sub', { text: 'posted to the books (5350 Agent Commission)' }) ]), el('div.card-body', null, [ pt.el ]) ]));
+    }
   }
   function receivedRatio(key) {
     var s = String(key), h = 0;

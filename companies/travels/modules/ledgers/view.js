@@ -299,13 +299,61 @@
     body.appendChild(t.el);
     body.appendChild(el('div.flex.justify-end.mt-2', null, [ el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement', onclick: function () { printAccountStatement(acc, rows.slice().reverse(), closing); } }) ]));
   }
+  /* ---- the CASHIER DESK on every party statement: see the open position and
+   * record a payment against it (receive from a customer/agent, or pay a
+   * vendor) — posts DR Cash / CR AR (or DR AP / CR Cash) with the party tag,
+   * so the statement, agings and cash book all move together. --------------*/
+  function receivePaymentForm(L, party, closing, modal) {
+    var receivable = closing >= 0;
+    // which control account does this party live in? vendors → AP 2000,
+    // sub-agents → 1150, everyone else → customer AR 1200
+    var isVendor = db.col('vendors').some(function (v) { return v.name === party; });
+    var isAgent = db.col('tv_agents').some(function (a) { return a.name === party; });
+    var ctrl = receivable ? (isAgent ? '1150' : '1200') : '2000';
+    EPAL.formModal({
+      title: (receivable ? 'Receive Payment — ' : 'Pay Vendor — ') + party, icon: 'cash-coin', size: 'sm',
+      record: { amount: Math.abs(closing), date: TODAY_STR, method: 'Bank' },
+      fields: [
+        { key: 'amount', label: (receivable ? 'Amount received (৳)' : 'Amount paid (৳)'), type: 'money', required: true, min: 1, max: Math.abs(closing),
+          hint: 'Open ' + (receivable ? 'receivable' : 'payable') + ': ' + ui.money(Math.abs(closing)) + ' — a smaller amount records a part payment.' },
+        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Nagad', 'Cheque'], default: 'Bank' },
+        { key: 'date', label: 'Date', type: 'date', default: TODAY_STR },
+        { key: 'note', label: 'Reference / note', type: 'text' }
+      ],
+      saveLabel: receivable ? 'Receive Payment' : 'Post Payment',
+      onSave: function (v) {
+        var amt = Math.min(+v.amount || 0, Math.abs(closing));
+        if (amt <= 0) { ui.toast('Enter the amount', 'error'); return false; }
+        var cashAcct = v.method === 'Cash' ? '1000' : '1010';
+        var lines = receivable
+          ? [ { account: cashAcct, dr: amt, cr: 0 }, { account: ctrl, dr: 0, cr: amt } ]
+          : [ { account: ctrl, dr: amt, cr: 0 }, { account: cashAcct, dr: 0, cr: amt } ];
+        try {
+          L.post({ id: 'GL-RCPT-' + ui.uid('').slice(-6), date: v.date, companyId: CID, ref: v.note || ('PMT-' + party),
+            memo: (receivable ? 'Payment received from ' : 'Payment made to ') + party + (v.note ? ' · ' + v.note : ''),
+            source: 'payment', party: party, lines: lines });
+          ui.toast((receivable ? 'Received ' : 'Paid ') + ui.money(amt) + ' · ' + v.method, 'success');
+          if (modal) modal.close();
+          EPAL.router.render();
+          setTimeout(function () { partyStatementModal(L, party); }, 60);   // reopen refreshed
+          return true;
+        } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; }
+      }
+    });
+  }
+
   function partyStatementModal(L, party) {
     var rows = L.partyLedger(party, { companyId: CID });
     var closing = rows.length ? rows[rows.length - 1].balance : 0;
     var body = el('div');
-    ui.modal({ title: party, icon: 'person-lines-fill', size: 'lg', body: body, footer: false });
-    body.appendChild(el('div.stat-row.mb-2', null, [ st2(closing >= 0 ? 'Owes Us' : 'We Owe', ui.money(Math.abs(closing))), st2('Transactions', String(rows.length)),
-      st2('Position', closing >= 0 ? 'Receivable' : 'Payable') ]));
+    var m = ui.modal({ title: party, icon: 'person-lines-fill', size: 'lg', body: body, footer: false });
+    body.appendChild(el('div.flex.items-center.gap-2.flex-wrap.mb-2', null, [
+      el('div.stat-row.flex-1', null, [ st2(closing >= 0 ? 'Owes Us' : 'We Owe', ui.money(Math.abs(closing))), st2('Transactions', String(rows.length)),
+        st2('Position', closing >= 0 ? 'Receivable' : 'Payable') ]),
+      (Math.abs(closing) > 0.5 && (!EPAL.perm || EPAL.perm.can(CID, 'ledgers', 'create')))
+        ? el('button.btn.btn-sm.btn-primary', { html: ui.icon('cash-coin') + (closing >= 0 ? ' Receive Payment' : ' Pay Vendor'), onclick: function () { receivePaymentForm(L, party, closing, m); } })
+        : null
+    ]));
     var t = EPAL.table({
       columns: [ { key: 'date', label: 'Date', date: true }, { key: 'ref', label: 'Ref' }, { key: 'memo', label: 'Narration' },
         { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', refund: 'bad', payment: 'accent' } },
