@@ -363,16 +363,27 @@
     // (car road + parking removed on the owner's mark-up — the terminal band
     // now anchors the very bottom of the frame)
 
+    // FLAG ROW in front of the terminal entrance — three swaying flags
+    [[100, 0xF5C542], [130, 0x2b6cd4], [160, 0xc0392b]].forEach(function (fp, fi) {
+      var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 11, 6), M.strut);
+      pole.position.set(fp[0], 5.5, TERM.z + 18); pole.castShadow = true; scene.add(pole);
+      var geo = new THREE.PlaneGeometry(4.4, 2.4); geo.translate(2.2, 0, 0);   // pivot at the pole
+      var flag = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: fp[1], side: THREE.DoubleSide }));
+      flag.position.set(fp[0], 9.7, TERM.z + 18); scene.add(flag);
+      updaters.push(function (t) { flag.rotation.y = 0.5 + Math.sin(t * 1.5 + fi * 2.1) * 0.55; });
+    });
+
     // CONTROL TOWER — right of the aprons (white, red bands, glass cab)
     (function () {
       var g = new THREE.Group(); g.position.set(238, 0, 20);
+      g.scale.setScalar(1.15);                            // landmark presence
       var shaft = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 4.4, 58, 12), M.bldg2); shaft.position.y = 29; shaft.castShadow = true; g.add(shaft);
       [[16, 4.0], [30, 3.6]].forEach(function (b) { var band = new THREE.Mesh(new THREE.CylinderGeometry(b[1], b[1] + 0.08, 5, 12), M.red); band.position.y = b[0]; g.add(band); });
       var deck = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 5.2, 3, 12), M.bldg); deck.position.y = 56; g.add(deck);
       var cab = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 6.2, 6, 12), M.glass); cab.position.y = 61; g.add(cab);
       var roof = new THREE.Mesh(new THREE.ConeGeometry(6.4, 3.2, 12), M.bldg2); roof.position.y = 66; g.add(roof);
       scene.add(g);
-      scene.add(at(light(THREE, M, 0xff2a2a, 3.2, 'beacon', 0.7, 0), 238, 68.5, 20));
+      scene.add(at(light(THREE, M, 0xff2a2a, 3.2, 'beacon', 0.7, 0), 238, 78.6, 20));
     })();
 
     // RADAR STATION — far top-right corner (building + dome + tiny lot)
@@ -466,6 +477,18 @@
       }
       groundLabel('TAKE OFF RUNWAY', 120, RT.z, 230);
       groundLabel('LANDING RUNWAY', 130, RL.z, 230);
+      // painted runway numbers at the thresholds (reversed at the east ends)
+      [[RT, '14', '32'], [RL, '09', '27']].forEach(function (rn) {
+        var R = rn[0];
+        function num(txt, x, rz) {
+          var n = new THREE.Mesh(new THREE.PlaneGeometry(9, 13),
+            new THREE.MeshBasicMaterial({ map: textTex(THREE, txt, '#f4f7fb', null, 128, 176, 96), transparent: true, depthWrite: false }));
+          n.rotation.x = -Math.PI / 2; n.rotation.z = rz;
+          n.position.set(x, 0.05, R.z); scene.add(n);
+        }
+        num(rn[1], R.x1 + 18, -Math.PI / 2);
+        num(rn[2], R.x2 - 18, Math.PI / 2);
+      });
       groundLabel('TRANSPORT ROAD', -208, -70, 92, Math.PI / 2);
       groundLabel('FIGHTER PLANE', -96, -30, 100, Math.PI / 2);
       groundLabel('PARKED PLANE', -262, 49, 46, Math.PI / 2, '#1B2A4A');
@@ -474,12 +497,32 @@
       groundLabel('Heli Copter', -178, -176, 34, 0, '#ffffff', '#2b6cd4');
     })();
 
-    /* ---- POND (small blue blob, centre) ------------------------------------*/
+    /* ---- POND (sand shore + water + ducks, centre) --------------------------*/
+    var sand = new THREE.Mesh(new THREE.CircleGeometry(17.5, 26), M.mat(0xd8c49a, 0.95, 0.02));
+    sand.scale.x = 1.32; sand.rotation.x = -Math.PI / 2; sand.position.set(-18, 0.012, -30); sand.receiveShadow = true; scene.add(sand);
     var pond = new THREE.Mesh(new THREE.CircleGeometry(15, 24), M.water);
     pond.scale.x = 1.3; pond.rotation.x = -Math.PI / 2; pond.position.set(-18, 0.02, -30); scene.add(pond);
     var shine = new THREE.Mesh(new THREE.CircleGeometry(13, 24), new THREE.MeshBasicMaterial({ color: 0xd6ecff, transparent: true, opacity: 0.16, depthWrite: false }));
     shine.scale.x = 1.28; shine.rotation.x = -Math.PI / 2; shine.position.set(-18, 0.05, -30); scene.add(shine);
     updaters.push(function (t) { shine.material.opacity = 0.1 + 0.08 * (0.5 + 0.5 * Math.sin(t * 0.7)); shine.rotation.z = t * 0.02; });
+    // three ducks drifting slow circles on the water
+    (function () {
+      var ducks = [];
+      for (var dk = 0; dk < 3; dk++) {
+        var duck = new THREE.Group();
+        var body = new THREE.Mesh(new THREE.SphereGeometry(0.75, 8, 6), M.bldg2); body.scale.set(1.3, 0.7, 1); duck.add(body);
+        var head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 8, 6), M.bldg2); head.position.set(0.85, 0.55, 0); duck.add(head);
+        var beak = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.4, 6), M.accent); beak.rotation.z = -Math.PI / 2; beak.position.set(1.3, 0.55, 0); duck.add(beak);
+        scene.add(duck); ducks.push({ g: duck, r: 4.5 + dk * 2.6, sp: 0.14 + dk * 0.05, ph: dk * 2.1 });
+      }
+      updaters.push(function (t) {
+        ducks.forEach(function (d) {
+          var a = t * d.sp + d.ph;
+          d.g.position.set(-18 + Math.cos(a) * d.r * 1.25, 0.35, -30 + Math.sin(a) * d.r);
+          d.g.rotation.y = -a - Math.PI / 2;
+        });
+      });
+    })();
 
     /* ---- DENSE MIXED FOREST (instanced) — the reference is thick with round
      * deciduous puffs plus conifers, right up to the frame edges -------------*/
@@ -488,8 +531,8 @@
         [-40, -215, 34], [110, -225, 40], [-190, -232, 36], [160, -121, 12, true], [10, -121, 13, true],
         [-60, -60, 28], [-230, -50, 24], [-170, 100, 28], [-60, 130, 32], [-20, 60, 26],
         [240, -40, 22], [120, -45, 22, true], [-120, -172, 18], [262, 110, 16], [-240, -190, 22],
-        [-315, 40, 40], [-300, -120, 40], [300, -180, 44], [300, 60, 36], [60, -238, 40],
-        [-150, 168, 26], [-20, 182, 18], [150, -252, 36], [-300, 175, 26], [320, -60, 30],
+        [-315, 40, 40], [-300, -120, 40], [300, -205, 36], [300, 60, 36], [60, -238, 40],
+        [-150, 168, 26], [-20, 182, 18], [150, -252, 36], [-300, 175, 26], [330, -38, 22],
         [0, -262, 40], [-100, -252, 36], [250, -262, 40], [350, -240, 44],
         [340, 20, 36], [345, 140, 40], [250, 182, 20], [-140, 180, 24],
         [-275, 95, 20], [-200, 165, 20], [-90, 150, 26], [60, 185, 22],
@@ -735,7 +778,9 @@
           case 'ROLL':
             st.circle = cruiseCircle();
             var c0 = st.circle.getPointAt(0);
-            setState('CLIMB', jit(15), curveOf([V(RT.x1 + 260, GY, RT.z), V(RT.x1 + 430, 55, RT.z + rnd(-16, 6)), V((RT.x1 + 540 + c0.x) / 2, (55 + c0.y) / 2 + 26, (RT.z + c0.z) / 2), c0]), easeIn);
+            // LINEAR climb: easeIn restarted the speed from zero right at
+            // rotation — the visible "slam stop" glitch at the end of the roll
+            setState('CLIMB', jit(15), curveOf([V(RT.x1 + 260, GY, RT.z), V(RT.x1 + 430, 55, RT.z + rnd(-16, 6)), V((RT.x1 + 540 + c0.x) / 2, (55 + c0.y) / 2 + 26, (RT.z + c0.z) / 2), c0]), null);
             break;
           case 'CLIMB':
             craft.userData.gear.visible = false;
@@ -747,7 +792,9 @@
             rwyLAFreeAt = t + 64;
             var cp = st.circle.getPointAt(0);
             craft.userData.gear.visible = true;
-            setState('APPROACH', jit(20), curveOf([cp, V(-560, 130, RL.z + rnd(-14, 14)), V(-320, 66, RL.z), V(-150, 15, RL.z), V(RL.x1 + 8, 6.4, RL.z)]), easeOut);
+            // LINEAR approach: easeOut decayed the speed to ~zero just before
+            // the threshold — the plane hovered/stalled instead of flaring
+            setState('APPROACH', jit(20), curveOf([cp, V(-560, 130, RL.z + rnd(-14, 14)), V(-320, 66, RL.z), V(-150, 15, RL.z), V(RL.x1 + 8, 6.4, RL.z)]), null);
             break;
           case 'APPROACH':
             setState('FLARE', jit(2.6), curveOf([V(RL.x1 + 8, 6.4, RL.z), V(RL.x1 + 34, GY + 0.4, RL.z), V(RL.x1 + 52, GY, RL.z)]));
@@ -906,6 +953,35 @@
         },
         path: function (u) { return V(dir * (-800 + u * 1600), alt + Math.sin(u * Math.PI) * arc, zb + Math.sin(u * Math.PI * 2) * wig); } };
     });
+    // HOT-AIR BALLOONS — slow, colourful drifters in the sky band
+    [[0xc0392b, 0xf4d03f], [0x2e86c1, 0xecf0f1], [0x27ae60, 0xf4b740]].forEach(function (bc, bi) {
+      var bal = new THREE.Group();
+      var env = new THREE.Mesh(new THREE.SphereGeometry(7, 12, 10), M.mat(bc[0], 0.65, 0.05)); env.scale.y = 1.15; bal.add(env);
+      var band = new THREE.Mesh(new THREE.SphereGeometry(7.1, 12, 10, 0, 6.2832, 0.6, 0.55), M.mat(bc[1], 0.65, 0.05)); band.scale.y = 1.15; bal.add(band);
+      var throat = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2.5, 2.4, 8), M.mat(bc[0], 0.65, 0.05)); throat.position.y = -8.6; bal.add(throat);
+      var basket = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2, 2.6), M.wood); basket.position.y = -11; bal.add(basket);
+      legMover(bal, function () {
+        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(175, 245), z = rnd(-230, -420), bob = rnd(5, 12);
+        return { dur: rnd(95, 150), gap: rnd(8, 46), flat: true,
+          path: function (u) { return V(dir * (-780 + u * 1560), alt + Math.sin(u * 8 + bi) * bob, z); } };
+      });
+    });
+    // BANNER PLANE — a small tow plane pulling the EPAL TRAVELS banner
+    (function () {
+      var g = new THREE.Group();
+      var tow = buildAirliner(THREE, M, 0.7, false, LIVERIES[3]);
+      tow.userData.gear.visible = false; g.add(tow);
+      var banner = new THREE.Mesh(new THREE.PlaneGeometry(30, 6),
+        new THREE.MeshBasicMaterial({ map: textTex(THREE, 'EPAL TRAVELS', '#1B2A4A', '#F5C542', 768, 144, 78), side: THREE.DoubleSide }));
+      banner.rotation.y = Math.PI / 2;                     // face the viewer while flying along x
+      banner.position.set(0, -0.6, -26); g.add(banner);
+      legMover(g, function () {
+        var dir = Math.random() < 0.5 ? 1 : -1, alt = rnd(150, 195), z = rnd(-180, -320);
+        return { dur: rnd(58, 84), gap: rnd(30, 90), flat: true,
+          path: function (u) { return V(dir * (-800 + u * 1600), alt + Math.sin(u * 6.28) * 5, z); },
+          tick: function (u, t) { banner.rotation.x = Math.sin(t * 6) * 0.05; } };
+      });
+    })();
     // V-formation birds
     (function () {
       var flock = new THREE.Group();
@@ -940,6 +1016,19 @@
     legMover(fm, serviceLeg(0.9));
     var fuel = buildTruck(THREE, M); addShadow(fuel, 9);
     legMover(fuel, serviceLeg(0));
+    // baggage train — a tug pulling two carts out to the stands
+    (function () {
+      var train = new THREE.Group();
+      train.add(buildTruck(THREE, M, 0x2e86c1));
+      [-7, -12].forEach(function (off, ci) {
+        var cart = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.3, 2), M.mat(ci ? 0x9aa2b1 : 0xe6b93c, 0.6, 0.2));
+        cart.position.set(0, 0.85, off); cart.castShadow = true; train.add(cart);
+        var bag = new THREE.Mesh(new THREE.BoxGeometry(2, 0.8, 1.3), M.mat(ci ? 0xc0392b : 0x27ae60, 0.6, 0.15));
+        bag.position.set(0, 1.9, off); train.add(bag);
+      });
+      addShadow(train, 12);
+      legMover(train, serviceLeg(0));
+    })();
     // RESCUE-9 fire patrol down the transport road
     (function () {
       var ft = buildTruck(THREE, M, 0xc0392b);
@@ -968,6 +1057,10 @@
       scene.add(sp); clouds.push(sp);
     }
     updaters.push(function () { for (var k = 0; k < clouds.length; k++) { var s = clouds[k]; s.position.x += s.userData.vx; if (s.position.x > 760) s.position.x = -760; else if (s.position.x < -760) s.position.x = 760; } });
+    // soft sun glare in the upper-left sky (matches the key-light azimuth)
+    var glare = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.lightTex, color: 0xfff0c4, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    glare.scale.set(240, 240, 1); glare.position.set(-600, 310, -720); scene.add(glare);
+    updaters.push(function (t) { glare.material.opacity = 0.42 + 0.1 * Math.sin(t * 0.4); });
 
     /* ---- blinking lights ----------------------------------------------------*/
     var lights = []; scene.traverse(function (o) { if (o.userData && o.userData.light && o.userData.light.pat !== 'steady' && o.material) lights.push(o); });
