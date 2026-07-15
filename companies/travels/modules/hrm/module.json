@@ -10,6 +10,8 @@
   "menu": [
     { "id": "attendance", "label": "Attendance", "route": "#/travels/hrm/attendance", "enabled": true },
     { "id": "leaves", "label": "Leaves", "route": "#/travels/hrm/leaves", "enabled": true },
+    { "id": "notices", "label": "Notices", "route": "#/travels/hrm/notices", "enabled": true },
+    { "id": "setup", "label": "HR Setup (shifts · holidays · leave types)", "route": "#/travels/hrm/setup", "enabled": true },
     { "id": "performance", "label": "Performance", "route": "#/travels/hrm/performance", "enabled": true }
   ],
   "files": {

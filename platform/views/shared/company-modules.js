@@ -62,6 +62,24 @@
   EPAL.view('*/hrm', { render: function (ctx) {
     var cid = ctx.companyId;
     var page = el('div.page');
+    var hrSub = ['notices', 'setup'].indexOf(ctx.subId) >= 0 ? ctx.subId : 'overview';
+    function hrPills() {
+      var pills = el('div.pill-tab.mb-3');
+      [['overview', 'Overview'], ['notices', 'Notices'], ['setup', 'HR Setup']].forEach(function (p) {
+        pills.appendChild(el('button' + (hrSub === p[0] ? '.active' : ''), { text: p[1],
+          onclick: function () { EPAL.router.navigate(cid + '/hrm' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
+      });
+      return pills;
+    }
+    if (hrSub !== 'overview' && (EPAL.noticeBoard || EPAL.hrSetup)) {
+      page.appendChild(head(ctx, hrSub === 'notices' ? 'Noticeboard' : 'HR Setup', hrSub === 'notices' ? 'megaphone' : 'gear',
+        hrSub === 'notices' ? 'Company notices — drafts, publish windows and the live board.'
+                            : 'Shifts, the holiday calendar and leave types (group-wide).'));
+      page.appendChild(hrPills());
+      (hrSub === 'notices' ? EPAL.noticeBoard : EPAL.hrSetup)(page, cid);
+      ctx.mount.appendChild(page);
+      return;
+    }
     var team = db().employees({ companyId: cid });
     var payroll = team.reduce(function (a, e) { return a + (e.salary || 0); }, 0);
     var present = team.reduce(function (a, e) { return a + ((e.attendance || {}).present || 0); }, 0);
@@ -70,6 +88,7 @@
     page.appendChild(head(ctx, 'HRM — ' + ctx.company.short + ' Team', 'people-fill',
       'Attendance, payroll and performance for this concern. Full lifecycle lives in Group ▸ Workforce.',
       EPAL.auth.isAdmin() ? [ el('a.btn.btn-ghost', { href: '#/group/employees/directory', html: ui.icon('person-badge') + ' Group Workforce' }) ] : null));
+    page.appendChild(hrPills());
 
     page.appendChild(el('div.kpi-grid', null, [
       kpi('Team Size', team.length, 'people'),

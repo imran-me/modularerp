@@ -101,11 +101,13 @@
   EPAL.view('travels/hrm', {
     render: function (ctx) {
       var sub = ctx.subId || 'directory';
-      if (['directory', 'attendance', 'leaves', 'performance'].indexOf(sub) < 0) sub = 'directory';
+      if (['directory', 'attendance', 'leaves', 'notices', 'setup', 'performance'].indexOf(sub) < 0) sub = 'directory';
       var page = el('div.page');
-      var titles = { directory: 'HRM — Team', attendance: 'Attendance', leaves: 'Leave Register', payroll: 'Payroll', performance: 'Performance' };
+      var titles = { directory: 'HRM — Team', attendance: 'Attendance', leaves: 'Leave Register', notices: 'Noticeboard', setup: 'HR Setup', payroll: 'Payroll', performance: 'Performance' };
       var subs = { directory: 'The Epal Travels team — roster, attendance, payroll and performance.',
         attendance: 'Present, absent, late and leave for the current period.', leaves: 'Apply, approve and track staff leave.',
+        notices: 'Company notices — drafts, publish windows and the live board.',
+        setup: 'Shifts, the holiday calendar and leave types (group-wide config).',
         payroll: 'Payslips and the monthly payroll run — posted to the ledger.', performance: 'Ratings, top performers and reviews.' };
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'directory' ? 'Epal Travels' : 'Travels › HRM', icon: 'people-fill', title: titles[sub], sub: subs[sub],
@@ -116,12 +118,15 @@
         ].filter(Boolean)
       }));
       var pills = el('div.pill-tab.mb-3');
-      [['directory', 'Directory'], ['attendance', 'Attendance'], ['leaves', 'Leaves'], ['performance', 'Performance']].forEach(function (p) {
+      [['directory', 'Directory'], ['attendance', 'Attendance'], ['leaves', 'Leaves'], ['notices', 'Notices'], ['setup', 'HR Setup'], ['performance', 'Performance']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/hrm' + (p[0] === 'directory' ? '' : '/' + p[0])); } }));
       });
       page.appendChild(pills);
-      ({ directory: directoryView, attendance: attendanceView, leaves: leavesView, payroll: payrollView, performance: performanceView }[sub])(page);
+      ({ directory: directoryView, attendance: attendanceView, leaves: leavesView,
+         notices: function (pg) { EPAL.noticeBoard(pg, 'travels'); },
+         setup: function (pg) { EPAL.hrSetup(pg, 'travels'); },
+         payroll: payrollView, performance: performanceView }[sub])(page);
       ctx.mount.appendChild(page);
     }
   });
@@ -474,7 +479,7 @@
       title: isNew ? 'Apply for Leave' : 'Edit Leave', icon: 'calendar2-plus', size: 'md', record: l || { status: 'Pending', from: TODAY_STR, to: TODAY_STR },
       fields: [
         { key: 'empId', label: 'Employee', type: 'select', required: true, options: t.map(function (e) { return [e.id, e.name + ' · ' + e.dept]; }) },
-        { key: 'type', label: 'Leave type', type: 'select', options: LEAVE_TYPES, default: 'Annual', required: true },
+        { key: 'type', label: 'Leave type', type: 'select', options: (EPAL.leaveTypeNames ? EPAL.leaveTypeNames() : LEAVE_TYPES), default: 'Annual', required: true },
         { key: 'from', label: 'From', type: 'date', required: true, default: TODAY_STR },
         { key: 'to', label: 'To', type: 'date', required: true, default: TODAY_STR },
         { key: 'status', label: 'Status', type: 'select', options: LEAVE_STATUS, default: 'Pending' },
