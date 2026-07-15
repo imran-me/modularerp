@@ -173,6 +173,11 @@
       var pills = el('div.tab-underline.mb-3');
       SECTIONS.forEach(function (s) { pills.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1], onclick: function () { EPAL.router.navigate('group/master-accounts/' + s[0]); } })); });
       page.appendChild(pills);
+      // AUDIT P2: the period lock is VISIBLE wherever money is handled
+      var lockYm = (EPAL.ledger && EPAL.ledger.lockedThrough) ? EPAL.ledger.lockedThrough() : null;
+      if (lockYm) page.appendChild(el('div.mb-2', null, [
+        el('span.badge.badge-warn', { html: ui.icon('lock-fill') + ' Books locked through ' + esc(lockYm) + ' — back-dated entries are blocked (reopen in Consolidated Finance)' })
+      ]));
       // COMPANY SWITCHER — the owner's "button-wise switch of companies at the top".
       // On Master Payroll it rides IN the desk's section row (owner mark);
       // everywhere else it is its own row under the tabs.
@@ -628,8 +633,8 @@
     var cols = [
       { key: 'date', label: 'Date', date: true },
       { key: 'ref', label: 'Reference', render: function (e) { return '<span class="mono xs text-mute">' + esc(e.ref || e.id) + '</span>'; } },
-      { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', opening: 'accent', payroll: 'warn', refund: 'bad', intercompany: 'accent', bank: 'info', payment: 'good' } },
-      { key: 'memo', label: 'Description', render: function (e) { return esc(e.memo || '—'); } },
+      { key: 'source', label: 'Source', badge: { sale: 'good', manual: 'info', opening: 'accent', payroll: 'warn', refund: 'bad', reversal: 'bad', intercompany: 'accent', bank: 'info', payment: 'good' } },
+      { key: 'memo', label: 'Description', render: function (e) { return esc(e.memo || '—') + (e.reversedBy ? ' <span class="badge badge-bad">reversed</span>' : ''); } },
       { key: 'dr', label: 'Total Debit', num: true, sortVal: drTotal, render: function (e) { return '<span class="num">' + ui.money(drTotal(e)) + '</span>'; }, exportVal: drTotal },
       { key: 'cr', label: 'Total Credit', num: true, sortVal: crTotal, render: function (e) { return '<span class="num">' + ui.money(crTotal(e)) + '</span>'; }, exportVal: crTotal },
       { key: 'bal', label: 'Balanced', render: function (e) { return Math.abs(drTotal(e) - crTotal(e)) < 0.01 ? '<span class="badge badge-good">✓ Yes</span>' : '<span class="badge badge-bad">No</span>'; }, exportVal: function (e) { return Math.abs(drTotal(e) - crTotal(e)) < 0.01 ? 'Yes' : 'No'; } }
@@ -794,8 +799,10 @@
       el('div.data-list', null, [
         el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Date / Company' }), el('div.strong', { text: ui.date(e.date) + ' · ' + coName(e.companyId) })]),
         el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Narration' }), el('div.strong', { text: e.memo || '—' })]),
-        el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Source / Ref' }), el('div.strong', { text: (e.source || '—') + ' · ' + (e.ref || '—') })])
-      ]),
+        el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Source / Ref' }), el('div.strong', { text: (e.source || '—') + ' · ' + (e.ref || '—') })]),
+        el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Posted by' }), el('div.strong', { text: e.by || '—' })]),
+        e.reversedBy ? el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Reversed' }), el('div', null, [el('span.badge.badge-bad', { text: 'Reversed by ' + e.reversedBy })])]) : null
+      ].filter(Boolean)),
       el('div.section-label', { text: 'Lines' }),
       el('div.data-list', null, (e.lines || []).map(function (l) {
         return el('div.data-row', null, [el('div.flex-1.sm', { text: l.account + ' · ' + (acc[l.account] || '') }),
@@ -857,17 +864,15 @@
         onRow: function (s) { masterScheduleDetail(s); },
         actions: canCreate() ? [
           { icon: 'file-earmark-text', title: 'Details', onClick: function (s) { masterScheduleDetail(s); } },
-          { icon: 'check-lg', title: 'Approve', onClick: function (s) {
+          { icon: 'check-lg', title: 'Approve (with note)', onClick: function (s) {
             if (!openActs(s) || s.status === 'Approved') { ui.toast('Nothing to approve', 'error'); return; }
-            s.status = 'Approved'; s.approvedAt = TODAY_STR; db.save('acc_schedules', s);
-            ui.toast('Approved', 'success'); EPAL.router.render();
+            approveScheduleForm(s);
           } },
           { icon: 'cash-coin', title: 'Payment done', onClick: function (s) { if (openActs(s)) schedulePayForm(s); else ui.toast('Already settled', 'error'); } },
           { icon: 'calendar2-plus', title: 'Reschedule', onClick: function (s) { if (openActs(s)) rescheduleForm(s); else ui.toast('Already settled', 'error'); } },
-          { icon: 'x-circle', title: 'Cancel', onClick: function (s) {
+          { icon: 'x-circle', title: 'Cancel (with reason)', onClick: function (s) {
             if (!openActs(s)) { ui.toast('Already settled', 'error'); return; }
-            ui.confirm({ title: 'Cancel this schedule?', text: s.party + ' · ' + ui.money(s.amount), danger: true, confirmLabel: 'Cancel Schedule' })
-              .then(function (ok) { if (ok) { s.status = 'Cancelled'; db.save('acc_schedules', s); ui.toast('Cancelled', 'success'); EPAL.router.render(); } });
+            cancelScheduleForm(s);
           } }
         ] : [{ icon: 'file-earmark-text', title: 'Details', onClick: function (s) { masterScheduleDetail(s); } }],
         empty: { icon: 'calendar2-week', title: 'No ' + kind.toLowerCase() + ' schedules' }
@@ -883,6 +888,40 @@
     section('Receivable', 'arrow-down-left-circle');
     section('Payable', 'arrow-up-right-circle');
   }
+  // AUDIT P2: every lifecycle action leaves a note on the schedule's TRAIL
+  // (production PaymentScheduleLog parity — who, when, what, why).
+  function schedTrail(s, action, note) {
+    var who = 'Owner';
+    try { var u = EPAL.auth && EPAL.auth.current && EPAL.auth.current(); who = (u && (u.name || u.email)) || 'Owner'; } catch (e) {}
+    s.trail = (s.trail || []).concat([{ action: action, at: new Date().toISOString().slice(0, 16).replace('T', ' '), by: who, note: note || '' }]);
+  }
+  function approveScheduleForm(s) {
+    EPAL.formModal({
+      title: 'Approve — ' + s.party, icon: 'check-lg', size: 'sm', record: {},
+      fields: [{ key: 'note', label: 'Approval note (why / on what basis)', type: 'textarea', placeholder: 'e.g. verified against the vendor bill' }],
+      saveLabel: 'Approve',
+      onSave: function (v) {
+        s.status = 'Approved'; s.approvedAt = TODAY_STR;
+        schedTrail(s, 'approved', v.note);
+        db.save('acc_schedules', s);
+        ui.toast('Approved', 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+  function cancelScheduleForm(s) {
+    EPAL.formModal({
+      title: 'Cancel — ' + s.party, icon: 'x-circle', size: 'sm', record: {},
+      fields: [{ key: 'note', label: 'Cancellation reason', type: 'textarea', required: true }],
+      saveLabel: 'Cancel Schedule',
+      onSave: function (v) {
+        s.status = 'Cancelled';
+        schedTrail(s, 'cancelled', v.note);
+        db.save('acc_schedules', s);
+        ui.toast('Cancelled', 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+
   // detail with the production ERP's lifecycle: Payment Done (partial pay spawns an
   // auto-REMAINDER schedule), Reschedule (keeps count + reason), priority setter.
   function masterScheduleDetail(s) {
@@ -906,7 +945,19 @@
           return canCreate() ? sel : el('span.badge', { text: s.priority || 'medium' });
         })()])]),
         s.desc ? el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Note' }), el('div', { text: s.desc })]) : null
-      ].filter(Boolean))
+      ].filter(Boolean)),
+      // AUDIT P2: the action trail — who did what, when, and why
+      (s.trail && s.trail.length) ? el('div', null, [
+        el('div.section-label', { text: 'Approval & Action Trail' }),
+        el('div.data-list', null, s.trail.slice().reverse().map(function (t) {
+          var badge = { approved: 'good', paid: 'good', partial_paid: 'warn', rescheduled: 'warn', cancelled: 'bad' }[t.action] || 'info';
+          return el('div.data-row', null, [
+            el('span.badge.badge-' + badge, { text: t.action.replace('_', ' ') }),
+            el('div.flex-1.sm', { style: { marginLeft: '10px' }, text: (t.note || '—') }),
+            el('div.text-mute.xs', { text: t.by + ' · ' + t.at })
+          ]);
+        }))
+      ]) : null
     ])]));
   }
   function schedulePayForm(s) {
@@ -926,6 +977,7 @@
         var partial = amt < outstanding - 0.001;
         s.paidAmount = (+s.paidAmount || 0) + amt; s.paidDate = v.date; s.payMethod = v.method;
         s.status = 'Paid';
+        schedTrail(s, partial ? 'partial_paid' : 'paid', ui.money(amt) + ' via ' + v.method);
         db.save('acc_schedules', s);
         if (partial) {
           db.save('acc_schedules', { id: 'SCH-' + ui.uid('').slice(-5).toUpperCase(), companyId: s.companyId, party: s.party, partyType: s.partyType,
@@ -948,6 +1000,7 @@
       onSave: function (v) {
         if (!s.originalDue) s.originalDue = s.due;
         s.due = v.due; s.rescheduleCount = (s.rescheduleCount || 0) + 1; s.rescheduleReason = v.reason; s.status = 'Pending';
+        schedTrail(s, 'rescheduled', 'to ' + ui.date(v.due) + ' — ' + v.reason);
         db.save('acc_schedules', s);
         ui.toast('Rescheduled to ' + ui.date(v.due), 'success'); EPAL.router.render(); return true;
       }

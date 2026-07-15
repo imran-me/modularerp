@@ -152,6 +152,11 @@
           onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
       });
       page.appendChild(pills);
+      // AUDIT P2: the period lock is VISIBLE wherever money is handled
+      var lockYm = (EPAL.ledger && EPAL.ledger.lockedThrough) ? EPAL.ledger.lockedThrough() : null;
+      if (lockYm) page.appendChild(el('div.mb-2', null, [
+        el('span.badge.badge-warn', { html: ui.icon('lock-fill') + ' Books locked through ' + ui.escapeHtml(lockYm) + ' — back-dated entries are blocked' })
+      ]));
 
       ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView, cashbook: cashBookView, pettycash: pettyView,
          payroll: function (p) { if (EPAL.payrollDesk) EPAL.payrollDesk(p, CID); else p.appendChild(el('div.card', null, [el('div.card-body', { text: 'Payroll desk unavailable.' })])); } }[sub] || overview)(page);
@@ -391,10 +396,19 @@
     });
   }
   function deleteEntry(e) {
-    ui.confirm({ title: 'Delete entry ' + e.id + '?', text: 'Removes the entry and its mirrored ledger posting.', danger: true, confirmLabel: 'Delete' })
+    // AUDIT P2 (immutability): the books never lose a posting. Deleting a
+    // voucher posts an equal-and-opposite REVERSAL journal dated today; the
+    // original + REV- pair stay in the ledger forever and net to zero, while
+    // the voucher leaves the register.
+    ui.confirm({ title: 'Delete entry ' + e.id + '?', text: 'The voucher leaves this register; its ledger posting is REVERSED (not erased) — the original and the reversal stay on the books for audit.', danger: true, confirmLabel: 'Delete & Reverse' })
       .then(function (ok) { if (!ok) return;
         db.remove('acc_entries', e.id);
-        try { if (EPAL.ledger && EPAL.ledger.remove) EPAL.ledger.remove('GL-ACC-' + e.id); } catch (x) {}
+        try {
+          if (EPAL.ledger && EPAL.ledger.reverse) {
+            var rev = EPAL.ledger.reverse('GL-ACC-' + e.id, { reason: 'Voucher ' + e.id + ' deleted' });
+            if (rev) { ui.toast('Entry removed — ledger reversal ' + rev.id + ' posted', 'success'); EPAL.router.render(); return; }
+          }
+        } catch (x) { ui.toast(x.message || 'Reversal failed', 'error'); }
         ui.toast('Entry deleted', 'success'); EPAL.router.render(); });
   }
   function printEntry(e) {

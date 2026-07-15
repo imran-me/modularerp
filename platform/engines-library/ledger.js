@@ -186,7 +186,13 @@
       party: spec.party || '',
       lines: clean,
       posted: true,
-      created: Date.now()
+      created: Date.now(),
+      // AUDIT P2: every posting is stamped with WHO created it (falls back
+      // to 'System' for seeds/engine flows that run before login)
+      by: spec.by || (function () {
+        try { var u = EPAL.auth && EPAL.auth.current && EPAL.auth.current(); return (u && (u.name || u.email)) || 'System'; }
+        catch (e) { return 'System'; }
+      })()
     };
 
     S.upsert(GL_KEY, entry);
@@ -552,7 +558,26 @@
     },
     lockPeriod: function (ym) { S.set('period_lock', ym); bus.emit('data:changed', { store: 'period_lock' }); return ym; },
     unlockPeriod: function () { S.remove('period_lock'); bus.emit('data:changed', { store: 'period_lock' }); },
-    lockedThrough: function () { return S.get('period_lock', null); }
+    lockedThrough: function () { return S.get('period_lock', null); },
+    // AUDIT P2 (immutability): instead of deleting a posted journal, post the
+    // equal-and-opposite entry TODAY. Both stay on the books forever — the
+    // original, and an explicit REV- entry that nets it to zero. Returns the
+    // reversal entry (or null if the original doesn't exist / already reversed).
+    reverse: function (id, opts) {
+      opts = opts || {};
+      var orig = S.list(GL_KEY).filter(function (e) { return e.id === id; })[0];
+      if (!orig) return null;
+      var revId = 'REV-' + id;
+      if (S.list(GL_KEY).some(function (e) { return e.id === revId; })) return null;   // already reversed
+      var entry = post({
+        id: revId, date: opts.date, companyId: orig.companyId, ref: 'REV-' + (orig.ref || orig.id),
+        memo: 'Reversal of ' + orig.id + (orig.memo ? ' — ' + orig.memo : '') + (opts.reason ? ' · ' + opts.reason : ''),
+        source: 'reversal', party: orig.party || '', override: true,
+        lines: (orig.lines || []).map(function (l) { return { account: l.account, dr: +l.cr || 0, cr: +l.dr || 0 }; })
+      });
+      orig.reversedBy = revId; S.upsert(GL_KEY, orig);
+      return entry;
+    }
   };
 
   /* ==========================================================================

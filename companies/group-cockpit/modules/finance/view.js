@@ -1440,7 +1440,9 @@
       metaRow('Company', co ? co.short : e.companyId), metaRow('Source', e.source),
       e.ref ? metaRow('Reference', e.ref) : null,
       e.party ? metaRow('Party', e.party) : null,
-      e.memo ? metaRow('Memo', e.memo) : null
+      e.memo ? metaRow('Memo', e.memo) : null,
+      metaRow('Posted by', e.by || '—'),
+      e.reversedBy ? metaRow('Reversed by', e.reversedBy) : null
     ]));
     var t = el('table.tbl');
     t.appendChild(el('thead', null, [ el('tr', null, [
