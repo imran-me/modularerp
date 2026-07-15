@@ -117,15 +117,20 @@
       var page = el('div.page');
 
       var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', payroll: 'Payroll', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register', cashbook: 'Cash Book', pettycash: 'Petty Cash' };
+      // Subtitles are written to FIT the one-line .page-sub (owner review
+      // 2026-07-15). The head is pinned to a single line, so an over-long sub
+      // doesn't wrap — it ellipses mid-sentence, which reads as a bug. The rule
+      // is to say it shorter, not to lean on the ellipsis. Currency is TAKA:
+      // "Every rupee earned/spent" was the wrong currency for Bangladesh.
       var subs = { overview: 'Income, expenses, journals and payment schedules for Epal Travels.',
-        income: 'Every rupee earned — by head, method and month.', expenses: 'Every rupee spent — controlled by head and method.',
-        journals: 'Post balanced double-entry journals straight into the general ledger.',
+        income: 'Every taka earned — by head, method and month.', expenses: 'Every taka spent — controlled by head and method.',
+        journals: 'Balanced double-entry journals, posted to the general ledger.',
         schedules: 'Payables and receivables with due dates, ageing and settlement.',
-        recurring: 'Rent, internet and other monthly costs — auto-created on their day each month.',
-        cheques: 'Issued and received cheques with clearing status (pending / cleared / bounced).',
-        cashbook: 'Every cash & bank movement, dated, with a running balance — straight from the ledger.',
+        recurring: 'Rent, internet and other monthly costs — auto-created each month.',
+        cheques: 'Issued and received cheques with their clearing status.',
+        cashbook: 'Every cash & bank movement, dated, with a running balance.',
         pettycash: 'Petty-cash IOU slips to staff and their settlement against bills.',
-        payroll: 'Salary template, monthly run, loans, payslips & advances — posted to the ledger.' };
+        payroll: 'Salary run, payslips, loans & advances — posted to the ledger.' };
 
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
@@ -145,8 +150,13 @@
         ]
       }));
 
-      // pill-tab navigation across the accounts sub-screens
-      var pills = el('div.pill-tab.mb-3');
+      // SECTION NAV — the same calm full-bleed underline band as Group Finance
+      // and Master Accounts (owner review 2026-07-15). This screen was still on
+      // the old pill row: same job, two different nav grammars across the group.
+      // House rule (see .tab-underline): section nav = underline tabs; pills are
+      // for switchers/filters BELOW it; real actions stay buttons. 10 sections,
+      // so .tabs-dense — the same marker Finance uses for its long row.
+      var pills = el('div.tab-underline.tabs-dense.mb-3');
       [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['payroll', 'Payroll'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['cashbook', 'Cash Book'], ['pettycash', 'Petty Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
@@ -254,12 +264,18 @@
     var heads2 = groupBy(list, 'category');
     var avg = list.length ? Math.round(total / list.length) : 0;
 
+    // Four NUMERIC facts (owner review 2026-07-15). The fifth tile used to be
+    // 'Top Head' — a text value ("Bank Charges") sitting in a row of figures,
+    // where it wrapped to two lines and made the whole strip read ragged. A KPI
+    // strip is a row of magnitudes you compare at a glance; prose doesn't
+    // compare. Nothing is lost: the head chips immediately below are ordered
+    // biggest-first, so the top head is the first chip — shown with its actual
+    // amount, and clickable to filter the register, which the tile never was.
     page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
       kpi('Total ' + kind, ui.money(total, { compact: true }), kind === 'Income' ? 'arrow-down-left-circle' : 'arrow-up-right-circle', kind === 'Income' ? 'text-good' : 'text-bad'),
       kpi('This Month', ui.money(thisMonth, { compact: true }), 'calendar3'),
       kpi('Entries', String(list.length), 'card-list'),
-      kpi('Average', ui.money(avg, { compact: true }), 'graph-up'),
-      kpi('Top Head', heads2[0] ? heads2[0].label : '—', 'trophy')
+      kpi('Average', ui.money(avg, { compact: true }), 'graph-up')
     ]));
 
     // clickable head chips — biggest posting heads, tap to filter the register

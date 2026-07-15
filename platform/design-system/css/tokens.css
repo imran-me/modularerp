@@ -18,6 +18,31 @@
   --font-display: 'Sora', 'Plus Jakarta Sans', var(--font-sans);
   --font-mono: 'JetBrains Mono', 'DM Mono', ui-monospace, 'SF Mono', monospace;
 
+  /* TYPE SCALE — 8 steps, and only these 8 (owner review 2026-07-15).
+     The scale had sprawled to 15 rendered sizes (10.5 · 11 · 11.5 · 12 · 12.5 ·
+     13 · 13.5 · 14 · 15 · 16.4 · 19 · 21 · 24 · 32): near-duplicates nobody can
+     tell apart, which is what made pages read "unresolved". Every TEXT size in
+     the app now resolves to one of these tokens — no raw px in a rule that sets
+     text. The ratio is ~1.10 at the small end (where legibility, not drama,
+     is the job) opening to ~1.25 at the display end.
+
+     NOT on this scale, deliberately:
+       · icon glyph sizes (.icon-btn i, .kpi-ico, .empty-state i) — an icon's
+         font-size is a box metric, not type. See the house 24px icon rule.
+       · print/document stylesheets (deepcore.css, the print windows built in
+         view.js) — a separate medium with its own scale.
+       · the 404 .err-code hero (96px) — a one-off by design.
+     Nothing here is below 11px: 10.5px uppercase + letter-spaced + muted was
+     four legibility taxes stacked (309 elements were under 11px). */
+  --fs-micro: 11px;   /* badges, kbd, chart ticks — the floor, never go under */
+  --fs-tiny:  12px;   /* table headers, KPI labels, form labels, hints        */
+  --fs-small: 13px;   /* table body, buttons, chips — the dense-UI workhorse  */
+  --fs-body:  14px;   /* base body copy (matches <body>)                      */
+  --fs-lead:  16px;   /* card titles, lead paragraphs                         */
+  --fs-h3:    20px;   /* stat values, compact-strip KPI values                */
+  --fs-h2:    24px;   /* page titles                                          */
+  --fs-h1:    32px;   /* the hero KPI number                                  */
+
   /* Brand accents (also declared in config.js per company) ---------------*/
   --gold: #1A43BF;
   --gold-soft: #7E9AE8;
@@ -109,8 +134,15 @@
   --hairline:      rgba(255,255,255,.7);    /* crisp top edge on white panels */
 
   --text:      #131a2c;
-  --text-dim:  #454f68;   /* owner 2026-07-15: secondary text +20% visibility */
-  --text-mute: #6d758a;
+  --text-dim:  #454f68;   /* owner 2026-07-15: secondary text +20% visibility.
+                             Measures 6.9:1 on --bg — already clears the floor. */
+  /* Was #6d758a, which measured 3.9:1 on --bg and 4.3:1 on --surface-2 — under
+     the 4.5:1 floor for normal text (dark theme was already fine at 5.8/4.9,
+     so this is a light-only correction). Darkened along the SAME hue (222°) so
+     it stays the same cool slate, just legible. Now measures:
+       5.1:1 on --bg (#e8edf6) · 5.7:1 on --surface-2 · 6.0:1 on --surface
+       4.7:1 on --bg-2 (#dde5f1), the darkest light surface — worst case. */
+  --text-mute: #5a6379;
 
   --shadow-sm: 0 1px 2px rgba(5,22,80,.07);
   --shadow:    0 2px 4px rgba(5,22,80,.05), 0 20px 42px -18px rgba(5,22,80,.18);

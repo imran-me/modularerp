@@ -12,7 +12,7 @@ body {
   font-family: var(--font-sans);
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -41,7 +41,7 @@ img, svg { display: block; max-width: 100%; }
 .btn {
   --btn-bg: var(--surface-2);
   display: inline-flex; align-items: center; gap: 8px; justify-content: center;
-  padding: 9px 16px; border-radius: var(--r-sm); font-weight: 600; font-size: 13.5px;
+  padding: 9px 16px; border-radius: var(--r-sm); font-weight: 600; font-size: var(--fs-small);
   background: var(--btn-bg); color: var(--text); border: 1px solid var(--border);
   transition: transform var(--t-fast) var(--e-out), background var(--t), border-color var(--t), box-shadow var(--t);
   white-space: nowrap; user-select: none;
@@ -60,8 +60,9 @@ img, svg { display: block; max-width: 100%; }
 .btn-ghost:hover { background: var(--surface-2); }
 .btn-danger { --btn-bg: var(--bad); color: #fff; border-color: transparent; }
 .btn-outline { --btn-bg: transparent; border-color: var(--border-strong); }
-.btn-sm { padding: 6px 11px; font-size: 12.5px; border-radius: var(--r-xs); }
-.btn-lg { padding: 12px 22px; font-size: 15px; }
+/* three distinct steps, none of them near-duplicates: 12 · 13 · 16 */
+.btn-sm { padding: 6px 11px; font-size: var(--fs-tiny); border-radius: var(--r-xs); }
+.btn-lg { padding: 12px 22px; font-size: var(--fs-lead); }
 .btn-icon { padding: 9px; width: 38px; height: 38px; }
 .btn[disabled] { opacity: .5; pointer-events: none; }
 .btn-block { width: 100%; }
@@ -72,12 +73,12 @@ img, svg { display: block; max-width: 100%; }
 }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
 .icon-btn i { font-size: 18px; }
-.link-btn { color: var(--accent); font-weight: 600; font-size: 12.5px; }
+.link-btn { color: var(--accent); font-weight: 600; font-size: var(--fs-small); }
 .link-btn:hover { text-decoration: underline; }
 
 /* ------------------------------------------------------------- Form fields */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-.field > label, .form-label { font-size: 12px; font-weight: 600; color: var(--text-dim); letter-spacing: .01em; }
+.field > label, .form-label { font-size: var(--fs-tiny); font-weight: 600; color: var(--text-dim); letter-spacing: .01em; }
 .field .req { color: var(--bad); }
 .input, .select, textarea.input {
   width: 100%; padding: 10px 12px; border-radius: var(--r-sm);
@@ -90,7 +91,7 @@ img, svg { display: block; max-width: 100%; }
 }
 .select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%238a93a9' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; }
-.hint { font-size: 11.5px; color: var(--text-mute); }
+.hint { font-size: var(--fs-tiny); color: var(--text-mute); }
 
 /* Toggle switch (used all over the Module Manager) ------------------------*/
 .switch { position: relative; display: inline-block; width: 42px; height: 24px; flex: none; }
@@ -119,10 +120,17 @@ img, svg { display: block; max-width: 100%; }
 .table-wrap::-webkit-scrollbar { height: 10px; }
 .table-wrap::-webkit-scrollbar-thumb { background: var(--border-strong, var(--border)); border-radius: 8px; border: 2px solid var(--surface); }
 .table-wrap::-webkit-scrollbar-track { background: transparent; }
-table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: auto; }
+table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); table-layout: auto; }
+/* Column headers (owner review 2026-07-15): were 10.5px, uppercase, letter-spaced
+   AND --text-mute — four legibility taxes stacked on the densest screens (Chart
+   of Accounts / Manage Accounts carry ~30 of these each). Uppercase + tracking
+   needs MORE size, not less, so: 12px on the scale, and --text-dim instead of
+   --text-mute (4.3:1 → 7.7:1 light, 4.9:1 → 8.6:1 dark). Still quieter than the
+   body text below it — the hierarchy now comes from weight + colour, not from
+   shrinking it past the point of reading. */
 .tbl thead th {
-  text-align: left; font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--text-mute); padding: 8px 9px; background: var(--surface-2); position: sticky; top: 0; z-index: 1;
+  text-align: left; font-weight: 600; font-size: var(--fs-tiny); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-dim); padding: 8px 9px; background: var(--surface-2); position: sticky; top: 0; z-index: 1;
   border-bottom: 1px solid var(--border); white-space: normal; line-height: 1.15;   /* headers wrap → columns stay narrow */
 }
 /* FIT, don't scroll: text cells WRAP so every column (incl. the Actions buttons)
@@ -150,7 +158,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
 
 /* ---------------------------------------------------------- Badges / chips */
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill);
-  font-size: 11px; font-weight: 700; letter-spacing: .02em; background: var(--surface-3); color: var(--text-dim); }
+  font-size: var(--fs-micro); font-weight: 700; letter-spacing: .02em; background: var(--surface-3); color: var(--text-dim); }
 .badge.dot::before { content:''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge-good { background: var(--good-soft); color: var(--good); }
 .badge-warn { background: var(--warn-soft); color: var(--warn); }
@@ -158,7 +166,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
 .badge-info { background: var(--info-soft); color: var(--info); }
 .badge-accent { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: var(--r-pill);
-  background: var(--surface-2); border: 1px solid var(--border); font-size: 12.5px; font-weight: 500; cursor: pointer; transition: all var(--t); }
+  background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-small); font-weight: 500; cursor: pointer; transition: all var(--t); }
 .chip:hover { border-color: var(--border-strong); }
 .chip.active { background: var(--accent); color: #fff; border-color: transparent; }
 
@@ -167,7 +175,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
 .text-mute { color: var(--text-mute); }
 .text-good { color: var(--good); } .text-bad { color: var(--bad); } .text-warn { color: var(--warn); }
 .text-accent { color: var(--accent); }
-.sm { font-size: 12px; } .xs { font-size: 11px; } .lg { font-size: 16px; }
+.sm { font-size: var(--fs-tiny); } .xs { font-size: var(--fs-micro); } .lg { font-size: var(--fs-lead); }
 .fw-700 { font-weight: 700; } .fw-600 { font-weight: 600; }
 .flex { display: flex; } .items-center { align-items: center; } .justify-between { justify-content: space-between; }
 .gap-1{gap:6px;} .gap-2{gap:12px;} .gap-3{gap:18px;} .gap-4{gap:24px;} .flex-wrap{flex-wrap:wrap;} .flex-1{flex:1;}
@@ -178,35 +186,59 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
 .spacer { flex: 1; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pill-tab { display:inline-flex; gap:4px; background: var(--surface-2); border:1px solid var(--border); border-radius: var(--r-pill); padding:4px; max-width:100%; overflow-x:auto; scrollbar-width:none; }
-.pill-tab::-webkit-scrollbar { display:none; }
-/* RESPONSIVE NAV (owner 2026-07-15): nav pills shrink fluidly with the
-   viewport — the clamp() maxima ARE the old fixed values, so wide screens
-   render identically and 90–110% zoom fits on one row instead of wrapping. */
-.pill-tab button { padding:6px clamp(8px, 0.95vw, 14px); border-radius: var(--r-pill); font-size: clamp(10.5px, 0.86vw, 12.5px); font-weight:600; color: var(--text-dim); white-space:nowrap; transition: all var(--t); }
+/* RESPONSIVE NAV — NEVER CLIPS (owner screenshot 2026-07-15).
+   The previous rule chased "one row at any cost": flex-wrap:nowrap +
+   overflow-x:auto + a HIDDEN scrollbar. So when the band ran out of width it
+   clipped IN SILENCE — "Loans We Took / Report" and "Constructio[n]" were cut
+   off at the window edge with nothing on screen to say more existed, and (the
+   scrollbar being hidden) no way to reach them without a trackpad. A nav that
+   hides its own destinations is worse than a nav on two rows.
+
+   Graceful degradation as width shrinks — the row DEMOTES, it never truncates:
+     1. wide   → both groups share one row (renders exactly as before)
+     2. tight  → pills compress via the clamp()s, down to the 11px floor
+     3. tighter→ the company switcher drops to its own row (.nav-row wraps)
+     4. tiny   → each group wraps internally (phones)
+   At no width/zoom does a label clip, and none renders below --fs-micro (11px):
+   the clamp minima used to be 9.5px, which bought one-row-ness with type nobody
+   could read. Width is negotiable; legibility and reachability are not. */
+.pill-tab { display:inline-flex; gap:4px; background: var(--surface-2); border:1px solid var(--border);
+  border-radius: var(--r-pill); padding:4px; max-width:100%; flex-wrap:wrap; row-gap:2px; }
+/* Type is a fixed scale step; only the PADDING stays fluid. The nav used to size
+   its text with clamp(…vw…) to force one row — but that produced off-scale sizes
+   (11.5 / 12.5 / 16.4px, part of the 15-size sprawl) AND it still clipped, which
+   is the bug in the owner's screenshot. Wrapping does that job properly now, so
+   fluid type buys nothing and costs legibility: at every width below 1440 those
+   clamps were simply pinned at their 11px floor anyway. */
+.pill-tab button { padding:6px clamp(8px, 0.95vw, 14px); border-radius: var(--r-pill);
+  font-size: var(--fs-small); font-weight:600; color: var(--text-dim);
+  white-space:nowrap; transition: all var(--t); }
 .pill-tab button.active { background: var(--accent); color:#fff; }
-/* one-row nav band: two groups share the row, a hairline separates them */
-.nav-row { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; min-width:0; }
-.nav-row > .pill-tab { flex:1 1 auto; min-width:0; }
-.nav-row .vsep { width:1px; align-self:stretch; background:var(--border-strong, var(--border)); flex:0 0 auto; }
-.nav-row .co-sw { display:flex; gap:4px; flex-wrap:nowrap; flex:0 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none; }
-.nav-row .co-sw::-webkit-scrollbar { display:none; }
-/* inside a shared row both groups compress HARDER before anything clips */
-.nav-row .pill-tab button { font-size: clamp(9.5px, 0.78vw, 12.5px); padding: 6px clamp(5px, 0.6vw, 14px); }
-.nav-row .btn.btn-sm { font-size: clamp(9.5px, 0.75vw, 12.5px); padding: clamp(3px, 0.4vw, 6px) clamp(5px, 0.65vw, 12px); white-space:nowrap; }
+/* nav band: two groups share the row while it fits, a hairline separates them */
+.nav-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; row-gap:10px; }
+.nav-row > .pill-tab { flex:1 1 auto; }
+/* fixed height (not align-self:stretch) so the hairline can't stretch to span
+   two rows once the switcher wraps below */
+.nav-row .vsep { width:1px; height:26px; background:var(--border-strong, var(--border)); flex:0 0 auto; }
+.nav-row .co-sw { display:flex; gap:4px; flex-wrap:wrap; flex:0 1 auto; row-gap:6px; }
+/* inside a shared row both groups compress harder — via padding, not type */
+.nav-row .pill-tab button { font-size: var(--fs-tiny); padding: 6px clamp(5px, 0.6vw, 14px); }
+.nav-row .btn.btn-sm { font-size: var(--fs-tiny); padding: clamp(3px, 0.4vw, 6px) clamp(5px, 0.65vw, 12px); white-space:nowrap; }
 /* UNDERLINE TABS — the calm PRIMARY navigation (owner mock 2026-07-15).
    Hierarchy: section nav = quiet underline tabs; switchers/filters below it
    stay as pills; real actions stay as buttons. Less chrome, more premium. */
 /* FULL-BLEED: the bar runs sidebar-edge → window-edge with NO side gaps
    (owner mark 2026-07-15) — negative margins cancel .content's padding. */
-.tab-underline { display:flex; gap:0; align-items:stretch; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none;
+/* Wraps rather than scroll-clipping, for the same reason as .nav-row above:
+   this band is the PRIMARY section nav, so a section that scrolls out of sight
+   behind a hidden scrollbar is a section the user cannot find. */
+.tab-underline { display:flex; gap:0; align-items:stretch; border-bottom:1px solid var(--border); flex-wrap:wrap;
   margin-left:-30px; margin-right:-30px; padding:0;
   background: color-mix(in srgb, var(--surface) 62%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 6px 18px rgba(7, 12, 30, .10);                            /* ~10% soft lift */ }
 @media (max-width: 720px) { .tab-underline { margin-left:-16px; margin-right:-16px; } }
-.tab-underline::-webkit-scrollbar { display:none; }
 .tab-underline button { flex:1 1 auto; min-width:0; text-align:center; padding:12px clamp(8px, 1.2vw, 18px) 13px; border-bottom:3px solid transparent; margin-bottom:-1px;
-  font-size: clamp(11.5px, 0.95vw, 14px); font-weight:700; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
+  font-size: var(--fs-small); font-weight:700; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
   border-radius:0; background:none; transition: color var(--t), border-color var(--t), background var(--t); }
 .tab-underline button + button { border-left:1px solid var(--border); }   /* 1px line between sections */
 .tab-underline button:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 9%, transparent); }
@@ -214,6 +246,6 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
 /* .tabs-dense — for long rows (Consolidated Finance's 13 sections): the same
    look, compressed harder so every label stays on one line before the
    hidden-scrollbar fallback ever engages. */
-.tab-underline.tabs-dense button { padding:12px clamp(4px, 0.62vw, 14px) 13px; font-size: clamp(10px, 0.72vw, 13px); letter-spacing:0; }
-kbd { font-family: var(--font-mono); font-size: 11px; background: var(--surface-3); border: 1px solid var(--border-strong);
+.tab-underline.tabs-dense button { padding:12px clamp(4px, 0.62vw, 14px) 13px; font-size: var(--fs-tiny); letter-spacing:0; }
+kbd { font-family: var(--font-mono); font-size: var(--fs-micro); background: var(--surface-3); border: 1px solid var(--border-strong);
   border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text-dim); }

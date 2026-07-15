@@ -373,13 +373,17 @@
     // the EMIs we owe in the next 30 days — the borrowings book's real alarm
     var soon = tkn.reduce(function (a, b) { var n = nextDueOf(b); return a + (n && daysUntil(n.due) <= 30 ? n.amount : 0); }, 0);
 
-    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+    // Six facts, laid out 3+3 rather than six-abreast (owner review 2026-07-15):
+    // squeezed into one row every label wrapped to two lines and the strip read
+    // ragged. --kpi-cols is the house cap knob (see .kpi-grid) — an even split
+    // beats a ragged 5+1. Labels shortened to fit one line at the new 12px.
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', { style: '--kpi-cols:3' }, [
       kpi('Lent Out', ui.money(extOut, { compact: true }), 'people'),
       kpi('Staff Loans', ui.money(empOut, { compact: true }), 'person-badge'),
       kpi('We Owe', ui.money(tknOwe, { compact: true }), 'bank', tknOwe ? 'text-warn' : null),
-      kpi('Overdue to Collect', ui.money(overdue, { compact: true }), 'exclamation-octagon', overdue ? 'text-bad' : null),
-      kpi('EMI Due · 30 days', ui.money(soon, { compact: true }), 'calendar-event'),
-      kpi('Collected · ' + ymNow, ui.money(collected, { compact: true }), 'cash-coin', 'text-good')
+      kpi('Overdue', ui.money(overdue, { compact: true }), 'exclamation-octagon', overdue ? 'text-bad' : null),
+      kpi('EMI Due · 30d', ui.money(soon, { compact: true }), 'calendar-event'),
+      kpi('Collected MTD', ui.money(collected, { compact: true }), 'cash-coin', 'text-good')
     ]));
 
     // The three books side by side — the owner's "one portfolio" view. Money
@@ -388,7 +392,7 @@
     three.appendChild(el('div.card', null, [
       el('div.card-head', null, [el('h3', { html: ui.icon('people') + ' We Lent Out' }), el('span.card-sub', { text: 'external' })]),
       el('div.card-body', null, [
-        el('div.stat-row.mb-2', null, [
+        el('div.stat-row.stat-2.mb-2', null, [
           el('div.stat', null, [el('div.stat-label', { text: 'Active loans' }), el('div.stat-value', { text: String(active.length) })]),
           el('div.stat', null, [el('div.stat-label', { text: 'To collect' }), el('div.stat-value.num', { text: ui.money(extOut, { compact: true }) })]),
           el('div.stat', null, [el('div.stat-label', { text: 'Interest earned' }), el('div.stat-value.num.text-good', { text: ui.money(interestEarned, { compact: true }) })])
@@ -400,7 +404,7 @@
     three.appendChild(el('div.card', null, [
       el('div.card-head', null, [el('h3', { html: ui.icon('person-badge') + ' Staff Loans' }), el('span.card-sub', { text: 'payroll' })]),
       el('div.card-body', null, [
-        el('div.stat-row.mb-2', null, [
+        el('div.stat-row.stat-2.mb-2', null, [
           el('div.stat', null, [el('div.stat-label', { text: 'Staff with loans' }), el('div.stat-value', { text: String(emp.length) })]),
           el('div.stat', null, [el('div.stat-label', { text: 'Outstanding' }), el('div.stat-value.num', { text: ui.money(empOut, { compact: true }) })]),
           el('div.stat', null, [el('div.stat-label', { text: 'Recovery' }), el('div.stat-value', { text: 'Automatic' })])
@@ -412,7 +416,7 @@
     three.appendChild(el('div.card', null, [
       el('div.card-head', null, [el('h3', { html: ui.icon('bank') + ' We Took' }), el('span.card-sub', { text: 'borrowed' })]),
       el('div.card-body', null, [
-        el('div.stat-row.mb-2', null, [
+        el('div.stat-row.stat-2.mb-2', null, [
           el('div.stat', null, [el('div.stat-label', { text: 'Running loans' }), el('div.stat-value', { text: String(tkn.length) })]),
           el('div.stat', null, [el('div.stat-label', { text: 'Still owed' }), el('div.stat-value.num' + (tknOwe ? '.text-warn' : ''), { text: ui.money(tknOwe, { compact: true }) })]),
           el('div.stat', null, [el('div.stat-label', { text: 'Interest paid' }), el('div.stat-value.num', { text: ui.money(interestPaid, { compact: true }) })])

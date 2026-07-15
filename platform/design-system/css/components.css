@@ -25,11 +25,11 @@
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 10px;
   flex-wrap: nowrap; min-height: 56px; }
 .page-head > *:first-child { min-width: 0; }
-.page-title { font-size: 24px; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: 12px;
+.page-title { font-size: var(--fs-h2); font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: 12px;
   flex-wrap: nowrap; min-width: 0; white-space: nowrap; overflow: hidden; }
-.page-title .eyebrow { flex: 0 0 auto; font-family: var(--font-sans); font-size: 11.5px; font-weight: 700; letter-spacing: .12em;
+.page-title .eyebrow { flex: 0 0 auto; font-family: var(--font-sans); font-size: var(--fs-tiny); font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase; color: var(--accent); white-space: nowrap; }
-.page-sub { color: var(--text-dim); font-size: 13.5px; line-height: 1.55; margin-top: 4px; max-width: min(760px, 46vw);
+.page-sub { color: var(--text-dim); font-size: var(--fs-small); line-height: 1.55; margin-top: 4px; max-width: min(760px, 46vw);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 21px; }
 .page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; flex: 0 0 auto; }
 @media (max-width: 720px) {                      /* phones: let it breathe again */
@@ -47,9 +47,9 @@
 .card.hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); transform: translateY(-2px); }
 .card-pad { padding: 20px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
-.card-head h3 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+.card-head h3 { font-size: var(--fs-lead); font-weight: 700; display: flex; align-items: center; gap: 9px; }
 .card-head h3 i { color: var(--accent); }
-.card-head .card-sub { font-size: 12px; color: var(--text-mute); font-weight: 400; }
+.card-head .card-sub { font-size: var(--fs-tiny); color: var(--text-mute); font-weight: 400; }
 .card-body { padding: 18px 20px; }
 .card-foot { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
 .glass { background: var(--glass); backdrop-filter: blur(20px); border: 1px solid var(--glass-brd); }
@@ -58,16 +58,31 @@
 /* --------------------------------------------------------------- KPI tiles */
 .grid-auto { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 /* HOUSE RULE: KPI cards are the SAME (slim) size everywhere — ~30% smaller than
-   the old cards — and fit as many as possible on one row, wrapping to a second row
-   only when they'd get too narrow. Achieved by shrinking the base .kpi-card (below)
-   and using a tight auto-fit column here. Label & value type sizes are unchanged. */
-.kpi-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
+   the old cards. They used to fit as many as possible on one row; they now stop
+   at five (see the cap below).
+   HOUSE CAP: at most FIVE KPIs abreast (owner review 2026-07-15). Consolidated
+   Finance was running 7 in one row and Manage Loan 6; they technically fit, but
+   every label then wrapped to two lines ("BLENDED MARGIN", "OVERDUE TO COLLECT",
+   "COLLECTED · 2026-07") and the row read ragged. A KPI strip is meant to be
+   scannable at a glance — past ~5 it stops being a glance.
+   The cap is enforced by the column MINIMUM, not by counting: each track is at
+   least one-fifth of the row, so auto-fit can never lay out a sixth. --kpi-cols
+   is the knob — a screen with exactly 6 facts can set it to 3 for a balanced
+   3+3 rather than a ragged 5+1. Below ~150px per card it drops to fewer
+   columns and wraps, as before. */
+.kpi-grid {
+  --kpi-gap: 12px; --kpi-cols: 5; --kpi-min: 150px;
+  display: grid; gap: var(--kpi-gap); margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(
+    max(var(--kpi-min), (100% - (var(--kpi-cols) - 1) * var(--kpi-gap)) / var(--kpi-cols)), 1fr));
+}
 /* compact + slim are kept as aliases (same size as the base now) for back-compat. */
-.kpi-grid.kpi-compact, .kpi-grid.kpi-slim { gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 16px; }
-/* Force every KPI onto ONE row (equal widths), whatever the count — falls back to
-   the wrapping slim grid on narrow screens so it never squeezes on mobile. */
-.kpi-grid.kpi-onerow { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-@media (max-width: 880px) { .kpi-grid.kpi-onerow { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } }
+.kpi-grid.kpi-compact, .kpi-grid.kpi-slim { gap: var(--kpi-gap); margin-bottom: 16px; }
+/* kpi-onerow: keep every KPI on ONE row (equal widths). It still honours the
+   five-abreast cap above — a strip with more than five now wraps rather than
+   shaving each card thinner, which is what made the labels wrap. */
+.kpi-grid.kpi-onerow { grid-auto-flow: row; }
+@media (max-width: 880px) { .kpi-grid.kpi-onerow { --kpi-cols: 2; } }
 /* clickable slab-tier cards (commission) — filter the ledger on tap */
 .grid-auto.kpi-compact { gap: 18px; }
 .tier-card { cursor: pointer; text-align: left; width: 100%; background: var(--surface);
@@ -98,12 +113,17 @@
 .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); border-color: var(--border-strong); }
 .kpi-card:hover::before { opacity: .95; }
 .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.kpi-label { font-size: 10.5px; color: var(--text-mute); font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
+/* Same correction as the table headers (owner review 2026-07-15): 10.5px +
+   uppercase + .09em tracking + --text-mute stacked four legibility taxes on the
+   one element that has to TELL YOU WHAT THE NUMBER IS. 12px, tracking eased to
+   .07em (wide tracking costs more width the bigger the type gets — this keeps
+   the label's footprint about where it was), and --text-dim for contrast. */
+.kpi-label { font-size: var(--fs-tiny); color: var(--text-dim); font-weight: 600; letter-spacing: .07em; text-transform: uppercase; }
 /* Jewel chip: deep royal→abyss gradient with a light "ink" icon, an inset top
    highlight and a soft coloured cast — reads as enamel/metal, not a flat pastel. */
 .kpi-ico {
   width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
-  font-size: 18px; color: #dbe4f8; flex: none;
+  font-size: var(--fs-h3); color: #dbe4f8; flex: none;
   background: linear-gradient(155deg, var(--epal-accent, var(--accent)) 0%, var(--epal-deep, var(--accent)) 60%, var(--epal-navy, var(--accent)) 100%);
   border: 1px solid rgba(255,255,255,.14);
   box-shadow:
@@ -114,9 +134,9 @@
 /* The hero number: near-foreground (NEVER brand-coloured), semibold not black,
    tight optical tracking, tabular figures — reads as a considered financial value,
    its confidence from size + contrast + tracking rather than heavy weight. */
-.kpi-value { font-size: 32px; font-weight: 700; letter-spacing: -.03em; line-height: 1.02;
+.kpi-value { font-size: var(--fs-h1); font-weight: 700; letter-spacing: -.03em; line-height: 1.02;
   color: var(--text); font-variant-numeric: tabular-nums; }
-.kpi-foot { display: flex; align-items: center; gap: 8px; margin-top: 11px; font-size: 12px; }
+.kpi-foot { display: flex; align-items: center; gap: 8px; margin-top: 11px; font-size: var(--fs-tiny); }
 .kpi-trend { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
 .kpi-trend.up { color: var(--good); background: var(--good-soft); }
 .kpi-trend.down { color: var(--bad); background: var(--bad-soft); }
@@ -130,17 +150,17 @@
 .kpi-spark canvas { display: block; }
 
 /* Share launcher (Gmail / WhatsApp / Copy) */
-.share-to { font-size: 13px; color: var(--text-dim); margin-bottom: 14px; }
+.share-to { font-size: var(--fs-small); color: var(--text-dim); margin-bottom: 14px; }
 .share-chans { display: flex; gap: 12px; margin-bottom: 18px; }
 .share-chan { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 16px 10px;
   border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); cursor: pointer;
   transition: border-color var(--t), transform var(--t), box-shadow var(--t); }
 .share-chan:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .share-chan-ico { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; font-size: 20px; }
-.share-chan-lbl { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.share-chan-lbl { font-size: var(--fs-small); font-weight: 600; color: var(--text); }
 .share-preview { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
-.share-preview-h { padding: 10px 14px; background: var(--surface-2); font-weight: 700; font-size: 13px; border-bottom: 1px solid var(--border); }
-.share-preview-b { padding: 14px; margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--text-dim);
+.share-preview-h { padding: 10px 14px; background: var(--surface-2); font-weight: 700; font-size: var(--fs-small); border-bottom: 1px solid var(--border); }
+.share-preview-b { padding: 14px; margin: 0; font-family: var(--font-mono); font-size: var(--fs-tiny); color: var(--text-dim);
   white-space: pre-wrap; max-height: 220px; overflow: auto; }
 
 /* Image / photo picker (form field) — preview tile + upload/remove controls */
@@ -171,15 +191,33 @@
 .kpi-grid[data-strip] { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 16px; }
 .kpi-grid[data-strip] .kpi-card { flex: 1 1 0; min-width: 146px; min-height: 0; padding: 12px 15px; }
 .kpi-grid[data-strip] .kpi-top { margin-bottom: 8px; }
-.kpi-grid[data-strip] .kpi-label { font-size: 9.5px; letter-spacing: .07em; }
+.kpi-grid[data-strip] .kpi-label { font-size: var(--fs-micro); letter-spacing: .05em; }
 .kpi-grid[data-strip] .kpi-ico { width: 30px; height: 30px; border-radius: 9px; font-size: 14px; }
-.kpi-grid[data-strip] .kpi-value { font-size: 21px; }
+.kpi-grid[data-strip] .kpi-value { font-size: var(--fs-h3); }
 
-/* Small stat rows (inside cards) */
+/* Small stat rows (inside cards) ------------------------------------------
+   How the hairlines are drawn: the CONTAINER is painted --border and the 1px
+   grid gap lets it show through between cells. Elegant, but it has a failure
+   mode — any grid AREA with no .stat in it is not empty, it is a lit --border
+   box. With auto-fit that happens the moment the count doesn't divide evenly
+   into however many columns the width happened to produce (3 stats in a narrow
+   card → 2+1 → one blank filled cell, visible in both themes).
+   Two defences, because auto-fit alone can't be reasoned about:
+     · .stat-2 pins the column count so the layout is DETERMINISTIC, not a
+       function of the container's width;
+     · the orphan rule spans a lone trailing stat across the full row, so an
+       odd count fills its row instead of leaving a hole. Note that pinning to
+       2 columns is NOT sufficient on its own — 3 stats in 2 columns still
+       leaves the 4th area lit; it's the span that actually closes it. */
 .stat-row { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); background: var(--border); border-radius: var(--r-md); overflow: hidden; }
+.stat-row.stat-2 { grid-template-columns: repeat(2, 1fr); }
+.stat-row.stat-2 .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
+@media (max-width: 520px) {                      /* phones: one clean column */
+  .stat-row.stat-2 { grid-template-columns: 1fr; }
+}
 .stat { background: var(--surface); padding: 14px 16px; }
-.stat-label { font-size: 11.5px; color: var(--text-mute); font-weight: 600; }
-.stat-value { font-size: 19px; font-weight: 700; margin-top: 4px; }
+.stat-label { font-size: var(--fs-tiny); color: var(--text-mute); font-weight: 600; }
+.stat-value { font-size: var(--fs-h3); font-weight: 700; margin-top: 4px; }
 
 /* --------------------------------------------------- Company performance */
 .co-strip { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
@@ -188,9 +226,9 @@
 .co-perf:hover { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--border-strong); }
 .co-perf-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .co-perf-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-size: 16px; background: var(--co, var(--accent)); }
-.co-perf-name { font-weight: 700; font-size: 14px; }
-.co-perf-rev { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.co-perf-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--text-dim); }
+.co-perf-name { font-weight: 700; font-size: var(--fs-body); }
+.co-perf-rev { font-size: var(--fs-h3); font-weight: 700; font-variant-numeric: tabular-nums; }
+.co-perf-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: var(--fs-tiny); color: var(--text-dim); }
 
 /* --------------------------------------------------------- Progress / ring */
 .progress { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
@@ -203,10 +241,10 @@
 .ring { --p: 0; --sz: 88px; --c: var(--accent); width: var(--sz); height: var(--sz); border-radius: 50%; display: grid; place-items: center;
   background: conic-gradient(var(--c) calc(var(--p) * 1%), var(--surface-3) 0); position: relative; }
 .ring::before { content:''; position: absolute; inset: 8px; border-radius: 50%; background: var(--surface); }
-.ring-label { position: relative; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.ring-label { position: relative; font-weight: 700; font-size: var(--fs-h3); font-variant-numeric: tabular-nums; }
 
 /* Extra-compact button — action rows that must fit on ONE line (payslip header). */
-.btn-xxs { padding: 4px 9px; font-size: 11.5px; border-radius: 8px; line-height: 1.25; }
+.btn-xxs { padding: 4px 9px; font-size: var(--fs-tiny); border-radius: 8px; line-height: 1.25; }
 .btn-xxs .bi { font-size: 12px; }
 
 /* Row flash — jumpTo() lands the user on the exact row and pulses it briefly. */
@@ -219,8 +257,8 @@
 .kb-col.drag-over { border-color: var(--accent); box-shadow: var(--glow); }
 .kb-col-head { display: flex; align-items: center; gap: 8px; padding: 13px 15px; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
 .kb-col-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--kb, var(--text-mute)); }
-.kb-col-title { font-weight: 700; font-size: 13px; }
-.kb-count { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--text-mute); background: var(--surface-3); padding: 1px 8px; border-radius: 999px; }
+.kb-col-title { font-weight: 700; font-size: var(--fs-small); }
+.kb-count { margin-left: auto; font-size: var(--fs-micro); font-weight: 700; color: var(--text-mute); background: var(--surface-3); padding: 1px 8px; border-radius: 999px; }
 .kb-list { padding: 10px; display: flex; flex-direction: column; gap: 10px; min-height: 40px; }
 .kb-card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 13px 14px;
@@ -232,22 +270,22 @@
 .kb-card.glow { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn), 0 0 22px -4px var(--warn); animation: pulseGlow 1.6s ease-in-out infinite; }
 .kb-card.restricted { border-left: 3px solid var(--bad); }
 .kb-card.redflag::after { content:'\F33A'; font-family: 'bootstrap-icons'; position: absolute; top: 10px; right: 12px; color: var(--bad); }
-.kb-card-title { font-weight: 600; font-size: 13.5px; margin-bottom: 8px; line-height: 1.35; padding-right: 16px; }
+.kb-card-title { font-weight: 600; font-size: var(--fs-body); margin-bottom: 8px; line-height: 1.35; padding-right: 16px; }
 .kb-card-labels { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
-.kb-tag { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; text-transform: uppercase; letter-spacing: .03em; }
-.kb-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 11.5px; color: var(--text-mute); }
+.kb-tag { font-size: var(--fs-micro); font-weight: 700; padding: 2px 7px; border-radius: 5px; text-transform: uppercase; letter-spacing: .03em; }
+.kb-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: var(--fs-tiny); color: var(--text-mute); }
 .kb-prog { display: flex; align-items: center; gap: 7px; margin-top: 8px; }
 .kb-prog .progress { flex: 1; }
-.kb-prog small { font-size: 10.5px; font-weight: 700; color: var(--text-dim); font-variant-numeric: tabular-nums; }
-.admin-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase;
+.kb-prog small { font-size: var(--fs-micro); font-weight: 700; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.admin-flag { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-micro); font-weight: 800; text-transform: uppercase;
   color: var(--warn); background: var(--warn-soft); padding: 2px 7px; border-radius: 5px; }
 
 /* Task phase rows (detail modal) */
 .phase { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
 .phase:last-child { border-bottom: none; }
 .phase-main { flex: 1; min-width: 0; }
-.phase-name { font-weight: 600; font-size: 13px; }
-.phase-time { font-size: 11.5px; color: var(--text-mute); font-family: var(--font-mono); }
+.phase-name { font-weight: 600; font-size: var(--fs-small); }
+.phase-time { font-size: var(--fs-tiny); color: var(--text-mute); font-family: var(--font-mono); }
 .phase-time.running { color: var(--good); }
 .phase-controls { display: flex; gap: 6px; }
 .phase-controls .btn { padding: 5px 10px; }
@@ -259,16 +297,16 @@
 /* time counting + timeline sit BESIDE each other as chips */
 .phase-timerow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
 .phase-time { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px;
-  background: var(--surface-2); border: 1px solid var(--border); font-size: 11.5px; font-family: var(--font-mono); color: var(--text-mute); }
+  background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-tiny); font-family: var(--font-mono); color: var(--text-mute); }
 .phase-time.running { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good) 12%, transparent); }
 .phase-range { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; letter-spacing: -0.01em;
-  background: var(--surface-2); border: 1px solid var(--border); font-size: 11px; font-family: var(--font-mono); color: var(--text-mute); }
+  background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-micro); font-family: var(--font-mono); color: var(--text-mute); }
 .phase-range.complete { color: var(--good); border-color: color-mix(in srgb, var(--good) 35%, var(--border)); background: color-mix(in srgb, var(--good) 9%, transparent); }
 .phase-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .phase-field { display: inline-flex; align-items: center; gap: 5px; color: var(--text-mute); font-size: 12px; }
 .phase-field .bi { font-size: 12px; }
 .phase-assignee, .phase-priority {
-  padding: 5px 8px; font-size: 12px; border-radius: 8px; max-width: 150px;
+  padding: 5px 8px; font-size: var(--fs-tiny); border-radius: 8px; max-width: 150px;
   background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
 }
 .phase-priority.pri-high   { color: var(--bad, #f0506e); border-color: color-mix(in srgb, var(--bad, #f0506e) 45%, var(--border)); }
@@ -288,7 +326,7 @@
 
 /* --------------------------------------------------------- Avatar stack */
 .avatar-stack { display: flex; }
-.avatar-stack .avatar { width: 28px; height: 28px; border-radius: 8px; font-size: 10.5px; margin-left: -8px; border: 2px solid var(--surface); }
+.avatar-stack .avatar { width: 28px; height: 28px; border-radius: 8px; font-size: var(--fs-micro); margin-left: -8px; border: 2px solid var(--surface); }   /* initials ARE text — they hold the 11px floor */
 .avatar-stack .avatar:first-child { margin-left: 0; }
 
 /* --------------------------------------------------------------- Timeline */
@@ -297,8 +335,8 @@
 .tl-item { position: relative; padding-bottom: 18px; }
 .tl-item::before { content:''; position: absolute; left: -22px; top: 3px; width: 12px; height: 12px; border-radius: 50%;
   background: var(--surface); border: 2px solid var(--accent); }
-.tl-item .tl-time { font-size: 11px; color: var(--text-mute); }
-.tl-item .tl-text { font-size: 13px; margin-top: 2px; }
+.tl-item .tl-time { font-size: var(--fs-micro); color: var(--text-mute); }
+.tl-item .tl-text { font-size: var(--fs-small); margin-top: 2px; }
 
 /* --------------------------------------------------------------- Modals */
 .modal-overlay { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 24px;
@@ -310,7 +348,7 @@
 .modal-overlay.in .modal-box { transform: none; opacity: 1; }
 .modal-sm { width: 420px; } .modal-lg { width: 780px; } .modal-xl { width: 1040px; } .modal-cmd { width: 620px; align-self: flex-start; margin-top: 10vh; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
-.modal-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+.modal-title { font-size: var(--fs-lead); font-weight: 700; display: flex; align-items: center; gap: 9px; }
 .modal-title i { color: var(--accent); }
 .modal-x { width: 32px; height: 32px; border-radius: 9px; font-size: 20px; color: var(--text-mute); display: grid; place-items: center; transition: all var(--t); }
 .modal-x:hover { background: var(--surface-2); color: var(--text); }
@@ -323,19 +361,19 @@
    scrollbar at any zoom. Content wraps to share the space; numbers wrap; badges
    shrink. This is the definitive no-scroll guarantee for drill-down/detail lists. */
 .modal-body .table-wrap { overflow: hidden; }
-.modal-body table.tbl { table-layout: fixed; font-size: 12px; }
+.modal-body table.tbl { table-layout: fixed; font-size: var(--fs-tiny); }
 .modal-body .tbl th, .modal-body .tbl td { padding-left: 7px; padding-right: 7px; overflow-wrap: anywhere; word-break: break-word; }
 /* let every otherwise-nowrap element WRAP so nothing spills past the fixed width */
 .modal-body .tbl td.num, .modal-body .tbl th.num,
 .modal-body .tbl td.nowrap, .modal-body .tbl .mono { white-space: normal; }
 .modal-body .tbl .dt-actions { white-space: normal; width: auto; }
 .modal-body .row-actions { flex-wrap: wrap; white-space: normal; justify-content: flex-start; }
-.modal-body .tbl .badge { font-size: 10px; padding: 2px 6px; white-space: normal; }
+.modal-body .tbl .badge { font-size: var(--fs-micro); padding: 2px 6px; white-space: normal; }
 
 /* Form grid inside modals */
 .form-grid { display: grid; gap: 0 16px; grid-template-columns: 1fr 1fr; }
 .form-grid .col-2 { grid-column: span 2; }
-.form-section-title { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+.form-section-title { font-size: var(--fs-tiny); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
   grid-column: span 2; margin: 8px 0 10px; padding-top: 8px; border-top: 1px solid var(--border); }
 .form-section-title:first-child { border-top: none; padding-top: 0; }
 @media (max-width: 560px){ .form-grid { grid-template-columns: 1fr; } .form-grid .col-2 { grid-column: span 1; } }
@@ -349,8 +387,8 @@
 .toast-ico { font-size: 18px; margin-top: 1px; }
 .toast-success .toast-ico { color: var(--good); } .toast-error .toast-ico { color: var(--bad); }
 .toast-warning .toast-ico { color: var(--warn); } .toast-info .toast-ico { color: var(--info); }
-.toast-title { font-weight: 700; font-size: 13px; }
-.toast-msg { font-size: 12.5px; color: var(--text-dim); }
+.toast-title { font-weight: 700; font-size: var(--fs-small); }
+.toast-msg { font-size: var(--fs-small); color: var(--text-dim); }
 .toast-x { margin-left: auto; color: var(--text-mute); font-size: 18px; line-height: 1; }
 
 /* --------------------------------------------------------------- Popovers */
@@ -360,7 +398,7 @@
 .pop.in { transform: none; opacity: 1; }
 .pop-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; border-bottom: 1px solid var(--border); }
 .pop-body { max-height: 380px; overflow-y: auto; }
-.pop-empty { padding: 26px; text-align: center; color: var(--text-mute); font-size: 13px; }
+.pop-empty { padding: 26px; text-align: center; color: var(--text-mute); font-size: var(--fs-small); }
 .pop-notif { width: 360px; }
 .notif { display: flex; gap: 11px; padding: 12px 16px; border-bottom: 1px solid var(--border); transition: background var(--t); }
 .notif:hover { background: var(--surface-3); }
@@ -370,20 +408,20 @@
 .notif-ico.notif-success { color: var(--good); background: var(--good-soft); }
 .notif-ico.notif-error { color: var(--bad); background: var(--bad-soft); }
 .notif-ico.notif-info { color: var(--info); background: var(--info-soft); }
-.notif-title { font-weight: 600; font-size: 13px; }
-.notif-text { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
-.notif-time { font-size: 11px; color: var(--text-mute); margin-top: 3px; }
+.notif-title { font-weight: 600; font-size: var(--fs-small); }
+.notif-text { font-size: var(--fs-tiny); color: var(--text-dim); margin-top: 1px; }
+.notif-time { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 3px; }
 .pop-user { width: 300px; }
 .pop-userhead { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border); }
-.pop-section-label { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-mute); padding: 12px 16px 6px; }
+.pop-section-label { font-size: var(--fs-micro); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-mute); padding: 12px 16px 6px; }
 .viewas { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 12px 10px; }
-.viewas-btn { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600;
+.viewas-btn { display: flex; align-items: center; gap: 7px; padding: 8px 10px; border-radius: var(--r-sm); font-size: var(--fs-tiny); font-weight: 600;
   color: var(--text-dim); border: 1px solid var(--border); transition: all var(--t); }
 .viewas-btn:hover { background: var(--surface-3); color: var(--text); }
 .viewas-btn.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-color: var(--border-accent); }
 .viewas-btn i { font-size: 13px; }
 .pop-divider { height: 1px; background: var(--border); margin: 6px 0; }
-.pop-link { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 16px; font-size: 13px; font-weight: 500; color: var(--text-dim); transition: all var(--t); }
+.pop-link { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 16px; font-size: var(--fs-small); font-weight: 500; color: var(--text-dim); transition: all var(--t); }
 .pop-link:hover { background: var(--surface-3); color: var(--text); }
 .pop-link.danger { color: var(--bad); }
 .pop-link i { font-size: 15px; width: 18px; }
@@ -392,13 +430,13 @@
 .cmdk { display: flex; flex-direction: column; }
 .cmd-box { display: flex; align-items: center; gap: 12px; padding: 6px 6px 14px; border-bottom: 1px solid var(--border); }
 .cmd-search { font-size: 18px; color: var(--text-mute); }
-.cmd-input { flex: 1; background: none; border: none; outline: none; font-size: 16px; color: var(--text); }
+.cmd-input { flex: 1; background: none; border: none; outline: none; font-size: var(--fs-lead); color: var(--text); }
 .cmd-results { max-height: 52vh; overflow-y: auto; padding: 8px 0; }
 .cmd-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 14px; border-radius: var(--r-sm); text-align: left; transition: background var(--t-fast); }
 .cmd-item.sel, .cmd-item:hover { background: var(--surface-3); }
 .cmd-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); }
-.cmd-label { flex: 1; font-weight: 600; font-size: 14px; display: flex; flex-direction: column; }
-.cmd-label small { font-weight: 400; font-size: 11.5px; color: var(--text-mute); }
+.cmd-label { flex: 1; font-weight: 600; font-size: var(--fs-body); display: flex; flex-direction: column; }
+.cmd-label small { font-weight: 400; font-size: var(--fs-tiny); color: var(--text-mute); }
 .cmd-go { color: var(--text-mute); opacity: 0; }
 .cmd-item.sel .cmd-go { opacity: 1; }
 
@@ -406,11 +444,14 @@
 .empty-state, .gate-state { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   padding: 60px 24px; color: var(--text-dim); }
 .empty-state i { font-size: 40px; color: var(--text-mute); margin-bottom: 14px; }
-.empty-state h3 { color: var(--text); margin-bottom: 6px; }
+/* Was the last off-scale text in the app: with no font-size of its own this fell
+   through to the UA default for h3 (1.17em × 14px = 16.4px) — a stray size nobody
+   chose, which is exactly what made the scale read as unresolved. */
+.empty-state h3 { color: var(--text); margin-bottom: 6px; font-size: var(--fs-lead); }
 .gate-state { min-height: 60vh; }
 .gate-ico { width: 88px; height: 88px; border-radius: 26px; display: grid; place-items: center; font-size: 40px; margin-bottom: 20px;
   background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); border: 1px solid var(--border-accent); }
-.gate-state h2 { font-size: 22px; margin-bottom: 8px; }
+.gate-state h2 { font-size: var(--fs-h3); margin-bottom: 8px; }
 .gate-state p { max-width: 420px; margin-bottom: 20px; }
 
 /* --------------------------------------------------------------- Boot splash */
@@ -419,14 +460,21 @@
 #boot-splash.gone { opacity: 0; pointer-events: none; }
 .boot-logo { display: flex; flex-direction: column; align-items: center; gap: 18px; }
 .boot-mark { width: 66px; height: 66px; border-radius: 20px; display: grid; place-items: center; font-family: var(--font-display);
-  font-weight: 800; font-size: 30px; color: #dbe4f8; background: linear-gradient(135deg, var(--gold), #0A2472); box-shadow: 0 14px 40px -10px var(--gold);
+  font-weight: 800; font-size: 30px; color: #dbe4f8; background: linear-gradient(135deg, var(--gold), #0A2472); box-shadow: 0 14px 40px -10px var(--gold);   /* logo mark, not type — off the scale by design */
   animation: floatY 2.4s var(--e-inout) infinite; }
-.boot-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: .02em; }
+.boot-name { font-family: var(--font-display); font-weight: 700; font-size: var(--fs-h3); letter-spacing: .02em; }
 .boot-bar { width: 160px; height: 3px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .boot-bar::before { content:''; display: block; height: 100%; width: 40%; background: var(--gold); border-radius: 999px; animation: bootSlide 1.1s var(--e-inout) infinite; }
 
 /* --------------------------------------------------- Section / list helpers */
-.section-label { font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-mute); margin: 26px 0 12px; }
+.section-label { font-size: var(--fs-tiny); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-mute); margin: 26px 0 12px; }
+/* A section label straight after a KPI strip stacked its own 26px top margin on
+   the strip's 16px bottom margin: ~42px of bare scene, landing exactly where the
+   ambient scene is at its brightest, so it read as a gap rather than a rhythm
+   (owner review 2026-07-15 — Chart of Accounts, Travels Expenses). The strip's
+   margin is the whole of the space; the label adds none. This also makes the
+   screens that hand-marked their label .mt-0 and the ones that didn't agree. */
+.kpi-grid + .section-label { margin-top: 0; }
 .data-list { display: flex; flex-direction: column; }
 .data-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .data-row:last-child { border-bottom: none; }
@@ -449,8 +497,8 @@
 .scaffold-card:hover { border-color: var(--border-accent); transform: translateY(-2px); box-shadow: var(--shadow); }
 .scaffold-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 18px; flex: none;
   background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
-.scaffold-card h4 { font-size: 14px; margin-bottom: 3px; }
-.scaffold-card p { font-size: 12px; color: var(--text-mute); }
+.scaffold-card h4 { font-size: var(--fs-body); margin-bottom: 3px; }
+.scaffold-card p { font-size: var(--fs-tiny); color: var(--text-mute); }
 .build-banner { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: var(--r-md); margin-bottom: 22px;
-  background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid var(--border-accent); color: var(--text-dim); font-size: 13px; }
+  background: color-mix(in srgb, var(--accent) 8%, transparent); border: 1px solid var(--border-accent); color: var(--text-dim); font-size: var(--fs-small); }
 .build-banner i { color: var(--accent); font-size: 18px; }

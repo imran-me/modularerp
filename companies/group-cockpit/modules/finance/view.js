@@ -677,14 +677,22 @@
       ]));
     }
 
-    page.appendChild(el('div.kpi-grid.stagger', null, [
-      kpi('Revenue (12M)', ui.money(f.revenue, { compact: true }), 'graph-up-arrow', 'group/finance/pnl', 'all concerns'),
-      kpi('Expense (12M)', ui.money(f.expense, { compact: true }), 'wallet2', 'group/finance/pnl', 'all concerns'),
+    // Seven facts, laid out 4+3 instead of seven-abreast (owner review
+    // 2026-07-15). At seven the cards were thin enough that every label broke to
+    // two lines ("BLENDED MARGIN", "REVENUE (12M)") and the row read ragged — a
+    // KPI strip is meant to be read at a glance, and past ~5 abreast it isn't.
+    // --kpi-cols is the house cap knob (see .kpi-grid); an even 4+3 beats a
+    // ragged 5+2. Labels shortened to hold one line at the new 12px — the
+    // per-tile sub-caption underneath already carries the qualifier ("to
+    // collect", "to settle"), so the label doesn't need to repeat it.
+    page.appendChild(el('div.kpi-grid.stagger', { style: '--kpi-cols:4' }, [
+      kpi('Revenue 12M', ui.money(f.revenue, { compact: true }), 'graph-up-arrow', 'group/finance/pnl', 'all concerns'),
+      kpi('Expense 12M', ui.money(f.expense, { compact: true }), 'wallet2', 'group/finance/pnl', 'all concerns'),
       kpi('Net Profit', ui.money(f.profit, { compact: true }), 'cash-stack', 'group/finance/pnl', 'revenue less expense'),
-      kpi('Blended Margin', ui.pct(f.margin), 'pie-chart-fill', 'group/finance/pnl', 'group-wide'),
-      kpi('Cash in Banks', ui.money(cash, { compact: true }), 'bank', 'group/finance/banks', db().col('banks').length + ' accounts'),
-      kpi('AR Outstanding', ui.money(ar, { compact: true }), 'arrow-down-left-circle', 'group/finance/receivables', 'to collect'),
-      kpi('AP Outstanding', ui.money(ap, { compact: true }), 'arrow-up-right-circle', 'group/finance/payables', 'to settle')
+      kpi('Margin', ui.pct(f.margin), 'pie-chart-fill', 'group/finance/pnl', 'blended, group-wide'),
+      kpi('Cash', ui.money(cash, { compact: true }), 'bank', 'group/finance/banks', db().col('banks').length + ' accounts'),
+      kpi('Receivables', ui.money(ar, { compact: true }), 'arrow-down-left-circle', 'group/finance/receivables', 'to collect'),
+      kpi('Payables', ui.money(ap, { compact: true }), 'arrow-up-right-circle', 'group/finance/payables', 'to settle')
     ]));
 
     renderRedFlagPanel(page);
@@ -1392,9 +1400,13 @@
 
   function renderCoa(page) {
     var accts = hasLedger() ? LED().accounts() : [];
+    // Written to FIT the one-line .page-sub (owner review 2026-07-15): the old
+    // sub ran ~128 chars and ellipsed mid-sentence ("…computed fr…"), which reads
+    // as a bug rather than as a summary. The title already says "Chart of
+    // Accounts", so the sub doesn't need to repeat it.
     page.appendChild(head('Chart of Accounts', 'diagram-2',
-      'The group double-entry chart of accounts — ' + accts.length + ' ledger accounts in ' +
-      TYPE_META.length + ' classes. Live balances are computed from the general ledger.', [
+      accts.length + ' ledger accounts in ' + TYPE_META.length +
+      ' classes — balances live from the general ledger.', [
       can('create') ? el('button.btn.btn-ghost', { html: ui.icon('plus-square') + ' Add Account', onclick: addAccountForm }) : null,
       can('create') ? el('button.btn.btn-ghost', { html: ui.icon('flag') + ' Opening Balance', onclick: openingBalanceForm }) : null,
       el('button.btn.btn-primary', { html: ui.icon('journal-plus') + ' New Journal', onclick: function () { newJournal(); } })
@@ -1421,8 +1433,24 @@
           { key: 'name', label: 'Account', render: function (r) { return '<span class="strong' + (r.active ? '' : ' text-mute') + '">' + ui.escapeHtml(r.name) + '</span>' + (r.active ? '' : ' <span class="badge">Inactive</span>'); } },
           { key: 'group', label: 'Group' },
           { key: 'normal', label: 'Normal', badge: { debit: 'info', credit: 'accent' } },
+          // Colour here is a SIGNAL, not decoration (owner review 2026-07-15).
+          // It used to be green for balance >= 0 and red below, which meant ৳0
+          // rendered green (zero is not good news) and a ৳5.46Cr payable rendered
+          // green too (a large liability is not a win) — green was carrying no
+          // information at all. LED().balance() is signed BY THE ACCOUNT'S NORMAL
+          // SIDE (ledger.js:257), so the sign states exactly one fact: whether the
+          // account sits on the side it is supposed to. Therefore:
+          //   · positive → normal. Neutral --text, like every other figure. A big
+          //                payable is just a balance; the reader judges it, not us.
+          //   · zero     → nothing to report → --text-mute, so it recedes.
+          //   · negative → CONTRA to its normal side (a credit balance on an asset,
+          //                a debit balance on income) → genuinely abnormal → --bad.
+          // Red now means "look at this", which is the only reason to spend red.
           { key: 'balance', label: 'Balance', num: true, render: function (r) {
-            return '<span class="num" style="color:' + (r.balance >= 0 ? GREEN : RED) + '">' + ui.money(r.balance) + '</span>'; },
+            var b = Math.abs(r.balance) < 0.005 ? 0 : r.balance;   // never let float dust (-0.0001) read as abnormal
+            var cls = b < 0 ? ' text-bad' : (b === 0 ? ' text-mute' : '');
+            var why = b < 0 ? ' title="Contra balance — this account is on the opposite side to its normal ' + ui.escapeHtml(String(r.normal)) + ' side"' : '';
+            return '<span class="num' + cls + '"' + why + '>' + ui.money(b) + '</span>'; },
             exportVal: function (r) { return r.balance; } }
         ],
         rows: rows, pageSize: 25, searchKeys: ['code', 'name', 'group'],
@@ -1714,15 +1742,23 @@
         { key: 'code', label: 'Code', render: function (r) { return '<span class="num">' + ui.escapeHtml(r.code) + '</span>'; } },
         { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.name) + '</span>'; } }
       ];
+      // Same correction as the Chart of Accounts balance column (owner review
+      // 2026-07-15), for the same reason. Here the sign means DEBIT (+) vs
+      // CREDIT (−) — see the section label below — and neither of those is good
+      // or bad news: a credit balance on a liability is simply what a liability
+      // looks like, yet it rendered red, while every debit rendered green. That
+      // is colour spent on an arithmetic sign. The minus sign already states the
+      // side, so these figures are neutral; red is kept for things that are
+      // actually wrong.
       comps.forEach(function (c) {
         cmpCols.push({ key: c.id, label: c.short, num: true, render: function (r) {
           var v = r[c.id];
           if (!v) return '<span class="text-mute">—</span>';
-          return '<span class="num" style="color:' + (v >= 0 ? GREEN : RED) + '">' + ui.money(v, { compact: true }) + '</span>'; },
+          return '<span class="num">' + ui.money(v, { compact: true }) + '</span>'; },
           exportVal: function (r) { return r[c.id]; } });
       });
       cmpCols.push({ key: 'grp', label: 'Group', num: true, render: function (r) {
-        return '<span class="num strong" style="color:' + (r.grp >= 0 ? GREEN : RED) + '">' + ui.money(r.grp, { compact: true }) + '</span>'; },
+        return '<span class="num strong">' + ui.money(r.grp, { compact: true }) + '</span>'; },
         exportVal: function (r) { return r.grp; } });
       page.appendChild(el('div.section-label', { text: 'Per-Company Comparison — net balance (debit positive · credit negative)' }));
       var cmpT = EPAL.table({
