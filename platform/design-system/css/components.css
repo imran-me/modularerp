@@ -7,12 +7,26 @@
  * ==========================================================================*/
 
 /* ---------------------------------------------------------- Page header */
-.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 22px; flex-wrap: wrap; }
+/* FIXED HEADER BLOCK (owner 2026-07-15): every section reserves the SAME
+   header height, so the section-nav bar lands at exactly the same Y on every
+   screen. Three things make it stable: a min-height that covers eyebrow +
+   title + a 2-line sub; a sub clamped to 2 lines with a reserved height (so
+   1-line and 2-line subs measure the same); and nowrap, so page actions can
+   never drop onto their own row and push the nav down. */
+/* 104 = eyebrow+title block (58) + sub margin (4) + the 2-line sub (42) */
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 18px;
+  flex-wrap: nowrap; min-height: 104px; }
+.page-head > *:first-child { min-width: 0; }
 .page-title { font-size: 24px; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: 12px; }
 .page-title .eyebrow { display: block; font-family: var(--font-sans); font-size: 11.5px; font-weight: 700; letter-spacing: .12em;
   text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
-.page-sub { color: var(--text-dim); font-size: 13.5px; margin-top: 4px; max-width: 620px; }
-.page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.page-sub { color: var(--text-dim); font-size: 13.5px; line-height: 1.5; margin-top: 4px; max-width: 620px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 42px; }
+.page-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 0 0 auto; }
+@media (max-width: 720px) {                      /* phones: let it breathe again */
+  .page-head { flex-wrap: wrap; min-height: 0; align-items: flex-start; }
+  .page-sub { min-height: 0; }
+}
 
 /* --------------------------------------------------------------- Cards */
 .card {

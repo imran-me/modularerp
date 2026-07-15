@@ -14,7 +14,8 @@
     { "id": "journals", "label": "Manage Journals", "route": "#/group/master-accounts/journals", "enabled": true },
     { "id": "expenses", "label": "Operational Expenses", "route": "#/group/master-accounts/expenses", "enabled": true },
     { "id": "accounts", "label": "Manage Accounts", "route": "#/group/master-accounts/accounts", "enabled": true },
-    { "id": "party-types", "label": "Party Types", "route": "#/group/master-accounts/party-types", "enabled": true }
+    { "id": "party-types", "label": "Party Types", "route": "#/group/master-accounts/party-types", "enabled": true },
+    { "id": "loans", "label": "Manage Loan", "route": "#/group/master-accounts/loans", "enabled": true }
   ],
   "files": { "view": "view.js", "backend": "backend/LARAVEL-BLUEPRINT.md" },
   "note": "Company switcher buttons at the top scope every section (All / Group HQ / each concern); Master Payroll mounts the shared EPAL.payrollDesk per company."

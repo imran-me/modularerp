@@ -41,7 +41,8 @@
   // OWNER ORDER: Banks → Payroll → Schedules → Journals → Expenses →
   // Accounts → Party Types (Manage Banks is the landing section)
   var SECTIONS = [['banks', 'Manage Banks'], ['payroll', 'Master Payroll'], ['schedules', 'Payment Schedules'],
-    ['journals', 'Manage Journals'], ['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'], ['party-types', 'Party Types']];
+    ['journals', 'Manage Journals'], ['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'],
+    ['party-types', 'Party Types'], ['loans', 'Manage Loan']];
   var EXP_TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Category & Sub-category']];
   var expTab = 'all';                                 // active button inside Operational Expenses
   var selCo = 'all';                                  // the company switcher state
@@ -196,6 +197,7 @@
       if (sub === 'categories' || sub === 'budget' || sub === 'report') { expTab = sub; sub = 'expenses'; }
       if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'banks';
       var page = el('div.page');
+      if (sub === 'loans' && selCo === 'all') { /* the loan desk reads 'all' fine */ }
       var titles = {}; SECTIONS.forEach(function (s) { titles[s[0]] = s[1]; });
       if (sub === 'payroll' && (selCo === 'all')) selCo = 'travels';
       page.appendChild(EPAL.pageHead({
@@ -203,7 +205,7 @@
         sub: 'Group-level accounting across every sister concern — switch company with the buttons below.'
       }));
       // section nav — calm underline tabs (primary), per the owner's mock
-      var pills = el('div.tab-underline.mb-3');
+      var pills = el('div.tab-underline.tabs-dense.mb-3');   // 8 sections — dense
       SECTIONS.forEach(function (s) { pills.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1], onclick: function () { EPAL.router.navigate('group/master-accounts/' + s[0]); } })); });
       page.appendChild(pills);
       // AUDIT P2: the period lock is VISIBLE wherever money is handled
@@ -224,7 +226,7 @@
       // payroll + expenses have their own sub-section row — the switcher
       // rides IN that row (one line, hairline separator); other sections
       // keep it as its own row
-      if (sub !== 'payroll' && sub !== 'expenses') page.appendChild(swWrap);
+      if (sub !== 'payroll' && sub !== 'expenses' && sub !== 'loans') page.appendChild(swWrap);
       else pendingSwitcher = swWrap;
       if (sub === 'expenses') {
         // buttons at the top of the ONE expenses section (owner directive) —
@@ -245,7 +247,7 @@
         ({ all: expensesView, budget: budgetView, report: reportView, categories: categoriesView }[expTab] || expensesView)(page);
       } else {
         ({ accounts: accountsView, journals: journalsView, schedules: schedulesView,
-           'party-types': partyTypesView, payroll: payrollView, banks: banksView }[sub])(page);
+           'party-types': partyTypesView, payroll: payrollView, banks: banksView, loans: loansSection }[sub])(page);
       }
       ctx.mount.appendChild(page);
     }
@@ -1213,6 +1215,15 @@
     });
   }
 
+  /* ======================================================= MANAGE LOAN
+   * The external loan book + a read-only mirror of the payroll staff book —
+   * the whole desk lives in platform/kit/loans.js (EPAL.loanDesk). */
+  function loansSection(page) {
+    if (EPAL.loanDesk) EPAL.loanDesk(page, selCo, { rightEl: pendingSwitcher });
+    else page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Loan desk unavailable.' })]));
+    pendingSwitcher = null;
+  }
+
   /* ======================================================= MASTER PAYROLL */
   var pendingSwitcher = null;                          // set by render for payroll
   function payrollView(page) {
@@ -1418,6 +1429,9 @@
     S.upsert('bank_txns', Object.assign({ id: 'BTX-' + ui.uid('').slice(-7).toUpperCase(), bankId: bank.id, bankName: bank.name,
       type: type, amount: amt, date: date, desc: desc || '', ref: ref || '', glId: glId || '' }, extra || {}));
   }
+  // shared so other desks (Manage Loan) move bank money the SAME way — one
+  // implementation keeps the bank register and the reconciliation card honest
+  EPAL.bankTxnApply = bankTxnApply;
   function banksView(page) {
     var allBanks = db.col('banks');
     var banks = allBanks.filter(function (b) { return selCo === 'all' ? true : (b.companyId || 'group') === selCo; });
