@@ -188,15 +188,27 @@
         swWrap.appendChild(el('button.btn.btn-sm' + ((selCo === o[0]) ? '.btn-primary' : '.btn-outline'), {
           text: o[1], onclick: function () { selCo = o[0]; EPAL.router.render(); } }));
       });
-      if (sub !== 'payroll') page.appendChild(swWrap);
+      // payroll + expenses have their own sub-section row — the switcher
+      // rides IN that row (one line, hairline separator); other sections
+      // keep it as its own row
+      if (sub !== 'payroll' && sub !== 'expenses') page.appendChild(swWrap);
       else pendingSwitcher = swWrap;
       if (sub === 'expenses') {
-        // buttons at the top of the ONE expenses section (owner directive)
-        var tb = el('div.pill-tab.mb-3');
+        // buttons at the top of the ONE expenses section (owner directive) —
+        // sub-tabs + company switcher share ONE row, hairline between
+        var tb = el('div.pill-tab');
         EXP_TABS.forEach(function (t) {
           tb.appendChild(el('button' + (expTab === t[0] ? '.active' : ''), { text: t[1], onclick: function () { expTab = t[0]; EPAL.router.render(); } }));
         });
-        page.appendChild(tb);
+        var expRow = el('div.nav-row.mb-3');
+        expRow.appendChild(tb);
+        if (pendingSwitcher) {
+          expRow.appendChild(el('div.vsep'));
+          pendingSwitcher.classList.remove('mb-3'); pendingSwitcher.classList.remove('flex-wrap');
+          pendingSwitcher.classList.add('co-sw');
+          expRow.appendChild(pendingSwitcher); pendingSwitcher = null;
+        }
+        page.appendChild(expRow);
         ({ all: expensesView, budget: budgetView, report: reportView, categories: categoriesView }[expTab] || expensesView)(page);
       } else {
         ({ accounts: accountsView, journals: journalsView, schedules: schedulesView,

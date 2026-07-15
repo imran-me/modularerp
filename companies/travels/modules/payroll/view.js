@@ -81,9 +81,16 @@
       host.innerHTML = '';
       var bar = el('div.pill-tab');
       TABS.forEach(function (t) { bar.appendChild(el('button' + (deskTab === t[0] ? '.active' : ''), { text: t[1], onclick: function () { deskTab = t[0]; draw(); } })); });
-      var row = el('div.flex.items-center.gap-2.flex-wrap.mb-3');
+      // ONE row (owner): section pills + company switcher share the line
+      // with a hairline separator; both groups shrink fluidly, never wrap
+      var row = el('div.nav-row.mb-3');
       row.appendChild(bar);
-      if (opts && opts.rightEl) { opts.rightEl.style.marginLeft = 'auto'; opts.rightEl.classList.remove('mb-3'); row.appendChild(opts.rightEl); }
+      if (opts && opts.rightEl) {
+        row.appendChild(el('div.vsep'));
+        opts.rightEl.classList.remove('mb-3'); opts.rightEl.classList.remove('flex-wrap');
+        opts.rightEl.classList.add('co-sw');
+        row.appendChild(opts.rightEl);
+      }
       host.appendChild(row);
       if (!PR()) { host.appendChild(card('Payroll engine unavailable.')); return; }
       var section = el('div');

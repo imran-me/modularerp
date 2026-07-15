@@ -178,9 +178,22 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
 .spacer { flex: 1; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pill-tab { display:inline-flex; gap:4px; background: var(--surface-2); border:1px solid var(--border); border-radius: var(--r-pill); padding:4px; }
-.pill-tab button { padding:6px 14px; border-radius: var(--r-pill); font-size:12.5px; font-weight:600; color: var(--text-dim); transition: all var(--t); }
+.pill-tab { display:inline-flex; gap:4px; background: var(--surface-2); border:1px solid var(--border); border-radius: var(--r-pill); padding:4px; max-width:100%; overflow-x:auto; scrollbar-width:none; }
+.pill-tab::-webkit-scrollbar { display:none; }
+/* RESPONSIVE NAV (owner 2026-07-15): nav pills shrink fluidly with the
+   viewport — the clamp() maxima ARE the old fixed values, so wide screens
+   render identically and 90–110% zoom fits on one row instead of wrapping. */
+.pill-tab button { padding:6px clamp(8px, 0.95vw, 14px); border-radius: var(--r-pill); font-size: clamp(10.5px, 0.86vw, 12.5px); font-weight:600; color: var(--text-dim); white-space:nowrap; transition: all var(--t); }
 .pill-tab button.active { background: var(--accent); color:#fff; }
+/* one-row nav band: two groups share the row, a hairline separates them */
+.nav-row { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; min-width:0; }
+.nav-row > .pill-tab { flex:1 1 auto; min-width:0; }
+.nav-row .vsep { width:1px; align-self:stretch; background:var(--border-strong, var(--border)); flex:0 0 auto; }
+.nav-row .co-sw { display:flex; gap:4px; flex-wrap:nowrap; flex:0 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none; }
+.nav-row .co-sw::-webkit-scrollbar { display:none; }
+/* inside a shared row both groups compress HARDER before anything clips */
+.nav-row .pill-tab button { font-size: clamp(9.5px, 0.78vw, 12.5px); padding: 6px clamp(5px, 0.6vw, 14px); }
+.nav-row .btn.btn-sm { font-size: clamp(9.5px, 0.75vw, 12.5px); padding: clamp(3px, 0.4vw, 6px) clamp(5px, 0.65vw, 12px); white-space:nowrap; }
 /* UNDERLINE TABS — the calm PRIMARY navigation (owner mock 2026-07-15).
    Hierarchy: section nav = quiet underline tabs; switchers/filters below it
    stay as pills; real actions stay as buttons. Less chrome, more premium. */
@@ -192,8 +205,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
   box-shadow: 0 6px 18px rgba(7, 12, 30, .10);                            /* ~10% soft lift */ }
 @media (max-width: 720px) { .tab-underline { margin-left:-16px; margin-right:-16px; } }
 .tab-underline::-webkit-scrollbar { display:none; }
-.tab-underline button { flex:1 0 auto; text-align:center; padding:12px 18px 13px; border-bottom:3px solid transparent; margin-bottom:-1px;
-  font-size:14px; font-weight:700; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
+.tab-underline button { flex:1 1 auto; min-width:0; text-align:center; padding:12px clamp(8px, 1.2vw, 18px) 13px; border-bottom:3px solid transparent; margin-bottom:-1px;
+  font-size: clamp(11.5px, 0.95vw, 14px); font-weight:700; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
   border-radius:0; background:none; transition: color var(--t), border-color var(--t), background var(--t); }
 .tab-underline button + button { border-left:1px solid var(--border); }   /* 1px line between sections */
 .tab-underline button:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 9%, transparent); }
