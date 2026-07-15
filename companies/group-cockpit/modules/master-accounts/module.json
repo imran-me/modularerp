@@ -9,6 +9,7 @@
   "built": true,
   "menu": [
     { "id": "banks", "label": "Manage Banks", "route": "#/group/master-accounts/banks", "enabled": true },
+    { "id": "cash", "label": "Manage Cash", "route": "#/group/master-accounts/cash", "enabled": true },
     { "id": "payroll", "label": "Master Payroll", "route": "#/group/master-accounts/payroll", "enabled": true },
     { "id": "schedules", "label": "Payment Schedules", "route": "#/group/master-accounts/schedules", "enabled": true },
     { "id": "journals", "label": "Manage Journals", "route": "#/group/master-accounts/journals", "enabled": true },

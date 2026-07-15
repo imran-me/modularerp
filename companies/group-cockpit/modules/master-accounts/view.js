@@ -40,7 +40,7 @@
   // category + sub-category screen switch with buttons at the top of it.
   // OWNER ORDER: Banks → Payroll → Schedules → Journals → Expenses →
   // Accounts → Party Types (Manage Banks is the landing section)
-  var SECTIONS = [['banks', 'Manage Banks'], ['payroll', 'Master Payroll'], ['schedules', 'Payment Schedules'],
+  var SECTIONS = [['banks', 'Manage Banks'], ['cash', 'Manage Cash'], ['payroll', 'Master Payroll'], ['schedules', 'Payment Schedules'],
     ['journals', 'Manage Journals'], ['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'],
     ['party-types', 'Party Types'], ['loans', 'Manage Loan']];
   var EXP_TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Category & Sub-category']];
@@ -226,7 +226,7 @@
       // payroll + expenses have their own sub-section row — the switcher
       // rides IN that row (one line, hairline separator); other sections
       // keep it as its own row
-      if (sub !== 'payroll' && sub !== 'expenses' && sub !== 'loans') page.appendChild(swWrap);
+      if (sub !== 'payroll' && sub !== 'expenses' && sub !== 'loans' && sub !== 'cash') page.appendChild(swWrap);
       else pendingSwitcher = swWrap;
       if (sub === 'expenses') {
         // buttons at the top of the ONE expenses section (owner directive) —
@@ -247,7 +247,7 @@
         ({ all: expensesView, budget: budgetView, report: reportView, categories: categoriesView }[expTab] || expensesView)(page);
       } else {
         ({ accounts: accountsView, journals: journalsView, schedules: schedulesView,
-           'party-types': partyTypesView, payroll: payrollView, banks: banksView, loans: loansSection }[sub])(page);
+           'party-types': partyTypesView, payroll: payrollView, banks: banksView, loans: loansSection, cash: cashSection }[sub])(page);
       }
       ctx.mount.appendChild(page);
     }
@@ -1224,6 +1224,15 @@
     pendingSwitcher = null;
   }
 
+  /* ======================================================= MANAGE CASH
+   * Hard cash (GL 1000) + read-only mirrors of cash-in-sell / petty / cheques —
+   * the whole desk lives in platform/kit/cash.js (EPAL.cashDesk). */
+  function cashSection(page) {
+    if (EPAL.cashDesk) EPAL.cashDesk(page, selCo, { rightEl: pendingSwitcher });
+    else page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Cash desk unavailable.' })]));
+    pendingSwitcher = null;
+  }
+
   /* ======================================================= MASTER PAYROLL */
   var pendingSwitcher = null;                          // set by render for payroll
   function payrollView(page) {
@@ -1456,6 +1465,17 @@
           el('div.text-mute.xs', { text: byCo[k].n + ' account' + (byCo[k].n === 1 ? '' : 's') + ' · filter' })
         ]));
       });
+      // HARD CASH & CHEQUES doorway (owner mark 2026-07-15): cash lives with
+      // the banks, so its card rides in this same strip — click → Manage Cash.
+      if (EPAL.cashDesk) {
+        var cashBal = EPAL.ledger ? EPAL.ledger.balance('1000', selCo === 'all' ? {} : { companyId: selCo }) : 0;
+        strip.appendChild(el('div.card', { style: { padding: '10px 14px', cursor: 'pointer', minWidth: '170px' },
+          onclick: function () { EPAL.router.navigate('group/master-accounts/cash'); } }, [
+          el('div.fw-600.sm', { html: ui.icon('cash-stack') + ' Hard Cash · Cheques' }),
+          el('div.strong.num' + (cashBal < 0 ? '.text-bad' : ''), { text: ui.money(cashBal) }),
+          el('div.text-mute.xs', { text: 'drawer · petty · cheques → manage cash' })
+        ]));
+      }
       page.appendChild(strip);
     })();
     // ---- BANK ↔ LEDGER RECONCILIATION (permanent audit card, P1-②) ----------

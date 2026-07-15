@@ -78,7 +78,7 @@
               ['coa','Chart of Accounts'],['journal','Journal'],['trial-balance','Trial Balance'],
               ['consolidation','Consolidation']] }),
     m('master-accounts','Master Accounts',      'safe2',         { desc:'Group accounting desk — operational expenses (budgets, reports, categories in one), chart of accounts, journals, schedules, party types, master payroll, banks — with a company switcher.',
-        subs:[['banks','Manage Banks'],['payroll','Master Payroll'],['schedules','Payment Schedules'],
+        subs:[['banks','Manage Banks'],['cash','Manage Cash'],['payroll','Master Payroll'],['schedules','Payment Schedules'],
               ['journals','Manage Journals'],['expenses','Operational Expenses'],['accounts','Manage Accounts'],
               ['party-types','Party Types'],['loans','Manage Loan']] }),
     m('analytics',      'Business Intelligence','graph-up-arrow',{ desc:'Cross-company trends, forecasts, comparisons.',
