@@ -26,7 +26,9 @@
   'use strict';
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
 
-  var TODAY = '2026-07-05';           // demo "now" (matches the group clock)
+  // real local today (was a hardcoded demo date — deadline math drifted as
+  // days passed). Local parts, NOT toISOString(): UTC lands on yesterday in +06.
+  var TODAY = (function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
   var RISK_WINDOW = 15;               // days-left threshold for the red alert
   var CATEGORIES = ['Umrah', 'Hajj', 'Tourist', 'Worker', 'Medical', 'Business', 'Student'];
   var CAT_COLOR = {
@@ -65,7 +67,7 @@
     render: function (ctx) {
       var sub = ctx.subId || 'schedule';
       var page = el('div.page');
-      var map = { schedule:'Flight Schedule', 'add-flight':'Add Contract Flight',
+      var map = { schedule:'Flight Schedule', 'day-board':'Departures Board', 'add-flight':'Add Contract Flight',
         category:'Seat Blocks by Category', 'manage-sales':'Contract-Seat Sales' };
 
       page.appendChild(EPAL.pageHead({
@@ -77,13 +79,14 @@
         ]
       }));
 
-      ({ schedule:schedule, 'add-flight':addFlight, category:category, 'manage-sales':manageSales }[sub] || schedule)(page, ctx);
+      ({ schedule:schedule, 'day-board':dayBoard, 'add-flight':addFlight, category:category, 'manage-sales':manageSales }[sub] || schedule)(page, ctx);
       ctx.mount.appendChild(page);
     }
   });
 
   function subDesc(sub) {
     return ({ schedule:'Every contracted seat block — capacity, sold, unsold and departure-deadline risk.',
+      'day-board':'The day-by-day departures board — yesterday · today · tomorrow, live statuses and tomorrow\'s reminder strip.',
       'add-flight':'Contract a fresh block of seats from a charter or GSA allotment.',
       category:'Seat inventory, sell-through and revenue grouped by travel category.',
       'manage-sales':'Every seat sold off a contract block, with per-flight profit & CSV.' }[sub]) || '';
@@ -570,6 +573,106 @@
       el('div.card-head', null, [ el('h3', { html: ui.icon('clipboard-data') + ' Per-Flight Profitability' }),
         el('span.card-sub', { text:'Block pre-bought → cost counts every seat' }) ]),
       el('div.card-body', null, [ brkTbl.el ])
+    ]));
+  }
+
+  /* ==========================================================================
+   * DEPARTURES BOARD — production FlightScheduleController parity: the
+   * yesterday · today · tomorrow day window (or any picked date), live
+   * status chips, Mark Departed, and tomorrow's reminder strip (the same
+   * list production feeds its FLIGHT DEADLINE bulletin from).
+   * ========================================================================*/
+  var boardDate = '';                    // '' = the rolling 3-day window
+  function addD(iso, n) { var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  // one-time demo-date refresh: the seeded departures were pinned around the
+  // old demo "now" — roll PAST, UN-departed blocks forward month-by-month so
+  // the board always has live traffic (GL refs untouched; dates only)
+  (function () {
+    try {
+      if (S.get && S.get('cf_dates_v2', null)) return;
+      flights().forEach(function (f) {
+        if (!f.depDate || f.status === 'Departed') return;
+        var d = String(f.depDate).slice(0, 10), guard = 0;
+        while (d < addD(TODAY, -1) && guard++ < 24) {
+          var dt = new Date(d + 'T00:00:00'); dt.setMonth(dt.getMonth() + 1);
+          d = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+        }
+        if (d !== f.depDate) { f.depDate = d; db.save('tv_contract_flights', f); }
+      });
+      if (S.set) S.set('cf_dates_v2', TODAY);
+    } catch (e) {}
+  })();
+  function dayBoard(page) {
+    var fl = flights();
+    var yesterday = addD(TODAY, -1), tomorrow = addD(TODAY, 1);
+    function dep(f) { return String(f.depDate || '').slice(0, 10); }
+    function weekEnd() { return addD(TODAY, 7); }
+    var todayAll = fl.filter(function (f) { return dep(f) === TODAY; });
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Departed · ' + ui.date(yesterday), fl.filter(function (f) { return dep(f) === yesterday && f.status === 'Departed'; }).length + ' / ' + fl.filter(function (f) { return dep(f) === yesterday; }).length, 'check2-circle'),
+      kpi('Today', todayAll.length + ' flight' + (todayAll.length === 1 ? '' : 's'), 'calendar-day'),
+      kpi('Today — still to go', String(todayAll.filter(function (f) { return f.status !== 'Departed'; }).length), 'clock-history'),
+      kpi('Tomorrow', String(fl.filter(function (f) { return dep(f) === tomorrow; }).length), 'calendar-plus'),
+      kpi('Next 7 Days', String(fl.filter(function (f) { return dep(f) >= TODAY && dep(f) <= weekEnd(); }).length), 'calendar-week')
+    ]));
+    // tomorrow's reminder strip — the production bulletin list
+    var rem = fl.filter(function (f) { return dep(f) === tomorrow && f.status !== 'Departed'; });
+    if (rem.length) {
+      var strip = el('div.grid-auto.kpi-compact.stagger.mb-3');
+      rem.slice(0, 6).forEach(function (f) {
+        strip.appendChild(el('div.card', null, [el('div.card-pad', null, [
+          el('div.flex.items-center.gap-2', null, [
+            ui.frag('<span class="notif-ico notif-warn">' + ui.icon('airplane') + '</span>'),
+            el('div.flex-1', null, [
+              el('div.fw-700', { text: f.airline + ' · ' + f.flightNo }),
+              el('div.text-mute.xs', { text: f.route + ' · departs ' + ui.date(f.depDate) + ' · IN 1 DAY' })
+            ]),
+            el('span.badge.badge-warn', { text: (f.sold || 0) + '/' + (f.seats || 0) + ' sold' })
+          ])
+        ])]));
+      });
+      page.appendChild(el('div.section-label.mt-0', { text: 'Departing tomorrow — reminder strip' }));
+      page.appendChild(strip);
+    }
+    // day picker: any date, or the rolling yesterday–tomorrow window
+    var picker = el('div.flex.gap-2.items-center.flex-wrap.mb-2', null, [
+      el('span.text-mute.sm', { text: 'Show' }),
+      el('input.input', { type: 'date', value: boardDate, onchange: function () { boardDate = this.value; EPAL.router.render(); } }),
+      el('button.btn.btn-sm' + (boardDate ? '.btn-outline' : '.btn-primary'), { text: 'Yesterday – Tomorrow window', onclick: function () { boardDate = ''; EPAL.router.render(); } })
+    ]);
+    page.appendChild(picker);
+    var rows = (boardDate ? fl.filter(function (f) { return dep(f) === boardDate; })
+                          : fl.filter(function (f) { return dep(f) >= yesterday && dep(f) <= tomorrow; }))
+      .slice().sort(function (a, b) { return dep(a) < dep(b) ? -1 : dep(a) > dep(b) ? 1 : String(a.flightNo).localeCompare(String(b.flightNo)); });
+    function statusChip(f) {
+      if (f.status === 'Departed') return '<span class="badge badge-good">Departed</span>';
+      var d = dep(f);
+      if (d < TODAY) return '<span class="badge badge-bad">Missed — not marked</span>';
+      if (d === TODAY) return '<span class="badge badge-warn">Boarding today</span>';
+      return '<span class="badge badge-info">Open</span>';
+    }
+    var tbl = EPAL.table({
+      columns: [
+        { key: 'flightNo', label: 'Flight', render: function (f) { return '<span class="strong">' + ui.escapeHtml(f.airline) + '</span><div class="text-mute xs">' + ui.escapeHtml(f.flightNo) + ' · ' + ui.escapeHtml(f.route) + '</div>'; } },
+        { key: 'category', label: 'Category', badge: {} },
+        { key: 'depDate', label: 'Departure', date: true, render: function (f) { return ui.date(f.depDate) + (dep(f) === TODAY ? ' <span class="badge badge-warn">TODAY</span>' : ''); } },
+        { key: 'sold', label: 'Seats', num: true, render: function (f) { return '<span class="num">' + (f.sold || 0) + ' / ' + (f.seats || 0) + '</span>'; }, sortVal: function (f) { return +f.sold || 0; } },
+        { key: 'status', label: 'Status', render: statusChip, exportVal: function (f) { return f.status === 'Departed' ? 'Departed' : dep(f) < TODAY ? 'Missed' : dep(f) === TODAY ? 'Boarding' : 'Open'; } }
+      ],
+      rows: rows, pageSize: 12, exportName: 'departures-board.csv',
+      actions: [
+        { icon: 'check2-circle', title: 'Mark departed', onClick: function (f) {
+          if (f.status === 'Departed') { ui.toast('Already departed', 'error'); return; }
+          f.status = 'Departed'; db.save('tv_contract_flights', f);
+          ui.toast(f.airline + ' ' + f.flightNo + ' marked departed', 'success'); EPAL.router.render();
+        } },
+        { icon: 'calendar3', title: 'Open in schedule', onClick: function () { EPAL.router.navigate('travels/contract-flight/schedule'); } }
+      ],
+      empty: { icon: 'calendar-day', title: 'No departures in this window', hint: 'Pick another date, or add a contract flight.' }
+    });
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [el('h3', { html: ui.icon('calendar-day') + ' Departures — ' + (boardDate ? ui.date(boardDate) : ui.date(yesterday) + ' → ' + ui.date(tomorrow)) })]),
+      el('div.card-body', null, [tbl.el])
     ]));
   }
 

@@ -29,7 +29,9 @@
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
 
   // A stable demo "today" so BSP/ADM dispute countdowns are deterministic.
-  var NOW = new Date('2026-07-05T00:00:00');
+  // real current moment (was a hardcoded demo date — TTL countdowns and BSP
+  // period math drifted as real days passed)
+  var NOW = new Date();
 
   // Ticket status vocabulary + colours (mirrors real GDS booking states).
   var STATUSES = [
@@ -67,6 +69,15 @@
     S.seedOnce('air_countries', seedCountries());
     S.seedOnce('air_states', seedStates());
     S.seedOnce('air_purchases', seedPurchases());
+    // one-time refresh of the OLD pinned-date TTL demo rows → live offsets
+    // (Hold/Expired demo rows only; anything the user Ticketed is kept)
+    if (!S.get('ttl_reseed_v2', null)) {
+      var kept = S.list('air_ttl').filter(function (r) { return r.status === 'Ticketed'; });
+      S.set('air_ttl', kept.concat(seedTtl().filter(function (r) {
+        return !kept.some(function (k) { return k.id === r.id; });
+      })));
+      S.set('ttl_reseed_v2', today());
+    }
   }});
 
   /* Ticket Purchase — the passport-holder PURCHASE register (buying a ticket for a
@@ -164,16 +175,21 @@
   }
 
   function seedTtl() {
-    // ttl dates spread around demo-today 2026-07-05: overdue, imminent, comfortable.
+    // ttl deadlines are generated RELATIVE to the real clock — overdue,
+    // imminent and comfortable — so the queue always demos live urgency.
+    function at(offsetHours, hh) {
+      var d = new Date(Date.now() + offsetHours * 3600000);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + 'T' + (hh || '12:00');
+    }
     var rows = [
-      { pnr:'RKPQ21', passenger:'Rahim Uddin',    airline:'Emirates',            route:'DAC → DXB', ttl:'2026-07-03T18:00', status:'Hold', amount:  86500 },
-      { pnr:'MHTZ88', passenger:'Nasreen Akter',  airline:'Qatar Airways',       route:'DAC → DOH', ttl:'2026-07-04T12:00', status:'Hold', amount: 112000 },
-      { pnr:'BSVL07', passenger:'Kamal Hossain',  airline:'US-Bangla',           route:'DAC → CXB', ttl:'2026-07-05T20:00', status:'Hold', amount:  14500 },
-      { pnr:'SQWX24', passenger:'Farhana Yasmin', airline:'Singapore Airlines',  route:'DAC → SIN', ttl:'2026-07-06T09:00', status:'Hold', amount: 138000 },
-      { pnr:'TKMN65', passenger:'Tanvir Ahmed',   airline:'Turkish Airlines',    route:'DAC → IST', ttl:'2026-07-07T15:00', status:'Hold', amount: 154500 },
-      { pnr:'BGAA74', passenger:'Shirin Sultana', airline:'Biman Bangladesh',    route:'DAC → JED', ttl:'2026-07-10T10:00', status:'Hold', amount:  92000 },
-      { pnr:'KUZZ12', passenger:'Jahangir Alam',  airline:'Kuwait Airways',      route:'DAC → KWI', ttl:'2026-07-12T23:59', status:'Hold', amount:  78500 },
-      { pnr:'GFOM58', passenger:'Mitu Rahman',    airline:'Gulf Air',            route:'DAC → BAH', ttl:'2026-07-02T14:00', status:'Expired', amount: 69000 }
+      { pnr:'RKPQ21', passenger:'Rahim Uddin',    airline:'Emirates',            route:'DAC → DXB', ttl:at(-40, '18:00'), status:'Hold', amount:  86500 },
+      { pnr:'MHTZ88', passenger:'Nasreen Akter',  airline:'Qatar Airways',       route:'DAC → DOH', ttl:at(-14, '12:00'), status:'Hold', amount: 112000 },
+      { pnr:'BSVL07', passenger:'Kamal Hossain',  airline:'US-Bangla',           route:'DAC → CXB', ttl:at(8, '20:00'),   status:'Hold', amount:  14500 },
+      { pnr:'SQWX24', passenger:'Farhana Yasmin', airline:'Singapore Airlines',  route:'DAC → SIN', ttl:at(26, '09:00'),  status:'Hold', amount: 138000 },
+      { pnr:'TKMN65', passenger:'Tanvir Ahmed',   airline:'Turkish Airlines',    route:'DAC → IST', ttl:at(52, '15:00'),  status:'Hold', amount: 154500 },
+      { pnr:'BGAA74', passenger:'Shirin Sultana', airline:'Biman Bangladesh',    route:'DAC → JED', ttl:at(120, '10:00'), status:'Hold', amount:  92000 },
+      { pnr:'KUZZ12', passenger:'Jahangir Alam',  airline:'Kuwait Airways',      route:'DAC → KWI', ttl:at(170, '23:59'), status:'Hold', amount:  78500 },
+      { pnr:'GFOM58', passenger:'Mitu Rahman',    airline:'Gulf Air',            route:'DAC → BAH', ttl:at(-70, '14:00'), status:'Expired', amount: 69000 }
     ];
     var out = [];
     for (var i = 0; i < rows.length; i++) {
@@ -193,7 +209,7 @@
     if (x.agent) { var ag = agentById(x.agent); if (ag) return ag.name; var e = db.employee(x.agent); if (e) return e.name; }
     return 'Direct / House';
   }
-  function today(){ return new Date().toISOString().slice(0,10); }
+  function today(){ var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function randPnr(){ return String.fromCharCode(65+Math.floor(Math.random()*26))+String.fromCharCode(65+Math.floor(Math.random()*26))+Math.floor(1000+Math.random()*9000); }
   function netProfitOf(x){ return (x.sale||0) - (x.cost||0) - (x.commission||0); }
 
@@ -206,7 +222,7 @@
         ticketing:'Ticket Operations', 'manage-sales':'Manage Sales',
         emd:'EMD & Ancillary', ttl:'Ticketing Deadlines',
         masters:'Setup', airlines:'Airlines', airports:'Airports', countries:'Country', states:'States',
-        bsp:'BSP / ADM Recon', refunds:'Refund Tracker'
+        bsp:'BSP / ADM Recon', refunds:'Refund Tracker', registers:'Re-Issue & Void Register'
       };
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Air Ticketing',
@@ -221,7 +237,7 @@
       ({ overview:overview, stock:stockView, purchase:purchaseView, ticketing:ticketOps, 'manage-sales':manageSales,
          emd:emdView, ttl:ttlView,
          masters:mastersView, airlines:airlinesView, airports:airportsView, countries:countriesView, states:statesView,
-         bsp:bspView, refunds:refundsView }[sub] || overview)(page, ctx);
+         bsp:bspView, refunds:refundsView, registers:registersView }[sub] || overview)(page, ctx);
 
       ctx.mount.appendChild(page);
     }
@@ -241,7 +257,8 @@
       countries:'Country master — used across ticketing and business services.',
       states:'Country-wise states master — used across ticketing and business services.',
       bsp:'Import the BSP billing file, auto-match against issued tickets and clear reconciliation exceptions; track ADMs with a dispute-deadline countdown.',
-      refunds:'Every refund request from filing to payout, with airline-penalty math.' }[sub]) || '';
+      refunds:'Every refund request from filing to payout, with airline-penalty math.',
+      registers:'The full audit trail of processed re-issues and voids — charges, routes and refunds.' }[sub]) || '';
   }
 
   /* ======================================================= OVERVIEW HUB */
@@ -537,13 +554,13 @@
     var alOpts = (airlines()||[]).map(function(a){ return [a.iata, a.name+' ('+a.iata+')']; });
     var vnOpts = [['','— none —']].concat((db.vendors?db.vendors():[]).map(function(v){ return [v.name, v.name]; }));
     EPAL.formModal({
-      title: isNew ? 'Add New Ticket Purchase' : 'Edit Ticket Purchase', icon:'cart-plus', size:'lg', record: p || { tripType:'One-way', purchaseDate:'2026-07-05' },
+      title: isNew ? 'Add New Ticket Purchase' : 'Edit Ticket Purchase', icon:'cart-plus', size:'lg', record: p || { tripType:'One-way', purchaseDate: today() },
       fields:[
         { type:'section', label:'Passenger & Ticket' },
         { key:'passenger', label:'Passport holder', type:'text', required:true, col2:true, placeholder:'e.g. HOSSAIN AHMED' },
         { key:'passport', label:'Passport No', type:'text', placeholder:'e.g. A1234567' },
         { key:'ticketNo', label:'Ticket No / PNR', type:'text', required:true, placeholder:'e.g. 09PPXW' },
-        { key:'purchaseDate', label:'Purchase date', type:'date', default:'2026-07-05' },
+        { key:'purchaseDate', label:'Purchase date', type:'date', default: today() },
         { type:'section', label:'Route' },
         { key:'fromCode', label:'From', type:'select', options:apOpts, required:true },
         { key:'via', label:'Via (optional)', type:'select', options:[['','— direct —']].concat(apOpts) },
@@ -693,6 +710,60 @@
   // shared "open a filtered list in a modal" helper for the master KPIs
   function masterList(title, icon, rows, tableFn) { var body=kpiShell(title+' — '+rows.length, icon, null); body.appendChild(el('div.card', null, [ el('div.card-body', null, [ tableFn(rows, null).el ]) ])); }
 
+  /* ======================================================= RE-ISSUE & VOID REGISTER
+     Production parity (TicketReissue model): the audit trail the ops forms
+     write to — every processed re-issue with its charge math, and every void
+     with its penalty/refund math. */
+  function registersView(page) {
+    var ris = S.list('air_reissues').slice().sort(function(a,b){ return (b.created||0)-(a.created||0); });
+    var vds = S.list('air_voids').slice().sort(function(a,b){ return (b.created||0)-(a.created||0); });
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Re-Issues', String(ris.length), 'arrow-repeat'),
+      kpi('Charges Collected', ui.money(ris.reduce(function(a,r){ return a+(+r.addlCharge||0); },0), { compact:true }), 'cash-coin'),
+      kpi('Voids', String(vds.length), 'x-octagon'),
+      kpi('Refunded on Void', ui.money(vds.reduce(function(a,r){ return a+(+r.refund||0); },0), { compact:true }), 'arrow-counterclockwise')
+    ]));
+    page.appendChild(el('div.mb-2', null, [ el('a.btn.btn-sm.btn-primary', { href:'#/travels/air-ticketing/ticketing', html: ui.icon('plus-lg')+' New Operation (Sale · Refund · Re-Issue · Void)' }) ]));
+    var rt = EPAL.table({
+      columns: [
+        { key:'date', label:'Date', date:true },
+        { key:'passenger', label:'Passenger', render:function(r){ return '<span class="strong">'+ui.escapeHtml(r.passenger||'—')+'</span>'; } },
+        { key:'oldRoute', label:'Route', render:function(r){ return ui.escapeHtml(r.oldRoute||'—')+' <span class="text-mute">→</span> <span class="strong">'+ui.escapeHtml(r.newRoute||'—')+'</span>'; }, exportVal:function(r){ return (r.oldRoute||'')+' -> '+(r.newRoute||''); } },
+        { key:'newPnr', label:'New PNR', render:function(r){ return '<span class="mono xs">'+ui.escapeHtml(r.newPnr||'—')+'</span>'; } },
+        { key:'penalty', label:'Penalty', num:true, money:true },
+        { key:'fareDiff', label:'Fare Diff', num:true, money:true },
+        { key:'serviceCharge', label:'Service Chg', num:true, money:true },
+        { key:'addlCharge', label:'Charged', num:true, render:function(r){ return '<span class="num strong">'+ui.money(r.addlCharge)+'</span>'; }, sortVal:function(r){ return +r.addlCharge||0; }, exportVal:function(r){ return r.addlCharge; } },
+        { key:'newCost', label:'New Cost', num:true, money:true }
+      ],
+      rows: ris, pageSize:10, totalKey:'addlCharge', searchKeys:['passenger','newPnr','oldRoute','newRoute'],
+      exportName:'reissue-register.csv', pdfTitle:'Re-Issue Register',
+      empty:{ icon:'arrow-repeat', title:'No re-issues yet', hint:'Process one from Ticket Operations ▸ Re-Issue.' }
+    });
+    page.appendChild(el('div.card.mb-2', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('arrow-repeat')+' Re-Issue Register' }) ]),
+      el('div.card-body', null, [ rt.el ])
+    ]));
+    var vt = EPAL.table({
+      columns: [
+        { key:'date', label:'Date', date:true },
+        { key:'passenger', label:'Passenger', render:function(r){ return '<span class="strong">'+ui.escapeHtml(r.passenger||'—')+'</span>'; } },
+        { key:'reason', label:'Reason', render:function(r){ return ui.escapeHtml(r.reason||'—'); } },
+        { key:'confirmNo', label:'Airline Confirm', render:function(r){ return '<span class="mono xs">'+ui.escapeHtml(r.confirmNo||'—')+'</span>'; } },
+        { key:'penalty', label:'Penalty', num:true, money:true },
+        { key:'agentFee', label:'Agent Fee', num:true, money:true },
+        { key:'refund', label:'Refunded', num:true, render:function(r){ return '<span class="num strong text-good">'+ui.money(r.refund)+'</span>'; }, sortVal:function(r){ return +r.refund||0; }, exportVal:function(r){ return r.refund; } }
+      ],
+      rows: vds, pageSize:10, totalKey:'refund', searchKeys:['passenger','reason','confirmNo'],
+      exportName:'void-register.csv', pdfTitle:'Void Register',
+      empty:{ icon:'x-octagon', title:'No voids yet', hint:'Process one from Ticket Operations ▸ Void.' }
+    });
+    page.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('x-octagon')+' Void Register' }) ]),
+      el('div.card-body', null, [ vt.el ])
+    ]));
+  }
+
   /* ======================================================= TICKET OPERATIONS hub
      One screen, five tabs — record EVERY ticketing operation: Direct Sale,
      Refund, Re-Issue, Void, EMD / Ancillary. Mirrors the legacy Ticketing screen. */
@@ -707,7 +778,9 @@
         op = tb[0]; Array.prototype.forEach.call(bar.children, function (b) { b.classList.remove('active'); }); this.classList.add('active'); paint();
       } }));
     });
-    page.appendChild(bar); page.appendChild(host);
+    page.appendChild(el('div.flex.items-center.gap-2.flex-wrap', null, [ bar,
+      el('a.btn.btn-sm.btn-outline', { style:{ marginLeft:'auto', marginBottom:'12px' }, href:'#/travels/air-ticketing/registers', html: ui.icon('journal-text')+' Re-Issue & Void Register' }) ]));
+    page.appendChild(host);
     function paint() { host.innerHTML=''; ({ direct:directSale, refund:refundForm, reissue:reissueForm, void:voidForm, emd:emdOpForm }[op] || directSale)(host); }
     paint();
   }
@@ -739,7 +812,7 @@
     var form = EPAL.form([
       { type:'section', label:'Refund Header' },
       { key:'agent', label:'Agent', type:'select', options:opAgents() },
-      { key:'refundDate', label:'Refund date', type:'date', required:true, default:'2026-07-05' },
+      { key:'refundDate', label:'Refund date', type:'date', required:true, default: today() },
       { key:'ticketId', label:'Original ticket / invoice', type:'select', options:opTickets(), required:true },
       { key:'refundStatus', label:'Refund status', type:'select', options:['Requested','Confirm','Filed','Paid'], default:'Confirm' },
       { type:'section', label:'Original Ticket Info' },
@@ -779,7 +852,7 @@
     var form = EPAL.form([
       { type:'section', label:'Original Ticket Reference' },
       { key:'agent', label:'Agent', type:'select', options:opAgents() },
-      { key:'reissueDate', label:'Re-issue date', type:'date', required:true, default:'2026-07-05' },
+      { key:'reissueDate', label:'Re-issue date', type:'date', required:true, default: today() },
       { key:'ticketId', label:'Original ticket / invoice', type:'select', options:opTickets(), required:true },
       { type:'section', label:'New Ticket Details' },
       { key:'newFrom', label:'New route — From', type:'select', options:opAirports() },
@@ -812,7 +885,17 @@
         newRoute:(v.newFrom&&v.newTo)?(v.newFrom+' → '+v.newTo):(t.route||''), newPnr:v.newPnr, penalty:num(form,'penalty'), fareDiff:num(form,'fareDiff'), serviceCharge:num(form,'serviceCharge'), newCost:newCost, addlCharge:addl, created:Date.now() };
       S.upsert('air_reissues', rec);
       if(t.id){ t.status='Re-issued'; if(v.newFrom&&v.newTo){ t.route=v.newFrom+' → '+v.newTo; t.fromCode=v.newFrom; t.toCode=v.newTo; } if(v.newPnr) t.pnr=v.newPnr; t.cost=newCost; if(db.saveAirTicket) db.saveAirTicket(t); }
-      ui.toast('Ticket re-issued · new cost '+ui.money(newCost),'success'); EPAL.router.navigate('travels/air-ticketing/manage-sales');
+      // the additional charge is real money — post it through the sale artery
+      // (penalty + fare difference pass through to the airline; the agent
+      // service charge is our income)
+      if (addl > 0 && db.postSale) {
+        try {
+          db.postSale('travels', { amount: addl, cost: num(form,'penalty') + num(form,'fareDiff'), ref: rec.id,
+            desc: 'Ticket re-issue · ' + (t.passenger || 'ticket ' + (t.pnr || v.ticketId)) + ' · ' + rec.newRoute,
+            customer: t.passenger || v.agent || 'Walk-in', category: 'air', vendor: v.newVendor || t.vendor || '', payStatus: 'Due' });
+        } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); }
+      }
+      ui.toast('Ticket re-issued · new cost '+ui.money(newCost),'success'); EPAL.router.navigate('travels/air-ticketing/registers');
     }));
   }
 
@@ -822,7 +905,7 @@
     var form = EPAL.form([
       { type:'section', label:'Void Header' },
       { key:'agent', label:'Agent', type:'select', options:opAgents() },
-      { key:'voidDate', label:'Void date', type:'date', required:true, default:'2026-07-05' },
+      { key:'voidDate', label:'Void date', type:'date', required:true, default: today() },
       { key:'ticketId', label:'Ticket to void', type:'select', options:opTickets(), required:true },
       { key:'voidReason', label:'Void reason', type:'select', options:['Duplicate booking','Wrong fare','Customer cancelled','Schedule change','Other'] },
       { key:'confirmNo', label:'Airline confirmation No', type:'text' },
@@ -859,7 +942,7 @@
     form = EPAL.form([
       { type:'section', label:'EMD / Ancillary Header' },
       { key:'agent', label:'Agent', type:'select', options:opAgents() },
-      { key:'issueDate', label:'Issue date', type:'date', required:true, default:'2026-07-05' },
+      { key:'issueDate', label:'Issue date', type:'date', required:true, default: today() },
       { key:'items', type:'items', label:'Ancillary / EMD Items (one row per service)', required:true, min:1, addLabel:'Add Item',
         columns:[
           { key:'passenger', label:'Passenger / Customer', type:'text', width:'2fr' },
@@ -2260,7 +2343,7 @@
   }
   // Momentum: metric over the last 30 days vs the prior 30 (by ticket created date).
   function momentum(list, valFn){
-    var now = new Date('2026-07-05').getTime(), d30 = now - 30*86400000, d60 = now - 60*86400000, cur = 0, prev = 0;
+    var now = new Date(today() + 'T00:00:00').getTime(), d30 = now - 30*86400000, d60 = now - 60*86400000, cur = 0, prev = 0;
     list.forEach(function(x){ var t=new Date(x.created||x.purchaseDate||'').getTime(); if(isNaN(t)) return; var v=valFn?valFn(x):1;
       if(t>d30 && t<=now) cur+=v; else if(t>d60 && t<=d30) prev+=v; });
     if(prev<=0) return cur>0 ? { dir:'up', txt:'new' } : null;
@@ -2538,9 +2621,9 @@
   /* ---- BSP SETTLEMENT COUNTDOWN — next BSP billing settlement, open ADM
      dispute deadlines (raised + 30d) and recoverable unused-ticket value. */
   function ymd(y,m,d){ return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0'); }
-  function daysToDate(str){ var a=new Date(str).getTime(), b=new Date('2026-07-05').getTime(); return Math.round((a-b)/86400000); }
+  function daysToDate(str){ var a=new Date(str).getTime(), b=new Date(today() + 'T00:00:00').getTime(); return Math.round((a-b)/86400000); }
   function addDaysStr(str,n){ var d=new Date(str); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
-  function nextBspSettlement(){ var t=new Date('2026-07-05'), y=t.getFullYear(), m=t.getMonth(), d=t.getDate();
+  function nextBspSettlement(){ var t=new Date(today() + 'T00:00:00'), y=t.getFullYear(), m=t.getMonth(), d=t.getDate();
     if(d<15) return ymd(y,m,15); var eom=new Date(y,m+1,0).getDate(); if(d<eom) return ymd(y,m,eom); return ymd(y,m+1,15); }
   function bspTile(label, value, sub, tone){
     return el('div.kpi-card', null, [ el('div.kpi-top', null, [ el('span.kpi-label',{text:label}) ]),

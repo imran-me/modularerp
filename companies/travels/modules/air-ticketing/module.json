@@ -44,6 +44,12 @@
       "enabled": true
     },
     {
+      "id": "registers",
+      "label": "Re-Issue & Void Register",
+      "route": "#/travels/air-ticketing/registers",
+      "enabled": true
+    },
+    {
       "id": "masters",
       "label": "Setup",
       "route": "#/travels/air-ticketing/masters",

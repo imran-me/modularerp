@@ -144,6 +144,52 @@
         page.appendChild(el('div.card.mb-3', null, [head, bodyEl]));
       })();
 
+      // --- FLIGHT DEADLINES widget — the production LIVE BULLETIN list:
+      // contract-flight departures inside 4 days + urgent held-PNR ticketing
+      // deadlines (48h). Click-through to the Departures Board / TTL queue.
+      (function () {
+        function locDay(off) { var d = new Date(); d.setDate(d.getDate() + (off || 0)); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+        var todayS = locDay(0), horizon = locDay(4);
+        var deps = (db.col ? db.col('tv_contract_flights') : []).filter(function (f) {
+          var d = String(f.depDate || '').slice(0, 10);
+          return f.status !== 'Departed' && d >= todayS && d <= horizon;
+        }).sort(function (a, b) { return String(a.depDate) < String(b.depDate) ? -1 : 1; });
+        var holds = (db.col ? db.col('air_ttl') : []).filter(function (r) {
+          if (r.status !== 'Hold' || !r.ttl) return false;
+          var h = (new Date(r.ttl) - Date.now()) / 3600000; return h > -24 && h <= 48;
+        }).sort(function (a, b) { return new Date(a.ttl) - new Date(b.ttl); });
+        if (!deps.length && !holds.length) return;
+        var bodyF = el('div.card-body');
+        deps.slice(0, 4).forEach(function (f) {
+          var days = Math.round((new Date(String(f.depDate).slice(0, 10) + 'T00:00:00') - new Date(todayS + 'T00:00:00')) / 86400000);
+          bodyF.appendChild(el('div.data-row', { style: { cursor: 'pointer' }, onclick: function () { EPAL.router.navigate('travels/contract-flight/day-board'); } }, [
+            ui.frag('<span class="notif-ico notif-' + (days <= 1 ? 'error' : 'warning') + '">' + ui.icon('airplane') + '</span>'),
+            el('div.flex-1', null, [
+              el('div.fw-600.sm', { text: f.airline + ' ' + f.flightNo + ' · ' + f.route }),
+              el('div.text-mute.xs', { text: 'departs ' + ui.date(f.depDate) + ' · ' + (days === 0 ? 'TODAY' : 'IN ' + days + ' DAY' + (days === 1 ? '' : 'S')) + ' · ' + (f.sold || 0) + '/' + (f.seats || 0) + ' sold' })
+            ]),
+            el('span.badge' + (days <= 1 ? '.badge-bad' : '.badge-warn'), { text: 'FLIGHT DEADLINE' })
+          ]));
+        });
+        holds.slice(0, 3).forEach(function (r) {
+          var h = Math.round((new Date(r.ttl) - Date.now()) / 3600000);
+          bodyF.appendChild(el('div.data-row', { style: { cursor: 'pointer' }, onclick: function () { EPAL.router.navigate('travels/air-ticketing/ttl'); } }, [
+            ui.frag('<span class="notif-ico notif-' + (h <= 6 ? 'error' : 'warning') + '">' + ui.icon('hourglass-split') + '</span>'),
+            el('div.flex-1', null, [
+              el('div.fw-600.sm', { text: r.airline + ' · ' + r.route + ' · PNR ' + r.pnr }),
+              el('div.text-mute.xs', { text: 'ticketing deadline ' + ui.date(String(r.ttl).slice(0, 10)) + ' ' + String(r.ttl).slice(11, 16) + ' · ' + (h < 0 ? 'OVERDUE' : 'in ' + h + 'h') })
+            ]),
+            el('span.badge' + (h <= 6 ? '.badge-bad' : '.badge-warn'), { text: 'TICKET TTL' })
+          ]));
+        });
+        page.appendChild(el('div.card.mb-3', null, [
+          el('div.card-head', null, [
+            el('h3', { html: ui.icon('broadcast') + ' Flight Deadlines' }),
+            el('a.btn.btn-sm.btn-ghost', { style: { marginLeft: 'auto' }, href: '#/travels/contract-flight/day-board', html: ui.icon('calendar-day') + ' Departures Board' })
+          ]), bodyF
+        ]));
+      })();
+
       // trend + visa stage funnel
       var row = el('div.two-col');
       row.appendChild(el('div.card', null, [

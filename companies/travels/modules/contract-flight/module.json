@@ -14,6 +14,12 @@
       "enabled": true
     },
     {
+      "id": "day-board",
+      "label": "Departures Board",
+      "route": "#/travels/contract-flight/day-board",
+      "enabled": true
+    },
+    {
       "id": "add-flight",
       "label": "Add Flight",
       "route": "#/travels/contract-flight/add-flight",
