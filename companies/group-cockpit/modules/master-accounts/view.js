@@ -105,24 +105,32 @@
       if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'banks';
       var page = el('div.page');
       var titles = {}; SECTIONS.forEach(function (s) { titles[s[0]] = s[1]; });
+      if (sub === 'payroll' && (selCo === 'all')) selCo = 'travels';
+      // COMPANY SCOPE — one calm dropdown at the top-right (owner mock),
+      // instead of a whole row of per-company pill buttons
+      var coSwitch = (function () {
+        var wrap = el('label.co-switch', { title: 'Company scope' });
+        wrap.appendChild(ui.frag(ui.icon('buildings')));
+        var sel = el('select', { onchange: function () { selCo = this.value; EPAL.router.render(); } });
+        [['all', 'All Companies'], ['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; }))
+          .forEach(function (o) {
+            if (sub === 'payroll' && o[0] === 'all') return;   // payroll needs one company
+            var op = el('option', { value: o[0], text: o[1] }); if (selCo === o[0]) op.selected = true;
+            sel.appendChild(op);
+          });
+        wrap.appendChild(sel);
+        wrap.appendChild(ui.frag(ui.icon('chevron-down')));
+        return wrap;
+      })();
       page.appendChild(EPAL.pageHead({
         eyebrow: 'Epal Group · Master Accounts', icon: 'safe2', title: titles[sub],
-        sub: 'Group-level accounting across every sister concern — switch company with the buttons below.'
+        sub: 'Group-level accounting across every sister concern — switch company with the selector.',
+        actions: [coSwitch]
       }));
       // section nav — calm underline tabs (primary), per the owner's mock
       var pills = el('div.tab-underline.mb-3');
       SECTIONS.forEach(function (s) { pills.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1], onclick: function () { EPAL.router.navigate('group/master-accounts/' + s[0]); } })); });
       page.appendChild(pills);
-      // COMPANY SWITCHER — the owner's "button-wise switch of companies at the top"
-      var swWrap = el('div.flex.gap-1.flex-wrap.mb-3');
-      var swOpts = [['all', 'All Companies'], ['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; }));
-      swOpts.forEach(function (o) {
-        if (sub === 'payroll' && o[0] === 'all') return;      // payroll needs one company
-        swWrap.appendChild(el('button.btn.btn-sm' + ((selCo === o[0]) ? '.btn-primary' : '.btn-outline'), {
-          text: o[1], onclick: function () { selCo = o[0]; EPAL.router.render(); } }));
-      });
-      page.appendChild(swWrap);
-      if (sub === 'payroll' && (selCo === 'all')) selCo = 'travels';
       if (sub === 'expenses') {
         // buttons at the top of the ONE expenses section (owner directive)
         var tb = el('div.pill-tab.mb-3');

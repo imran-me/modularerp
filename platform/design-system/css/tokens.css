@@ -74,8 +74,8 @@
   --hairline:      rgba(200,218,255,.09);   /* beveled top-edge light on panels */
 
   --text:      #eaeefb;
-  --text-dim:  #9aa6c2;
-  --text-mute: #5c6884;
+  --text-dim:  #aeb8d0;   /* owner 2026-07-15: secondary text +20% visibility */
+  --text-mute: #808aa2;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,.45);
   --shadow:    0 1px 1px rgba(0,0,0,.4), 0 16px 36px -14px rgba(0,4,20,.66);
@@ -109,8 +109,8 @@
   --hairline:      rgba(255,255,255,.7);    /* crisp top edge on white panels */
 
   --text:      #131a2c;
-  --text-dim:  #56617c;
-  --text-mute: #8a93a9;
+  --text-dim:  #454f68;   /* owner 2026-07-15: secondary text +20% visibility */
+  --text-mute: #6d758a;
 
   --shadow-sm: 0 1px 2px rgba(5,22,80,.07);
   --shadow:    0 2px 4px rgba(5,22,80,.05), 0 20px 42px -18px rgba(5,22,80,.18);
