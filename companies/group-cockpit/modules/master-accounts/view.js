@@ -1528,30 +1528,82 @@
     (function () {
       var scopeIds = {}; banks.forEach(function (b) { scopeIds[b.id] = b; });
       var txns = S.list('bank_txns').filter(function (t) { return !!scopeIds[t.bankId]; });
-      // derive the balance AFTER each txn by walking each bank backward from
-      // its live balance (newest txn's after-balance = the current balance)
+
+      // Money direction. One helper so every column, sort and running total
+      // agrees on what "in" means — this is the only place that decides it.
+      function isIn(t) { return t.type === 'deposit' || t.type === 'transfer-in'; }
+      function delta(t) { return isIn(t) ? (+t.amount || 0) : -(+t.amount || 0); }
+
+      // Newest-first ordering (ties broken by insertion order, newest first).
+      function newestFirst(a, b) { return (a.date === b.date) ? b._seq - a._seq : (a.date < b.date ? 1 : -1); }
+      txns.forEach(function (t, i) { t._seq = i; });
+
+      /* TWO running balances, deliberately, because they answer two different
+         questions (owner 2026-07-15):
+
+         1) _before / _after — THIS BANK's own opening and closing around the
+            txn. Derived by walking each bank BACKWARD from its live balance:
+            the newest txn's closing IS the bank's current balance, so every
+            earlier one follows by subtracting the delta. Shown small under the
+            bank name.
+
+         2) _overall — the GROUP's balance across every bank in the current
+            scope, after this txn. NOT the bank's closing balance. Same backward
+            method, but from the scope total: with "All Companies" selected this
+            is every company's money combined, so the column answers "what did
+            the group hold at that moment", which no per-bank figure can.
+
+         Both are derived, never stored — the bank register stays the single
+         source of truth and these can't drift from it. ⇢ Laravel: compute in
+         the query layer (window function over date, id) rather than persisting. */
       var byBank = {};
-      txns.forEach(function (t, i) { t._seq = i; (byBank[t.bankId] = byBank[t.bankId] || []).push(t); });
+      txns.forEach(function (t) { (byBank[t.bankId] = byBank[t.bankId] || []).push(t); });
       Object.keys(byBank).forEach(function (bid) {
-        var rows = byBank[bid].slice().sort(function (a, b) { return (a.date === b.date) ? b._seq - a._seq : (a.date < b.date ? 1 : -1); });
         var bal = +(scopeIds[bid].balance) || 0;
-        rows.forEach(function (t) {
-          t._after = bal;
-          bal -= (t.type === 'deposit' || t.type === 'transfer-in') ? (+t.amount || 0) : -(+t.amount || 0);
+        byBank[bid].slice().sort(newestFirst).forEach(function (t) {
+          t._after = bal; t._before = bal - delta(t); bal = t._before;
         });
       });
-      var recent = txns.slice().sort(function (a, b) { return (a.date === b.date) ? b._seq - a._seq : (a.date < b.date ? 1 : -1); }).slice(0, 50);
+      var scopeTotal = banks.reduce(function (a, b) { return a + (+b.balance || 0); }, 0);
+      txns.slice().sort(newestFirst).forEach(function (t) {
+        t._overall = scopeTotal; scopeTotal -= delta(t);
+      });
+
+      var recent = txns.slice().sort(newestFirst).slice(0, 50);
+      // Dr/Cr presentation for a derived balance: negative = credit (overdrawn).
+      function drcr(v) {
+        v = +v || 0;
+        return '<span class="num nowrap' + (v < 0 ? ' text-bad' : '') + '">' + ui.money(Math.abs(v)) + ' ' + (v < 0 ? 'Cr' : 'Dr') + '</span>';
+      }
       var tt2 = EPAL.table({
         columns: [
           { key: 'date', label: 'Date', date: true },
+          // Bank identity + this account's own opening/closing around the txn.
           { key: 'bankName', label: 'Bank', render: function (t) {
             var b = scopeIds[t.bankId] || {};
-            return '<span class="strong">' + esc(t.bankName) + '</span><div class="text-mute xs">' + esc(b.account || '') + ' · ' + esc(coName(b.companyId || 'group')) + '</div>';
+            return '<span class="strong">' + esc(t.bankName) + '</span>' +
+              '<div class="text-mute xs">' + esc(b.account || '') + '</div>' +
+              '<div class="text-mute xs nowrap">Opening: ' + ui.money(Math.abs(+t._before || 0)) + ((+t._before || 0) < 0 ? ' Cr' : ' Dr') +
+              ' · Closing: ' + ui.money(Math.abs(+t._after || 0)) + ((+t._after || 0) < 0 ? ' Cr' : ' Dr') + '</div>';
           } },
-          { key: 'desc', label: 'Description', render: function (t) { return esc(t.desc || t.type); } },
-          { key: 'in', label: 'Debit', num: true, render: function (t) { return (t.type === 'deposit' || t.type === 'transfer-in') ? '<span class="num text-good">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return (t.type === 'deposit' || t.type === 'transfer-in') ? +t.amount : 0; }, exportVal: function (t) { return (t.type === 'deposit' || t.type === 'transfer-in') ? t.amount : ''; } },
-          { key: 'out', label: 'Credit', num: true, render: function (t) { return (t.type === 'withdraw' || t.type === 'transfer-out') ? '<span class="num text-bad">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return (t.type === 'withdraw' || t.type === 'transfer-out') ? +t.amount : 0; }, exportVal: function (t) { return (t.type === 'withdraw' || t.type === 'transfer-out') ? t.amount : ''; } },
-          { key: 'bal', label: 'Balance', num: true, render: function (t) { var v = +t._after || 0; return '<span class="num ' + (v < 0 ? 'text-bad' : '') + '">' + ui.money(Math.abs(v)) + ' ' + (v < 0 ? 'Cr' : 'Dr') + '</span>'; }, sortVal: function (t) { return +t._after || 0; }, exportVal: function (t) { return t._after; } }
+          // Reference / purpose and the free note are SEPARATE fields on the
+          // record (bankTxnApply stores ref + desc), so they get their own
+          // columns rather than being crushed into one "Description".
+          { key: 'ref', label: 'Reference / Purpose', render: function (t) {
+            return t.ref ? '<span class="mono">' + esc(t.ref) + '</span>' : '<span class="text-mute">—</span>'; } },
+          { key: 'desc', label: 'Description / Note', render: function (t) {
+            return esc(t.desc || t.type || '') || '<span class="text-mute">—</span>'; } },
+          // Whose account this is — promoted out of the bank sub-line into its
+          // own sortable/filterable column (the point of the All-Companies view).
+          { key: 'company', label: 'Company', render: function (t) {
+            var b = scopeIds[t.bankId] || {};
+            return '<span class="badge">' + esc(coName(b.companyId || 'group')) + '</span>'; },
+            sortVal: function (t) { var b = scopeIds[t.bankId] || {}; return coName(b.companyId || 'group'); },
+            exportVal: function (t) { var b = scopeIds[t.bankId] || {}; return coName(b.companyId || 'group'); } },
+          { key: 'in', label: 'Debit', num: true, render: function (t) { return isIn(t) ? '<span class="num text-good">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return isIn(t) ? t.amount : ''; } },
+          { key: 'out', label: 'Credit', num: true, render: function (t) { return !isIn(t) ? '<span class="num text-bad">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return !isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return !isIn(t) ? t.amount : ''; } },
+          { key: 'overall', label: 'Overall Balance', num: true, render: function (t) { return drcr(t._overall); },
+            sortVal: function (t) { return +t._overall || 0; }, exportVal: function (t) { return t._overall; } }
         ],
         rows: recent, pageSize: 10, exportName: 'bank-transactions.csv',
         searchKeys: ['bankName', 'desc', 'ref'],
@@ -1559,7 +1611,8 @@
         empty: { icon: 'clock-history', title: 'No bank transactions yet', hint: 'Deposits, withdrawals and transfers appear here.' }
       });
       page.appendChild(el('div.card.mb-2', null, [
-        el('div.card-head', null, [el('h3', { html: ui.icon('clock-history') + ' Recent Bank Transactions' }), el('span.card-sub', { text: 'all accounts in scope — newest first' })]),
+        el('div.card-head', null, [el('h3', { html: ui.icon('clock-history') + ' Recent Bank Transactions' }),
+          el('span.card-sub', { text: (selCo === 'all' ? 'all companies' : coName(selCo)) + ' — newest first · Overall Balance = every bank in scope combined' })]),
         el('div.card-body', null, [tt2.el])
       ]));
     })();
