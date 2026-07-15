@@ -62,15 +62,22 @@
       ])
     ]);
   }
+  // SECTION NAV — the same calm full-bleed underline tabs as Master Accounts
+  // (owner 2026-07-15). 13 sections, so the row is marked .tabs-dense: it
+  // compresses harder and scrolls (hidden bar) only at the narrowest widths.
   function pills(active) {
-    var host = el('div.pill-tab.mb-3');
+    var host = el('div.tab-underline.tabs-dense.mb-3');
     TABS.forEach(function (t) {
       host.appendChild(el('button' + ((active || null) === t[0] ? '.active' : ''), {
         text: t[1],
         onclick: function () { EPAL.router.navigate('group/finance' + (t[0] ? '/' + t[0] : '')); }
       }));
     });
-    return el('div', null, [host]);
+    // the period lock is VISIBLE here too (P2) — this is where it is set
+    var locked = (hasLedger() && LED().lockedThrough) ? LED().lockedThrough() : null;
+    return el('div', null, [host, locked ? el('div.mb-2', null, [
+      el('span.badge.badge-warn', { html: ui.icon('lock-fill') + ' Books locked through ' + ui.escapeHtml(locked) + ' — back-dated entries are blocked' })
+    ]) : null].filter(Boolean));
   }
   function head(title, icon, sub, actions) {
     return EPAL.pageHead({ eyebrow: 'Epal Group · Consolidated Finance', icon: icon, title: title, sub: sub, actions: actions });

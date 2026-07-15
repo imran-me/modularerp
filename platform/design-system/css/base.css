@@ -211,5 +211,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
 .tab-underline button + button { border-left:1px solid var(--border); }   /* 1px line between sections */
 .tab-underline button:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 9%, transparent); }
 .tab-underline button.active { color: var(--accent); border-bottom-color: var(--accent); }   /* the blue line */
+/* .tabs-dense — for long rows (Consolidated Finance's 13 sections): the same
+   look, compressed harder so every label stays on one line before the
+   hidden-scrollbar fallback ever engages. */
+.tab-underline.tabs-dense button { padding:12px clamp(4px, 0.62vw, 14px) 13px; font-size: clamp(10px, 0.72vw, 13px); letter-spacing:0; }
 kbd { font-family: var(--font-mono); font-size: 11px; background: var(--surface-3); border: 1px solid var(--border-strong);
   border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text-dim); }
