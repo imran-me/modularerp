@@ -205,7 +205,7 @@
         sub: 'Group-level accounting across every sister concern — switch company with the buttons below.'
       }));
       // section nav — calm underline tabs (primary), per the owner's mock
-      var pills = el('div.tab-underline.tabs-dense.mb-3');   // 8 sections — dense
+      var pills = el('div.tab-underline.tabs-dense.mb-3');   // 9 sections — dense
       SECTIONS.forEach(function (s) { pills.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1], onclick: function () { EPAL.router.navigate('group/master-accounts/' + s[0]); } })); });
       page.appendChild(pills);
       // AUDIT P2: the period lock is VISIBLE wherever money is handled

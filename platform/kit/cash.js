@@ -114,10 +114,21 @@
   function cashSales(cid) {
     return db().col('sh_orders').filter(function (o) {
       return o.payMethod === 'Cash' && inScope(cid, 'shop');
+    }).map(function (o) {
+      // display fallback only (never written back): seeded history predates
+      // the payStatus field — a Completed cash order with no due is Paid
+      if (!o.payStatus) o = Object.assign({}, o, { payStatus: 'Paid' });
+      return o;
     }).sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
   }
-  // cash actually kept from a POS order: what was tendered minus the change
-  function keptOf(o) { return Math.max(0, Math.min(+o.tendered || 0, +o.amount || 0)); }
+  // Cash actually kept from a POS order: tendered minus change. Orders that
+  // never recorded a tendered figure (the seeded history predates the field)
+  // are Completed cash sales — treat the bill as fully tendered, otherwise the
+  // whole seeded book reads "৳0 kept" against real bills (review finding).
+  function keptOf(o) {
+    var t = (o.tendered == null) ? (+o.amount || 0) : (+o.tendered || 0);
+    return Math.max(0, Math.min(t, +o.amount || 0));
+  }
   function pettyList(cid) {
     return S.list('tv_petty').filter(function (p) { return inScope(cid, p.companyId); })
       .sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
@@ -141,10 +152,18 @@
       options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })),
       default: cid === 'all' ? 'group' : cid };
   }
-  function postCash(spec, okMsg) {
+  function postCash(spec, okMsg, after) {
     // one funnel for every journal this desk writes — the ledger enforces
-    // balance and the period lock; surface its message instead of crashing
-    try { L().post(spec); ui.toast(okMsg, 'success'); EPAL.router.render(); return true; }
+    // balance and the period lock; surface its message instead of crashing.
+    // `after` runs between the post and the re-render: the bank-register leg
+    // hangs off it, so (a) the register can never move when the journal was
+    // refused, and (b) the screen repaints only once BOTH legs are in — a
+    // render in between would flash the journal without its register entry.
+    try {
+      L().post(spec);
+      if (after) after();
+      ui.toast(okMsg, 'success'); EPAL.router.render(); return true;
+    }
     catch (err) { ui.toast(String(err && err.message || err), 'error'); return false; }
   }
 
@@ -157,8 +176,8 @@
         { key: 'date', label: 'Date', type: 'date', required: true },
         { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
         { key: 'account', label: 'Where it came from', type: 'select', required: true,
-          options: acctOpts(['1200', '3000', 'income']),
-          hint: 'Collecting a sale already on the books = 1200 Accounts Receivable (the default — POS cash sits there until collected). Fresh income = a 4xxx head. Owner putting money in = 3000.' },
+          options: acctOpts(['1200', '1150', '3000', 'income']),
+          hint: 'Collecting a sale already on the books = 1200 Accounts Receivable (the default — POS cash sits there until collected) or 1150 for a sub-agent. Fresh income = a 4xxx head. Owner putting money in = 3000.' },
         { key: 'party', label: 'From (party)', type: 'text', placeholder: 'e.g. Concord Group · walk-in customers' },
         { key: 'ref', label: 'Reference', type: 'text', placeholder: 'e.g. money receipt no' },
         { key: 'memo', label: 'Note', type: 'text', col2: true }
@@ -210,8 +229,17 @@
   // bank.balance and the reconciliation float all stay honest.
   function bankMoveForm(cid, dir) {
     var toBank = dir === 'deposit';
-    var bankList = db().col('banks').filter(function (b) { return (b.status || 'Active') !== 'Inactive' && (b.type || '') !== 'Cash Box'; });
-    if (!bankList.length) { ui.toast('No bank accounts yet — add one in Manage Banks first', 'error'); return; }
+    // SCOPE RULE (review finding 2026-07-15): the journal books BOTH legs under
+    // the bank's company — a deposit is that company's drawer going into that
+    // company's bank. So when the desk is scoped to one company, only ITS banks
+    // are offered; otherwise a Travels-scoped user could pick a Woodart bank
+    // and move Woodart's drawer while watching Travels' numbers not change.
+    // Cross-company money movements belong to the ledger's inter-company flow
+    // (1300/2400), not to a cash deposit.
+    var bankList = db().col('banks').filter(function (b) {
+      return (b.status || 'Active') !== 'Inactive' && (b.type || '') !== 'Cash Box' && inScope(cid, b.companyId);
+    });
+    if (!bankList.length) { ui.toast(cid === 'all' ? 'No bank accounts yet — add one in Manage Banks first' : 'No bank accounts for ' + coName(cid) + ' — add one in Manage Banks first', 'error'); return; }
     EPAL.formModal({
       title: toBank ? 'Deposit Cash to Bank' : 'Withdraw Cash from Bank', icon: toBank ? 'bank' : 'cash-stack', size: 'md',
       record: { date: today(), bankId: bankList[0].id },
@@ -234,16 +262,15 @@
         var co = bank.companyId || 'group';
         var glId = 'GL-CSH-' + ui.uid('').slice(-7).toUpperCase();
         var desc = (toBank ? 'Cash deposit' : 'Cash withdrawal') + ' — ' + bank.name;
-        var ok = postCash({ id: glId, date: v.date, companyId: co, ref: v.ref || '', memo: v.memo || desc,
+        return postCash({ id: glId, date: v.date, companyId: co, ref: v.ref || '', memo: v.memo || desc,
           source: 'cash', party: bank.name,
           lines: toBank
             ? [{ account: '1010', dr: amt, cr: 0 }, { account: '1000', dr: 0, cr: amt }]
             : [{ account: '1000', dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt }] },
-          (toBank ? 'Deposited ' : 'Withdrew ') + ui.money(amt) + (toBank ? ' → ' : ' ← ') + bank.name);
-        // register leg only AFTER the journal went through (post throws on a
-        // locked period — the register must never move without its journal)
-        if (ok && EPAL.bankTxnApply) EPAL.bankTxnApply(bank, toBank ? 'deposit' : 'withdraw', amt, v.date, desc, v.ref || '', glId);
-        return ok;
+          (toBank ? 'Deposited ' : 'Withdrew ') + ui.money(amt) + (toBank ? ' → ' : ' ← ') + bank.name,
+          // the register leg — runs only after the journal is accepted (a
+          // locked period throws before this) and before the single re-render
+          function () { if (EPAL.bankTxnApply) EPAL.bankTxnApply(bank, toBank ? 'deposit' : 'withdraw', amt, v.date, desc, v.ref || '', glId); });
       }
     });
   }
