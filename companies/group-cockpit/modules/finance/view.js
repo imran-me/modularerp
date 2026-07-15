@@ -524,6 +524,9 @@
         el('div.flex.gap-1.flex-wrap.items-center', null, [
           fySel,
           can('create') ? el('button.btn.btn-sm.btn-outline', { html: ui.icon('lock') + ' Close a Month', onclick: closeMonthPrompt }) : null,
+          can('create') ? el('button.btn.btn-sm.btn-primary', { html: ui.icon('archive') + ' Close Fiscal Year…', onclick: fyCloseWizard }) : null,
+          can('create') && LED().entries({}).some(function (e) { return String(e.id).indexOf('GL-FYCLOSE-') === 0 && !e.reversedBy; })
+            ? el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-counterclockwise') + ' Undo FY Close', onclick: fyUndo }) : null,
           can('create') && locked ? el('button.btn.btn-sm.btn-ghost', { html: ui.icon('unlock') + ' Reopen', onclick: function () { ui.confirm({ title: 'Reopen the books?', text: 'Removes the period lock (MD action).', confirmLabel: 'Reopen' }).then(function (ok) { if (ok) { LED().unlockPeriod(); ui.toast('Books reopened', 'success'); EPAL.router.render(); } }); } }) : null
         ].filter(Boolean))
       ]) ])
@@ -557,6 +560,69 @@
       }
     });
   }
+  /* ---- P3: FISCAL-YEAR CLOSE WIZARD ---------------------------------------
+   * Rolls every income & expense balance (per company) into Retained Earnings
+   * (3100) with ONE explicit closing entry per company, then locks the books
+   * through the FY end. Undo = reversal entries (immutability, P2). */
+  function fyCloseWizard() {
+    var fyDefault = EPAL.store.get('fiscal_year_start', '07') === '07' ? '2026-06' : '2025-12';
+    EPAL.formModal({
+      title: 'Close Fiscal Year', icon: 'archive', size: 'md', record: { fy: fyDefault },
+      fields: [
+        { key: 'fy', label: 'Fiscal year END month (YYYY-MM)', type: 'text', required: true, placeholder: '2026-06',
+          hint: 'Per company: every income and expense balance rolls into Retained Earnings (3100) dated the last day of this month; the P&L restarts at zero and the books lock through it. Undo posts reversals.' }
+      ],
+      saveLabel: 'Close the Year',
+      onSave: function (v) {
+        var fy = (v.fy || '').trim();
+        if (!/^\d{4}-\d{2}$/.test(fy)) { ui.toast('Use the YYYY-MM format', 'error'); return false; }
+        var LEDG = LED();
+        if (LEDG.entries({}).some(function (e) { return String(e.id).indexOf('GL-FYCLOSE-') === 0 && String(e.id).slice(-7) === fy && !e.reversedBy; })) {
+          ui.toast('FY ' + fy + ' is already closed — Undo FY Close first', 'error'); return false;
+        }
+        var lastDay = (function () { var y = +fy.slice(0, 4), m = +fy.slice(5, 7); return fy + '-' + String(new Date(y, m, 0).getDate()).padStart(2, '0'); })();
+        var cos = activeCompanies().map(function (c) { return c.id; }).concat(['group']);
+        var closedN = 0, netTotal = 0;
+        try {
+          cos.forEach(function (cid) {
+            var lines = [], dr = 0, cr = 0;
+            LEDG.accounts().forEach(function (a) {
+              if (a.type !== 'income' && a.type !== 'expense') return;
+              var bal = LEDG.balance(a.code, { companyId: cid });
+              if (Math.abs(bal) < 0.5) return;
+              // balance() is positive on the account's NORMAL side; abnormal
+              // (negative) balances close from the opposite side
+              if (a.type === 'income') { if (bal > 0) { lines.push({ account: a.code, dr: bal, cr: 0 }); dr += bal; } else { lines.push({ account: a.code, dr: 0, cr: -bal }); cr += -bal; } }
+              else { if (bal > 0) { lines.push({ account: a.code, dr: 0, cr: bal }); cr += bal; } else { lines.push({ account: a.code, dr: -bal, cr: 0 }); dr += -bal; } }
+            });
+            if (!lines.length) return;
+            var net = dr - cr;                          // + = profit → credit 3100
+            if (net > 0.001) lines.push({ account: '3100', dr: 0, cr: net });
+            else if (net < -0.001) lines.push({ account: '3100', dr: -net, cr: 0 });
+            LEDG.post({ id: 'GL-FYCLOSE-' + cid + '-' + fy, date: lastDay, companyId: cid, ref: 'FY-' + fy,
+              memo: 'Fiscal year close ' + fy + ' — P&L to Retained Earnings', source: 'closing', override: true, lines: lines });
+            closedN++; netTotal += net;
+          });
+        } catch (e) { ui.toast(e.message || 'Close failed', 'error'); return false; }
+        LEDG.lockPeriod(fy);
+        ui.toast('FY ' + fy + ' closed — ' + closedN + ' companies, net ' + ui.money(netTotal) + ' to Retained Earnings; books locked', 'success');
+        EPAL.router.render(); return true;
+      }
+    });
+  }
+  function fyUndo() {
+    var LEDG = LED();
+    var closes = LEDG.entries({}).filter(function (e) { return String(e.id).indexOf('GL-FYCLOSE-') === 0 && !e.reversedBy; });
+    if (!closes.length) { ui.toast('No FY close to undo', 'error'); return; }
+    ui.confirm({ title: 'Undo the fiscal-year close?', text: closes.length + ' closing entries will be REVERSED (originals stay on the books). The period lock is kept — reopen it separately if needed.', danger: true, confirmLabel: 'Undo FY Close' })
+      .then(function (ok) {
+        if (!ok) return;
+        var n = 0;
+        closes.forEach(function (e) { try { if (LEDG.reverse(e.id, { reason: 'FY close undone' })) n++; } catch (x) {} });
+        ui.toast(n + ' closing entries reversed', 'success'); EPAL.router.render();
+      });
+  }
+
   function closeMonthPrompt() {
     EPAL.formModal({ title: 'Close Accounting Period', icon: 'lock', size: 'sm', record: { ym: LED().lockedThrough() || '2026-06' },
       fields: [ { key: 'ym', label: 'Close through month (YYYY-MM)', type: 'text', required: true, placeholder: '2026-06', hint: 'Locks this month and everything before it against new/back-dated entries.' } ],

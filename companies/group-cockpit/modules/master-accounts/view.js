@@ -49,6 +49,7 @@
   var reportDate = TODAY_STR;                         // daily / weekly anchor
   var reportMonth = TODAY_STR.slice(0, 7);            // monthly anchor (YYYY-MM)
   var reportFrom = '2026-07-01', reportTo = TODAY_STR;
+  var taxYm = TODAY_STR.slice(0, 7);                  // VAT/AIT return period (P3)
 
   /* ---- seeds -------------------------------------------------------------*/
   EPAL.registerEngine({ name: 'master-accounts-seed', seed: function () {
@@ -126,6 +127,38 @@
         S.set('bank_gl_open_v1', { banks: opN, amount: opAmt });
       } catch (x) {}
     }
+
+    /* ---- P3: ALERTS SWEEP (runs each boot, deduped by stable ids) ----------
+     * Budget breaches → one notification per budget per month.
+     * Overdue schedules → one per schedule per due-date. Both land in the
+     * group Notifications inbox (bell). */
+    try {
+      var haveN = {}; S.list('notifications').forEach(function (n) { haveN[n.id] = 1; });
+      var ymNow = TODAY_STR.slice(0, 7);
+      S.list('group_budgets').forEach(function (b) {
+        var spent = db.col('acc_entries').filter(function (e) {
+          return e.kind === 'Expense' && e.category === b.category &&
+            ((b.companyId || 'group') === 'group' ? true : e.companyId === b.companyId) &&
+            String(e.date).slice(0, 7) === ymNow;
+        }).reduce(function (a, e) { return a + (+e.amount || 0); }, 0);
+        var pct = (+b.amount || 0) ? spent / b.amount * 100 : 0;
+        var nid = 'NB-' + b.id + '-' + ymNow;
+        if (pct >= (+b.threshold || 80) && !haveN[nid]) {
+          db.notify({ id: nid, level: pct >= 100 ? 'error' : 'warn', icon: 'bullseye', companyId: b.companyId || 'group',
+            title: 'Budget ' + (pct >= 100 ? 'EXCEEDED' : 'near limit') + ' · ' + b.category,
+            text: coName(b.companyId || 'group') + ' — ' + ui.money(spent) + ' of ' + ui.money(b.amount) + ' (' + Math.round(pct) + '%) spent in ' + ymNow });
+        }
+      });
+      db.col('acc_schedules').forEach(function (s) {
+        if (s.status === 'Paid' || s.status === 'Cancelled' || !(s.due && s.due < TODAY_STR)) return;
+        var nid = 'NS-' + s.id + '-' + s.due;
+        if (haveN[nid]) return;
+        var open = (+s.amount || 0) - (+s.paidAmount || 0);
+        db.notify({ id: nid, level: 'warn', icon: 'calendar2-x', companyId: s.companyId || 'group',
+          title: 'Overdue ' + (s.kind === 'Receivable' ? 'receivable' : 'payable') + ' · ' + s.party,
+          text: ui.money(open) + ' was due ' + ui.date(s.due) + ' (' + coName(s.companyId || 'group') + ') — open it in Payment Schedules' });
+      });
+    } catch (x) {}
   } });
 
   /* ---- helpers -----------------------------------------------------------*/
@@ -642,6 +675,37 @@
         el('button.btn.btn-sm.btn-outline', { html: ui.icon('layers-half') + ' Opening Asset', onclick: function () { openingAssetForm(); } })
       ]));
     }
+    // ---- P3: VAT & AIT RETURN (BD tax cycle: collect → report → deposit) ----
+    (function () {
+      var scope = selCo === 'all' ? {} : { companyId: selCo };
+      function taxRow(code, label) {
+        var coll = 0, dep = 0;
+        list.forEach(function (e) {
+          if (String(e.date).slice(0, 7) !== taxYm) return;
+          (e.lines || []).forEach(function (l) { if (l.account === code) { coll += +l.cr || 0; dep += +l.dr || 0; } });
+        });
+        var closing = 0;
+        try { closing = L.balance(code, scope); } catch (e2) { closing = 0; }
+        return { code: code, label: label, collected: coll, deposited: dep, closing: closing };
+      }
+      var rows = [taxRow('2130', 'VAT (output, on services)'), taxRow('2140', 'AIT / TDS (withheld)')];
+      var mSel = el('input.input', { type: 'month', value: taxYm, style: { width: 'auto' }, onchange: function () { taxYm = this.value || taxYm; EPAL.router.render(); } });
+      var bodyT = el('div.card-body');
+      bodyT.appendChild(el('div.flex.gap-2.items-center.mb-2', null, [el('span.text-mute.sm', { text: 'Return period' }), mSel,
+        el('span.text-mute.xs', { text: 'collected via the Credit/Debit journal tax fields · deposit clears the payable' })]));
+      rows.forEach(function (r) {
+        bodyT.appendChild(el('div.data-row', null, [
+          el('div.flex-1', null, [el('div.fw-600.sm', { text: r.code + ' · ' + r.label }),
+            el('div.text-mute.xs', { text: taxYm + ': collected ' + ui.money(r.collected) + ' · deposited ' + ui.money(r.deposited) })]),
+          el('div.num.strong' + (r.closing > 0.5 ? '.text-warn' : ''), { text: 'Payable ' + ui.money(r.closing) }),
+          canCreate() && r.closing > 0.5 ? el('button.btn.btn-sm.btn-outline', { style: { marginLeft: '10px' },
+            html: ui.icon('bank') + ' Record NBR Deposit', onclick: function () { nbrDepositForm(r.code, r.label, r.closing); } }) : null
+        ].filter(Boolean)));
+      });
+      page.appendChild(el('div.card.mb-2', null, [
+        el('div.card-head', null, [el('h3', { html: ui.icon('receipt') + ' VAT & AIT Return — ' + coName(selCo) }),
+          el('span.card-sub', { text: 'Bangladesh NBR cycle' })]), bodyT]));
+    })();
     var cols = [
       { key: 'date', label: 'Date', date: true },
       { key: 'ref', label: 'Reference', render: function (e) { return '<span class="mono xs text-mute">' + esc(e.ref || e.id) + '</span>'; } },
@@ -665,6 +729,39 @@
     });
     page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('journal-text') + ' Journal Entries — ' + coName(selCo) }), el('span.card-sub', { text: 'filter by Source to see its total' })]), el('div.card-body', null, [tbl.el])]));
   }
+  // P3: deposit a tax payable to the NBR — DR 2130|2140 / CR bank, logged on
+  // the bank register too so the reconciliation stays exact.
+  function nbrDepositForm(code, label, closing) {
+    var banks = db.col('banks').filter(function (b) { return (b.status || 'Active') !== 'Inactive'; });
+    if (!banks.length) { ui.toast('Add a bank account first (Manage Banks)', 'error'); return; }
+    EPAL.formModal({
+      title: 'NBR Deposit — ' + label, icon: 'bank', size: 'sm',
+      record: { amount: Math.round(closing), date: TODAY_STR, bankId: banks[0].id, companyId: selCo === 'all' ? 'group' : selCo },
+      fields: [
+        { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+        { key: 'bankId', label: 'Paid from bank', type: 'select', required: true, options: banks.map(function (b) { return [b.id, b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; }) },
+        { key: 'amount', label: 'Deposit amount (৳)', type: 'money', required: true, min: 1, hint: 'Payable to date: ' + ui.money(closing) },
+        { key: 'date', label: 'Deposit date', type: 'date', required: true },
+        { key: 'ref', label: 'Challan / reference no', type: 'text', placeholder: 'e.g. TR-6 challan no' }
+      ],
+      saveLabel: 'Record Deposit',
+      onSave: function (v) {
+        var amt = +v.amount || 0; if (amt <= 0) { ui.toast('Enter an amount', 'error'); return false; }
+        var bank = db.col('banks').filter(function (b) { return b.id === v.bankId; })[0];
+        if (!bank) { ui.toast('Pick a bank', 'error'); return false; }
+        if ((+bank.balance || 0) < amt) { ui.toast('Insufficient balance — available ' + ui.money(bank.balance), 'error'); return false; }
+        var memo = label + ' deposit to NBR' + (v.ref ? ' · challan ' + v.ref : '');
+        var glId = 'GL-NBR-' + ui.uid('').slice(-6).toUpperCase();
+        try {
+          EPAL.ledger.post({ id: glId, date: v.date, companyId: v.companyId, ref: v.ref || 'NBR', memo: memo, source: 'bank',
+            lines: [{ account: code, dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt }] });
+        } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); return false; }
+        bankTxnApply(bank, 'withdraw', amt, v.date, memo, v.ref || '', glId);
+        ui.toast(label + ' deposit recorded — ' + ui.money(amt), 'success'); EPAL.router.render(); return true;
+      }
+    });
+  }
+
   // Credit Journal (money IN): DR bank control / CR income-liability-equity.
   // Debit Journal (money OUT): DR expense-asset / CR bank control.
   function bankJournalForm(kind, presetBankId) {
@@ -684,24 +781,34 @@
         { key: 'bankId', label: 'Bank', type: 'select', required: true, options: banks.map(function (b) { return [b.id, b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; }) },
         { key: 'account', label: isCr ? 'Credit account' : 'Debit account', type: 'select', required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
         { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+        // AUDIT P3 (BD tax cycle): optional split — collected VAT rides to
+        // 2130 on money-in; withheld AIT/TDS rides to 2140 on money-out
+        isCr ? { key: 'vat', label: 'VAT included (৳) → 2130', type: 'money', min: 0, hint: 'Part of the amount that is output VAT (e.g. 15% of the service charge). Leave 0 if none.' }
+             : { key: 'tds', label: 'AIT / TDS withheld (৳) → 2140', type: 'money', min: 0, hint: 'Tax withheld from the payee and owed to the NBR. The bank pays amount minus this.' },
         { key: 'ref', label: 'Reference', type: 'text', placeholder: 'e.g. JV-001' },
         { key: 'desc', label: 'Description', type: 'textarea', col2: true }
       ],
       saveLabel: isCr ? 'Save Credit Journal' : 'Save Debit Journal',
       onSave: function (v) {
         var amt = +v.amount || 0; if (amt <= 0) { ui.toast('Enter an amount', 'error'); return false; }
+        var vat = isCr ? Math.max(0, +v.vat || 0) : 0;
+        var tds = !isCr ? Math.max(0, +v.tds || 0) : 0;
+        if (vat >= amt || tds >= amt) { ui.toast('Tax portion must be less than the amount', 'error'); return false; }
         var bank = db.col('banks').filter(function (b) { return b.id === v.bankId; })[0];
         if (!bank) { ui.toast('Pick a bank', 'error'); return false; }
-        if (!isCr && (+bank.balance || 0) < amt) { ui.toast('Insufficient balance — available ' + ui.money(bank.balance), 'error'); return false; }
-        var memo = (isCr ? 'Deposit to ' : 'Withdrawal from ') + bank.name + (v.desc ? ' — ' + v.desc : '');
+        var bankMove = isCr ? amt : amt - tds;               // withheld tax never leaves the bank
+        if (!isCr && (+bank.balance || 0) < bankMove) { ui.toast('Insufficient balance — available ' + ui.money(bank.balance), 'error'); return false; }
+        var memo = (isCr ? 'Deposit to ' : 'Withdrawal from ') + bank.name + (v.desc ? ' — ' + v.desc : '')
+          + (vat ? ' · VAT ' + ui.money(vat) : '') + (tds ? ' · TDS ' + ui.money(tds) : '');
         var glId = 'GL-BK-' + ui.uid('').slice(-6).toUpperCase();
+        var lines = isCr
+          ? [{ account: '1010', dr: amt, cr: 0 }, { account: v.account, dr: 0, cr: amt - vat }].concat(vat ? [{ account: '2130', dr: 0, cr: vat }] : [])
+          : [{ account: v.account, dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: bankMove }].concat(tds ? [{ account: '2140', dr: 0, cr: tds }] : []);
         try {
           EPAL.ledger.post({ id: glId, date: v.date, companyId: v.companyId,
-            ref: v.ref || ('BANK-' + (isCr ? 'DEP' : 'WDR')), memo: memo, source: 'bank',
-            lines: isCr ? [{ account: '1010', dr: amt, cr: 0 }, { account: v.account, dr: 0, cr: amt }]
-                        : [{ account: v.account, dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt }] });
+            ref: v.ref || ('BANK-' + (isCr ? 'DEP' : 'WDR')), memo: memo, source: 'bank', lines: lines });
         } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); return false; }
-        bankTxnApply(bank, isCr ? 'deposit' : 'withdraw', amt, v.date, memo, v.ref || '', glId);
+        bankTxnApply(bank, isCr ? 'deposit' : 'withdraw', bankMove, v.date, memo, v.ref || '', glId);
         ui.toast((isCr ? 'Credit' : 'Debit') + ' journal posted', 'success'); EPAL.router.render(); return true;
       }
     });
@@ -1131,9 +1238,12 @@
       return kpi(t[1], String(counts[t[0]] || 0), t[2]);
     })));
     if (canCreate()) {
-      page.appendChild(el('div.flex.gap-1.mb-2', null, [
+      var in4000 = 0;
+      try { in4000 = L.balance('4000', scope); } catch (e0) {}
+      page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
         el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-square') + ' Add Account', onclick: addAccountForm }),
-        el('button.btn.btn-sm.btn-outline', { html: ui.icon('flag') + ' Opening Balance', onclick: openingBalanceForm })
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('flag') + ' Opening Balance', onclick: openingBalanceForm }),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('shuffle') + ' Reclass 4000 Catch-all' + (in4000 > 0.5 ? ' (' + ui.money(in4000, { compact: true }) + ')' : ''), onclick: reclass4000Tool })
       ]));
     }
     TYPE_META.forEach(function (t) {
@@ -1230,6 +1340,67 @@
         }
       });
     }
+  }
+
+  /* ---- P3: 4000 CATCH-ALL RECLASS TOOL --------------------------------------
+   * Every sale that landed in the generic 4000 head gets a suggested proper
+   * income line (via the ledger's own income mapper). Applying posts an
+   * explicit reclass journal (DR 4000 / CR target) per entry — the original
+   * stays untouched, the P&L moves to the right line. */
+  function reclass4000Tool() {
+    var L = EPAL.ledger;
+    var glIds = {}; L.entries({}).forEach(function (g) { glIds[g.id] = 1; });
+    var rows = [];
+    L.entries(selCo === 'all' ? {} : { companyId: selCo }).forEach(function (e) {
+      if (glIds['GL-RC4K-' + e.id]) return;                        // already reclassed
+      var amt = 0; (e.lines || []).forEach(function (l) { if (l.account === '4000') amt += (+l.cr || 0) - (+l.dr || 0); });
+      if (amt < 0.5) return;
+      var sug = '4000';
+      try { sug = L.incomeAccountFor({ category: e.memo, desc: (e.memo || '') + ' ' + (e.ref || '') }) || '4000'; } catch (x) {}
+      rows.push({ e: e, amt: amt, sug: sug === '4000' ? '' : sug });
+    });
+    if (!rows.length) { ui.toast('Nothing sitting in 4000 for this scope — all clean', 'success'); return; }
+    var incomeOpts = L.accounts().filter(function (a) { return a.type === 'income' && a.code !== '4000' && a.active !== false; })
+      .map(function (a) { return [a.code, a.code + ' · ' + a.name]; });
+    var body = el('div');
+    var m = ui.modal({ title: 'Reclass 4000 Catch-all — ' + rows.length + ' entries · ' + ui.money(rows.reduce(function (a, r) { return a + r.amt; }, 0)), icon: 'shuffle', size: 'xl', body: body, footer: false });
+    var sels = [];
+    body.appendChild(el('p.text-mute.sm.mb-2', { text: 'Pick the proper income line per entry (suggestions pre-filled where the memo gives one away). Applying posts an explicit reclass journal — originals stay untouched.' }));
+    var t = el('table.tbl');
+    t.appendChild(el('thead', null, [el('tr', null, [el('th', { text: 'Date' }), el('th', { text: 'Company' }), el('th', { text: 'Memo' }),
+      el('th.num', { text: 'In 4000' }), el('th', { text: 'Move to' })])]));
+    var tb = el('tbody');
+    rows.forEach(function (r) {
+      var sel = el('select.input', { style: { minWidth: '210px' } });
+      sel.appendChild(el('option', { value: '', text: '— keep in 4000 —' }));
+      incomeOpts.forEach(function (o) { var op = el('option', { value: o[0], text: o[1] }); if (r.sug === o[0]) op.selected = true; sel.appendChild(op); });
+      sels.push({ r: r, sel: sel });
+      tb.appendChild(el('tr', null, [
+        el('td', { text: ui.date(r.e.date) }), el('td', { text: coName(r.e.companyId) }),
+        el('td', { text: (r.e.memo || r.e.ref || r.e.id).slice(0, 48) }),
+        el('td.num', { html: ui.money(r.amt) }), el('td', null, [sel])
+      ]));
+    });
+    t.appendChild(tb);
+    body.appendChild(el('div.table-wrap', { style: { maxHeight: '420px', overflowY: 'auto' } }, [t]));
+    body.appendChild(el('div.flex.justify-between.mt-2', null, [
+      el('span.text-mute.xs', { text: 'Reclass journals post as GL-RC4K-<entry> · source manual · one per entry' }),
+      el('button.btn.btn-primary', { html: ui.icon('check-lg') + ' Apply Selected Reclasses', onclick: function () {
+        var n = 0, amt = 0;
+        sels.forEach(function (x) {
+          var to = x.sel.value; if (!to) return;
+          try {
+            EPAL.ledger.post({ id: 'GL-RC4K-' + x.r.e.id, date: TODAY_STR, companyId: x.r.e.companyId, ref: 'RECLASS-' + (x.r.e.ref || x.r.e.id),
+              memo: 'Reclass from 4000 → ' + to + ' — ' + (x.r.e.memo || x.r.e.id), source: 'manual', party: x.r.e.party || '', override: true,
+              lines: [{ account: '4000', dr: x.r.amt, cr: 0 }, { account: to, dr: 0, cr: x.r.amt }] });
+            n++; amt += x.r.amt;
+          } catch (e2) {}
+        });
+        m.close();
+        ui.toast(n ? (n + ' entries reclassed · ' + ui.money(amt) + ' moved off 4000') : 'Nothing selected', n ? 'success' : 'error');
+        EPAL.router.render();
+      } })
+    ]));
   }
 
   /* ======================================================= MANAGE BANKS

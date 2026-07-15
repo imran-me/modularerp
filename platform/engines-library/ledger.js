@@ -544,6 +544,7 @@
     consolidatedTrialBalance: consolidatedTrialBalance,
     postIntercompany: postIntercompany,
     expenseAccountFor: expenseAccountFor, isAgentParty: isAgentParty,
+    incomeAccountFor: function (rec) { return incomeAccountFor(rec || {}); },   // P3 reclass tool
     // remove one journal by id (used when a mirrored quick-entry is deleted, so
     // the GL doesn't keep an orphaned posting). Prefer reversal entries for real
     // audit trails; this exists for the mirrored-entry lifecycle.
@@ -635,7 +636,11 @@
       { code: '5600', name: 'Conveyance & Travel', type: 'expense', group: 'Operating Expenses' },
       { code: '5800', name: 'Miscellaneous Expenses', type: 'expense', group: 'Operating Expenses' },
       { code: '5900', name: 'Penalties & ADM', type: 'expense', group: 'Operating Expenses' },
-      { code: '6000', name: 'Bank Charges & Fees', type: 'expense', group: 'Operating Expenses' }
+      { code: '6000', name: 'Bank Charges & Fees', type: 'expense', group: 'Operating Expenses' },
+      // AUDIT P3 (Bangladesh tax cycle): output VAT collected on services and
+      // AIT/TDS withheld from payments — both are money owed to the NBR
+      { code: '2130', name: 'VAT Payable', type: 'liability', group: 'Taxes Payable' },
+      { code: '2140', name: 'AIT & TDS Payable', type: 'liability', group: 'Taxes Payable' }
     ];
     var coa = S.list(COA_KEY); if (!coa.length) return; var have = {}; coa.forEach(function (a) { have[a.code] = true; });
     var add = false; extra.forEach(function (x) { if (!have[x.code]) { coa.push(withNormal({ code: x.code, name: x.name, type: x.type, group: x.group })); add = true; } });
