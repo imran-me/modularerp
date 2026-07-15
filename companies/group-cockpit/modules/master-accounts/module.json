@@ -8,13 +8,13 @@
   "enabled": true,
   "built": true,
   "menu": [
+    { "id": "banks", "label": "Manage Banks", "route": "#/group/master-accounts/banks", "enabled": true },
+    { "id": "payroll", "label": "Master Payroll", "route": "#/group/master-accounts/payroll", "enabled": true },
+    { "id": "schedules", "label": "Payment Schedules", "route": "#/group/master-accounts/schedules", "enabled": true },
+    { "id": "journals", "label": "Manage Journals", "route": "#/group/master-accounts/journals", "enabled": true },
     { "id": "expenses", "label": "Operational Expenses", "route": "#/group/master-accounts/expenses", "enabled": true },
     { "id": "accounts", "label": "Manage Accounts", "route": "#/group/master-accounts/accounts", "enabled": true },
-    { "id": "journals", "label": "Manage Journals", "route": "#/group/master-accounts/journals", "enabled": true },
-    { "id": "schedules", "label": "Payment Schedules", "route": "#/group/master-accounts/schedules", "enabled": true },
-    { "id": "party-types", "label": "Party Types", "route": "#/group/master-accounts/party-types", "enabled": true },
-    { "id": "payroll", "label": "Master Payroll", "route": "#/group/master-accounts/payroll", "enabled": true },
-    { "id": "banks", "label": "Manage Banks", "route": "#/group/master-accounts/banks", "enabled": true }
+    { "id": "party-types", "label": "Party Types", "route": "#/group/master-accounts/party-types", "enabled": true }
   ],
   "files": { "view": "view.js", "backend": "backend/LARAVEL-BLUEPRINT.md" },
   "note": "Company switcher buttons at the top scope every section (All / Group HQ / each concern); Master Payroll mounts the shared EPAL.payrollDesk per company."

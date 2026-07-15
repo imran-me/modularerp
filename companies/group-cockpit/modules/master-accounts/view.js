@@ -38,8 +38,10 @@
   // OWNER LAYOUT: the group's operational expenses live in ONE section — all
   // expenses, budget setup, the D/W/M/custom report and the combined
   // category + sub-category screen switch with buttons at the top of it.
-  var SECTIONS = [['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'], ['journals', 'Manage Journals'],
-    ['schedules', 'Payment Schedules'], ['party-types', 'Party Types'], ['payroll', 'Master Payroll'], ['banks', 'Manage Banks']];
+  // OWNER ORDER: Banks → Payroll → Schedules → Journals → Expenses →
+  // Accounts → Party Types (Manage Banks is the landing section)
+  var SECTIONS = [['banks', 'Manage Banks'], ['payroll', 'Master Payroll'], ['schedules', 'Payment Schedules'],
+    ['journals', 'Manage Journals'], ['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'], ['party-types', 'Party Types']];
   var EXP_TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Category & Sub-category']];
   var expTab = 'all';                                 // active button inside Operational Expenses
   var selCo = 'all';                                  // the company switcher state
@@ -97,10 +99,10 @@
    * ========================================================================*/
   EPAL.view('group/master-accounts', {
     render: function (ctx) {
-      var sub = ctx.subId || 'expenses';
+      var sub = ctx.subId || 'banks';
       // legacy deep-links from the pre-consolidation layout land on the right tab
       if (sub === 'categories' || sub === 'budget' || sub === 'report') { expTab = sub; sub = 'expenses'; }
-      if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'expenses';
+      if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'banks';
       var page = el('div.page');
       var titles = {}; SECTIONS.forEach(function (s) { titles[s[0]] = s[1]; });
       page.appendChild(EPAL.pageHead({
