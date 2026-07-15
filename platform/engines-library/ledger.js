@@ -601,7 +601,16 @@
       { code: '4030', name: 'Package & Tour', type: 'income', group: 'Revenue' },
       { code: '4040', name: 'Hotel & Other Travel', type: 'income', group: 'Revenue' },
       { code: '4050', name: 'Contract Flights & Files', type: 'income', group: 'Revenue' },
-      { code: '5350', name: 'Agent Commission', type: 'expense', group: 'Selling Expenses' }
+      { code: '5350', name: 'Agent Commission', type: 'expense', group: 'Selling Expenses' },
+      // AUDIT P1: every head expenseAccountFor() can emit MUST exist as an
+      // account — trialBalance silently skips unknown codes, and ৳66.04L of
+      // register expenses were invisible to the TB via 5550/5600/5800
+      { code: '5500', name: 'Office & Admin', type: 'expense', group: 'Operating Expenses' },
+      { code: '5550', name: 'Food & Entertainment', type: 'expense', group: 'Operating Expenses' },
+      { code: '5600', name: 'Conveyance & Travel', type: 'expense', group: 'Operating Expenses' },
+      { code: '5800', name: 'Miscellaneous Expenses', type: 'expense', group: 'Operating Expenses' },
+      { code: '5900', name: 'Penalties & ADM', type: 'expense', group: 'Operating Expenses' },
+      { code: '6000', name: 'Bank Charges & Fees', type: 'expense', group: 'Operating Expenses' }
     ];
     var coa = S.list(COA_KEY); if (!coa.length) return; var have = {}; coa.forEach(function (a) { have[a.code] = true; });
     var add = false; extra.forEach(function (x) { if (!have[x.code]) { coa.push(withNormal({ code: x.code, name: x.name, type: x.type, group: x.group })); add = true; } });

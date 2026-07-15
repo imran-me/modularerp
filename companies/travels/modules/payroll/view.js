@@ -71,15 +71,20 @@
    * (owner: "payroll goes in the accounts section — no side menus, buttons at the
    * top"). The six sections render as a second pill row; state survives re-renders. */
   var deskTab = 'manage';
-  EPAL.payrollDesk = function (page, cid) {
+  // opts.rightEl — an element (e.g. Master Accounts' company switcher) laid
+  // in the SAME row as the section pills, pushed to the right (owner mark)
+  EPAL.payrollDesk = function (page, cid, opts) {
     if (CID !== cid) { payYm = null; deskTab = 'manage'; }
     CID = cid;
     var host = el('div');
     function draw() {
       host.innerHTML = '';
-      var bar = el('div.pill-tab.mb-3');
+      var bar = el('div.pill-tab');
       TABS.forEach(function (t) { bar.appendChild(el('button' + (deskTab === t[0] ? '.active' : ''), { text: t[1], onclick: function () { deskTab = t[0]; draw(); } })); });
-      host.appendChild(bar);
+      var row = el('div.flex.items-center.gap-2.flex-wrap.mb-3');
+      row.appendChild(bar);
+      if (opts && opts.rightEl) { opts.rightEl.style.marginLeft = 'auto'; opts.rightEl.classList.remove('mb-3'); row.appendChild(opts.rightEl); }
+      host.appendChild(row);
       if (!PR()) { host.appendChild(card('Payroll engine unavailable.')); return; }
       var section = el('div');
       ({ template: tplView, manage: manageView, loans: loansView, payslip: payslipView, advance: advanceView, reports: reportsView }[deskTab])(section);

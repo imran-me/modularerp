@@ -67,6 +67,65 @@
       { id: 'PT-1', name: 'Customer' }, { id: 'PT-2', name: 'Vendor' }, { id: 'PT-3', name: 'Sub-Agent' },
       { id: 'PT-4', name: 'Officer' }, { id: 'PT-5', name: 'Staff' }, { id: 'PT-6', name: 'Bank' }, { id: 'PT-7', name: 'Other' }
     ]);
+
+    /* ---- P1-① AUDIT MIGRATION (guarded, one-time): mirror every register
+     * expense into the GL. The GL-MX mirror only fired on UI saves, so the
+     * seeded register (৳1.04Cr / 71 entries at audit time) never reached the
+     * books and the GL P&L under-reported expenses. Same pattern as the
+     * agent_reclass_v1 migration: explicit journals, stable ids, override
+     * (period locks don't block a books-repair), guard flag records what ran. */
+    if (EPAL.ledger && !S.get('exp_gl_backfill_v1', null)) {
+      try {
+        var glIds = {};
+        (EPAL.ledger.entries({}) || []).forEach(function (g) { glIds[g.id] = 1; });
+        var bfN = 0, bfAmt = 0;
+        db.col('acc_entries').filter(function (e) { return e.kind === 'Expense'; }).forEach(function (e) {
+          var gid = 'GL-MX-' + e.id;
+          if (glIds[gid] || !(+e.amount > 0)) return;
+          try {
+            EPAL.ledger.post({ id: gid, date: e.date, companyId: e.companyId || 'group', ref: e.ref || e.id,
+              memo: (e.category || 'Expense') + (e.subCategory ? ' · ' + e.subCategory : '') + (e.desc ? ' — ' + e.desc : ''),
+              source: 'manual', party: e.party || '', override: true,
+              // historical repair credits the BANK control (1010) uniformly —
+              // crediting 1000 for old "Cash" rows drove petty cash ৳21L
+              // negative, since the GL never held that cash. New entries from
+              // the form ARE method-aware (fund petty cash via Withdraw → 1000).
+              lines: [{ account: (EPAL.ledger.expenseAccountFor ? EPAL.ledger.expenseAccountFor((e.category || '') + ' ' + (e.subCategory || '')) : '5800'), dr: +e.amount, cr: 0 },
+                      { account: '1010', dr: 0, cr: +e.amount }] });
+            bfN++; bfAmt += +e.amount;
+          } catch (x) {}
+        });
+        S.set('exp_gl_backfill_v1', { entries: bfN, amount: bfAmt });
+      } catch (x) {}
+    }
+
+    /* ---- P1-② AUDIT MIGRATION (guarded, one-time): open every bank's live
+     * balance into the ledger so the GL finally KNOWS the bank money. One
+     * explicit opening per bank vs Retained Earnings (3100), party-tagged
+     * with the bank's name (id GL-OPBK-<bank>). From here on, deposits /
+     * withdrawals / credit-debit journals already post to the GL, so the
+     * bank↔GL reconciliation card can prove the remaining float. */
+    if (EPAL.ledger && !S.get('bank_gl_open_v1', null)) {
+      try {
+        var glIds2 = {};
+        (EPAL.ledger.entries({}) || []).forEach(function (g) { glIds2[g.id] = 1; });
+        var opN = 0, opAmt = 0;
+        db.col('banks').forEach(function (b) {
+          var gid = 'GL-OPBK-' + b.id, amt = +b.balance || 0;
+          if (glIds2[gid] || !amt) return;
+          var cashAcct = b.type === 'Cash Box' ? '1000' : '1010';
+          var abs = Math.abs(amt);
+          try {
+            EPAL.ledger.post({ id: gid, date: b.created || '2026-07-01', companyId: b.companyId || 'group',
+              ref: 'OPENING', memo: 'Bank opening balance · ' + b.name, source: 'opening', party: b.name, override: true,
+              lines: amt > 0 ? [{ account: cashAcct, dr: abs, cr: 0 }, { account: '3100', dr: 0, cr: abs }]
+                             : [{ account: '3100', dr: abs, cr: 0 }, { account: cashAcct, dr: 0, cr: abs }] });
+            opN++; opAmt += amt;
+          } catch (x) {}
+        });
+        S.set('bank_gl_open_v1', { banks: opN, amount: opAmt });
+      } catch (x) {}
+    }
   } });
 
   /* ---- helpers -----------------------------------------------------------*/
@@ -114,7 +173,9 @@
       var pills = el('div.tab-underline.mb-3');
       SECTIONS.forEach(function (s) { pills.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1], onclick: function () { EPAL.router.navigate('group/master-accounts/' + s[0]); } })); });
       page.appendChild(pills);
-      // COMPANY SWITCHER — the owner's "button-wise switch of companies at the top"
+      // COMPANY SWITCHER — the owner's "button-wise switch of companies at the top".
+      // On Master Payroll it rides IN the desk's section row (owner mark);
+      // everywhere else it is its own row under the tabs.
       var swWrap = el('div.flex.gap-1.flex-wrap.mb-3');
       var swOpts = [['all', 'All Companies'], ['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; }));
       swOpts.forEach(function (o) {
@@ -122,7 +183,8 @@
         swWrap.appendChild(el('button.btn.btn-sm' + ((selCo === o[0]) ? '.btn-primary' : '.btn-outline'), {
           text: o[1], onclick: function () { selCo = o[0]; EPAL.router.render(); } }));
       });
-      page.appendChild(swWrap);
+      if (sub !== 'payroll') page.appendChild(swWrap);
+      else pendingSwitcher = swWrap;
       if (sub === 'expenses') {
         // buttons at the top of the ONE expenses section (owner directive)
         var tb = el('div.pill-tab.mb-3');
@@ -203,7 +265,8 @@
         r.companyId = v.companyId; r.category = v.category; r.subCategory = (v.subCategory || '').trim();
         r.items = items; r.amount = total; r.date = v.date; r.method = v.method; r.party = v.party || ''; r.ref = v.ref || ''; r.desc = v.desc || '';
         db.save('acc_entries', r);
-        try { EPAL.ledger.post({ id: 'GL-MX-' + r.id, date: r.date, companyId: r.companyId, ref: r.ref || r.id, memo: r.category + (r.subCategory ? ' · ' + r.subCategory : '') + (r.desc ? ' — ' + r.desc : ''), source: 'manual', party: r.party, lines: [{ account: expenseAccountFor(r.category + ' ' + r.subCategory), dr: r.amount, cr: 0 }, { account: '1010', dr: 0, cr: r.amount }] }); } catch (e) { ui.toast(e.message || 'Ledger mirror failed', 'error'); }
+        // mirror into the GL — Cash pays from 1000, everything else from 1010
+        try { EPAL.ledger.post({ id: 'GL-MX-' + r.id, date: r.date, companyId: r.companyId, ref: r.ref || r.id, memo: r.category + (r.subCategory ? ' · ' + r.subCategory : '') + (r.desc ? ' — ' + r.desc : ''), source: 'manual', party: r.party, lines: [{ account: expenseAccountFor(r.category + ' ' + r.subCategory), dr: r.amount, cr: 0 }, { account: r.method === 'Cash' ? '1000' : '1010', dr: 0, cr: r.amount }] }); } catch (e) { ui.toast(e.message || 'Ledger mirror failed', 'error'); }
         ui.toast('Expense recorded', 'success'); EPAL.router.render(); return true;
       }
     });
@@ -979,10 +1042,12 @@
   }
 
   /* ======================================================= MASTER PAYROLL */
+  var pendingSwitcher = null;                          // set by render for payroll
   function payrollView(page) {
-    // the company buttons above already switch selCo; the full payroll desk mounts here
-    if (EPAL.payrollDesk) EPAL.payrollDesk(page, selCo === 'all' ? 'travels' : selCo);
+    // the company switcher rides in the desk's section row (owner mark)
+    if (EPAL.payrollDesk) EPAL.payrollDesk(page, selCo === 'all' ? 'travels' : selCo, { rightEl: pendingSwitcher });
     else page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Payroll desk unavailable.' })]));
+    pendingSwitcher = null;
   }
 
   /* ======================================================= MANAGE ACCOUNTS
@@ -1142,6 +1207,27 @@
         ]));
       });
       page.appendChild(strip);
+    })();
+    // ---- BANK ↔ LEDGER RECONCILIATION (permanent audit card, P1-②) ----------
+    (function () {
+      if (!EPAL.ledger) return;
+      var scope = selCo === 'all' ? {} : { companyId: selCo };
+      var gl = EPAL.ledger.balance('1000', scope) + EPAL.ledger.balance('1010', scope);
+      var delta = gl - total;
+      var ok = Math.abs(delta) < 1;
+      var bf = S.get('exp_gl_backfill_v1', null), op = S.get('bank_gl_open_v1', null);
+      page.appendChild(el('div.card.mb-2', null, [
+        el('div.card-head', null, [el('h3', { html: ui.icon('shield-check') + ' Bank ↔ Ledger Reconciliation' }),
+          el('span.badge' + (ok ? '.badge-good' : '.badge-warn'), { style: { marginLeft: 'auto' }, text: ok ? 'RECONCILED' : 'FLOAT ' + ui.money(Math.abs(delta)) })]),
+        el('div.card-body', null, [
+          el('div.stat-row', null, [
+            el('div.stat', null, [el('div.stat-label', { text: 'Ledger cash + bank (1000 + 1010)' }), el('div.stat-value.num', { text: ui.money(gl) })]),
+            el('div.stat', null, [el('div.stat-label', { text: 'Bank register total' }), el('div.stat-value.num', { text: ui.money(total) })]),
+            el('div.stat', null, [el('div.stat-label', { text: 'Unassigned cash float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) })])
+          ]),
+          el('p.text-mute.xs.mt-2', { text: 'Float = business cash in the books not yet held on any bank record (e.g. undeposited collections). Bank openings and the expense backfill are explicit journals (GL-OPBK-* · GL-MX-*)' + (op ? ' — ' + op.banks + ' bank openings ' + ui.money(op.amount) : '') + (bf ? ' · backfilled ' + bf.entries + ' expenses ' + ui.money(bf.amount) : '') + '.' })
+        ])
+      ]));
     })();
     if (canCreate()) {
       page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
