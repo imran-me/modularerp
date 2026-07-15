@@ -109,8 +109,8 @@
         eyebrow: 'Epal Group · Master Accounts', icon: 'safe2', title: titles[sub],
         sub: 'Group-level accounting across every sister concern — switch company with the buttons below.'
       }));
-      // section pills
-      var pills = el('div.pill-tab.mb-2');
+      // section nav — calm underline tabs (primary), per the owner's mock
+      var pills = el('div.tab-underline.mb-3');
       SECTIONS.forEach(function (s) { pills.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1], onclick: function () { EPAL.router.navigate('group/master-accounts/' + s[0]); } })); });
       page.appendChild(pills);
       // COMPANY SWITCHER — the owner's "button-wise switch of companies at the top"
