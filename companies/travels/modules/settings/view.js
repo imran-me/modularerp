@@ -56,7 +56,8 @@
         ])
       ]) ]));
 
-      var pills = el('div.pill-tab.mb-3');
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      var pills = el('div.tab-underline.mb-3');
       [['profile', 'Profile'], ['financial', 'Financial'], ['documents', 'Documents'], ['notifications', 'Notifications'], ['data', 'Data & Access']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/settings' + (p[0] === 'profile' ? '' : '/' + p[0])); } }));

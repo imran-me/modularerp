@@ -46,7 +46,9 @@
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Analytics', icon: 'graph-up', title: titles[sub], sub: subs[sub],
         actions: [ el('a.btn.btn-ghost', { href: '#/travels/reports', html: ui.icon('file-earmark-bar-graph') + ' Reports' }) ]
       }));
-      var pills = el('div.pill-tab.mb-3');
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15: sections = underline tabs; pills are for filters below)
+      var pills = el('div.tab-underline.mb-3');
       [['overview', 'Overview'], ['profit-leak', 'Profit Leak'], ['fraud', 'Fraud Sentinel'], ['travel-dna', 'Travel DNA']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/analytics' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));

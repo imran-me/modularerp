@@ -44,7 +44,8 @@
       }));
       if (!L) { page.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('p.text-mute', { text: 'The ledger engine is not available.' }) ]) ])); ctx.mount.appendChild(page); return; }
 
-      var pills = el('div.pill-tab.mb-3');
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      var pills = el('div.tab-underline.mb-3');
       TABS.forEach(function (p) { pills.appendChild(el('button' + (tab === p[0] ? '.active' : ''), { text: p[1],
         onclick: function () { EPAL.router.navigate('travels/ledgers', { tab: p[0] }); } })); });
       page.appendChild(pills);

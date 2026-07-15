@@ -117,7 +117,8 @@
           EPAL.auth.isAdmin() ? el('a.btn.btn-primary', { href: '#/group/employees/directory', html: ui.icon('person-badge') + ' Group Workforce' }) : null
         ].filter(Boolean)
       }));
-      var pills = el('div.pill-tab.mb-3');
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      var pills = el('div.tab-underline.mb-3');
       [['directory', 'Directory'], ['attendance', 'Attendance'], ['leaves', 'Leaves'], ['notices', 'Notices'], ['setup', 'HR Setup'], ['performance', 'Performance']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/hrm' + (p[0] === 'directory' ? '' : '/' + p[0])); } }));

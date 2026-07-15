@@ -159,7 +159,8 @@
         sub: 'Omni-channel campaigns, message templates and a live WhatsApp booking bot — the concern’s comms channel.'
       }));
 
-      var pills = el('div.pill-tab.mb-3');
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      var pills = el('div.tab-underline.mb-3');
       var host = el('div');
 
       function drawPills() {

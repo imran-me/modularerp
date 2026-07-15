@@ -134,7 +134,8 @@
     }));
 
     /* ---- sub navigation pills --------------------------------------------*/
-    var pills = el('div.pill-tab.mb-3');
+    // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+    var pills = el('div.tab-underline.mb-3');
     [['pipeline', 'Pipeline'], ['leads', 'Leads'], ['customers', 'Customers 360'], ['activities', 'Activities']]
       .forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],

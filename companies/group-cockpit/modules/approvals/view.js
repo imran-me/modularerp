@@ -69,8 +69,9 @@
         actions: [ badge ]
       }));
 
-      // pill tabs
-      var tabsWrap = el('div.pill-tab.mb-3');
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15); drawTabs() below rebuilds the buttons with live counts
+      var tabsWrap = el('div.tab-underline.mb-3');
       page.appendChild(tabsWrap);
 
       // content host

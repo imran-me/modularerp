@@ -57,7 +57,9 @@
           payslip: 'Salary statements per employee & month, with the annual Leave-Encashment benefit.', advance: 'Advance salary — disburse and recover against future pay.',
           reports: 'Leave-encashment liability, salary due, advance & loan registers, department cost.' };
         page.appendChild(EPAL.pageHead({ eyebrow: coShort(cid) + ' › Payroll', icon: 'cash-coin', title: titles[sub], sub: subs[sub] }));
-        var pills = el('div.pill-tab.mb-3');
+        // SECTION NAV — underline band (owner grammar 2026-07-15); the shared
+        // payrollDesk's own pill row below stays a pill row (desk sub-tabs)
+        var pills = el('div.tab-underline.mb-3');
         TABS.forEach(function (t) { pills.appendChild(el('button' + (sub === t[0] ? '.active' : ''), { text: t[1], onclick: function () { EPAL.router.navigate(cid + '/payroll/' + t[0]); } })); });
         page.appendChild(pills);
         if (!PR()) { page.appendChild(card('Payroll engine unavailable.')); ctx.mount.appendChild(page); return; }

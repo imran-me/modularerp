@@ -53,7 +53,9 @@
     ]);
   }
   function pills(active) {
-    var host = el('div.pill-tab.mb-3');
+    // SECTION NAV — the house full-bleed underline band (owner grammar
+    // 2026-07-15); the per-company FOCUS pills further down stay pills
+    var host = el('div.tab-underline.mb-3');
     TABS.forEach(function (t) {
       host.appendChild(el('button' + ((active || null) === t[0] ? '.active' : ''), {
         text: t[1],

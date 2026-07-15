@@ -95,7 +95,8 @@
           el('a.btn.btn-primary', { href: '#/travels/crm/pipeline', html: ui.icon('kanban') + ' Pipeline' })
         ].filter(Boolean)
       }));
-      var pills = el('div.pill-tab.mb-3');
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      var pills = el('div.tab-underline.mb-3');
       [['overview', 'Overview'], ['pipeline', 'Pipeline'], ['leads', 'Leads'], ['follow-ups', 'Follow-ups'], ['comm-hub', 'Comm Hub']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/crm' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));

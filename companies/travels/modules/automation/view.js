@@ -122,7 +122,8 @@
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Automation', icon: 'robot', title: titles[sub], sub: subs[sub],
         actions: [ canCreate() && sub === 'rules' ? el('button.btn.btn-ghost', { html: ui.icon('plus-lg') + ' New Rule', onclick: function () { ruleForm(null); } }) : null ].filter(Boolean)
       }));
-      var pills = el('div.pill-tab.mb-3');
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      var pills = el('div.tab-underline.mb-3');
       [['overview', 'Overview'], ['rules', 'Rules & Bots'], ['radar', 'Doc-Expiry Radar'], ['markup', 'Markup Engine']].forEach(function (p) {
         pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/automation' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
