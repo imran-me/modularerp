@@ -184,14 +184,16 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; table-lay
 /* UNDERLINE TABS — the calm PRIMARY navigation (owner mock 2026-07-15).
    Hierarchy: section nav = quiet underline tabs; switchers/filters below it
    stay as pills; real actions stay as buttons. Less chrome, more premium. */
-.tab-underline { display:flex; gap:2px; align-items:flex-end; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none;
+.tab-underline { display:flex; gap:0; align-items:stretch; width:100%; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none;
   background: color-mix(in srgb, var(--surface) 62%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border-radius: 12px 12px 0 0; padding: 0 6px; }
+  border-radius: 12px 12px 0 0; padding: 0 6px;
+  box-shadow: 0 6px 18px rgba(7, 12, 30, .10);                            /* ~10% soft lift */ }
 .tab-underline::-webkit-scrollbar { display:none; }
-.tab-underline button { padding:9px 14px 11px; border-bottom:2px solid transparent; margin-bottom:-1px;
-  font-size:13px; font-weight:600; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
-  border-radius:0; background:none; transition: color var(--t), border-color var(--t); }
-.tab-underline button:hover { color: var(--text); }
-.tab-underline button.active { color: var(--text); font-weight:700; border-bottom-color: var(--accent); }
+.tab-underline button { flex:1 0 auto; text-align:center; padding:12px 18px 13px; border-bottom:2px solid transparent; margin-bottom:-1px;
+  font-size:14px; font-weight:700; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
+  border-radius:8px 8px 0 0; background:none; transition: color var(--t), border-color var(--t), background var(--t); }
+.tab-underline button + button { border-left:1px solid var(--border); }   /* 1px line between sections */
+.tab-underline button:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.tab-underline button.active { color: var(--accent); border-bottom-color: var(--accent); }
 kbd { font-family: var(--font-mono); font-size: 11px; background: var(--surface-3); border: 1px solid var(--border-strong);
   border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text-dim); }
