@@ -165,24 +165,9 @@
         el('a.btn.btn-ghost', { href: '#/group/activity-log', html: ui.icon('shield-lock') + ' Activity Log' })
       ]) ])
     ]));
-    // Appearance — background scene (3D flight / 2D airfield / off)
-    var atmos = EPAL.store.get('ui.atmos', '3d');
-    var atSel = el('select.select', { style: { maxWidth: '240px' } });
-    [['3d', '3D flight (plane)'], ['2d', '2D airfield (classic)'], ['off', 'Off (plain)']].forEach(function (o) {
-      atSel.appendChild(el('option', { value: o[0], text: o[1], selected: atmos === o[0] }));
-    });
-    atSel.addEventListener('change', function () {
-      EPAL.store.set('ui.atmos', atSel.value);
-      ui.toast('Background set to ' + atSel.options[atSel.selectedIndex].text + ' — reloading…', 'success');
-      setTimeout(function () { location.reload(); }, 500);
-    });
-    page.appendChild(el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('stars') + ' Appearance' }) ]),
-      el('div.card-body', null, [
-        el('p.text-mute.sm.mb-2', { text: 'Background scene behind the app. The 3D plane needs WebGL; if unavailable it falls back automatically.' }),
-        el('div', null, [ el('div.text-mute.sm.mb-1', { text: 'Background' }), atSel ])
-      ])
-    ]));
+    // Appearance — Background Animation (3D airport / 2D airfield / none +
+    // per-scene opacity sliders). Shared card, applies live via EPAL.atmos.
+    if (EPAL.atmosSettingsCard) page.appendChild(EPAL.atmosSettingsCard());
     page.appendChild(el('div.card', null, [
       el('div.card-head', null, [ el('h3', { html: ui.icon('download') + ' Backup' }) ]),
       el('div.card-body', null, [

@@ -25,6 +25,42 @@
     try { var m = localStorage.getItem('epal.v1.ui.atmos'); if (m) return JSON.parse(m); } catch (e) {}
     return '3d';
   }
+  function atmosOpacity(kind) {                       // 15..100 (%), per layer
+    try { var v = JSON.parse(localStorage.getItem('epal.v1.ui.atmosOp' + kind) || '100'); return Math.max(15, Math.min(100, +v || 100)); } catch (e) { return 100; }
+  }
+  // stamp the mode classes + the 2D master-opacity var at boot so the CSS
+  // scenes obey the setting even when the 3D renderer never starts
+  function applyModeFlags() {
+    var root = document.documentElement, mode = atmosMode();
+    root.classList.toggle('atmos-off', mode === 'off');
+    if (mode !== '3d') root.classList.remove('atmos-3d');
+    root.style.setProperty('--atmos-op2d', String(atmosOpacity('2d') / 100));
+  }
+  applyModeFlags();
+
+  /* Live controller for the Settings screen — switch scene / opacity without
+   * a reload. window.EPAL may not exist yet (this file loads deferred before
+   * the kernel), so attach lazily-safe. */
+  window.EPAL = window.EPAL || {};
+  window.EPAL.atmos = {
+    mode: atmosMode,
+    setMode: function (m) {
+      try { localStorage.setItem('epal.v1.ui.atmos', JSON.stringify(m)); } catch (e) {}
+      applyModeFlags();
+      var c = document.getElementById('ambient3d');
+      if (m === '3d') {
+        if (c) { c.style.display = ''; document.documentElement.classList.add('atmos-3d'); if (window.EPAL._atmos3d) window.EPAL._atmos3d.start(); }
+        else init();
+      } else if (c) { c.style.display = 'none'; if (window.EPAL._atmos3d) window.EPAL._atmos3d.stop(); }
+    },
+    setOpacity: function (kind, pct) {
+      pct = Math.max(15, Math.min(100, +pct || 100));
+      try { localStorage.setItem('epal.v1.ui.atmosOp' + kind, JSON.stringify(pct)); } catch (e) {}
+      if (kind === '3d') { var c = document.getElementById('ambient3d'); if (c) c.style.opacity = String(pct / 100); }
+      else document.documentElement.style.setProperty('--atmos-op2d', String(pct / 100));
+    },
+    opacity: atmosOpacity
+  };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(init, 400); });
   else setTimeout(init, 400);
@@ -45,6 +81,7 @@
       var canvas = document.createElement('canvas');
       canvas.id = 'ambient3d'; canvas.setAttribute('aria-hidden', 'true');
       canvas.style.cssText = 'position:fixed;right:0;bottom:0;top:var(--topbar-h,62px);z-index:0;pointer-events:none;display:block;';
+      canvas.style.opacity = String(atmosOpacity('3d') / 100);   // Settings slider
       main.insertBefore(canvas, main.firstChild);
 
       var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
@@ -105,7 +142,9 @@
       }
       function stopL() { if (running) pausedAt = (window.performance && performance.now()) || 0; running = false; if (raf) window.cancelAnimationFrame(raf); }
       if (reduce) { for (var i = 0; i < updaters.length; i++) updaters[i](7); renderer.render(scene, camera); } else startL();
-      document.addEventListener('visibilitychange', function () { if (document.hidden) stopL(); else startL(); });
+      document.addEventListener('visibilitychange', function () { if (document.hidden) stopL(); else if (atmosMode() === '3d') startL(); });
+      // handles for the Settings live controller (EPAL.atmos.setMode)
+      window.EPAL._atmos3d = { start: startL, stop: stopL };
     } catch (e) { /* atmosphere is optional — never break the app */ }
   }
 

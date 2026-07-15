@@ -41,6 +41,12 @@
    scene — it's kept in the codebase and re-appears when `ui.atmos` is set back to
    '2d'. (The faint #view::before emblem watermark stays; it never fights the 3D.) */
 html.atmos-3d .ascene { display: none !important; }
+/* Settings ▸ Background: 'No background' hides the 2D scenes too (the 3D
+   canvas never mounts in that mode), and the 2D master-opacity slider drives
+   --atmos-op2d — filter:opacity multiplies ON TOP of the scene's own fades,
+   so the .on/.off transitions keep working untouched. */
+html.atmos-off .ascene { display: none !important; }
+.ascene { filter: opacity(var(--atmos-op2d, 1)); }
 #view::before {
   content: ''; position: absolute; z-index: 0; pointer-events: none;
   top: 0; right: 0;                               /* stays inside the scroll box */

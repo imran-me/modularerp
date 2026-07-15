@@ -1137,11 +1137,56 @@
   /* ==========================================================================
    * SETTINGS  (per-company preferences)
    * ========================================================================*/
+  /* ==========================================================================
+   * BACKGROUND ANIMATION CARD (Settings) — 3D airport / 2D airfield / none,
+   * with a master-opacity slider for each scene. Applies LIVE through
+   * EPAL.atmos (ambient3d.js) — no reload needed. Shared by every company's
+   * Settings screen.
+   * ========================================================================*/
+  EPAL.atmosSettingsCard = function () {
+    var A = EPAL.atmos;
+    if (!A) return el('div');                       // scene script not loaded
+    var mode = A.mode();
+    var body = el('div.card-body');
+    var card = el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('stars') + ' Background Animation' }),
+        el('span.card-sub', { text: 'applies instantly — no reload' }) ]), body ]);
+    function build() {
+      body.innerHTML = '';
+      body.appendChild(el('p.text-mute.sm.mb-2', { text: 'The scene behind the app. The 3D airport needs WebGL; the 2D airfield is the classic hand-drawn scene.' }));
+      // the three mode buttons
+      var row = el('div.flex.gap-2.flex-wrap.mb-3');
+      [['3d', 'airplane-engines', '3D Airport (Live)'], ['2d', 'image', '2D Airfield (Classic)'], ['off', 'slash-circle', 'No Background']].forEach(function (o) {
+        row.appendChild(el('button.btn' + (mode === o[0] ? '.btn-primary' : '.btn-outline'), {
+          html: ui.icon(o[1]) + ' ' + o[2],
+          onclick: function () { mode = o[0]; A.setMode(o[0]); ui.toast('Background: ' + o[2], 'success'); build(); }
+        }));
+      });
+      body.appendChild(row);
+      // opacity sliders — one per scene, enabled when its scene is selected
+      function sliderRow(kind, label) {
+        var val = A.opacity(kind);
+        var out = el('span.strong.num', { text: val + '%' });
+        var range = el('input', { type: 'range', min: '15', max: '100', step: '5', value: String(val), style: { flex: '1', maxWidth: '340px' } });
+        var active = mode === kind;
+        range.disabled = !active;
+        range.addEventListener('input', function () { out.textContent = this.value + '%'; A.setOpacity(kind, +this.value); });
+        return el('div.flex.items-center.gap-2.mb-2' + (active ? '' : '.text-mute'), null, [
+          el('span.sm', { style: { minWidth: '150px' }, text: label }), range, out ]);
+      }
+      body.appendChild(sliderRow('3d', '3D scene opacity'));
+      body.appendChild(sliderRow('2d', '2D scene opacity'));
+    }
+    build();
+    return card;
+  };
+
   EPAL.view('*/settings', { render: function (ctx) {
     var cid = ctx.companyId, page = el('div.page');
     var key = 'settings.' + cid;
     var cur = EPAL.store.get(key, {}) || {};
     page.appendChild(head(ctx, 'Settings', 'gear-fill', 'Preferences for ' + ctx.company.name + '. Module visibility lives in Group ▸ Module Control.'));
+    page.appendChild(EPAL.atmosSettingsCard());
 
     var form = EPAL.form([
       { type: 'section', label: 'Identity' },
