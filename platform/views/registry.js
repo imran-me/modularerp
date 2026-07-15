@@ -34,7 +34,9 @@
           opts.icon ? ui.frag('<i class="bi bi-' + opts.icon + '"></i>') : null,
           document.createTextNode(opts.title || '')
         ]),
-        opts.sub ? el('p.page-sub', { text: opts.sub }) : null
+        // title= keeps the full sentence reachable on hover: the head is pinned
+        // to one line (see .page-sub in components.css), so a long sub ellipses.
+        opts.sub ? el('p.page-sub', { text: opts.sub, title: opts.sub }) : null
       ]),
       opts.actions ? el('div.page-actions', null, opts.actions) : null
     ]);

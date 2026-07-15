@@ -640,12 +640,11 @@
       // AUDIT P3 (Bangladesh tax cycle): output VAT collected on services and
       // AIT/TDS withheld from payments — both are money owed to the NBR
       { code: '2130', name: 'VAT Payable', type: 'liability', group: 'Taxes Payable' },
-      { code: '2140', name: 'AIT & TDS Payable', type: 'liability', group: 'Taxes Payable' },
-      // MANAGE LOAN (external book). Staff loans keep their own head (1260,
-      // seeded by the payroll engine) — these are loans to OUTSIDE parties.
-      { code: '1270', name: 'Loans Receivable (External)', type: 'asset', group: 'Current Assets' },
-      { code: '4060', name: 'Interest Income', type: 'income', group: 'Revenue' },
-      { code: '5700', name: 'Bad Debt Written Off', type: 'expense', group: 'Operating Expenses' }
+      { code: '2140', name: 'AIT & TDS Payable', type: 'liability', group: 'Taxes Payable' }
+      // NO loan heads here (owner 2026-07-15): Manage Loan keeps the external
+      // book and the borrowings book OUTSIDE the main accounts — see the
+      // header of platform/kit/loans.js for why. The only loans on the books
+      // are STAFF loans, and payroll owns that head (1260).
     ];
     var coa = S.list(COA_KEY); if (!coa.length) return; var have = {}; coa.forEach(function (a) { have[a.code] = true; });
     var add = false; extra.forEach(function (x) { if (!have[x.code]) { coa.push(withNormal({ code: x.code, name: x.name, type: x.type, group: x.group })); add = true; } });
