@@ -36,6 +36,7 @@
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
 
   var CID = 'travels';
+  var expTab = 'all';                               // active button inside Operational Expenses
   var TODAY = new Date(2026, 6, 5);                 // demo "today" = 2026-07-05
   var TODAY_STR = '2026-07-05';
   // Payment sources — Debit Card and Credit Card are SEPARATE sources from a bank
@@ -117,12 +118,12 @@
       // the Manage Cash desk (owner 2026-07-15: "consolidate into one Manage
       // Cash, like Master Accounts"), so old links and bookmarks land on the
       // desk with that tab already open instead of 404-ing.
-      if (['overview', 'income', 'expenses', 'payroll', 'journals', 'schedules', 'recurring', 'cash', 'cheques', 'cashbook', 'pettycash'].indexOf(sub) < 0) sub = 'overview';
+      if (['overview', 'income', 'expenses', 'payroll', 'journals', 'schedules', 'recurring', 'cash', 'banks', 'cheques', 'cashbook', 'pettycash'].indexOf(sub) < 0) sub = 'overview';
       var page = el('div.page');
 
       // the three old cash sections now open the ONE Manage Cash desk
       var CASH_SUBS = { cheques: 'cheques', cashbook: 'cashbook', pettycash: 'petty' };
-      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', payroll: 'Payroll', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cash: 'Manage Cash', cheques: 'Manage Cash', cashbook: 'Manage Cash', pettycash: 'Manage Cash' };
+      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Operational Expenses', payroll: 'Payroll', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', banks: 'Banks', cash: 'Manage Cash', cheques: 'Manage Cash', cashbook: 'Manage Cash', pettycash: 'Manage Cash' };
       // Subtitles are written to FIT the one-line .page-sub (owner review
       // 2026-07-15). The head is pinned to a single line, so an over-long sub
       // doesn't wrap — it ellipses mid-sentence, which reads as a bug. The rule
@@ -133,6 +134,7 @@
         journals: 'Balanced double-entry journals, posted to the general ledger.',
         schedules: 'Payables and receivables with due dates, ageing and settlement.',
         recurring: 'Rent, internet and other monthly costs — auto-created each month.',
+        banks: 'Travels’ bank accounts and their movements — read-only; the Group opens and controls banks.',
         cash: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
         cheques: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
         cashbook: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
@@ -168,7 +170,7 @@
       var pills = el('div.tab-underline.tabs-dense.mb-3');
       var active = CASH_SUBS[sub] ? 'cash' : sub;      // an old cash link still lights Manage Cash
       [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['payroll', 'Payroll'],
-       ['recurring', 'Recurring'], ['cash', 'Manage Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
+       ['recurring', 'Recurring'], ['banks', 'Banks'], ['cash', 'Manage Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
         pills.appendChild(el('button' + (active === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
       });
@@ -186,6 +188,59 @@
          Cash Book. Nothing was lost in the consolidation — the three former
          sections are the same screens, now tabs of one desk. Cash in Sell hides
          itself (Travels has no POS). */
+      /* BANKS — READ-ONLY (owner decision 2026-07-15: "read-only view for
+         Travels"). The Group opens and controls bank accounts in Master
+         Accounts; Travels needs to SEE its own money without being able to add,
+         edit, deposit or withdraw. So this deliberately renders NO actions —
+         the absence of buttons is the feature, not an omission. Money movement
+         stays where its journal is: Manage Cash for the drawer, Master Accounts
+         for the bank register. */
+      function banksSection(p) {
+        var banks = db.col('banks').filter(function (b) { return (b.companyId || 'group') === CID; });
+        var total = banks.reduce(function (a, b) { return a + (+b.balance || 0); }, 0);
+        var scopeIds = {}; banks.forEach(function (b) { scopeIds[b.id] = b; });
+        var txns = S.list('bank_txns').filter(function (t) { return !!scopeIds[t.bankId]; });
+        function isIn(t) { return t.type === 'deposit' || t.type === 'transfer-in'; }
+        p.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+          kpi('Total Balance', ui.money(total, { compact: true }), 'safe2'),
+          kpi('Accounts', String(banks.length), 'bank'),
+          kpi('Active', String(banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length), 'check-circle'),
+          kpi('Movements', String(txns.length), 'clock-history')
+        ]));
+        p.appendChild(el('div.text-mute.sm.mb-2', { html: ui.icon('lock') + ' Read-only — Travels’ banks are opened and operated by the Group in <a class="text-accent" href="#/group/master-accounts/banks">Master Accounts › Manage Banks</a>. To move cash, use <a class="text-accent" href="#/travels/accounts/cash">Manage Cash</a>.' }));
+        var bt = EPAL.table({
+          columns: [
+            { key: 'name', label: 'Bank', render: function (b) { return '<span class="strong">' + ui.escapeHtml(b.name || '') + '</span><div class="text-mute xs">' + ui.escapeHtml(b.branch || '') + '</div>'; } },
+            { key: 'account', label: 'Account No', render: function (b) { return '<span class="mono">' + ui.escapeHtml(b.account || '—') + '</span>'; } },
+            { key: 'type', label: 'Type' },
+            { key: 'status', label: 'Status', badge: { Active: 'good', Inactive: 'bad' } },
+            { key: 'balance', label: 'Balance', num: true, render: function (b) { var v = +b.balance || 0; return '<span class="num nowrap' + (v < 0 ? ' text-bad' : '') + '">' + ui.money(Math.abs(v)) + (v < 0 ? ' Cr' : ' Dr') + '</span>'; }, exportVal: function (b) { return b.balance; } }
+          ],
+          rows: banks, pageSize: 10, searchKeys: ['name', 'account', 'branch'], exportName: 'travels-banks.csv',
+          empty: { icon: 'bank', title: 'No bank accounts for Travels', hint: 'The Group opens bank accounts in Master Accounts › Manage Banks.' }
+        });
+        p.appendChild(el('div.card.mb-2', null, [
+          el('div.card-head', null, [el('h3', { html: ui.icon('bank') + ' Travels Bank Accounts' }), el('span.card-sub', { text: 'read-only' })]),
+          el('div.card-body', null, [bt.el])
+        ]));
+        var recent = txns.slice().sort(function (a, b) { return (a.date === b.date) ? 0 : (a.date < b.date ? 1 : -1); }).slice(0, 50);
+        var tt = EPAL.table({
+          columns: [
+            { key: 'date', label: 'Date', date: true },
+            { key: 'bankName', label: 'Bank', render: function (t) { return '<span class="strong">' + ui.escapeHtml(t.bankName || '') + '</span>'; } },
+            { key: 'ref', label: 'Reference', render: function (t) { return t.ref ? '<span class="mono">' + ui.escapeHtml(t.ref) + '</span>' : '<span class="text-mute">—</span>'; } },
+            { key: 'desc', label: 'Description / Note', render: function (t) { return ui.escapeHtml(t.desc || t.type || '') || '<span class="text-mute">—</span>'; } },
+            { key: 'in', label: 'Debit', num: true, render: function (t) { return isIn(t) ? '<span class="num text-good">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return isIn(t) ? t.amount : ''; } },
+            { key: 'out', label: 'Credit', num: true, render: function (t) { return !isIn(t) ? '<span class="num text-bad">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return !isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return !isIn(t) ? t.amount : ''; } }
+          ],
+          rows: recent, pageSize: 10, searchKeys: ['bankName', 'desc', 'ref'], exportName: 'travels-bank-transactions.csv',
+          empty: { icon: 'clock-history', title: 'No bank movements yet' }
+        });
+        p.appendChild(el('div.card', null, [
+          el('div.card-head', null, [el('h3', { html: ui.icon('clock-history') + ' Recent Movements' }), el('span.card-sub', { text: 'newest first · read-only' })]),
+          el('div.card-body', null, [tt.el])
+        ]));
+      }
       function cashSection(p) {
         if (!EPAL.cashDesk) { p.appendChild(el('div.card', null, [el('div.card-body', { text: 'Cash desk unavailable.' })])); return; }
         EPAL.cashDesk(p, CID, {
@@ -197,8 +252,38 @@
           ]
         });
       }
-      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView,
-         cash: cashSection, cheques: cashSection, cashbook: cashSection, pettycash: cashSection,
+      /* OPERATIONAL EXPENSES — the same four tabs Master Accounts has (owner
+         2026-07-15: "whatever Master has for Travels should be in Travels").
+         Budget Setup and Expense Report come from the SHARED kit
+         (platform/kit/expenses.js) scoped to Travels, so the two desks render
+         identical code and can never drift. Categories is READ-ONLY here: the
+         category list is ONE list every company posts against (like the chart
+         of accounts), so Travels can see the heads without silently editing
+         Woodart's books — editing stays in Master Accounts. */
+      function expensesSection(p) {
+        var TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Categories']];
+        var bar = el('div.pill-tab.mb-3');
+        var host = el('div');
+        function paint() {
+          host.innerHTML = '';
+          if (expTab === 'budget' && EPAL.expenseViews) EPAL.expenseViews.budget(host, CID);
+          else if (expTab === 'report' && EPAL.expenseViews) EPAL.expenseViews.report(host, CID, { onBack: function () { expTab = 'all'; EPAL.router.render(); } });
+          else if (expTab === 'categories' && EPAL.expenseViews) {
+            host.appendChild(el('div.text-mute.sm.mb-2', { html: ui.icon('info-circle') + ' Expense categories are shared by every Epal company — the same list Woodart, Shop and Construction post against. Read-only here; add or edit them in <a class="text-accent" href="#/group/master-accounts/expenses">Master Accounts › Operational Expenses</a>.' }));
+            EPAL.expenseViews.categories(host, CID, { canEdit: false });
+          } else expenseView(host);
+        }
+        TABS.forEach(function (t) {
+          bar.appendChild(el('button' + (expTab === t[0] ? '.active' : ''), { text: t[1], onclick: function () {
+            expTab = t[0];
+            Array.prototype.forEach.call(bar.children, function (b) { b.classList.remove('active'); });
+            this.classList.add('active'); paint();
+          } }));
+        });
+        p.appendChild(bar); p.appendChild(host); paint();
+      }
+      ({ overview: overview, income: incomeView, expenses: expensesSection, journals: journalsView, schedules: schedulesView, recurring: recurringView,
+         banks: banksSection, cash: cashSection, cheques: cashSection, cashbook: cashSection, pettycash: cashSection,
          payroll: function (p) { if (EPAL.payrollDesk) EPAL.payrollDesk(p, CID); else p.appendChild(el('div.card', null, [el('div.card-body', { text: 'Payroll desk unavailable.' })])); } }[sub] || overview)(page);
       ctx.mount.appendChild(page);
     }

@@ -131,7 +131,7 @@
     // Cash Book and Petty Cash existed and routed but were invisible in the menu.
     m('accounts',        'Accounts',         'cash-stack', { desc:'Income, expenses, payroll, recurring, cheques, cash book, petty cash, journals, payment schedules.',
         subs:[['overview','Overview'],['income','Income'],['expenses','Expenses'],['payroll','Payroll'],
-              ['recurring','Recurring'],['cash','Manage Cash'],['journals','Journals'],['schedules','Payment Schedules']] }),
+              ['recurring','Recurring'],['banks','Banks'],['cash','Manage Cash'],['journals','Journals'],['schedules','Payment Schedules']] }),
     m('ledgers',         'Ledgers',          'journal-text', { desc:'General & party ledgers, trial balance.' }),
     m('reports',         'Reports',          'file-earmark-spreadsheet', { desc:'Sales, visa, ticketing, financial reports.' }),
     m('analytics',       'Analytics',        'graph-up', { desc:'Profit leak, fraud sentinel, travel-DNA.' }),
