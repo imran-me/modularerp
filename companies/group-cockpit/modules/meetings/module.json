@@ -1,0 +1,42 @@
+{
+  "key": "meetings",
+  "company": "group",
+  "title": "Meetings & Notes",
+  "icon": "calendar2-week-fill",
+  "route": "/group/meetings",
+  "desc": "Schedule meetings with anyone in the group, notify them, and keep the agenda, minutes, decisions and action items in one thread.",
+  "enabled": true,
+  "built": true,
+  "note": "The owner/super-admin schedules; every invited employee is notified via an ADDRESSED notification (db.notify with toId → db.inbox()) and can RSVP. Ordinary employees see only the meetings they organise or are invited to; Rooms & Setup is admin-only.",
+  "menu": {
+    "label": "Meetings & Notes",
+    "icon": "calendar2-week-fill",
+    "subs": [
+      { "id": "agenda",   "label": "Agenda",          "icon": "dot", "enabled": true, "default": true },
+      { "id": "calendar", "label": "Calendar",        "icon": "dot", "enabled": true },
+      { "id": "minutes",  "label": "Minutes & Notes", "icon": "dot", "enabled": true },
+      { "id": "actions",  "label": "Action Items",    "icon": "dot", "enabled": true },
+      { "id": "rooms",    "label": "Rooms & Setup",   "icon": "dot", "enabled": true, "admin": true }
+    ]
+  },
+  "roles": {
+    "schedule": ["owner", "admin"],
+    "view_all": ["owner", "admin"],
+    "view_own": ["manager", "accountant", "hr", "employee"],
+    "rsvp": ["owner", "admin", "manager", "accountant", "hr", "employee"],
+    "rooms": ["owner", "admin"]
+  },
+  "stores": [
+    "meetings",
+    "meeting_notes",
+    "meeting_actions",
+    "meeting_rooms",
+    "meeting_prefs"
+  ],
+  "engines": ["notifications"],
+  "bridge": {
+    "emits": [],
+    "note": "Meetings record no money, so this module raises no bridge events — nothing to roll up to the Group books."
+  },
+  "backend": "backend/LARAVEL-BLUEPRINT.md"
+}

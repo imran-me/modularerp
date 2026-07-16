@@ -336,12 +336,15 @@
     },
 
     /* ---- TOPBAR POPOVERS -------------------------------------------------*/
+    // The bell rings for the CURRENT user's inbox: every broadcast alert plus the
+    // notifications addressed to them (db.inbox() — see database.js). Legacy /
+    // seeded notifications carry no `toId`, so they all still ring, exactly as before.
     refreshNotifications: function () {
-      var unread = EPAL.db.notifications().filter(function (n) { return !n.read; }).length;
+      var unread = EPAL.db.inbox().filter(function (n) { return !n.read; }).length;
       var dot = $('#notif-dot'); if (dot) { dot.hidden = unread === 0; dot.textContent = unread || ''; }
     },
     openNotifications: function (e) {
-      var list = EPAL.db.notifications();
+      var list = EPAL.db.inbox();
       popover(e.currentTarget, el('div.pop.pop-notif', null, [
         el('div.pop-head', null, [ el('strong', { text:'Notifications' }),
           el('button.link-btn', { text:'Mark all read', onclick: function () { EPAL.db.markNotificationsRead(); App.refreshNotifications(); closePop(); } }) ]),

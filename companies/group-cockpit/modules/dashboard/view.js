@@ -378,7 +378,9 @@
 
   function buildAlertsCard(snap) {
     var atRisk = snap.companies.slice().sort(function (a, b) { return b.risk - a.risk; }).slice(0, 3);
-    var notifs = db.notifications().slice(0, 4);
+    // inbox() = broadcasts + what is addressed to me; keeps other people's meeting
+    // invites off the owner's radar (identical output for all broadcast alerts).
+    var notifs = db.inbox().slice(0, 4);
     return el('div.card', null, [
       el('div.card-head', null, [ el('h3', { html: ui.icon('shield-exclamation') + ' Risk Radar & Alerts' }) ]),
       el('div.card-body', null, [

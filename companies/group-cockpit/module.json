@@ -235,6 +235,46 @@
       "built": false
     },
     {
+      "id": "meetings",
+      "label": "Meetings & Notes",
+      "icon": "calendar2-week-fill",
+      "desc": "Call meetings with anyone in the group, notify them, and keep the agenda, minutes, decisions & actions in one thread.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "agenda",
+          "label": "Agenda",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "calendar",
+          "label": "Calendar",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "minutes",
+          "label": "Minutes & Notes",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "actions",
+          "label": "Action Items",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "rooms",
+          "label": "Rooms & Setup",
+          "icon": "dot",
+          "enabled": true
+        }
+      ],
+      "built": true
+    },
+    {
       "id": "reports",
       "label": "Reports",
       "icon": "file-earmark-bar-graph-fill",

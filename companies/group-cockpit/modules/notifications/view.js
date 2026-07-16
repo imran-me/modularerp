@@ -11,8 +11,9 @@
  * and a Preferences card persists per-category alert switches to the
  * notif_prefs store key.
  *
- * Data: db.notifications(), db.markNotificationsRead(), EPAL.store.removeFrom
- * with a data:changed emit so the topbar bell and dashboards stay in sync.
+ * Data: db.inbox() (broadcasts + notifications addressed to the current user via
+ * `toId`), db.markNotificationsRead(), EPAL.store.removeFrom with a data:changed
+ * emit so the topbar bell and dashboards stay in sync.
  * ==========================================================================*/
 
 (function (EPAL) {
@@ -47,7 +48,10 @@
     var page = el('div.page');
     var mode = 'all';                       // all | unread | read (pill state)
 
-    var all = db().notifications();
+    // The inbox = broadcasts + the notifications addressed to me (db.inbox()).
+    // Meeting invites are addressed, so an organiser does not see the copies that
+    // belong to their attendees. Broadcast alerts (all seeded data) are unaffected.
+    var all = db().inbox();
     var unread = all.filter(function (n) { return !n.read; });
     var today = all.filter(function (n) { return (n.at || 0) >= startOfToday(); });
     var critical = all.filter(function (n) { return n.level === 'error'; });
@@ -59,13 +63,15 @@
       sub: 'Every alert, approval and system signal across all sister concerns — triage it here.',
       actions: [
         el('button.btn.btn-ghost', { html: ui.icon('trash3') + ' Clear Read', onclick: function () {
-          var read = db().notifications().filter(function (n) { return n.read; });
+          var read = db().inbox().filter(function (n) { return n.read; });
           if (!read.length) { ui.toast('Nothing to clear — no read notifications', 'info'); return; }
           ui.confirm({ title: 'Clear ' + read.length + ' read notifications?',
             text: 'Unread notifications are kept. This cannot be undone.',
             danger: true, confirmLabel: 'Clear' }).then(function (ok) {
             if (!ok) return;
-            EPAL.store.set('notifications', db().notifications().filter(function (n) { return !n.read; }));
+            // Drop only MY read ones — another employee's invite is not ours to delete.
+            var drop = {}; read.forEach(function (n) { drop[n.id] = true; });
+            EPAL.store.set('notifications', db().notifications().filter(function (n) { return !drop[n.id]; }));
             EPAL.bus.emit('data:changed', { store: 'notifications' });
             ui.toast('Read notifications cleared', 'success');
             redraw();
@@ -114,7 +120,7 @@
     page.appendChild(el('div', null, [pills]));
 
     function rows() {
-      var list = db().notifications();
+      var list = db().inbox();
       if (mode === 'unread') list = list.filter(function (n) { return !n.read; });
       if (mode === 'read') list = list.filter(function (n) { return n.read; });
       return list;

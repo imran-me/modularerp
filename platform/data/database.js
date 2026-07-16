@@ -462,6 +462,20 @@
     airRefunds: function () { return S.list('airRefunds'); },
     airBsp: function () { return S.get('airBsp', { txns:[], adms:[], unused:[], api:{} }); },
     notifications: function () { return S.list('notifications').sort(function (a, b) { return b.at - a.at; }); },
+
+    /* The notifications ONE user should actually see — their inbox.
+       A notification is either BROADCAST (no `toId`: system-wide alerts, the
+       original behaviour) or ADDRESSED to a single employee (`toId` set, e.g. a
+       meeting invite). Broadcasts reach everyone; an addressed one reaches only
+       its recipient, so the owner scheduling a meeting with 8 people does not
+       get their own 8 invites echoed back into their bell.
+       Every seeded/legacy notification has no toId, so inbox() === notifications()
+       for all pre-existing data — this is additive, not a behaviour change. */
+    inbox: function (empId) {
+      var me = empId || (EPAL.auth ? (EPAL.auth.current() || {}).id : null);
+      return this.notifications().filter(function (n) { return !n.toId || n.toId === me; });
+    },
+
     activity: function () { return S.list('activity').sort(function (a, b) { return b.at - a.at; }); },
     tasksFor: function (empId) { return S.list('tasks.' + empId); },
 
@@ -648,10 +662,17 @@
     saveCustomer: function (c) { S.upsert('customers', c); bus.emit('customer:upserted', { customerId:c.id }); return c; },
     saveVisaCat: function (c) { S.upsert('visaCats', c); bus.emit('data:changed', { store:'visaCats', action:'upsert', record:c }); return c; },
 
+    /* "Mark all read" only clears what the user can SEE (their inbox) — marking
+       someone else's unopened meeting invite as read on their behalf would be a
+       lie. With no addressed notifications in the store this is identical to the
+       previous mark-everything behaviour. */
     markNotificationsRead: function () {
-      var arr = this.notifications().map(function (n) { n.read = true; return n; });
+      var mine = {};
+      this.inbox().forEach(function (n) { mine[n.id] = true; });
+      var arr = this.notifications().map(function (n) { if (mine[n.id]) n.read = true; return n; });
       S.set('notifications', arr); bus.emit('data:changed', { store:'notifications', action:'read' });
     },
+    /* n.toId (optional) addresses the notification to one employee — see inbox(). */
     notify: function (n) {
       n.id = n.id || EPAL.ui.uid('N'); n.at = n.at || Date.now(); n.read = false;
       S.upsert('notifications', n); bus.emit('notify', n); return n;
