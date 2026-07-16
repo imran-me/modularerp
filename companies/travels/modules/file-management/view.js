@@ -59,18 +59,30 @@
     'add-file': 'Open a new embassy file for a visa applicant.',
     'slot-tracker': 'Files with a booked slot or a decision falling due soon.' };
 
+  // Section band — labels mirror the registry (config.js subs); the default
+  // section owns the bare route.
+  var SECTIONS = [['files', 'All Files'], ['add-file', 'Add File'], ['slot-tracker', 'Slot Tracker']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('travels/file-management' + (s[0] === 'files' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('travels/file-management', {
     render: function (ctx) {
       var sub = ctx.subId || 'files';
       var page = el('div.page');
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'files' ? 'Epal Travels' : 'Travels › File Management',
-        icon: 'folder-fill', title: titles[sub] || 'File Management', sub: descs[sub],
-        actions: [
-          sub !== 'files' ? el('a.btn.btn-ghost', { href: '#/travels/file-management/files', html: ui.icon('grid') + ' All Files' }) : null,
-          sub !== 'add-file' ? el('a.btn.btn-primary', { href: '#/travels/file-management/add-file', html: ui.icon('plus-lg') + ' Add File' }) : null
-        ]
+        icon: 'folder-fill', title: titles[sub] || 'File Management', sub: descs[sub]
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15), replacing the page-action buttons that were navigating
+      // between sections.
+      page.appendChild(sectionNav(sub));
       ({ files: filesView, 'add-file': addFileView, 'slot-tracker': slotView }[sub] || filesView)(page, ctx);
       ctx.mount.appendChild(page);
     }

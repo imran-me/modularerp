@@ -57,6 +57,18 @@
     ]);
   }
 
+  // Section band — labels mirror the registry (config.js subs) so the sidebar
+  // and the band can never disagree; the default section owns the bare route.
+  var SECTIONS = [['contracts', 'All Contracts'], ['add', 'New Contract'], ['documents', 'Documents']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('travels/contract-file' + (s[0] === 'contracts' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('travels/contract-file', {
     render: function (ctx) {
       var sub = ctx.subId || 'contracts';
@@ -69,12 +81,13 @@
       };
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'contracts' ? 'Epal Travels' : 'Travels › Contract File',
-        icon: 'file-earmark-medical', title: titles[sub] || 'Contract File', sub: descs[sub],
-        actions: [
-          sub !== 'contracts' ? el('a.btn.btn-ghost', { href: '#/travels/contract-file/contracts', html: ui.icon('grid') + ' All Contracts' }) : null,
-          sub !== 'add' ? el('a.btn.btn-primary', { href: '#/travels/contract-file/add', html: ui.icon('plus-lg') + ' New Contract' }) : null
-        ]
+        icon: 'file-earmark-medical', title: titles[sub] || 'Contract File', sub: descs[sub]
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15). Replaces the page-action buttons that were doing the
+      // section nav's job; the band carries every section, so keeping them
+      // would just be a second grammar for the same thing.
+      page.appendChild(sectionNav(sub));
       ({ contracts: listView, add: addView, documents: docsView }[sub] || listView)(page, ctx);
       ctx.mount.appendChild(page);
     }

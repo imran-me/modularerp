@@ -205,6 +205,22 @@
   /* ==========================================================================
    * VIEW ENTRY
    * ========================================================================*/
+  /* Section band. Labels mirror the registry (config.js subs), plus Overview —
+     which the view renders on the bare route but the registry does not list as
+     a sub (the sidebar treats the module root as Overview implicitly, so the
+     band spells it out). 7 sections → .tabs-dense, as Finance/Master Accounts
+     do for their long rows. */
+  var SECTIONS = [['overview', 'Overview'], ['vendors', 'Manage Vendors'], ['agents', 'Manage Agents'],
+    ['customers', 'Customers'], ['portals', 'Portals / GDS'], ['accounts', 'Party Accounts'], ['commission', 'Commission']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.tabs-dense.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('travels/vendor-agent' + (s[0] === 'overview' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('travels/vendor-agent', {
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
@@ -213,14 +229,12 @@
         portals: 'Portals & Channels', accounts: 'Party Ledger', commission: 'Agent Commission' };
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Vendor, Agent & Customer',
-        icon: 'people-fill', title: titles[sub] || 'Vendor, Agent & Customer', sub: subDesc(sub),
-        actions: [
-          sub !== 'overview' ? el('a.btn.btn-ghost', { href: '#/travels/vendor-agent',
-            html: ui.icon('grid') + ' Overview' }) : null,
-          sub !== 'accounts' ? el('a.btn.btn-primary', { href: '#/travels/vendor-agent/accounts',
-            html: ui.icon('journal-text') + ' Party Ledger' }) : null
-        ]
+        icon: 'people-fill', title: titles[sub] || 'Vendor, Agent & Customer', sub: subDesc(sub)
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15). Replaces the page-action buttons ("Overview" / "Party
+      // Ledger") that were navigating between sections.
+      page.appendChild(sectionNav(sub));
       ({ overview: overview, vendors: vendorsView, agents: agentsView, customers: customersView,
          portals: portalsView, accounts: accountsView, commission: commissionView }[sub] || overview)(page, ctx);
       ctx.mount.appendChild(page);

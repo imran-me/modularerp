@@ -80,6 +80,28 @@
   }
 
   /* ================================================================ VIEW: PROJECTS */
+  // Section bands — labels mirror the registry (config.js subs); each module's
+  // default section owns its bare route. This file registers TWO views
+  // (projects + estimates), so each gets its own band.
+  var PROJECT_SECTIONS = [['active', 'Active Projects'], ['design', 'Design Studio'], ['milestones', 'Milestones'], ['gallery', 'Gallery']];
+  function projectsNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    PROJECT_SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('woodart/projects' + (s[0] === 'active' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+  var ESTIMATE_SECTIONS = [['quotations', 'Quotations'], ['boq', 'Bill of Materials'], ['costing', 'Costing']];
+  function estimatesNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    ESTIMATE_SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('woodart/estimates' + (s[0] === 'quotations' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('woodart/projects', {
     render: function (ctx) {
       var sub = ctx.subId || 'active';
@@ -89,11 +111,15 @@
         eyebrow:'Woodart › Projects', icon:'easel2-fill',
         title: map[sub] || 'Projects', sub: subDesc(sub),
         actions: [
-          sub !== 'active' ? el('a.btn.btn-ghost', { href:'#/woodart/projects/active', html: ui.icon('grid') + ' Portfolio' }) : null,
+          // 'Portfolio' is gone — it only jumped to the 'active' SECTION, which
+          // the band below carries. Estimates points at a DIFFERENT module and
+          // New Project is a real action, so both stay buttons (house grammar).
           el('a.btn.btn-ghost', { href:'#/woodart/estimates/quotations', html: ui.icon('calculator') + ' Estimates' }),
           el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Project', onclick: function () { editProject(null); } })
         ]
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      page.appendChild(projectsNav(sub));
       ({ active:activeSites, design:designStudio, milestones:milestones, gallery:gallery }[sub] || activeSites)(page, ctx);
       ctx.mount.appendChild(page);
     }
@@ -694,6 +720,8 @@
           el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Estimate', onclick: function () { editEstimate(null, function () { EPAL.router.render(); }); } })
         ]
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      page.appendChild(estimatesNav(sub));
       ({ quotations:quotations, boq:boqView, costing:costing }[sub] || quotations)(page, ctx);
       ctx.mount.appendChild(page);
     }

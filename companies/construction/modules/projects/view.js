@@ -120,6 +120,18 @@
   }
 
   /* ================================================================ VIEW: PROJECTS */
+  // Section band — labels mirror the registry (config.js subs); the default
+  // section owns the bare route.
+  var SECTIONS = [['active', 'Active Sites'], ['wbs', 'Work Breakdown'], ['progress', 'Progress'], ['milestones', 'Milestones']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('construction/projects' + (s[0] === 'active' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('construction/projects', {
     render: function (ctx) {
       var sub = ctx.subId || 'active';
@@ -129,11 +141,15 @@
         eyebrow:'Construction › Projects', icon:'buildings-fill',
         title: map[sub] || 'Projects', sub: subDesc(sub),
         actions: [
-          sub !== 'active' ? el('a.btn.btn-ghost', { href:'#/construction/projects/active', html: ui.icon('grid') + ' Portfolio' }) : null,
+          // 'Portfolio' is gone — it only jumped to the 'active' SECTION, which
+          // the band below carries. BOQ Workspace is a DIFFERENT module and New
+          // Project is a real action, so both stay buttons (house grammar).
           el('a.btn.btn-ghost', { href:'#/construction/boq', html: ui.icon('calculator') + ' BOQ Workspace' }),
           el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Project', onclick: function () { editProject(null); } })
         ]
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      page.appendChild(sectionNav(sub));
       ({ active:activeSites, wbs:wbs, progress:progress, milestones:milestones }[sub] || activeSites)(page, ctx);
       ctx.mount.appendChild(page);
     }

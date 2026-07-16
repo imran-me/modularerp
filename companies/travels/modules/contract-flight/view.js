@@ -63,6 +63,19 @@
   function pnlOf(f) { return revOf(f) - (+f.seats || 0) * (+f.costSeat || 0); }
 
   /* ================================================================ VIEW */
+  // Section band — labels mirror the registry (config.js subs); the default
+  // section owns the bare route.
+  var SECTIONS = [['schedule', 'Flight Schedule'], ['day-board', 'Departures Board'], ['add-flight', 'Add Flight'],
+    ['category', 'Category'], ['manage-sales', 'Manage Sales']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('travels/contract-flight' + (s[0] === 'schedule' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('travels/contract-flight', {
     render: function (ctx) {
       var sub = ctx.subId || 'schedule';
@@ -72,12 +85,12 @@
 
       page.appendChild(EPAL.pageHead({
         eyebrow: 'Travels › Contract Flight', icon:'airplane-engines-fill',
-        title: map[sub] || 'Contract Flight', sub: subDesc(sub),
-        actions: [
-          sub !== 'schedule' ? el('a.btn.btn-ghost', { href:'#/travels/contract-flight/schedule', html: ui.icon('calendar3') + ' Schedule' }) : null,
-          sub !== 'add-flight' ? el('a.btn.btn-primary', { href:'#/travels/contract-flight/add-flight', html: ui.icon('plus-lg') + ' Add Flight' }) : null
-        ]
+        title: map[sub] || 'Contract Flight', sub: subDesc(sub)
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15), replacing the page-action buttons that were navigating
+      // between sections (Schedule / Add Flight are both sections).
+      page.appendChild(sectionNav(sub));
 
       ({ schedule:schedule, 'day-board':dayBoard, 'add-flight':addFlight, category:category, 'manage-sales':manageSales }[sub] || schedule)(page, ctx);
       ctx.mount.appendChild(page);

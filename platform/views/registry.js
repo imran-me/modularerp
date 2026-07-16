@@ -38,7 +38,15 @@
         // to one line (see .page-sub in components.css), so a long sub ellipses.
         opts.sub ? el('p.page-sub', { text: opts.sub, title: opts.sub }) : null
       ]),
-      opts.actions ? el('div.page-actions', null, opts.actions) : null
+      // ALWAYS render the actions rail, even for a head that declares none of
+      // its own. Views routinely inject their per-section buttons into it after
+      // the fact — `page.querySelector('.page-actions').prepend(…)`, 11 call
+      // sites in Air Ticketing alone, most of them unguarded. Rendering the rail
+      // only when opts.actions was truthy made that a null dereference the
+      // moment a head had no actions of its own, which is a trap for every
+      // future view. An empty flex rail costs nothing: no children, no gap,
+      // zero width, so the head measures exactly as before.
+      el('div.page-actions', null, opts.actions || [])
     ]);
     return head;
   };

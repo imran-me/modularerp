@@ -98,6 +98,18 @@
   }
 
   /* ================================================================ VIEW: PROJECTS */
+  // Section band — labels mirror the registry (config.js subs); the default
+  // section owns the bare route.
+  var SECTIONS = [['active', 'Active Projects'], ['sprints', 'Sprints'], ['roadmap', 'Roadmap']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('it/projects' + (s[0] === 'active' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('it/projects', {
     render: function (ctx) {
       var sub = ctx.subId || 'active';
@@ -107,11 +119,15 @@
         eyebrow:'IT Solutions › Projects', icon:'kanban-fill',
         title: map[sub] || 'Projects', sub: projSubDesc(sub),
         actions: [
-          sub !== 'active' ? el('a.btn.btn-ghost', { href:'#/it/projects/active', html: ui.icon('grid') + ' Portfolio' }) : null,
+          // 'Portfolio' is gone — it only jumped to the 'active' SECTION, which
+          // the band below now carries. Support links to a DIFFERENT module and
+          // New Project is a real action, so both stay buttons (house grammar).
           el('a.btn.btn-ghost', { href:'#/it/support', html: ui.icon('life-preserver') + ' Support' }),
           el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Project', onclick: function () { editProject(null); } })
         ]
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar 2026-07-15)
+      page.appendChild(sectionNav(sub));
       ({ active:activeProjects, sprints:sprints, roadmap:roadmap }[sub] || activeProjects)(page, ctx);
       ctx.mount.appendChild(page);
     }

@@ -124,6 +124,21 @@
   function apps() { return S.list('visaApps'); }
   function cats() { return db.visaCats(); }
 
+  /* Section band. Labels mirror the registry (config.js subs), plus Overview —
+     rendered on the bare route but not listed as a registry sub. 9 sections →
+     .tabs-dense, like Finance's 13. */
+  var SECTIONS = [['overview', 'Overview'], ['categories', 'Visa Categories'], ['new-application', 'New Application'],
+    ['application-board', 'Application Board'], ['manage-sales', 'Manage Sales'], ['visa-rates', 'Visa Rates'],
+    ['embassy-tracking', 'Embassy Tracking'], ['documents', 'Required Documents'], ['analysis', 'Analysis']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.tabs-dense.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('travels/visa-processing' + (s[0] === 'overview' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('travels/visa-processing', {
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
@@ -136,12 +151,12 @@
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Visa Processing',
         icon:'passport-fill', title: map[sub] || 'Visa Processing',
-        sub: subDesc(sub),
-        actions: [
-          sub !== 'overview' ? el('a.btn.btn-ghost', { href:'#/travels/visa-processing', html: ui.icon('grid') + ' Overview' }) : null,
-          sub !== 'new-application' ? el('a.btn.btn-primary', { href:'#/travels/visa-processing/new-application', html: ui.icon('plus-lg') + ' New Application' }) : null
-        ]
+        sub: subDesc(sub)
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15). Replaces the page-action buttons ("Overview" / "New
+      // Application") that were navigating between sections.
+      page.appendChild(sectionNav(sub));
 
       ({ overview:overview, categories:categories, 'new-application':newApplication,
          'application-board':board, 'manage-sales':manageSales, 'visa-rates':visaRates,

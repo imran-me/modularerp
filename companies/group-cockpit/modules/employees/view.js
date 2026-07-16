@@ -38,6 +38,19 @@
     S.seedOnce('leave_requests', LEAVE_SEED);
   } });
 
+  // Section band — labels mirror the registry (config.js subs); the default
+  // section owns the bare route.
+  var SECTIONS = [['directory', 'Directory'], ['attendance', 'Attendance'], ['leaves', 'Leaves'],
+    ['payroll', 'Payroll'], ['performance', 'Performance'], ['org-chart', 'Org Chart']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('group/employees' + (s[0] === 'directory' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   function view() {
     return { render: function (ctx) {
       if (!EPAL.auth.isAdmin() && EPAL.auth.role() !== 'hr') { ctx.mount.innerHTML = ''; return; }
@@ -56,6 +69,11 @@
           el('button.btn' + (sub === 'leaves' || sub === 'attendance' ? '.btn-ghost' : '.btn-primary'), { html: ui.icon('person-plus-fill') + ' Add Employee', onclick: function () { editEmployee(null, function(){ EPAL.router.render(); }); } })
         ]
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15). Every page-action above is a REAL action (exports, Apply
+      // Leave, Punch, Add Employee), so they all stay buttons; only the
+      // missing section nav is added.
+      page.appendChild(sectionNav(sub));
 
       if (sub === 'directory') renderDirectory(page);
       else if (sub === 'attendance') renderAttendance(page);

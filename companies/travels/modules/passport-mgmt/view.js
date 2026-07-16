@@ -53,18 +53,34 @@
     categories: 'How the register breaks down by document type — tap a card to filter.',
     expiry: 'Passports approaching expiry — renew before the window closes.' };
 
+  // The section band. Labels match the registry (config.js subs) so the
+  // sidebar and the band can never disagree; the default section routes to the
+  // bare module route, exactly as the other converted modules do.
+  var SECTIONS = [['holders', 'Holders'], ['categories', 'Categories'], ['expiry', 'Expiry Radar']];
+  function sectionNav(sub) {
+    var nav = el('div.tab-underline.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (sub === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('travels/passport-mgmt' + (s[0] === 'holders' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('travels/passport-mgmt', {
     render: function (ctx) {
       var sub = ctx.subId || 'holders';
       var page = el('div.page');
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'holders' ? 'Epal Travels' : 'Travels › Passport Management',
-        icon: 'person-vcard', title: titles[sub] || 'Passport Management', sub: descs[sub],
-        actions: [
-          sub !== 'holders' ? el('a.btn.btn-ghost', { href: '#/travels/passport-mgmt/holders', html: ui.icon('grid') + ' Holders' }) : null,
-          sub !== 'expiry' ? el('a.btn.btn-primary', { href: '#/travels/passport-mgmt/expiry', html: ui.icon('radar') + ' Expiry Radar' }) : null
-        ]
+        icon: 'person-vcard', title: titles[sub] || 'Passport Management', sub: descs[sub]
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15: sections = underline tabs; pills are filters below).
+      // This module had NO section band: it navigated through page-action
+      // buttons ("Holders" / "Expiry Radar"), a third grammar for the same
+      // job. The band carries every section, so those buttons are gone rather
+      // than left duplicating it.
+      page.appendChild(sectionNav(sub));
       ({ holders: holdersView, categories: categoriesView, expiry: expiryView }[sub] || holdersView)(page, ctx);
       ctx.mount.appendChild(page);
     }

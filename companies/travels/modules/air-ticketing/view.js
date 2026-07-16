@@ -213,6 +213,26 @@
   function randPnr(){ return String.fromCharCode(65+Math.floor(Math.random()*26))+String.fromCharCode(65+Math.floor(Math.random()*26))+Math.floor(1000+Math.random()*9000); }
   function netProfitOf(x){ return (x.sale||0) - (x.cost||0) - (x.commission||0); }
 
+  /* Section band. Labels mirror the registry (config.js subs), plus Overview —
+     rendered on the bare route but not a registry sub. 11 sections → .tabs-dense.
+     airlines/airports/countries/states are deep-links INTO Setup (its own pill
+     switcher owns them), so they light Setup rather than leaving the band with
+     nothing active. */
+  var SECTIONS = [['overview', 'Overview'], ['stock', 'Ticket Manage'], ['purchase', 'Ticket Purchase'],
+    ['ticketing', 'Ticketing'], ['manage-sales', 'Manage Sales'], ['emd', 'EMD & Ancillary'],
+    ['ttl', 'Ticketing Deadlines'], ['registers', 'Re-Issue & Void Register'], ['masters', 'Setup'],
+    ['bsp', 'BSP / ADM Recon'], ['refunds', 'Refund Tracker']];
+  var MASTER_SUBS = ['airlines', 'airports', 'countries', 'states'];
+  function sectionNav(sub) {
+    var active = MASTER_SUBS.indexOf(sub) >= 0 ? 'masters' : sub;
+    var nav = el('div.tab-underline.tabs-dense.mb-3');
+    SECTIONS.forEach(function (s) {
+      nav.appendChild(el('button' + (active === s[0] ? '.active' : ''), { text: s[1],
+        onclick: function () { EPAL.router.navigate('travels/air-ticketing' + (s[0] === 'overview' ? '' : '/' + s[0])); } }));
+    });
+    return nav;
+  }
+
   EPAL.view('travels/air-ticketing', {
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
@@ -227,12 +247,14 @@
       page.appendChild(EPAL.pageHead({
         eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Air Ticketing',
         icon:'airplane-fill', title: map[sub] || 'Air Ticketing',
-        sub: subDesc(sub),
-        actions: [
-          sub !== 'overview' ? el('a.btn.btn-ghost', { href:'#/travels/air-ticketing', html: ui.icon('grid') + ' Overview' }) : null,
-          sub !== 'ticketing' ? el('a.btn.btn-primary', { href:'#/travels/air-ticketing/ticketing', html: ui.icon('plus-lg') + ' Direct Sale' }) : null
-        ]
+        sub: subDesc(sub)
       }));
+      // SECTION NAV — the house full-bleed underline band (owner grammar
+      // 2026-07-15). Replaces the page-action buttons ("Overview" / "Direct
+      // Sale") that were navigating between sections. The operation pills
+      // inside Ticket Operations and Setup are NOT touched: they are switchers
+      // within a section, which the grammar keeps as pills BELOW the band.
+      page.appendChild(sectionNav(sub));
 
       ({ overview:overview, stock:stockView, purchase:purchaseView, ticketing:ticketOps, 'manage-sales':manageSales,
          emd:emdView, ttl:ttlView,
