@@ -1,2 +1,0 @@
-auto-deploy proof · 2026-07-16T11:46:22Z
-If you can read this in your browser, push→live works.
