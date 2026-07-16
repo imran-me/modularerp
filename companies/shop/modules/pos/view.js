@@ -304,7 +304,9 @@
         // books to AR). Before this, every POS sale — even cash — posted as debt,
         // which is why 1000/1010 Cash had zero postings. (Bookkeeping audit fix 2.)
         var fullyPaid = (t.grand - tendered) <= 0.5;
-        db.postSale('shop', { amount: t.grand, cost: t.cost, ref: orderId, desc: 'POS sale', customer: customer,
+        // vat: the 7.5% VAT inside grand — the ledger books it to 2130 VAT Payable,
+        // not revenue. (Bookkeeping audit fix 6 — VAT was booked as income.)
+        db.postSale('shop', { amount: t.grand, cost: t.cost, vat: t.vat, ref: orderId, desc: 'POS sale', customer: customer,
           paid: fullyPaid, payStatus: fullyPaid ? 'Paid' : (tendered > 0 ? 'Partial' : 'Due') });
 
         // 4) append to the shop order book

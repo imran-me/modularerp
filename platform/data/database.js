@@ -571,6 +571,10 @@
         companyId: companyId,
         date: sale.date || new Date().toISOString().slice(0, 10),
         amount: +sale.amount || 0, cost: +sale.cost || 0,
+        // VAT portion of `amount` (0 for sales that don't charge VAT). The ledger
+        // splits it out to the VAT-payable liability instead of counting it as
+        // revenue. (Bookkeeping audit fix 6 — VAT was booked as income.)
+        vat: +sale.vat || 0,
         profit: (+sale.amount || 0) - (+sale.cost || 0),
         ref: sale.ref || '', desc: sale.desc || '', customer: sale.customer || '',
         // accounting hints for the ledger auto-post: categorised income + whether the

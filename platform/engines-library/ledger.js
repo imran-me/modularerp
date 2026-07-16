@@ -842,17 +842,24 @@
       if (alreadyPosted(rec)) { postedKeys[key] = true; return; } // seen in store
       postedKeys[key] = true;
 
-      var amount = +rec.amount || 0, cost = +rec.cost || 0;
+      var amount = +rec.amount || 0, cost = +rec.cost || 0, vat = +rec.vat || 0;
       var incAcct = incomeAccountFor(rec);
       var paid = rec.paid === true || rec.payStatus === 'Paid';
       // cash if paid; else the RIGHT receivable for the party class (audit fix:
       // sub-agent sales go to 1150 Agent Receivable, not customer AR)
       var debit = paid ? '1010' : (isAgentParty(rec.customer) ? '1150' : '1200');
+      // When the sale price includes VAT, only the NET is revenue — the VAT
+      // collected is money owed to the NBR (2130 VAT Payable), not income. Split
+      // it out so the P&L is not inflated by tax. (Bookkeeping audit fix 6.)
+      var splitVat = vat > 0 && vat < Math.abs(amount);
       try {
-        // revenue leg — categorised income, party = customer
+        // revenue leg — categorised income (net of VAT), party = customer; the VAT
+        // portion, if any, credits the VAT-payable liability so credits = debit.
         post({ id: 'GL-S' + (rec.id || key), date: rec.date, companyId: rec.companyId,
           ref: rec.ref, memo: rec.desc || 'Sale', source: 'sale', party: rec.customer || '',
-          lines: [ { account: debit, dr: amount, cr: 0 }, { account: incAcct, dr: 0, cr: amount } ] });
+          lines: splitVat
+            ? [ { account: debit, dr: amount, cr: 0 }, { account: incAcct, dr: 0, cr: amount - vat }, { account: '2130', dr: 0, cr: vat } ]
+            : [ { account: debit, dr: amount, cr: 0 }, { account: incAcct, dr: 0, cr: amount } ] });
         // cost leg — a SEPARATE entry so the vendor's payable sub-ledger is correct;
         // cash-out if the vendor is already paid (costPaid), otherwise a payable.
         // `!== 0` NOT `> 0`: a void/refund reverses a sale with a NEGATIVE cost, and
