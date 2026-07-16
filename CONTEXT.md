@@ -4,6 +4,111 @@
 > (human or AI) can resume work months later without losing the vision, the
 > architecture, or the conventions. Read this first, always.
 
+> 📌 **STANDING INSTRUCTION (owner, 2026-07-16):** keep THIS file continuously
+> updated with all context + instructions, and **push it to GitHub every session**
+> (it is the shareable resume doc). A private AI memory also exists at
+> `C:\Users\User\.claude\projects\e--Imran-New-folder-newerp\memory\` (local, not
+> pushed) — this file is the public mirror of the load-bearing parts.
+
+---
+
+## 🚧 RESUME HERE — 2026-07-16 · BACKEND MIGRATION (real data + modular Laravel)
+
+**Phase now:** connect the new dev UI to a **real Laravel backend + MySQL**, using
+the owner's **real production data**. Scope: **GROUP + TRAVELS first** (prove, then
+roll out the other 4 companies).
+
+**MANDATORY STACK (boss's directive — honor everywhere):**
+- Frontend: **HTML5 · CSS3 · Tailwind · custom CSS stylesheet · jQuery · raw JS**
+  (custom CSS is now ALLOWED — the existing design system stays; jQuery is available
+  for the AJAX layer; this supersedes the old "Tailwind-only, delete custom CSS" rule).
+- Backend: **PHP Laravel**.  Database: **MySQL / MariaDB**.
+
+**THE LOAD-BEARING RULE:** the OLD ERP's **accounting is wrong** ("many wrong,
+bookkeeping errors — that's why we build the new one"). So we **import the DATA,
+never the old accounting LOGIC.** The new system's corrected ledger is the source of
+truth. Old journal entries = archive/reference, not the opening position. The old
+Laravel app (`E:\Imran\epal_erp_soft-main`, monolith) is a **DONOR** (its auth, its
+140 models, its real data, the 36 `backend/LARAVEL-BLUEPRINT.md` specs) — NOT run
+as-is (a monolith can't do delete-a-folder).
+
+**ARCHITECTURE (owner-approved): MODULAR, folder-wise, drop-in/drop-out — the backend
+MIRRORS the frontend.** Each module folder owns BOTH sides and is deletable as a unit:
+```
+companies/<co>/modules/<mod>/
+├─ view.js            ← frontend (exists)
+├─ module.json        ← manifest (exists)
+└─ backend/           ← its Laravel slice (NEW), auto-discovered by the kernel
+   ├─ routes.php · <Name>Controller.php · migrations/ · bridge.map
+```
+Delete the folder → screen + API + tables + Group rollup all vanish; nothing else
+notices. This is exactly `EPAL_GROUP_ERP_Modular_Architecture.md` §4 + the bridge in
+`platform/bridge/bridge.js`. **PROVEN today** (remove a `backend/` folder →
+`route:list` drops it; restore → back).
+
+**DEPLOYMENT (owner decision): ONE subdomain `dev.epal.com.bd` serves BOTH FE + BE**
+(like the old erp — one Laravel app per subdomain). The repo BECOMES a Laravel app:
+docroot → `platform/backend/public`; Laravel serves the SPA shell + `/api/*`; the
+modular asset folders (platform/, companies/) reachable via symlinks so delete-a-folder
+survives. Same-origin → NO CORS. **Not done yet** — still deploys as the static demo.
+Hosting facts: dev.epal.com.bd → `~/domains/epal.com.bd/public_html/modularerp`,
+auto-deploy via Hostinger cron **`/usr/bin/git -C <path> pull`** every minute (NOT
+`cd && git pull` — cron can't run the `cd` builtin). erp.epal.com.bd is the SEPARATE
+live old system (own folder, own GitHub Epal-It-Solutions) — never touched.
+
+**DATABASES:** new = `u203838805_modularerp` (Hostinger, imported; separate from the old
+`u203838805_erp`). Password lives ONLY in the server `.env` — never in git, never in chat.
+
+**LOCAL DEV (this machine has Laragon):** PHP 8.3.26, Composer 2.8, MySQL 8.4.3.
+- Start MySQL: `D:/laragon/bin/mysql/mysql-8.4.3-winx64/bin/mysqld.exe --defaults-file=".../my.ini" --datadir="D:/laragon/data/mysql-8.4"` (DLL warnings are harmless).
+- Real DB imported to local `modularerp`. IMPORT GOTCHA: the dump has an FK ordering
+  issue (contract_flights→tickets) — import with `SET FOREIGN_KEY_CHECKS=0;` prepended
+  + `mysql --force`, or it aborts ~line 61326.
+- Run the API: `cd platform/backend && php artisan serve` (local test user:
+  `admin@epal.com` / `epal1234` — set in LOCAL db only; production passwords untouched).
+
+**BUILT + WORKING (local) today:**
+- `platform/backend/` = Laravel 13 kernel. `ModuleServiceProvider` (app/Providers) is
+  the module-loader: globs `companies/*/modules/*/backend` + `companies/*/app/backend`,
+  loads each `routes.php` under `/api`, adds `migrations/`, and a runtime autoloader maps
+  namespace `Epal\Modules\<CompanyStudly>\<ModuleStudly>\<Class>` → that folder (kebab).
+- **Login** (`app/Http/Controllers/AuthController.php`, `routes/api.php`): Sanctum token,
+  real bcrypt check, returns `{token, user{id,name,email,companyId,isSuperAdmin,scope}}`.
+  `POST /api/login`, `GET /api/me`, `POST /api/logout`. (User model got `HasApiTokens`.)
+- **13 module read endpoints serving REAL data**, each in its module's `backend/`
+  (built via a 4-way parallel workflow, all `php -l` clean):
+  group/master-accounts → accounts(263), banks(11), journals(74 w/ 156 lines nested),
+  customers(14), suppliers(10), schedules(26); group/employees → directory(82);
+  travels/air-ticketing → airlines(24), airports(301), purchases(3);
+  travels/visa-processing → categories(25), sales(3). Controllers translate old
+  snake_case tables → the frontend store shapes (mapping notes are in each controller).
+  Re-verify each returns rows on resume (some counts skip soft-deleted rows).
+
+**NOT deployed / NOT fully committed (deliberate):** `platform/backend/vendor` + `.env`
+are gitignored (Laravel default). The kernel CODE + module `backend/` files ARE committed
+so the work is preserved; `composer install` regenerates vendor on the server at deploy.
+
+**NEXT (resume order):**
+1. **Fix visa-processing/categories** (returns 0 rows though table has 46 — mapping/filter bug).
+2. **Frontend swap** = the milestone: a login screen before boot; `platform/data/state.js`
+   load-at-boot — fetch the module endpoints into the in-memory cache, map into stores
+   (`coa` ← /api/group/master-accounts/accounts, etc.), so the user logs in with a real
+   password and SEES real data on the new UI. Keep it ADDITIVE: if no API base configured
+   (current static deploy) → behave exactly as demo; if API + token → real data.
+   Swap point = `platform/core/app.js` `EPAL.db.seed()` (~line 53).
+3. **Deploy-restructure**: point dev.epal.com.bd docroot at `platform/backend/public`,
+   `composer install` + real `.env` on the server, symlink platform/ + companies/ into
+   public/. Guide the owner through the Hostinger steps (like the git-clone was).
+4. **Roll out** the rest of group + travels module `backend/` folders (blueprints exist),
+   then wire `bridge.map` events (ticket.sold → group.revenue) for consolidation.
+5. **Bookkeeping fixes** (see AI memory `epal-bookkeeping-audit`): the new ledger's
+   posting bugs (voids destroying money, cash-as-debt, VAT, etc.) — some applied, some
+   remain. These govern how the CORRECT books post going forward.
+
+**Key new paths:** `platform/backend/` (kernel) · `platform/backend/app/Providers/ModuleServiceProvider.php` (the loader) · `companies/**/modules/**/backend/` (per-module slices) · `docs/BACKEND-ARCHITECTURE.md` (to be written once the frontend swap is proven).
+
+---
+
 > ✅ **DEEP CORE PASS COMPLETE (v0.3.0, 2026-07-06).** The double-entry ledger, audit
 > trail, maker-checker approvals, branded document engine, intelligence layer (MD
 > briefing/RFM/anomalies), action-level permissions, automation scheduler, comment

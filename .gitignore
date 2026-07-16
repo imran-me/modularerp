@@ -7,3 +7,8 @@ Thumbs.db
 
 # Claude verification harness temp files (never commit)
 __*.html
+
+# Laravel backend: never commit deps or secrets
+platform/backend/vendor/
+platform/backend/.env
+platform/backend/storage/*.key
