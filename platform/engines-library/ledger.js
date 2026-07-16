@@ -834,7 +834,12 @@
           lines: [ { account: debit, dr: amount, cr: 0 }, { account: incAcct, dr: 0, cr: amount } ] });
         // cost leg — a SEPARATE entry so the vendor's payable sub-ledger is correct;
         // cash-out if the vendor is already paid (costPaid), otherwise a payable.
-        if (cost > 0) {
+        // `!== 0` NOT `> 0`: a void/refund reverses a sale with a NEGATIVE cost, and
+        // a `> 0` guard silently dropped that reversal — the revenue leg (unguarded)
+        // reversed but the cost stayed on the books as a phantom loss + a phantom
+        // payable to the vendor. Non-zero (either sign) posts; only a true-zero-cost
+        // sale still books no cost leg. (Bookkeeping audit fix 1, 2026-07-16.)
+        if (cost !== 0) {
           var creditCost = rec.costPaid === true ? '1010' : '2000';
           post({ id: 'GL-SC' + (rec.id || key), date: rec.date, companyId: rec.companyId,
             ref: rec.ref, memo: (rec.desc || 'Sale') + ' — cost', source: 'sale', party: rec.vendor || rec.customer || '',
