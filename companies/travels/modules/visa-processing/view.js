@@ -114,7 +114,11 @@
       ref: a.id,
       desc: 'Visa ' + (a.country || ''),
       customer: a.applicant || '',
-      category: 'visa', vendor: 'Embassy / VFS'
+      category: 'visa', vendor: 'Embassy / VFS',
+      // forward the customer's payment state: a paid application books to cash
+      // (1010), an unpaid one to a receivable. Default 'Due' → AR, as before.
+      // (Bookkeeping audit fix 2 — cash was booking as debt.)
+      payStatus: a.payStatus || 'Due'
     });
     a.posted = true;
     db.saveVisaApp(a);

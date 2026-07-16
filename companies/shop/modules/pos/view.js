@@ -299,7 +299,13 @@
         });
 
         // 3) revenue → finance + ledger (the cross-company artery)
-        db.postSale('shop', { amount: t.grand, cost: t.cost, ref: orderId, desc: 'POS sale', customer: customer });
+        // A fully-tendered counter sale is CASH — book it to 1010, not a
+        // receivable. Any shortfall is recorded as a customer due below (and
+        // books to AR). Before this, every POS sale — even cash — posted as debt,
+        // which is why 1000/1010 Cash had zero postings. (Bookkeeping audit fix 2.)
+        var fullyPaid = (t.grand - tendered) <= 0.5;
+        db.postSale('shop', { amount: t.grand, cost: t.cost, ref: orderId, desc: 'POS sale', customer: customer,
+          paid: fullyPaid, payStatus: fullyPaid ? 'Paid' : (tendered > 0 ? 'Partial' : 'Due') });
 
         // 4) append to the shop order book
         var order = {
