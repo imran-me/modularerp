@@ -113,10 +113,16 @@
   EPAL.view('travels/accounts', {
     render: function (ctx) {
       var sub = ctx.subId || 'overview';
-      if (['overview', 'income', 'expenses', 'payroll', 'journals', 'schedules', 'recurring', 'cheques', 'cashbook', 'pettycash'].indexOf(sub) < 0) sub = 'overview';
+      // 'cheques' / 'cashbook' / 'pettycash' still ROUTE — they are now tabs of
+      // the Manage Cash desk (owner 2026-07-15: "consolidate into one Manage
+      // Cash, like Master Accounts"), so old links and bookmarks land on the
+      // desk with that tab already open instead of 404-ing.
+      if (['overview', 'income', 'expenses', 'payroll', 'journals', 'schedules', 'recurring', 'cash', 'cheques', 'cashbook', 'pettycash'].indexOf(sub) < 0) sub = 'overview';
       var page = el('div.page');
 
-      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', payroll: 'Payroll', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cheques: 'Cheque Register', cashbook: 'Cash Book', pettycash: 'Petty Cash' };
+      // the three old cash sections now open the ONE Manage Cash desk
+      var CASH_SUBS = { cheques: 'cheques', cashbook: 'cashbook', pettycash: 'petty' };
+      var titles = { overview: 'Accounts', income: 'Income', expenses: 'Expenses', payroll: 'Payroll', journals: 'Journals', schedules: 'Payment Schedules', recurring: 'Recurring Expenses', cash: 'Manage Cash', cheques: 'Manage Cash', cashbook: 'Manage Cash', pettycash: 'Manage Cash' };
       // Subtitles are written to FIT the one-line .page-sub (owner review
       // 2026-07-15). The head is pinned to a single line, so an over-long sub
       // doesn't wrap — it ellipses mid-sentence, which reads as a bug. The rule
@@ -127,9 +133,10 @@
         journals: 'Balanced double-entry journals, posted to the general ledger.',
         schedules: 'Payables and receivables with due dates, ageing and settlement.',
         recurring: 'Rent, internet and other monthly costs — auto-created each month.',
-        cheques: 'Issued and received cheques with their clearing status.',
-        cashbook: 'Every cash & bank movement, dated, with a running balance.',
-        pettycash: 'Petty-cash IOU slips to staff and their settlement against bills.',
+        cash: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
+        cheques: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
+        cashbook: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
+        pettycash: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
         payroll: 'Salary run, payslips, loans & advances — posted to the ledger.' };
 
       page.appendChild(EPAL.pageHead({
@@ -154,11 +161,15 @@
       // and Master Accounts (owner review 2026-07-15). This screen was still on
       // the old pill row: same job, two different nav grammars across the group.
       // House rule (see .tab-underline): section nav = underline tabs; pills are
-      // for switchers/filters BELOW it; real actions stay buttons. 10 sections,
-      // so .tabs-dense — the same marker Finance uses for its long row.
+      // for switchers/filters BELOW it; real actions stay buttons.
+      // 8 sections since Cheques + Cash Book + Petty Cash folded into the ONE
+      // Manage Cash desk (owner 2026-07-15) — the same shape as Master Accounts,
+      // where cash is one section with its books as tabs, not three siblings.
       var pills = el('div.tab-underline.tabs-dense.mb-3');
-      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['payroll', 'Payroll'], ['recurring', 'Recurring'], ['cheques', 'Cheques'], ['cashbook', 'Cash Book'], ['pettycash', 'Petty Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
-        pills.appendChild(el('button' + (sub === p[0] ? '.active' : ''), { text: p[1],
+      var active = CASH_SUBS[sub] ? 'cash' : sub;      // an old cash link still lights Manage Cash
+      [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['payroll', 'Payroll'],
+       ['recurring', 'Recurring'], ['cash', 'Manage Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
+        pills.appendChild(el('button' + (active === p[0] ? '.active' : ''), { text: p[1],
           onclick: function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); } }));
       });
       page.appendChild(pills);
@@ -168,7 +179,26 @@
         el('span.badge.badge-warn', { html: ui.icon('lock-fill') + ' Books locked through ' + ui.escapeHtml(lockYm) + ' — back-dated entries are blocked' })
       ]));
 
-      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView, cheques: chequesView, cashbook: cashBookView, pettycash: pettyView,
+      /* MANAGE CASH — the shared desk (platform/kit/cash.js), scoped to Travels.
+         At group level its Petty/Cheque tabs are read-only mirrors because entry
+         belongs to the company screens; here this desk IS the company screen, so
+         Travels hands in its own real entry views for those tabs and adds its
+         Cash Book. Nothing was lost in the consolidation — the three former
+         sections are the same screens, now tabs of one desk. Cash in Sell hides
+         itself (Travels has no POS). */
+      function cashSection(p) {
+        if (!EPAL.cashDesk) { p.appendChild(el('div.card', null, [el('div.card-body', { text: 'Cash desk unavailable.' })])); return; }
+        EPAL.cashDesk(p, CID, {
+          tab: CASH_SUBS[sub] || 'overview',
+          tabs: [
+            ['cashbook', 'Cash Book', function (host) { cashBookView(host); }],
+            ['petty', 'Petty Cash', function (host) { pettyView(host); }],
+            ['cheques', 'Cheques', function (host) { chequesView(host); }]
+          ]
+        });
+      }
+      ({ overview: overview, income: incomeView, expenses: expenseView, journals: journalsView, schedules: schedulesView, recurring: recurringView,
+         cash: cashSection, cheques: cashSection, cashbook: cashSection, pettycash: cashSection,
          payroll: function (p) { if (EPAL.payrollDesk) EPAL.payrollDesk(p, CID); else p.appendChild(el('div.card', null, [el('div.card-body', { text: 'Payroll desk unavailable.' })])); } }[sub] || overview)(page);
       ctx.mount.appendChild(page);
     }

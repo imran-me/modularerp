@@ -125,8 +125,13 @@
         subs:[['files','All Files'],['add-file','Add File'],['slot-tracker','Slot Tracker']] }),
     m('passport-mgmt',   'Passport Management', 'person-vcard', { desc:'Passport holders, categories, expiry radar.',
         subs:[['holders','Holders'],['categories','Categories'],['expiry','Expiry Radar']] }),
-    m('accounts',        'Accounts',         'cash-stack', { desc:'Income, expenses, payroll, journals, payment schedules.',
-        subs:[['income','Income'],['expenses','Expenses'],['payroll','Payroll'],['journals','Journals'],['schedules','Payment Schedules']] }),
+    // Every section the view actually renders is listed here, in the band's
+    // order — the sidebar, the band and the view must agree (Master Accounts is
+    // the reference). This used to list only 5 of the 10, so Recurring, Cheques,
+    // Cash Book and Petty Cash existed and routed but were invisible in the menu.
+    m('accounts',        'Accounts',         'cash-stack', { desc:'Income, expenses, payroll, recurring, cheques, cash book, petty cash, journals, payment schedules.',
+        subs:[['overview','Overview'],['income','Income'],['expenses','Expenses'],['payroll','Payroll'],
+              ['recurring','Recurring'],['cash','Manage Cash'],['journals','Journals'],['schedules','Payment Schedules']] }),
     m('ledgers',         'Ledgers',          'journal-text', { desc:'General & party ledgers, trial balance.' }),
     m('reports',         'Reports',          'file-earmark-spreadsheet', { desc:'Sales, visa, ticketing, financial reports.' }),
     m('analytics',       'Analytics',        'graph-up', { desc:'Profit leak, fraud sentinel, travel-DNA.' }),

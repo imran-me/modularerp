@@ -278,13 +278,55 @@
   /* ==========================================================================
    * THE DESK
    * ========================================================================*/
-  var TABS = [['overview', 'Overview'], ['hard', 'Hard Cash'], ['sales', 'Cash in Sell'],
-    ['petty', 'Petty Cash'], ['cheques', 'Cheques']];
+  /* The desk's own tabs. A COMPANY desk can hand in its own (see opts.tabs
+     below): at group level the sub-books are read-only mirrors — entry belongs
+     to each company's screens (owner decision) — but when Travels mounts this
+     desk INSIDE its own Accounts module, that desk IS the company screen, so it
+     supplies its real entry views instead of the mirrors. */
+  var BASE_TABS = [['overview', 'Overview', function (p, c) { overviewView(p, c); }],
+    ['hard', 'Hard Cash', function (p, c) { hardView(p, c); }],
+    ['sales', 'Cash in Sell', function (p, c) { salesView(p, c); }],
+    ['petty', 'Petty Cash', function (p, c) { pettyView(p, c); }],
+    ['cheques', 'Cheques', function (p, c) { chequesView(p, c); }]];
+
+  // Cash-in-Sell only means something where there is a till. The POS book is
+  // the shop's, so a scope with no POS module (e.g. Travels) would otherwise
+  // show a permanently empty tab.
+  function scopeHasPos(cid) {
+    if (cid === 'all') return true;
+    return !!(EPAL.config && EPAL.config.module && EPAL.config.module(cid, 'pos'));
+  }
+
+  /* opts.tabs — [[id, label, renderFn], …]. An id that already exists REPLACES
+     that tab (same slot, so the order stays predictable); a new id is inserted
+     right after Hard Cash, next to the book it belongs with. */
+  function deskTabs(cid, opts) {
+    var tabs = BASE_TABS.filter(function (t) { return t[0] !== 'sales' || scopeHasPos(cid); })
+      .map(function (t) { return t.slice(); });
+    ((opts && opts.tabs) || []).forEach(function (x) {
+      var i = -1;
+      tabs.forEach(function (t, n) { if (t[0] === x[0]) i = n; });
+      if (i >= 0) { tabs[i] = x.slice(); return; }
+      var after = -1;
+      tabs.forEach(function (t, n) { if (t[0] === 'hard') after = n; });
+      tabs.splice(after + 1, 0, x.slice());
+    });
+    return tabs;
+  }
+
   var tab = 'overview';
   EPAL.cashDesk = function (page, cid, opts) {
+    opts = opts || {};
+    // opts.tab — open on a given book. Lets a host module keep deep links alive
+    // (Travels' old /cheques, /cashbook, /pettycash routes open the desk on that
+    // tab instead of 404-ing) without the desk owning the router.
+    if (opts.tab) tab = opts.tab;
     var host = el('div');
     function draw() {
       host.innerHTML = '';
+      var TABS = deskTabs(cid, opts);
+      // a tab that vanished with the scope (Cash in Sell) must not strand the desk
+      if (!TABS.some(function (t) { return t[0] === tab; })) tab = TABS[0][0];
       var bar = el('div.pill-tab');
       TABS.forEach(function (t) { bar.appendChild(el('button' + (tab === t[0] ? '.active' : ''), { text: t[1], onclick: function () { tab = t[0]; draw(); } })); });
       var row = el('div.nav-row.mb-3');
@@ -296,7 +338,10 @@
       }
       host.appendChild(row);
       var body = el('div');
-      ({ overview: overviewView, hard: hardView, sales: salesView, petty: pettyView, cheques: chequesView }[tab] || overviewView)(body, cid);
+      // render through the resolved tab list, so an injected/overridden tab
+      // (a company desk's own entry screen) is what actually draws
+      var cur = TABS.filter(function (t) { return t[0] === tab; })[0] || TABS[0];
+      cur[2](body, cid);
       host.appendChild(body);
     }
     draw();
