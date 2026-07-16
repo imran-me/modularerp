@@ -99,6 +99,39 @@
       } catch (x) {}
     }
 
+    /* ---- AUDIT FIX 3 (guarded, one-time): the twin of the expense backfill
+     * above. It mirrored only kind==='Expense', so every kind==='Income' row in
+     * the acc_entries register (manual JV income — ticket sales, visa fees,
+     * consultancy, project billing…) NEVER reached the GL: the P&L under-reported
+     * REVENUE by the whole income feed (~৳5Cr at audit time), which is the larger
+     * half of the −377% margin. Same mechanics: stable GL-MXI-<id> ids, override
+     * (a books repair is not blocked by a period lock), its OWN guard so it runs
+     * even where the expense backfill already ran. Debits the 1010 bank control
+     * uniformly (as the expense backfill credits it) — the reconciliation float
+     * card accounts for book-cash vs bank-held. Income head via the shared
+     * incomeAccountFor mapper, so it lands on the same 4xxx line a live sale would. */
+    if (EPAL.ledger && !S.get('inc_gl_backfill_v1', null)) {
+      try {
+        var glIdsI = {};
+        (EPAL.ledger.entries({}) || []).forEach(function (g) { glIdsI[g.id] = 1; });
+        var ibN = 0, ibAmt = 0;
+        db.col('acc_entries').filter(function (e) { return e.kind === 'Income'; }).forEach(function (e) {
+          var gid = 'GL-MXI-' + e.id;
+          if (glIdsI[gid] || !(+e.amount > 0)) return;
+          try {
+            var incAcct = EPAL.ledger.incomeAccountFor
+              ? EPAL.ledger.incomeAccountFor({ category: e.category, desc: e.desc }) : '4000';
+            EPAL.ledger.post({ id: gid, date: e.date, companyId: e.companyId || 'group', ref: e.ref || e.id,
+              memo: (e.category || 'Income') + (e.desc && e.desc !== '—' ? ' — ' + e.desc : ''),
+              source: 'manual', party: e.party || '', override: true,
+              lines: [{ account: '1010', dr: +e.amount, cr: 0 }, { account: incAcct, dr: 0, cr: +e.amount }] });
+            ibN++; ibAmt += +e.amount;
+          } catch (x) {}
+        });
+        S.set('inc_gl_backfill_v1', { entries: ibN, amount: ibAmt });
+      } catch (x) {}
+    }
+
     /* ---- P1-② AUDIT MIGRATION (guarded, one-time): open every bank's live
      * balance into the ledger so the GL finally KNOWS the bank money. One
      * explicit opening per bank vs Retained Earnings (3100), party-tagged
