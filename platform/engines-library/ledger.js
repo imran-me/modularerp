@@ -678,8 +678,16 @@
   // profitable business regardless of how large the seeded sales sample is.
   var EXP_MONTHS = ['2026-04-28', '2026-05-28', '2026-06-28'];
   var EXP_NAMES = { '5100': 'Salaries', '5200': 'Rent', '5300': 'Utilities' };
-  // per-month share of a company's revenue, split across the three expense heads
-  var EXP_SPLIT = { '5100': 0.036, '5200': 0.015, '5300': 0.009 }; // ~6%/mo total
+  // Per-month share of a company's revenue, split across the NON-salary operating
+  // heads. Salary (5100) is deliberately NOT here: the payroll engine is the
+  // authoritative salary accrual (5100 → 2100), and it posts May/June/July. Seeding
+  // 5100 for those same months double-booked salary (audit: May + June charged
+  // twice). Salary is now seeded ONLY for the pre-payroll month below. (Audit fix 4.)
+  var EXP_SPLIT = { '5200': 0.015, '5300': 0.009 };
+  // Salary as a share of revenue, seeded only for months BEFORE payroll's demo
+  // range so nothing is charged twice. Payroll owns 2026-05 onward.
+  var SAL_RATE = 0.036;
+  var SEED_SAL_MONTHS = ['2026-04-28'];
 
   function buildGlSeed() {
     var out = [];
@@ -728,6 +736,19 @@
           });
         });
       }
+      // Salary, pre-payroll months only — payroll owns the rest, so no double-book.
+      SEED_SAL_MONTHS.forEach(function (dateStr) {
+        var amt = Math.round(rev * SAL_RATE / 1000) * 1000;
+        if (amt <= 0) return;
+        out.push({
+          id: 'GL-EX-' + cid + '-5100-' + dateStr.slice(0, 7),
+          date: dateStr, companyId: cid,
+          ref: 'Salaries ' + dateStr.slice(0, 7),
+          memo: 'Salaries — ' + cid, source: 'manual', party: '',
+          lines: [ { account: '5100', dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt } ],
+          posted: true, created: Date.now()
+        });
+      });
     });
 
     // 4) inter-company transactions (eliminate on consolidation). Seller DR 1300
