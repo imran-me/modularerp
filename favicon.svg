@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Epal Group">
+  <!-- Brand mark: the "E" monogram on the deep-navy → accent gradient, matching
+       the boot-mark / rail-brand in the app (tokens.css: #00072D · #1A43BF). -->
+  <defs>
+    <linearGradient id="epal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#123499"/>
+      <stop offset="1" stop-color="#00072D"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#epal)"/>
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="14.25" fill="none" stroke="#1A43BF" stroke-opacity="0.55" stroke-width="1.5"/>
+  <path d="M23 18 h20 v6 h-13 v5 h11 v6 h-11 v5 h13 v6 h-20 z" fill="#EAEEFB"/>
+</svg>
