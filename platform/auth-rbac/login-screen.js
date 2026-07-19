@@ -18,7 +18,7 @@
   'use strict';
 
   EPAL.loginScreen = {
-    show: function () {
+    show: function (bootErr) {
       var splash = document.getElementById('boot-splash');
       if (splash) splash.remove();
 
@@ -43,6 +43,7 @@
           'border-radius:8px;padding:8px 12px;margin-bottom:14px;}' +
         '#login-gate .btn{width:100%;justify-content:center;}' +
         '#login-gate .lg-foot{font-size:11px;color:var(--text-mute,#808aa2);text-align:center;margin-top:18px;}' +
+        '#login-gate .lg-foot a{color:var(--soft,#7E9AE8);cursor:pointer;text-decoration:underline;}' +
         '</style>' +
         '<form class="lg-card">' +
           '<div class="lg-mark">E</div>' +
@@ -54,11 +55,20 @@
           '<div class="lg-field"><label for="lg-pass">Password</label>' +
             '<input class="input" id="lg-pass" type="password" autocomplete="current-password" required /></div>' +
           '<button class="btn btn-primary" id="lg-go" type="submit">Sign In</button>' +
-          '<div class="lg-foot">Connected to the live Epal database</div>' +
+          '<div class="lg-foot">Connected to the live Epal database · <a id="lg-reset">Trouble signing in? Reset session</a></div>' +
         '</form>';
       document.body.appendChild(host);
 
       var err = host.querySelector('#lg-err'), btn = host.querySelector('#lg-go');
+      if (bootErr) {
+        err.textContent = 'Session ended: ' + ((bootErr && bootErr.message) || String(bootErr)) + '. Please sign in again.';
+        err.style.display = 'block';
+      }
+      host.querySelector('#lg-reset').addEventListener('click', function () {
+        localStorage.removeItem('EPAL_TOKEN');
+        localStorage.removeItem('EPAL_USER');
+        location.reload();
+      });
       host.querySelector('form').addEventListener('submit', function (e) {
         e.preventDefault();
         err.style.display = 'none';

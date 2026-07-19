@@ -60,12 +60,21 @@
         if (!localStorage.getItem('EPAL_TOKEN')) return EPAL.loginScreen.show();
         EPAL.api.hydrate().then(
           function () { self.start(true); },
-          function () {                      // hydrate rejects ONLY on 401 — stale token
+          function (err) {                   // hydrate rejects on 401 (stale token) OR any other failure
             localStorage.removeItem('EPAL_TOKEN');
             localStorage.removeItem('EPAL_USER');
-            EPAL.loginScreen.show();
+            EPAL.loginScreen.show(err);       // pass the failure reason through — shown on the gate
           }
         );
+      }).catch(function (err) {
+        // detect()/hydrate() itself throwing (not just rejecting) must still
+        // surface SOMETHING on screen — a silently blank/stuck boot is worse
+        // than an ugly error, and this codebase has no console access
+        // guaranteed for whoever is looking at it live.
+        var pre = document.createElement('pre');
+        pre.style.cssText = 'position:fixed;inset:0;margin:0;padding:24px;background:#1a0000;color:#f88;font:13px/1.5 monospace;white-space:pre-wrap;z-index:99999;overflow:auto;';
+        pre.textContent = 'Boot failed:\n' + (err && (err.stack || err.message) || String(err));
+        document.body.appendChild(pre);
       });
     },
 
@@ -394,10 +403,13 @@
         el('div.pop-divider'),
         el('button.pop-link', { onclick: function () { closePop(); EPAL.router.navigate('group/settings'); },
           html: ui.icon('gear') + ' Settings' }),
-        el('button.pop-link.danger', { onclick: function () {
-            closePop(); ui.confirm({ title:'Reset demo data?', text:'This restores all seeded data and clears your changes.', danger:true, confirmLabel:'Reset' })
-              .then(function (ok) { if (ok) { EPAL.db.reset(); location.reload(); } }); },
-          html: ui.icon('arrow-counterclockwise') + ' Reset demo data' })
+        (EPAL.api && EPAL.api.enabled())
+          ? el('button.pop-link.danger', { onclick: function () { closePop(); EPAL.api.logout(); },
+              html: ui.icon('box-arrow-right') + ' Sign out' })
+          : el('button.pop-link.danger', { onclick: function () {
+              closePop(); ui.confirm({ title:'Reset demo data?', text:'This restores all seeded data and clears your changes.', danger:true, confirmLabel:'Reset' })
+                .then(function (ok) { if (ok) { EPAL.db.reset(); location.reload(); } }); },
+            html: ui.icon('arrow-counterclockwise') + ' Reset demo data' })
       ]));
     },
     openQuickAdd: function (e) {
