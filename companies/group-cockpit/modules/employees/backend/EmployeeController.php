@@ -2,6 +2,7 @@
 
 namespace Epal\Modules\GroupCockpit\Employees;
 
+use App\Support\ScopesToCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,8 @@ use Illuminate\Support\Str;
  */
 class EmployeeController
 {
+    use ScopesToCompany;
+
     /**
      * Numeric company_id (real `companies` table) -> frontend company slug
      * used throughout the SPA registry (platform/core/config.js COMPANIES).
@@ -104,10 +107,12 @@ class EmployeeController
         return $out;
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $cid = $this->requesterCompanyId($request);
         $rows = DB::table('users as u')
             ->whereNull('u.deleted_at')
+            ->when($cid, fn ($q) => $q->where('u.company_id', $cid))   // company user: only their own people
             ->leftJoin('employee_profiles as ep', 'ep.user_id', '=', 'u.id')
             ->leftJoin('departments as d', 'd.id', '=', 'ep.department_id')
             ->leftJoin('designations as g', 'g.id', '=', 'ep.designation_id')

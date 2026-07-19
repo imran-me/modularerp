@@ -1,7 +1,9 @@
 <?php
 namespace Epal\Modules\Travels\AirTicketing;
 
+use App\Support\ScopesToCompany;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,6 +29,8 @@ use Illuminate\Support\Facades\DB;
  */
 class TicketPurchaseController
 {
+    use ScopesToCompany;
+
     private function present(object $p): array
     {
         $total = (float) $p->amount;
@@ -67,11 +71,13 @@ class TicketPurchaseController
                 'tp.created_at', 'ph.name as passenger', 'ph.passport_no']);
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $cid = $this->requesterCompanyId($request);
         $rows = DB::table('ticket_purchases as tp')
             ->leftJoin('passport_holders as ph', 'ph.id', '=', 'tp.passport_holder_id')
             ->whereNull('tp.deleted_at')
+            ->when($cid, fn ($q) => $q->where('tp.company_id', $cid))   // company user: only their own
             ->orderByDesc('tp.purchase_date')
             ->get(['tp.id', 'tp.ticket_no', 'tp.purchase_date', 'tp.trip_type', 'tp.airline_or_operator',
                 'tp.amount', 'tp.paid_amount', 'tp.due_amount', 'tp.status', 'tp.payment_status',

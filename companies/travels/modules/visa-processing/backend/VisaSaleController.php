@@ -1,6 +1,7 @@
 <?php
 namespace Epal\Modules\Travels\VisaProcessing;
 
+use App\Support\ScopesToCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  */
 class VisaSaleController
 {
+    use ScopesToCompany;
+
     /** DB payment status → frontend payStatus. */
     private const PAY_MAP = ['paid' => 'Paid', 'partial' => 'Partial', 'pending' => 'Due'];
 
@@ -61,10 +64,12 @@ class VisaSaleController
     private const COLS = ['id', 'invoice_number', 'client_name', 'client_phone', 'client_email',
         'bundle_label', 'voucher_date', 'issued_by', 'total_amount', 'paid_amount', 'due_amount', 'notes', 'status'];
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $cid = $this->requesterCompanyId($request);
         $rows = DB::table('visa_sales')
             ->whereNull('deleted_at')
+            ->when($cid, fn ($q) => $q->where('company_id', $cid))   // company user: only their own
             ->orderByDesc('voucher_date')
             ->get(self::COLS);
 

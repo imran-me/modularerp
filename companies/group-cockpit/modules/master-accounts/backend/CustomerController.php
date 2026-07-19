@@ -2,7 +2,9 @@
 
 namespace Epal\Modules\GroupCockpit\MasterAccounts;
 
+use App\Support\ScopesToCompany;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,6 +29,8 @@ use Illuminate\Support\Facades\DB;
  */
 class CustomerController
 {
+    use ScopesToCompany;
+
     /** DB companies.id -> frontend company slug (matches platform/core/config.js). */
     private function companySlug($id): string
     {
@@ -68,9 +72,11 @@ class CustomerController
         ];
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $cid = $this->requesterCompanyId($request);
         $rows = DB::table('customers')
+            ->when($cid, fn ($q) => $q->where('company_id', $cid))   // company user: only their own
             ->orderBy('name')
             ->get(['id', 'company_id', 'name', 'email', 'phone', 'address', 'is_active', 'created_at']);
 
