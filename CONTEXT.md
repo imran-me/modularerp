@@ -157,8 +157,30 @@ beyond that).
 Construction) — same proven modular pattern, only after Group + Travels' write
 layer (Phases A-C) is solid.
 
-**NEXT CONCRETE STEP:** Phase A item 2 — Suppliers, mirroring the Customer
-controller/routes/wireWrites pattern exactly.
+**PHASE A COMPLETE (2026-07-19, same session):** all seven modules live —
+Customers (`2a8bcde`), Suppliers (`aaa3202`), Banks (`6080948`), Employees
+(`c4d52b6`), Airlines + Airports (`fcdc3b5`), Visa Categories (`852a6f5`).
+Every one proven against real local MySQL (row-level checks, not just a
+200 response) before pushing. Real bugs the schema surfaced along the way
+(all fixed, not just noted):
+- Banks: `currency` NOT NULL no default (defaulted to BDT), `account_number`
+  NOT NULL+UNIQUE (Cash Box needs a generated-per-row placeholder, not a
+  fixed one), `type` is a 4-value enum narrower than the frontend's 5
+  payment-type options (bKash/Nagad → mobile_banking, Card → digital_wallet).
+- Employees (highest risk — `users` IS the login table): a create is
+  wrapped in `DB::transaction()` after testing caught a real orphaned-row
+  bug (profile insert failing after the user insert had already committed);
+  `is_super_admin` escalation is checked against the REQUESTER's own token
+  server-side, never trusting the frontend's client-side role-picker guard.
+- Airports / Visa Categories: `countries.code` is NOT NULL+UNIQUE with no
+  frontend field for it — both generate a code from the country name
+  (find-or-create, verified NOT to duplicate on reuse).
+
+**Phase B is next: Payment Schedules, Air Ticketing Purchases, Visa Sales**
+— transactional (money/inventory) but no shared ledger posting required
+yet, just get the raw record persisting correctly. Same
+test-against-real-MySQL discipline as Phase A: never trust a 200 response
+alone, always check the actual row.
 
 ---
 
