@@ -103,10 +103,22 @@ already-fixed things showing a cached build. Tell them to hard-refresh
   build the posting logic by guessing — the whole project exists because the old
   books are wrong (see [[epal-bookkeeping-audit]]). The owner picks the fix order
   first. This is a design task, not a mechanical rollout.
-- **Phase D** — real per-company logins (today AuthController only splits
-  group-vs-one-company by `company_id IS NULL`).
-- **Phase E** — roll out the other 4 companies' backends (Woodart, IT, Shop,
-  Construction) using the same proven modular write pattern.
+- **Phase D — DONE.** (1) login scope: `AuthController.identity()` maps
+  `company_id` → company SLUG (not the numeric id the SPA couldn't match), so a
+  company user logs in and lands in THEIR company; super-admin/Group-less → group.
+  (2) data isolation: new trait `App\Support\ScopesToCompany` filters every
+  company-bearing controller's `index()` (Customers, Banks, Payment Schedules,
+  Employees, Visa Sales, Air Purchases) to the requester's company — a company
+  login no longer receives other concerns' rows; Group/super-admin unchanged.
+  Verified vs real MySQL (Travels user sees only Travels). Follow-up left:
+  scope journal_entries + performance_reviews reads, and add write-path guards
+  (`requesterMayTouch()` is in the trait, ready).
+- **Phase E** — roll out the other 4 companies' MODULE backends (Woodart, IT,
+  Shop, Construction). Lower value right now: the shared master data
+  (customers/employees/banks/cash) already works for all companies and the live
+  DB is fresh (sparse company-specific data), so their bespoke modules would
+  mostly serve empty states. Do this once real per-company transactional data
+  exists, using the same proven modular read+write pattern.
 See memory `epal-backend-migration` for the full phase map.
 
 ---
