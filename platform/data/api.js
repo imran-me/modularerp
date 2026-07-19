@@ -67,6 +67,7 @@
     airports:  'travels/air-ticketing/airports',
     air_purchases: 'travels/air-ticketing/purchases',
     visaCats:  'travels/visa-processing/categories',
+    visaApps:  'travels/visa-processing/sales',
     acc_schedules: 'group/master-accounts/schedules'
   };
 

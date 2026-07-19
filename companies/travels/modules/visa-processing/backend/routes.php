@@ -8,3 +8,5 @@ Route::post('travels/visa-processing/categories', [VisaCategoryController::class
 Route::delete('travels/visa-processing/categories/{id}', [VisaCategoryController::class, 'destroy']);
 
 Route::get('travels/visa-processing/sales', [VisaSaleController::class, 'index']);
+Route::post('travels/visa-processing/sales', [VisaSaleController::class, 'store']);
+Route::delete('travels/visa-processing/sales/{id}', [VisaSaleController::class, 'destroy']);
