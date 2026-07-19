@@ -24,23 +24,13 @@
   'use strict';
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
 
-  /* Country flag → real flag glyph. The bundled 'Twemoji Country Flags' web
-     font (see tokens.css @font-face) renders regional-indicator emoji as
-     proper flag images even on Windows, where Chromium otherwise shows bare
-     "NP"/"SG" letters. Accepts the stored value whether it's already a flag
-     emoji (🇳🇵, demo + API) or a 2-letter ISO code (converted to the emoji);
-     a missing/unknown value falls back to a neutral globe. Returns an HTML
-     string wrapped in .flag-emoji for consistent sizing. */
-  function flagChip(flag) {
-    var f = flag ? String(flag).trim() : '';
-    if (/^[A-Za-z]{2}$/.test(f)) {                     // a 2-letter code -> flag emoji
-      var cc = f.toUpperCase();
-      f = String.fromCodePoint(0x1F1E6 + cc.charCodeAt(0) - 65) +
-          String.fromCodePoint(0x1F1E6 + cc.charCodeAt(1) - 65);
-    }
-    if (!f) f = '🌍';
-    return '<span class="flag-emoji">' + f + '</span>';
-  }
+  /* Country flag → real flag glyph. Delegates to the global EPAL.flag()
+     (platform/core/flags.js), which resolves a country NAME, ISO code, or
+     existing emoji to the real flag (rendered by the bundled Twemoji flag
+     font). Kept as a thin local alias so the many call-sites below stay
+     unchanged; pass the country NAME when a card has one so a brand-new
+     country renders automatically. */
+  function flagChip(flag) { return EPAL.flag(flag); }
 
   var STAGES = [
     { id:'New',           color:'#8b93a7', icon:'inbox' },

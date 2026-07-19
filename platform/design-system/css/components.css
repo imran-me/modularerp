@@ -230,6 +230,7 @@
    the rest. Slightly rounded to read as a flag, not a square emoji. */
 .flag-emoji { display: inline-block; font-size: 1.15em; line-height: 1; vertical-align: -2px;
   border-radius: 2px; overflow: hidden; }
+.flag-emoji.flag-unknown { color: var(--text-mute); font-size: 1em; }
 
 /* --------------------------------------------------- Company performance */
 .co-strip { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
