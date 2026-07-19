@@ -500,10 +500,17 @@
     _pop = el('div.popover-layer', null, [node]);
     document.body.appendChild(_pop);
     var r = anchor.getBoundingClientRect();
-    var w = node.offsetWidth || 300;
     node.style.position = 'fixed';
-    node.style.top = (r.bottom + 8) + 'px';
     node.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
+    // Flip upward (anchor stays below the card, e.g. #user-card at the
+    // sidebar footer) when there isn't room to drop down without the
+    // popover running off the bottom of the viewport.
+    var h = node.offsetHeight || 200;
+    if (r.bottom + 8 + h > window.innerHeight) {
+      node.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+    } else {
+      node.style.top = (r.bottom + 8) + 'px';
+    }
     requestAnimationFrame(function () { node.classList.add('in'); });
     setTimeout(function () { document.addEventListener('click', outside, true); }, 0);
     function outside(e) { if (_pop && !_pop.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) closePop(); }
