@@ -62,7 +62,9 @@
     customers: 'group/master-accounts/customers',
     suppliers: 'group/master-accounts/suppliers',
     banks:     'group/master-accounts/banks',
-    employees: 'group/employees/directory'
+    employees: 'group/employees/directory',
+    airlines:  'travels/air-ticketing/airlines',
+    airports:  'travels/air-ticketing/airports'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()
