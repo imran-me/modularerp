@@ -48,6 +48,7 @@
     suppliers:     'group/master-accounts/suppliers',
     acc_schedules: 'group/master-accounts/schedules',
     employees:     'group/employees/directory',
+    perf_reviews:  'group/employees/reviews',
     airlines:      'travels/air-ticketing/airlines',
     airports:      'travels/air-ticketing/airports',
     air_purchases: 'travels/air-ticketing/purchases',
@@ -68,7 +69,8 @@
     air_purchases: 'travels/air-ticketing/purchases',
     visaCats:  'travels/visa-processing/categories',
     visaApps:  'travels/visa-processing/sales',
-    acc_schedules: 'group/master-accounts/schedules'
+    acc_schedules: 'group/master-accounts/schedules',
+    perf_reviews: 'group/employees/reviews'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()

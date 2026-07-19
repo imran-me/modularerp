@@ -18,6 +18,8 @@
 (function (EPAL) {
   'use strict';
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
+  function esc(s) { return ui.escapeHtml(String(s == null ? '' : s)); }
+  function canManage() { return !EPAL.perm || EPAL.perm.can('group', 'employees', 'create') || (EPAL.auth && EPAL.auth.isAdmin && EPAL.auth.isAdmin()); }
 
   /* ---- workforce constants + new-store seed ----------------------------- */
   var LEAVE_TYPES = ['Casual', 'Sick', 'Annual', 'Unpaid'];
@@ -718,25 +720,95 @@
   }
 
   /* ---- PERFORMANCE ------------------------------------------------------*/
+  /* ---- PERFORMANCE — real reviews drive the rating (no invented score) --*/
+  function reviewsFor(empId) { return S.list('perf_reviews').filter(function (r) { return r.empId === empId; }); }
+  // Rating = average of an employee's REAL review scores. In demo mode there
+  // are no reviews yet, so fall back to the seeded e.rating so the leaderboard
+  // isn't blank; in API mode it's purely review-driven (0 until first review).
+  function ratingOf(e) {
+    var revs = reviewsFor(e.id);
+    if (revs.length) return revs.reduce(function (a, r) { return a + (+r.score || 0); }, 0) / revs.length;
+    return +e.rating || 0;
+  }
+  function reviewForm(emp, done) {
+    var emps = db.employees();
+    var fields = [];
+    if (!emp) fields.push({ key: 'empId', label: 'Employee', type: 'select', required: true, options: emps.map(function (x) { return [x.id, x.name]; }) });
+    fields = fields.concat([
+      { key: 'period', label: 'Period', type: 'text', placeholder: 'e.g. 2026-07 or Q2 2026' },
+      { key: 'score', label: 'Score (0–5)', type: 'number', required: true, min: 0, max: 5, step: 0.5 },
+      { key: 'reviewedOn', label: 'Review date', type: 'date' },
+      { key: 'reviewer', label: 'Reviewer', type: 'text' },
+      { key: 'strengths', label: 'Strengths', type: 'textarea', col2: true },
+      { key: 'improvements', label: 'Areas to improve', type: 'textarea', col2: true }
+    ]);
+    EPAL.formModal({
+      title: 'Performance Review' + (emp ? ' — ' + emp.name : ''), icon: 'star-fill', size: 'md',
+      record: { period: new Date().toISOString().slice(0, 7), score: 4, reviewedOn: new Date().toISOString().slice(0, 10), reviewer: (EPAL.auth.current() || {}).name || '' },
+      fields: fields,
+      onSave: function (v) {
+        var target = emp || db.employee(v.empId) || emps.filter(function (x) { return x.id === v.empId; })[0];
+        if (!target) { ui.toast('Pick an employee', 'error'); return false; }
+        db.save('perf_reviews', {
+          id: 'PR-' + Date.now().toString().slice(-6), empId: target.id, userId: target.id,
+          period: v.period, score: +v.score || 0, strengths: v.strengths, improvements: v.improvements,
+          reviewer: v.reviewer, reviewedOn: v.reviewedOn
+        });
+        ui.toast('Review saved for ' + target.name, 'success');
+        done && done();
+      }
+    });
+  }
+
   function renderPerformance(page) {
-    var emps = db.employees().slice().sort(function (a, b) { return (b.rating||0) - (a.rating||0); });
-    page.appendChild(el('div.section-label', { style:{ marginTop:0 }, text:'Performance Leaderboard' }));
-    var grid = el('div.grid-auto');
-    emps.slice(0, 12).forEach(function (e, i) {
-      var tasks = db.tasksFor(e.id); var done = tasks.filter(function (t){return t.status==='done';}).length;
+    var emps = db.employees();
+    if (canManage()) page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
+      el('button.btn.btn-sm.btn-primary', { html: ui.icon('star-fill') + ' New Review', onclick: function () { reviewForm(null, function () { EPAL.router.render(); }); } })
+    ]));
+
+    var ranked = emps.slice().sort(function (a, b) { return ratingOf(b) - ratingOf(a); });
+    page.appendChild(el('div.section-label', { style: { marginTop: 0 }, text: 'Performance Leaderboard' }));
+    var grid = el('div.grid-auto', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
+    ranked.slice(0, 12).forEach(function (e, i) {
+      var revs = reviewsFor(e.id);
+      var tasks = db.tasksFor(e.id); var done = tasks.filter(function (t) { return t.status === 'done'; }).length;
       var comp = tasks.length ? Math.round(done / tasks.length * 100) : 0;
-      grid.appendChild(el('div.card', null, [ el('div.card-pad', null, [
+      grid.appendChild(el('div.card.hover', { style: { cursor: 'pointer' }, onclick: function () { reviewForm(e, function () { EPAL.router.render(); }); } }, [ el('div.card-pad', null, [
         el('div.flex.items-center.gap-2', null, [
-          el('div.avatar', { style:{ background: ui.colorFor(e.name) }, text: ui.initials(e.name) }),
-          el('div.flex-1', null, [ el('div.fw-600', { text: e.name }), el('div.text-muted.xs', { text: e.designation }) ]),
-          el('span.badge.badge-accent', { text: '#' + (i+1) })
+          el('div.avatar', { style: { background: ui.colorFor(e.name) }, text: ui.initials(e.name) }),
+          el('div.flex-1.min-w-0', null, [ el('div.fw-600', { text: e.name }), el('div.text-muted.xs', { text: e.designation }) ]),
+          el('span.badge.badge-accent', { text: '#' + (i + 1) })
         ]),
-        el('div.flex.justify-between.mt-3.sm', null, [ el('span.text-muted', { text:'Rating' }),
-          el('strong', { html: ui.icon('star-fill') + ' ' + (e.rating||0).toFixed(1) }) ]),
-        el('div.kb-prog.mt-1', null, [ el('div.progress', null, [ el('div.progress-bar', { style:{ width: comp+'%' } }) ]), el('small', { text: comp+'%' }) ])
+        el('div.stat-row.mt-3', null, [
+          miniStat('Rating', ratingOf(e).toFixed(1)),
+          miniStat('Reviews', String(revs.length)),
+          miniStat('Tasks', comp + '%')
+        ])
       ]) ]));
     });
     page.appendChild(grid);
+
+    // recent reviews register
+    var byId = {}; emps.forEach(function (e) { byId[e.id] = e; });
+    var allRevs = S.list('perf_reviews').slice().sort(function (a, b) { return (a.reviewedOn || '') < (b.reviewedOn || '') ? 1 : -1; });
+    if (allRevs.length) {
+      page.appendChild(el('div.section-label', { text: 'Recent Reviews' }));
+      var tbl = EPAL.table({
+        columns: [
+          { key: 'reviewedOn', label: 'Date', date: true },
+          { key: 'emp', label: 'Employee', render: function (r) { var e = byId[r.empId]; return '<span class="strong">' + esc(e ? e.name : r.empId) + '</span>'; }, sortVal: function (r) { var e = byId[r.empId]; return e ? e.name : r.empId; } },
+          { key: 'period', label: 'Period', render: function (r) { return esc(r.period || '—'); } },
+          { key: 'score', label: 'Score', num: true, render: function (r) { return '<span class="num strong">' + (+r.score || 0).toFixed(1) + '</span>'; }, sortVal: function (r) { return +r.score || 0; } },
+          { key: 'reviewer', label: 'Reviewer', render: function (r) { return esc(r.reviewer || '—'); } }
+        ],
+        rows: allRevs, pageSize: 15, searchKeys: ['reviewer', 'period'], exportName: 'performance-reviews.csv',
+        actions: canManage() ? [{ icon: 'trash', title: 'Delete review', onClick: function (r) {
+          ui.confirm({ title: 'Delete this review?', danger: true, confirmLabel: 'Delete' }).then(function (ok) { if (ok) { db.remove('perf_reviews', r.id); EPAL.router.render(); } });
+        } }] : [],
+        empty: { icon: 'star', title: 'No reviews yet', hint: 'Add one with New Review.' }
+      });
+      page.appendChild(el('div.card', null, [ el('div.card-body', null, [tbl.el]) ]));
+    }
   }
 
   /* ---- ORG CHART --------------------------------------------------------*/

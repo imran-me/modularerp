@@ -11,6 +11,7 @@
  */
 
 use Epal\Modules\GroupCockpit\Employees\EmployeeController;
+use Epal\Modules\GroupCockpit\Employees\PerformanceController;
 use Illuminate\Support\Facades\Route;
 
 // Employee Directory — the group-wide workforce (real `users` LEFT JOIN
@@ -19,3 +20,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('group/employees/directory', [EmployeeController::class, 'index']);
 Route::post('group/employees/directory', [EmployeeController::class, 'store']);
 Route::delete('group/employees/directory/{id}', [EmployeeController::class, 'destroy']);
+
+// Performance reviews — the real rating source (frontend `perf_reviews` store).
+Route::get('group/employees/reviews', [PerformanceController::class, 'index']);
+Route::post('group/employees/reviews', [PerformanceController::class, 'store']);
+Route::delete('group/employees/reviews/{id}', [PerformanceController::class, 'destroy']);
