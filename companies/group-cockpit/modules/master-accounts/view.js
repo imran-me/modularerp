@@ -247,7 +247,7 @@
       // COMPANY SWITCHER — the owner's "button-wise switch of companies at the top".
       // On Master Payroll it rides IN the desk's section row (owner mark);
       // everywhere else it is its own row under the tabs.
-      var swWrap = el('div.flex.gap-1.flex-wrap.mb-3');
+      var swWrap = el('div.flex.gap-1.scroll-row.mb-3');
       var swOpts = [['all', 'All Companies'], ['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; }));
       swOpts.forEach(function (o) {
         if (sub === 'payroll' && o[0] === 'all') return;      // payroll needs one company
@@ -270,7 +270,7 @@
         expRow.appendChild(tb);
         if (pendingSwitcher) {
           expRow.appendChild(el('div.vsep'));
-          pendingSwitcher.classList.remove('mb-3'); pendingSwitcher.classList.remove('flex-wrap');
+          pendingSwitcher.classList.remove('mb-3'); pendingSwitcher.classList.remove('scroll-row');
           pendingSwitcher.classList.add('co-sw');
           expRow.appendChild(pendingSwitcher); pendingSwitcher = null;
         }

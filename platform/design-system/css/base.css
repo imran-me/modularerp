@@ -202,8 +202,12 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    At no width/zoom does a label clip, and none renders below --fs-micro (11px):
    the clamp minima used to be 9.5px, which bought one-row-ness with type nobody
    could read. Width is negotiable; legibility and reachability are not. */
+/* SINGLE-LINE SCROLLABLE NAV (owner 2026-07-19, reverses the earlier wrap
+   rule): tab/filter rows stay on ONE line at any zoom/width; when they don't
+   fit, the row scrolls sideways. A thin but VISIBLE scrollbar keeps off-screen
+   tabs discoverable — the concern that originally motivated wrapping. */
 .pill-tab { display:inline-flex; gap:4px; background: var(--surface-2); border:1px solid var(--border);
-  border-radius: var(--r-pill); padding:4px; max-width:100%; flex-wrap:wrap; row-gap:2px; }
+  border-radius: var(--r-pill); padding:4px; max-width:100%; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; }
 /* Type is a fixed scale step; only the PADDING stays fluid. The nav used to size
    its text with clamp(…vw…) to force one row — but that produced off-scale sizes
    (11.5 / 12.5 / 16.4px, part of the 15-size sprawl) AND it still clipped, which
@@ -212,15 +216,13 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    clamps were simply pinned at their 11px floor anyway. */
 .pill-tab button { padding:6px clamp(8px, 0.95vw, 14px); border-radius: var(--r-pill);
   font-size: var(--fs-small); font-weight:600; color: var(--text-dim);
-  white-space:nowrap; transition: all var(--t); }
+  white-space:nowrap; flex:0 0 auto; transition: all var(--t); }
 .pill-tab button.active { background: var(--accent); color:#fff; }
 /* nav band: two groups share the row while it fits, a hairline separates them */
-.nav-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; row-gap:10px; }
-.nav-row > .pill-tab { flex:1 1 auto; }
-/* fixed height (not align-self:stretch) so the hairline can't stretch to span
-   two rows once the switcher wraps below */
+.nav-row { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; }
+.nav-row > .pill-tab { flex:0 0 auto; overflow:visible; }   /* natural width; the whole nav-row scrolls, not each group */
 .nav-row .vsep { width:1px; height:26px; background:var(--border-strong, var(--border)); flex:0 0 auto; }
-.nav-row .co-sw { display:flex; gap:4px; flex-wrap:wrap; flex:0 1 auto; row-gap:6px; }
+.nav-row .co-sw { display:flex; gap:4px; flex-wrap:nowrap; flex:0 0 auto; }
 /* inside a shared row both groups compress harder — via padding, not type */
 .nav-row .pill-tab button { font-size: var(--fs-tiny); padding: 6px clamp(5px, 0.6vw, 14px); }
 .nav-row .btn.btn-sm { font-size: var(--fs-tiny); padding: clamp(3px, 0.4vw, 6px) clamp(5px, 0.65vw, 12px); white-space:nowrap; }
@@ -232,12 +234,14 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 /* Wraps rather than scroll-clipping, for the same reason as .nav-row above:
    this band is the PRIMARY section nav, so a section that scrolls out of sight
    behind a hidden scrollbar is a section the user cannot find. */
-.tab-underline { display:flex; gap:0; align-items:stretch; border-bottom:1px solid var(--border); flex-wrap:wrap;
+.tab-underline { display:flex; gap:0; align-items:stretch; border-bottom:1px solid var(--border); flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin;
   margin-left:-30px; margin-right:-30px; padding:0;
   background: color-mix(in srgb, var(--surface) 62%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 6px 18px rgba(7, 12, 30, .10);                            /* ~10% soft lift */ }
 @media (max-width: 720px) { .tab-underline { margin-left:-16px; margin-right:-16px; } }
-.tab-underline button { flex:1 1 auto; min-width:0; text-align:center; padding:12px clamp(8px, 1.2vw, 18px) 13px; border-bottom:3px solid transparent; margin-bottom:-1px;
+/* flex:1 0 auto = fill the bar when the tabs fit, keep natural width and
+   scroll when they don't (never shrink below the label). */
+.tab-underline button { flex:1 0 auto; min-width:0; text-align:center; padding:12px clamp(8px, 1.2vw, 18px) 13px; border-bottom:3px solid transparent; margin-bottom:-1px;
   font-size: var(--fs-small); font-weight:700; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
   border-radius:0; background:none; transition: color var(--t), border-color var(--t), background var(--t); }
 .tab-underline button + button { border-left:1px solid var(--border); }   /* 1px line between sections */
@@ -247,5 +251,16 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    look, compressed harder so every label stays on one line before the
    hidden-scrollbar fallback ever engages. */
 .tab-underline.tabs-dense button { padding:12px clamp(4px, 0.62vw, 14px) 13px; font-size: var(--fs-tiny); letter-spacing:0; }
+
+/* .scroll-row — utility: a flex row of chips/buttons that stays on ONE line
+   and scrolls sideways instead of wrapping (e.g. the standalone company
+   switcher). */
+.scroll-row { flex-wrap:nowrap !important; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; }
+.scroll-row > * { flex:0 0 auto; }
+/* Thin but visible scrollbar for every single-line nav scroller (so
+   off-screen tabs stay discoverable — the reason the nav used to wrap). */
+.pill-tab::-webkit-scrollbar, .nav-row::-webkit-scrollbar, .tab-underline::-webkit-scrollbar, .scroll-row::-webkit-scrollbar { height:6px; }
+.pill-tab::-webkit-scrollbar-thumb, .nav-row::-webkit-scrollbar-thumb, .tab-underline::-webkit-scrollbar-thumb, .scroll-row::-webkit-scrollbar-thumb { background:var(--border-strong); border-radius:3px; }
+.pill-tab::-webkit-scrollbar-track, .nav-row::-webkit-scrollbar-track, .tab-underline::-webkit-scrollbar-track, .scroll-row::-webkit-scrollbar-track { background:transparent; }
 kbd { font-family: var(--font-mono); font-size: var(--fs-micro); background: var(--surface-3); border: 1px solid var(--border-strong);
   border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text-dim); }
