@@ -60,7 +60,8 @@
    * corrected posting logic is built). Rolled out module by module. */
   var WRITABLE = {
     customers: 'group/master-accounts/customers',
-    suppliers: 'group/master-accounts/suppliers'
+    suppliers: 'group/master-accounts/suppliers',
+    banks:     'group/master-accounts/banks'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()

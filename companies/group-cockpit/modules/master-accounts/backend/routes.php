@@ -24,6 +24,8 @@ Route::get('group/master-accounts/accounts', [AccountController::class, 'index']
 
 // Bank accounts (real `banks` table) — frontend `banks` store.
 Route::get('group/master-accounts/banks', [BankController::class, 'index']);
+Route::post('group/master-accounts/banks', [BankController::class, 'store']);
+Route::delete('group/master-accounts/banks/{id}', [BankController::class, 'destroy']);
 
 // Journal entries + their items (real `journal_entries` + `journal_items`),
 // each entry with its lines nested — frontend `gl_entries` store.
