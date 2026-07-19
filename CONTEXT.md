@@ -12,6 +12,66 @@
 
 ---
 
+## 📐 MIGRATION SPEC (owner, 2026-07-19) — the binding brief for the rebuild
+
+> Owner asked to save this prompt in context. It is the authoritative statement
+> of the frontend+backend rebuild. Read with `MIGRATION_BRIEF_for_Claude_Code.md`
+> and the R1–R8 rules in CLAUDE.md (they still bind — pixel-identical, no
+> behaviour change, incremental, verify before deleting old, ask when ambiguous).
+
+**Goal:** rebuild/restructure the ERP into a modern, maintainable, enterprise-grade
+architecture WITHOUT changing the user experience. Modular, folder-wise — each
+module keeps BOTH its frontend and backend in its own dedicated folder (the
+structure already in place). Convert the `view.js` screens to the new frontend
+stack. Migrate **module by module**; do the **Travels module FIRST** and finish it
+(tested, functionally + visually identical) before any other module.
+
+**Frontend stack:** HTML5 · Tailwind CSS · Vanilla/raw JS. UI must stay **100%
+pixel-identical** — no redesign, no change to spacing / colours / fonts / component
+sizes / animations / layout / responsiveness; no elements added or removed unless
+strictly required for function. Every interaction, hover, transition, modal,
+dropdown, table, sidebar, nav, filter, search, form, notification, chart, card and
+dashboard must behave exactly as now. A side-by-side comparison must show no 1-px
+difference.
+
+**Backend stack:** PHP 8+ · Laravel (latest stable) · MariaDB. Enterprise
+architecture & best practices: MVC + Service layer + Repository pattern (where
+apt) + Form Request validation + Policies/Gates + Middleware + API Resources +
+Eloquent relationships + Migrations + Seeders + Factories + Route groups + config
++ env + proper error handling + logging + Events/Listeners (where beneficial) +
+queue-ready + role/permission-ready. DB: foreign keys, indexes, constraints,
+normalisation, Eloquent relations.
+
+**Code quality:** clean, modular, reusable, documented, SOLID, no duplication,
+meaningful names, business logic OUT of controllers/Blade — maintainable by a new
+dev with zero context.
+
+**Preserve EVERYTHING:** every page/button/modal/form/table/filter/search/dashboard/
+chart/report/workflow/validation/calculation/business-rule keeps working exactly.
+Only the underlying architecture improves.
+
+**Travels module scope (first):** Dashboard, Customer Mgmt, Leads & CRM, Visa
+Processing, Air Ticketing, Tour Packages, Vendor Mgmt, Supplier Mgmt, Booking Mgmt,
+File Tracking, Payments, Due Collection, Invoices, Quotations, Receipts, Expenses,
+Income, Reports, Employee Assignment, Task Mgmt, Notifications, Document Mgmt,
+Status Tracking + all associated forms/modals/filters/tables/calcs/logic.
+
+**Per-component method:** analyse existing → recreate FE (HTML+Tailwind+raw JS) →
+build BE (Laravel clean arch) → DB schema+migrations → models+relations →
+controllers/services/repos/validation → preserve every behaviour/rule → verify UI
+visually identical (screenshot-diff harness) → sign off → next.
+
+**⚠️ OPEN DECISION before large-scale conversion (see chat 2026-07-19):** "pure
+Tailwind + pixel-identical + module-by-module + don't touch other modules" is in
+tension with the SHARED custom-CSS component system (platform/design-system +
+platform/core/ui.js `el()`, `EPAL.table`, `EPAL.formModal`, `ui.modal`) that EVERY
+module's view.js renders through. A per-module pure-Tailwind rewrite can't drop
+that shared layer without touching all modules. Resolve the Tailwind strategy
+(reuse design-system classes vs. replicate every rule as Tailwind utilities/@apply)
+BEFORE mass conversion, and prove pixel-parity on ONE pilot screen first.
+
+---
+
 ## 🚧 RESUME HERE — 2026-07-19 (late) · WRITE ENDPOINTS + LIVE UI POLISH SPRINT
 
 Big session on top of the live deploy. Everything below is pushed + boot-swept
