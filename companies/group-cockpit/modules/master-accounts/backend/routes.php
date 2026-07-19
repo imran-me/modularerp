@@ -36,6 +36,8 @@ Route::delete('group/master-accounts/customers/{id}', [CustomerController::class
 
 // Suppliers (real `suppliers` table) — frontend `suppliers` store.
 Route::get('group/master-accounts/suppliers', [SupplierController::class, 'index']);
+Route::post('group/master-accounts/suppliers', [SupplierController::class, 'store']);
+Route::delete('group/master-accounts/suppliers/{id}', [SupplierController::class, 'destroy']);
 
 // Payment schedules (real `payment_schedules` table) — frontend `acc_schedules` store.
 Route::get('group/master-accounts/schedules', [PaymentScheduleController::class, 'index']);

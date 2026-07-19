@@ -59,7 +59,8 @@
    * ledger-affecting stores like coa/gl_entries stay read-only until the
    * corrected posting logic is built). Rolled out module by module. */
   var WRITABLE = {
-    customers: 'group/master-accounts/customers'
+    customers: 'group/master-accounts/customers',
+    suppliers: 'group/master-accounts/suppliers'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()
