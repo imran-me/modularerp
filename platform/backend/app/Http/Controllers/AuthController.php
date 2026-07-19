@@ -66,18 +66,28 @@ class AuthController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /** The identity + scope the SPA needs to decide Group vs company visibility. */
+    /** DB companies.id -> frontend company slug (matches platform/core/config.js
+     *  and every module controller). company 4 IS the Group itself. */
+    private const COMPANY_SLUG = [
+        1 => 'it', 2 => 'travels', 3 => 'construction', 4 => 'group',
+        5 => 'shop', 6 => 'woodart',
+    ];
+
+    /** The identity + scope the SPA needs to decide Group vs company visibility.
+     *  companyId is the frontend SLUG (not the numeric DB id) — the SPA scopes
+     *  by slug, so a company user's login lands them in THEIR company. */
     private function identity(User $u): array
     {
-        $isGroup = (int) ($u->is_super_admin ?? 0) === 1 || empty($u->company_id);
+        $slug    = self::COMPANY_SLUG[(int) ($u->company_id ?? 0)] ?? null;
+        $isGroup = (int) ($u->is_super_admin ?? 0) === 1 || empty($u->company_id) || $slug === 'group';
 
         return [
             'id'           => $u->id,
             'name'         => $u->name,
             'email'        => $u->email,
-            'companyId'    => $u->company_id,
+            'companyId'    => $isGroup ? 'group' : $slug,
             'isSuperAdmin' => (bool) ($u->is_super_admin ?? false),
-            'scope'        => $isGroup ? 'group' : ('company:'.$u->company_id),
+            'scope'        => $isGroup ? 'group' : ('company:'.$slug),
         ];
     }
 }
