@@ -23,3 +23,18 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# EPAL-HARDENING (deploy.sh — do not remove)
+# Defense in depth on top of the symlink boundary in deploy.sh: even though
+# platform/backend/ is never linked into public/, block dotfiles and any
+# direct .php hit outside Laravel's own front controller (this file's folder).
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>
+# Laravel's own front controller must stay reachable.
+<Files "index.php">
+    Require all granted
+</Files>

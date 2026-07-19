@@ -12,3 +12,11 @@ __*.html
 platform/backend/vendor/
 platform/backend/.env
 platform/backend/storage/*.key
+platform/backend/bootstrap/cache/*.php
+
+# Laravel backend: symlinks deploy.sh creates into public/ every run.
+# These point to ABSOLUTE paths on whichever machine ran deploy.sh — meaningless
+# (and would overwrite the server's correct symlinks) if committed. Never track.
+platform/backend/public/platform/
+platform/backend/public/companies/
+platform/backend/public/favicon.svg
