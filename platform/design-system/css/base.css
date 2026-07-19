@@ -147,14 +147,18 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 .tbl tbody tr:hover { background: var(--surface-2); }
 .tbl tbody tr:last-child td { border-bottom: none; }
 .tbl td .strong, .tbl td strong { color: var(--text); font-weight: 600; }
-/* numeric cells stay right-aligned & tabular, but MAY WRAP when the container is
-   tight (e.g. inside a modal) so the table always fits — no horizontal scrollbar,
-   every column visible. On wide layouts there is room, so figures stay on one line. */
-.tbl td.num, .tbl thead th.num { text-align: right; white-space: normal; overflow-wrap: anywhere; }
+/* numeric cells are ATOMIC — a money value must NEVER break across lines
+   (owner 2026-07-19: "৳300,0⏎00" mid-digit wrapping looked broken). They stay
+   right-aligned, tabular, and on ONE line; if the table gets too wide for the
+   container it scrolls inside its .table-wrap (which has fade + scrollbar
+   affordances) rather than fracturing a figure. */
+.tbl td.num, .tbl thead th.num { text-align: right; white-space: nowrap; overflow-wrap: normal; }
 .tbl td.num { color: var(--text); }
 .tbl .row-click { cursor: pointer; }
 /* left-align numeric figures in a cell while keeping tabular spacing (phones, refs) */
-.tbl td.lnum, .tnum { font-variant-numeric: tabular-nums; }
+.tbl td.lnum, .tnum { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Any inline number/money span is atomic too — never break a figure. */
+.num, .mono { white-space: nowrap; }
 
 /* ---------------------------------------------------------- Badges / chips */
 .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill);
