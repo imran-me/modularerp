@@ -41,10 +41,10 @@
 /* --------------------------------------------------------------- Cards */
 .card {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface-hi) 20%, var(--surface)), var(--surface));
-  border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
   box-shadow: var(--shadow-card), inset 0 1px 0 var(--hairline); position: relative; overflow: hidden; transition: border-color var(--t), box-shadow var(--t), transform var(--t);
 }
-.card.hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); transform: translateY(-2px); }
+.card.hover:hover { border-color: var(--card-hover); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); transform: translateY(-2px); }
 .card-pad { padding: 20px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
 .card-head h3 { font-size: var(--fs-lead); font-weight: 700; display: flex; align-items: center; gap: 9px; }
@@ -209,7 +209,7 @@
        odd count fills its row instead of leaving a hole. Note that pinning to
        2 columns is NOT sufficient on its own — 3 stats in 2 columns still
        leaves the 4th area lit; it's the span that actually closes it. */
-.stat-row { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); background: var(--border); border-radius: var(--r-md); overflow: hidden; }
+.stat-row { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); background: var(--stat-divider); border-radius: var(--r-md); overflow: hidden; }
 .stat-row.stat-2 { grid-template-columns: repeat(2, 1fr); }
 .stat-row.stat-2 .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
 @media (max-width: 520px) {                      /* phones: one clean column */
