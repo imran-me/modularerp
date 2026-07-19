@@ -14,11 +14,25 @@ use Illuminate\Support\Facades\DB;
  *
  * index() is pure read/translate. store()/destroy() are master-data writes
  * (pricing catalog, not a ledger posting — safe to write directly). `flag`
- * is a frontend-only emoji decoration with no DB column; not persisted,
- * same as the read side always returning the static 🌍.
+ * has no DB column, but the demo used the country's flag emoji (🇲🇾, 🇹🇭 …)
+ * — reproduced here from the linked country's real ISO code (countries.code:
+ * MY, TH …) so real-data cards show the SAME flags, not a generic globe.
  */
 class VisaCategoryController
 {
+    /** ISO 3166-1 alpha-2 code -> its flag emoji (two regional-indicator
+     *  symbols). 'MY' -> 🇲🇾. Falls back to a globe for a missing/odd code,
+     *  matching the demo's own fallback. */
+    private function flag(?string $code): string
+    {
+        $code = strtoupper(trim((string) $code));
+        if (strlen($code) !== 2 || ! ctype_alpha($code)) {
+            return '🌍';
+        }
+        $offset = 127397; // 0x1F1E6 ('🇦') minus ord('A')
+        return mb_chr($offset + ord($code[0])) . mb_chr($offset + ord($code[1]));
+    }
+
     private function present(object $r): array
     {
         $country = $r->country_name ?: ($r->description ?: $r->name);
@@ -30,7 +44,7 @@ class VisaCategoryController
             'id'      => 'VC-' . $r->id,
             'country' => $country,
             'name'    => $r->name,
-            'flag'    => '🌍',
+            'flag'    => $this->flag($r->country_code ?? null),
             'type'    => $r->visa_type ?: 'Tourist',
             'cost'    => (float) $r->costing_price,
             'sale'    => (float) $r->sale_price,
@@ -45,7 +59,7 @@ class VisaCategoryController
             ->leftJoin('countries as c', 'c.id', '=', 'vc.country_id')
             ->where('vc.id', $id)
             ->first(['vc.id', 'vc.name', 'vc.visa_type', 'vc.description', 'vc.costing_price',
-                'vc.sale_price', 'vc.avg_processing_days', 'vc.is_active', 'c.name as country_name']);
+                'vc.sale_price', 'vc.avg_processing_days', 'vc.is_active', 'c.name as country_name', 'c.code as country_code']);
     }
 
     public function index(): JsonResponse
@@ -55,7 +69,7 @@ class VisaCategoryController
             ->whereNull('vc.deleted_at')
             ->orderBy('vc.name')
             ->get(['vc.id', 'vc.name', 'vc.visa_type', 'vc.description', 'vc.costing_price',
-                'vc.sale_price', 'vc.avg_processing_days', 'vc.is_active', 'c.name as country_name']);
+                'vc.sale_price', 'vc.avg_processing_days', 'vc.is_active', 'c.name as country_name', 'c.code as country_code']);
 
         return response()->json([
             'success' => true,

@@ -51,6 +51,36 @@ class EmployeeController
         6 => 'woodart',       // WOOD ART INTERIORS
     ];
 
+    /**
+     * Per-user attendance tallies for the LATEST month that has data, keyed by
+     * user_id → ['present'=>n,'absent'=>n,'leave'=>n]. The employee cards show
+     * a month's Present/Absent (demo seeded ~20/month), so all-time totals
+     * (hundreds) would misrepresent the card — one calendar month matches its
+     * intent. `late` has no status in the real enum
+     * (present|absent|leave|holiday), so it stays 0 (the demo's own default).
+     */
+    private function attendanceByUser(): array
+    {
+        $latest = DB::table('attendances')->max('date');
+        if (! $latest) {
+            return [];
+        }
+        $ym = substr((string) $latest, 0, 7);   // 'YYYY-MM'
+
+        $rows = DB::table('attendances')
+            ->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$ym])
+            ->select('user_id', 'status', DB::raw('count(*) as cnt'))
+            ->groupBy('user_id', 'status')
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(int) $r->user_id][$r->status] = (int) $r->cnt;
+        }
+
+        return $out;
+    }
+
     public function index(): JsonResponse
     {
         $rows = DB::table('users as u')
@@ -76,9 +106,12 @@ class EmployeeController
                 'c.name as company_name',
             ]);
 
-        $employees = $rows->map(function ($e) {
+        $att = $this->attendanceByUser();
+
+        $employees = $rows->map(function ($e) use ($att) {
             $companyId = self::COMPANY_SLUG[(int) $e->company_id] ?? 'group';
             $dept      = $e->dept_name ?: 'Unassigned';
+            $a         = $att[(int) $e->id] ?? [];
 
             return [
                 'id'          => $e->employee_id_no ?: ('U-' . $e->id),
@@ -94,9 +127,16 @@ class EmployeeController
                 'joinDate'    => $e->joining_date,
                 'salary'      => (float) $e->salary,
                 'status'      => $e->status ?: 'active',
-                // Attendance/rating are live-workflow fields the SPA maintains
-                // locally; seed defaults so cards/matrices render cleanly.
-                'attendance'  => ['present' => 0, 'absent' => 0, 'late' => 0, 'leave' => 0],
+                // Present/Absent/Leave are REAL, from the `attendances` table
+                // (latest month). `late` and `rating` have no source column in
+                // the real DB (the demo invented them) — left 0 until a real
+                // performance/late-tracking source exists.
+                'attendance'  => [
+                    'present' => $a['present'] ?? 0,
+                    'absent'  => $a['absent'] ?? 0,
+                    'late'    => 0,
+                    'leave'   => $a['leave'] ?? 0,
+                ],
                 'rating'      => 0,
             ];
         })->values();
