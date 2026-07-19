@@ -31,6 +31,8 @@ Route::get('group/master-accounts/journals', [JournalController::class, 'index']
 
 // Customers (real `customers` table) — frontend `customers` store.
 Route::get('group/master-accounts/customers', [CustomerController::class, 'index']);
+Route::post('group/master-accounts/customers', [CustomerController::class, 'store']);
+Route::delete('group/master-accounts/customers/{id}', [CustomerController::class, 'destroy']);
 
 // Suppliers (real `suppliers` table) — frontend `suppliers` store.
 Route::get('group/master-accounts/suppliers', [SupplierController::class, 'index']);

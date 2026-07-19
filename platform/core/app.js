@@ -80,6 +80,7 @@
 
     start: function (apiMode) {
       if (!apiMode) EPAL.db.seed();      // 1. demo data — DEMO MODE ONLY
+      if (apiMode) EPAL.api.wireWrites();// 1b. saves/deletes on writable stores now reach the DB
       EPAL.modules.applyOverrides();     // 2. fold saved on/off flags onto config
       this.applyTheme();                 // 3. paint theme before first render
       this.renderShell();                // 4. build rail + sidebar + topbar

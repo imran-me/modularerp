@@ -55,6 +55,13 @@
     visaApps:      'travels/visa-processing/sales'
   };
 
+  /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
+   * ledger-affecting stores like coa/gl_entries stay read-only until the
+   * corrected posting logic is built). Rolled out module by module. */
+  var WRITABLE = {
+    customers: 'group/master-accounts/customers'
+  };
+
   var mode = null;              // 'api' | 'demo' — resolved once by detect()
 
   function base() { return localStorage.getItem(BASE_KEY) || ''; }
@@ -149,7 +156,40 @@
       });
     },
 
-    call: call            // exposed for module screens' future write paths
+    call: call,           // exposed for module screens' future write paths
+
+    /* ---- write-through ----------------------------------------------------
+     * Hooks the SAME bus event every db.save(name,record) / db.remove(name,id)
+     * call already emits (see platform/data/database.js: db.save/db.remove
+     * and the specific saveXxx helpers) — so wiring a store into WRITABLE is
+     * the only change needed; no call site anywhere in the app is touched.
+     * Only fires in API mode; call once, after EPAL.bus exists (core/app.js
+     * start()). Local store stays optimistic; on a create, the client's temp
+     * id is swapped for the server's real id once the response comes back —
+     * on failure the temp record is rolled back and the user is told. */
+    wireWrites: function () {
+      var S = EPAL.store;
+      EPAL.bus.on('data:changed', function (e) {
+        var path = WRITABLE[e.store];
+        if (!path) return;                 // not a writable store — read-only for now
+        if (e.action === 'upsert') {
+          var before = e.record.id;
+          call(path, { method: 'POST', body: e.record }).then(function (j) {
+            if (j.data && j.data.id && j.data.id !== before) {
+              S.removeFrom(e.store, before);   // temp client id -> real server id
+            }
+            if (j.data) S.upsert(e.store, j.data);
+          }, function (err) {
+            S.removeFrom(e.store, before);     // roll back the optimistic local write
+            EPAL.bus.emit('notify', { text: 'Save failed: ' + (err.message || err), level: 'danger', title: 'Not saved' });
+          });
+        } else if (e.action === 'delete') {
+          call(path + '/' + e.id, { method: 'DELETE' }).catch(function (err) {
+            EPAL.bus.emit('notify', { text: 'Delete failed: ' + (err.message || err), level: 'danger', title: 'Not deleted' });
+          });
+        }
+      });
+    }
   };
 
   EPAL.api = Api;
