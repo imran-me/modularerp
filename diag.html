@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Diagnostic</title>
+<style>body{font-family:monospace;font-size:16px;padding:24px;background:#001;color:#0f0;white-space:pre-wrap;line-height:1.6;}
+.bad{color:#f55;} .good{color:#5f5;} h1{color:#fff;}</style>
+</head>
+<body>
+<h1>Epal ERP — Live Diagnostic</h1>
+<div id="out">Running checks...</div>
+<script>
+var out = document.getElementById('out');
+function line(txt, cls) { var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = txt; out.appendChild(d); }
+out.textContent = '';
+
+line('1) Checking /api/health ...');
+fetch('/api/health', { headers: { Accept: 'application/json' } })
+  .then(function (r) { line('   HTTP status: ' + r.status, r.ok ? 'good' : 'bad'); return r.text(); })
+  .then(function (txt) {
+    line('   Raw response: ' + txt);
+    try {
+      var j = JSON.parse(txt);
+      line('   Parsed service field: ' + j.service, j.service === 'epal-kernel' ? 'good' : 'bad');
+    } catch (e) {
+      line('   JSON parse FAILED: ' + e.message, 'bad');
+    }
+  })
+  .catch(function (e) { line('   FETCH ERROR (network/CORS/blocked): ' + e.message, 'bad'); })
+  .then(function () {
+    line('');
+    line('2) Checking window.EPAL.api exists ...');
+    line('   typeof EPAL: ' + typeof window.EPAL, window.EPAL ? 'good' : 'bad');
+    line('   typeof EPAL.api: ' + (window.EPAL ? typeof window.EPAL.api : 'n/a'), (window.EPAL && window.EPAL.api) ? 'good' : 'bad');
+    line('');
+    line('3) localStorage state ...');
+    line('   EPAL_API_BASE: ' + JSON.stringify(localStorage.getItem('EPAL_API_BASE')));
+    line('   EPAL_TOKEN: ' + (localStorage.getItem('EPAL_TOKEN') ? '(present, ' + localStorage.getItem('EPAL_TOKEN').length + ' chars)' : '(none)'));
+    line('   epal.v1.auth.currentUserId: ' + JSON.stringify(localStorage.getItem('epal.v1.auth.currentUserId')));
+    line('');
+    line('DONE — screenshot this whole page.', 'good');
+  });
+</script>
+</body>
+</html>
