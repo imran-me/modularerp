@@ -55,6 +55,24 @@
     /* Resolve & cache the current user (defaults to the owner) --------------*/
     current: function () {
       if (this._user) return this._user;
+      // API MODE: the REAL signed-in user (Sanctum identity stored by api.js)
+      // IS the current user — the EPL-0001 default and the View-As demo
+      // impersonation below belong to demo mode only. scope 'group' (super
+      // admin / no company) maps to the owner role; company-scoped users get
+      // manager-of-their-company. (Old-DB numeric company ids will map to
+      // company slugs in the backend identity when company logins land.)
+      if (EPAL.api && EPAL.api.enabled && EPAL.api.enabled()) {
+        var api = EPAL.api.user();
+        if (api) {
+          this._user = {
+            id: 'API-' + api.id, name: api.name, email: api.email,
+            role: api.scope === 'group' ? 'owner' : 'manager',
+            companyId: api.companyId || 'group',
+            accessLevel: 'full', permissions: [], _api: true
+          };
+          return this._user;
+        }
+      }
       var id = S.get(KEY, 'EPL-0001');
       this._user = EPAL.db.employee(id) || EPAL.db.employee('EPL-0001');
       // apply sensible default permissions/accessLevel if none stored

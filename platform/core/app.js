@@ -49,8 +49,28 @@
     activeCompany: 'group',
 
     /* ---- BOOT ------------------------------------------------------------*/
+    // REAL-DATA GATE (see platform/data/api.js): resolve api-vs-demo mode
+    // first. API mode = sign-in before anything renders, then hydrate the
+    // store from the Laravel backend INSTEAD of seeding demo data — real and
+    // demo are never mixed. Demo mode = start(false) = the old path unchanged.
     init: function () {
-      EPAL.db.seed();                    // 1. seed demo data (idempotent)
+      var self = this;
+      EPAL.api.detect().then(function (m) {
+        if (m !== 'api') return self.start(false);
+        if (!localStorage.getItem('EPAL_TOKEN')) return EPAL.loginScreen.show();
+        EPAL.api.hydrate().then(
+          function () { self.start(true); },
+          function () {                      // hydrate rejects ONLY on 401 — stale token
+            localStorage.removeItem('EPAL_TOKEN');
+            localStorage.removeItem('EPAL_USER');
+            EPAL.loginScreen.show();
+          }
+        );
+      });
+    },
+
+    start: function (apiMode) {
+      if (!apiMode) EPAL.db.seed();      // 1. demo data — DEMO MODE ONLY
       EPAL.modules.applyOverrides();     // 2. fold saved on/off flags onto config
       this.applyTheme();                 // 3. paint theme before first render
       this.renderShell();                // 4. build rail + sidebar + topbar

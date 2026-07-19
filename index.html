@@ -97,6 +97,8 @@
   <!-- config MUST load first (ui/db/auth read from it at load time). -->
   <script src="platform/core/config.js"></script>
   <script src="platform/data/state.js"></script>
+  <!-- Real-data bridge: API client + boot hydration (api mode) — see api.js header -->
+  <script src="platform/data/api.js"></script>
   <script src="platform/core/eventbus.js"></script>
   <script src="platform/core/ui.js"></script>
   <script src="platform/core/charts.js"></script>
@@ -127,6 +129,8 @@
   <script src="platform/kit/expenses.js"></script>
   <script src="platform/auth-rbac/auth.js"></script>
   <script src="platform/auth-rbac/permissions.js"></script>
+  <!-- Pre-boot sign-in gate (api mode only; never invoked in demo mode) -->
+  <script src="platform/auth-rbac/login-screen.js"></script>
   <script src="platform/core/router.js"></script>
   <!-- Auto-discovery (Phase 3a): folder present = company/module appears. Default
        present + file:// fallback, so no visual/behaviour change when all folders
