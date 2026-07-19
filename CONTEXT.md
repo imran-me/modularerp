@@ -82,11 +82,32 @@ the 1-min cron pull + browser cache. Several "it's broken" reports were
 already-fixed things showing a cached build. Tell them to hard-refresh
 (Ctrl+Shift+R) before diagnosing.
 
-**NEXT:** (1) finish + test the parked Air Ticketing Purchases write, then Visa
-Sales write; (2) build the real Employee performance-review/rating feature (owner
-chose this over a fake rating — card currently omits rating); (3) resume backend
-Phase C (corrected ledger — owner-review-gated) / D / E. See memory
-`epal-backend-migration` for the full phase map.
+**DONE SINCE (all pushed, tested vs real MySQL, boot-swept):**
+- Phase B COMPLETE — Air Ticketing Purchases + Visa Sales writes live (join
+  Payment Schedules). All Phase A+B write endpoints done.
+- Real **Performance Review** feature (owner chose it over a fake rating):
+  module-owned `performance_reviews` table + PerformanceController
+  (Schema::hasTable-guarded so it no-ops safely before the table exists) +
+  `perf_reviews` in HYDRATE/WRITABLE + a Performance-tab review workflow; the
+  employee rating = average of real reviews.
+  **DEPLOY STEP (owner, once):** the imported DB isn't in Laravel's migrations
+  ledger, so plain `php artisan migrate` fails ("table already exists"). Create
+  the new table with the module path only:
+  `php artisan migrate --path=../../companies/group-cockpit/modules/employees/backend/migrations --force`
+- More live UI: bank Overview (company-row button) with INLINE per-account
+  ledger (print/in-out/date filters), employee Directory list-view + print +
+  status filter, "Cash in Sell" on every company, name-driven real flags.
+
+**NEXT (remaining phases):**
+- **Phase C — corrected ledger/COA posting logic: OWNER-REVIEW-GATED.** Do NOT
+  build the posting logic by guessing — the whole project exists because the old
+  books are wrong (see [[epal-bookkeeping-audit]]). The owner picks the fix order
+  first. This is a design task, not a mechanical rollout.
+- **Phase D** — real per-company logins (today AuthController only splits
+  group-vs-one-company by `company_id IS NULL`).
+- **Phase E** — roll out the other 4 companies' backends (Woodart, IT, Shop,
+  Construction) using the same proven modular write pattern.
+See memory `epal-backend-migration` for the full phase map.
 
 ---
 
