@@ -202,6 +202,16 @@
     ui.modal({
       title:'Employee Profile', icon:'person-vcard', size:'lg', body: body,
       actions: [
+        { label:'Delete', variant:'danger', icon:'trash', onClick: function () {
+            ui.confirm({ title:'Delete employee?', text:'Remove ' + e.name + ' from the directory. This cannot be undone.', danger:true, confirmLabel:'Delete' })
+              .then(function (ok) {
+                if (!ok) return;
+                db.remove('employees', e.id);
+                db.log(EPAL.auth.current().name, 'Deleted employee ' + e.name, e.companyId);
+                ui.toast(e.name + ' deleted', 'success');
+                EPAL.router.render();
+              });
+          } },
         { label:'Download Report', variant:'ghost', icon:'file-earmark-arrow-down', keepOpen:true, onClick: function () { downloadProfile(e); } },
         { label:'Open Task Board', variant:'ghost', icon:'kanban', onClick: function () { EPAL.router.navigate('group/tasks', { emp: e.id }); } },
         { label:'Edit', variant:'primary', icon:'pencil', onClick: function () { editEmployee(e, function(){ EPAL.router.render(); }); } }
@@ -709,7 +719,8 @@
       inp('Designation','designation',e.designation),
       roleField,
       inp('Email','email',e.email), inp('Phone','phone',e.phone),
-      inp('Join date','joinDate',e.joinDate,'','date'), inp('Monthly salary','salary',e.salary,'','number')
+      inp('Join date','joinDate',e.joinDate,'','date'), inp('Monthly salary','salary',e.salary,'','number'),
+      selInp('Status','status',e.status || 'active',[['active','Active'],['on-leave','On leave']])
     ]);
     ui.modal({ title: isNew ? 'Add Employee' : 'Edit Employee', icon:'person-badge', size:'lg', body: body,
       actions: [ { label:'Cancel', variant:'ghost' }, { label: isNew?'Create':'Save', variant:'primary', onClick: function (boxEl) {
@@ -718,8 +729,8 @@
         // Never let a non-admin write the role field (guards against privilege
         // escalation even if the disabled/restricted select is bypassed).
         var applyKeys = canSetRole
-          ? ['name','companyId','dept','designation','role','email','phone','joinDate']
-          : ['name','companyId','dept','designation','email','phone','joinDate'];
+          ? ['name','companyId','dept','designation','role','email','phone','joinDate','status']
+          : ['name','companyId','dept','designation','email','phone','joinDate','status'];
         applyKeys.forEach(function (k){ e[k] = g(k); });
         e.salary = +g('salary') || 0;
         db.saveEmployee(e);
