@@ -40,7 +40,7 @@
   // category + sub-category screen switch with buttons at the top of it.
   // OWNER ORDER: Banks → Payroll → Schedules → Journals → Expenses →
   // Accounts → Party Types (Manage Banks is the landing section)
-  var SECTIONS = [['banks', 'Manage Banks'], ['cash', 'Manage Cash'], ['payroll', 'Master Payroll'], ['schedules', 'Payment Schedules'],
+  var SECTIONS = [['overview', 'Overview'], ['banks', 'Manage Banks'], ['cash', 'Manage Cash'], ['payroll', 'Master Payroll'], ['schedules', 'Payment Schedules'],
     ['journals', 'Manage Journals'], ['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'],
     ['party-types', 'Party Types'], ['loans', 'Manage Loan']];
   var EXP_TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Category & Sub-category']];
@@ -223,10 +223,10 @@
    * ========================================================================*/
   EPAL.view('group/master-accounts', {
     render: function (ctx) {
-      var sub = ctx.subId || 'banks';
+      var sub = ctx.subId || 'overview';
       // legacy deep-links from the pre-consolidation layout land on the right tab
       if (sub === 'categories' || sub === 'budget' || sub === 'report') { expTab = sub; sub = 'expenses'; }
-      if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'banks';
+      if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'overview';
       var page = el('div.page');
       if (sub === 'loans' && selCo === 'all') { /* the loan desk reads 'all' fine */ }
       var titles = {}; SECTIONS.forEach(function (s) { titles[s[0]] = s[1]; });
@@ -277,7 +277,7 @@
         page.appendChild(expRow);
         ({ all: expensesView, budget: budgetView, report: reportView, categories: categoriesView }[expTab] || expensesView)(page);
       } else {
-        ({ accounts: accountsView, journals: journalsView, schedules: schedulesView,
+        ({ overview: overviewView, accounts: accountsView, journals: journalsView, schedules: schedulesView,
            'party-types': partyTypesView, payroll: payrollView, banks: banksView, loans: loansSection, cash: cashSection }[sub])(page);
       }
       ctx.mount.appendChild(page);
@@ -1153,6 +1153,155 @@
   // shared so other desks (Manage Loan) move bank money the SAME way — one
   // implementation keeps the bank register and the reconciliation card honest
   EPAL.bankTxnApply = bankTxnApply;
+  /* ======================================================= OVERVIEW
+   * Bank Accounts Dashboard (owner 2026-07-19, mirrors the production ERP):
+   * every sister-concern account combined, as cards; click one → its full
+   * ledger (bankAccountDetail). Respects the company switcher scope. */
+  function overviewView(page) {
+    var allBanks = db.col('banks');
+    var banks = allBanks.filter(function (b) { return selCo === 'all' ? true : (b.companyId || 'group') === selCo; });
+    var total = banks.reduce(function (a, b) { return a + (+b.balance || 0); }, 0);
+    var active = banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length;
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Total Balance', ui.money(total, { compact: true }), 'safe2'),
+      kpi('Accounts', String(banks.length), 'bank'),
+      kpi('Active', String(active), 'check-circle'),
+      kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
+    ]));
+
+    if (canCreate()) page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
+      el('a.btn.btn-sm.btn-primary', { href: '#/group/master-accounts/banks', html: ui.icon('plus-lg') + ' Add / manage accounts' }),
+      el('a.btn.btn-sm.btn-outline', { href: '#/group/master-accounts/cash', html: ui.icon('cash-stack') + ' Manage cash' })
+    ]));
+
+    page.appendChild(el('div.section-label', { text: 'Bank Accounts — ' + (selCo === 'all' ? 'all sister concerns' : coName(selCo)) }));
+    if (!banks.length) { page.appendChild(el('div.card', null, [ el('div.card-pad.text-mute', { text: 'No bank accounts in this scope.' }) ])); return; }
+
+    var txns = S.list('bank_txns');
+    var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
+    banks.forEach(function (b) {
+      var last = txns.filter(function (t) { return t.bankId === b.id; }).sort(function (x, y) { return (x.date < y.date ? 1 : -1); })[0];
+      grid.appendChild(el('div.card.hover', { style: { cursor: 'pointer' }, onclick: function () { bankAccountDetail(b); } }, [
+        el('div.card-pad', null, [
+          el('div.flex.items-center.gap-2.mb-2', null, [
+            el('div.avatar', { style: { background: ui.colorFor(b.name), width: '34px', height: '34px', fontSize: '13px' },
+              html: '<i class="bi bi-' + (b.type === 'Cash Box' ? 'cash-stack' : 'bank') + '"></i>' }),
+            el('div.flex-1.min-w-0', null, [
+              el('div.fw-700', { text: b.name }),
+              el('div.text-mute.xs', { text: coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '') })
+            ]),
+            (b.status || 'Active') === 'Inactive' ? el('span.badge', { text: 'Inactive' }) : el('span.badge.badge-good', { text: 'Active' })
+          ]),
+          el('div.num.strong' + ((+b.balance || 0) < 0 ? '.text-bad' : ''), { style: { fontSize: '22px' }, text: ui.money(b.balance) }),
+          el('div.text-mute.xs.mt-1', { text: (b.account ? 'A/C ' + b.account + ' · ' : '') + (last ? 'Last: ' + ui.date(last.date) : 'No transactions yet') })
+        ])
+      ]));
+    });
+    page.appendChild(grid);
+  }
+
+  /* ---- BANK ACCOUNT DETAIL — click an account card → its full ledger.
+   * All transactions for ONE account, newest first, with a running balance,
+   * date-range + direction (in/out) filters, and print (the current filtered
+   * view = all · a single day · a custom range · only-in · only-out) plus a
+   * per-row print for a single transaction. Mirrors the production ERP. */
+  function bankAccountDetail(bank) {
+    var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in'; };
+    var all = S.list('bank_txns').filter(function (t) { return t.bankId === bank.id; });
+    all.forEach(function (t, i) { t._seq = i; });
+    function newestFirst(a, b) { return (a.date === b.date) ? b._seq - a._seq : (a.date < b.date ? 1 : -1); }
+    // running balance: newest txn's closing IS the live balance; walk backward.
+    var bal = +bank.balance || 0;
+    all.slice().sort(newestFirst).forEach(function (t) {
+      t._after = bal; t._before = bal - (isIn(t) ? (+t.amount || 0) : -(+t.amount || 0)); bal = t._before;
+    });
+
+    var state = { from: '', to: '', dir: 'all' };
+    function rowsNow() {
+      return all.filter(function (t) {
+        if (state.from && (t.date || '') < state.from) return false;
+        if (state.to && (t.date || '') > state.to) return false;
+        if (state.dir === 'in' && !isIn(t)) return false;
+        if (state.dir === 'out' && isIn(t)) return false;
+        return true;
+      }).sort(newestFirst);
+    }
+    function stat(l, v, cls) { return el('div.stat', null, [ el('div.stat-label', { text: l }), el('div.stat-value.num' + (cls || ''), { html: v }) ]); }
+    function printRows(list, label) {
+      var head = '<tr><th>Date</th><th>Reference</th><th>Description</th><th style="text-align:right">Debit (In)</th><th style="text-align:right">Credit (Out)</th><th style="text-align:right">Balance</th></tr>';
+      var rows = list.map(function (t) {
+        var v = +t._after || 0;
+        return '<tr><td>' + esc(ui.date(t.date)) + '</td><td>' + esc(t.ref || '') + '</td><td>' + esc(t.desc || t.type || '') + '</td>' +
+          '<td style="text-align:right">' + (isIn(t) ? ui.money(t.amount) : '') + '</td>' +
+          '<td style="text-align:right">' + (!isIn(t) ? ui.money(t.amount) : '') + '</td>' +
+          '<td style="text-align:right">' + ui.money(Math.abs(v)) + (v < 0 ? ' Cr' : ' Dr') + '</td></tr>';
+      }).join('');
+      ui.printDoc({ title: bank.name + ' — Bank Statement', subtitle: coName(bank.companyId || 'group') + ' · ' + (label || 'All transactions'),
+        meta: 'Account: ' + (bank.account || '—') + ' · Balance: ' + ui.money(bank.balance), footer: 'Epal Group — Bank Account Statement',
+        bodyHtml: '<table>' + head + rows + '</table>' });
+    }
+    function printLabel() {
+      var d = state.dir === 'in' ? 'In only' : state.dir === 'out' ? 'Out only' : 'All';
+      var r = (state.from || state.to) ? ((state.from || '…') + ' → ' + (state.to || '…')) : 'All dates';
+      return d + ' · ' + r;
+    }
+
+    var body = el('div');
+    ui.modal({ title: bank.name + ' · ' + coName(bank.companyId || 'group'), icon: 'bank', size: 'lg', body: body, footer: false });
+
+    function draw() {
+      body.innerHTML = '';
+      var rows = rowsNow();
+      var tin = rows.filter(isIn).reduce(function (a, t) { return a + (+t.amount || 0); }, 0);
+      var tout = rows.filter(function (t) { return !isIn(t); }).reduce(function (a, t) { return a + (+t.amount || 0); }, 0);
+
+      body.appendChild(el('div.stat-row.mb-2', null, [
+        stat('Account No.', esc(bank.account || '—')),
+        stat('Type', esc((bank.type || 'Bank') + ' · ' + (bank.accType || 'Current'))),
+        stat('Closing Balance', ui.money(bank.balance), (+bank.balance || 0) < 0 ? '.text-bad' : ''),
+        stat('Transactions', String(rows.length))
+      ]));
+      body.appendChild(el('div.stat-row.mb-3', null, [
+        stat('Total In (Debit)', '<span class="text-good">' + ui.money(tin) + '</span>'),
+        stat('Total Out (Credit)', '<span class="text-bad">' + ui.money(tout) + '</span>'),
+        stat('Net Movement', ui.money(tin - tout))
+      ]));
+
+      var fromI = el('input.input', { type: 'date', value: state.from, style: { width: 'auto' } });
+      fromI.addEventListener('change', function () { state.from = fromI.value; draw(); });
+      var toI = el('input.input', { type: 'date', value: state.to, style: { width: 'auto' } });
+      toI.addEventListener('change', function () { state.to = toI.value; draw(); });
+      function dirBtn(k, label) { return el('button.btn.btn-sm' + (state.dir === k ? '.btn-primary' : '.btn-outline'), { text: label, onclick: function () { state.dir = k; draw(); } }); }
+      function todayBtn() {
+        return el('button.btn.btn-sm.btn-ghost', { text: 'Today', onclick: function () { var d = (new Date()).toISOString().slice(0, 10); state.from = d; state.to = d; draw(); } });
+      }
+      body.appendChild(el('div.flex.gap-2.flex-wrap.items-center.mb-2', null, [
+        el('span.text-mute.xs', { text: 'From' }), fromI, el('span.text-mute.xs', { text: 'To' }), toI, todayBtn(),
+        dirBtn('all', 'All'), dirBtn('in', 'Only In'), dirBtn('out', 'Only Out'),
+        el('button.btn.btn-sm.btn-outline', { html: ui.icon('x-lg') + ' Clear', onclick: function () { state.from = ''; state.to = ''; state.dir = 'all'; draw(); } }),
+        el('button.btn.btn-sm.btn-primary', { style: { marginLeft: 'auto' }, html: ui.icon('printer') + ' Print', onclick: function () { printRows(rows, printLabel()); } })
+      ]));
+
+      var tbl = EPAL.table({
+        columns: [
+          { key: 'date', label: 'Date', date: true },
+          { key: 'ref', label: 'Reference', render: function (t) { return t.ref ? '<span class="mono">' + esc(t.ref) + '</span>' : '<span class="text-mute">—</span>'; } },
+          { key: 'desc', label: 'Description', render: function (t) { return esc(t.desc || t.type || '') || '—'; } },
+          { key: 'in', label: 'Debit (In)', num: true, render: function (t) { return isIn(t) ? '<span class="num text-good">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return isIn(t) ? t.amount : ''; } },
+          { key: 'out', label: 'Credit (Out)', num: true, render: function (t) { return !isIn(t) ? '<span class="num text-bad">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return !isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return !isIn(t) ? t.amount : ''; } },
+          { key: 'bal', label: 'Balance', num: true, render: function (t) { var v = +t._after || 0; return '<span class="num' + (v < 0 ? ' text-bad' : '') + '">' + ui.money(Math.abs(v)) + (v < 0 ? ' Cr' : ' Dr') + '</span>'; }, sortVal: function (t) { return +t._after || 0; }, exportVal: function (t) { return t._after; } }
+        ],
+        rows: rows, pageSize: 12, exportName: 'bank-statement-' + (bank.account || bank.id) + '.csv',
+        searchKeys: ['ref', 'desc'],
+        actions: [{ icon: 'printer', title: 'Print this transaction', onClick: function (t) { printRows([t], 'Single transaction'); } }],
+        empty: { icon: 'clock-history', title: 'No transactions in this view', hint: 'Adjust the date range or the In/Out filter — or this account has no movement yet.' }
+      });
+      body.appendChild(el('div.card', null, [ el('div.card-body', null, [tbl.el]) ]));
+    }
+    draw();
+  }
+
   function banksView(page) {
     var allBanks = db.col('banks');
     var banks = allBanks.filter(function (b) { return selCo === 'all' ? true : (b.companyId || 'group') === selCo; });
@@ -1165,10 +1314,12 @@
       kpi('Active', String(banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length), 'check-circle'),
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
-    // per-company cards, like the production dashboard header
+    // per-company cards, like the production dashboard header. Respects the
+    // selected company: on a specific company only THAT company's card shows,
+    // not every sister concern (owner 2026-07-19).
     (function () {
       var byCo = {};
-      allBanks.forEach(function (b) { var k = b.companyId || 'group'; byCo[k] = byCo[k] || { total: 0, n: 0 }; byCo[k].total += +b.balance || 0; byCo[k].n++; });
+      banks.forEach(function (b) { var k = b.companyId || 'group'; byCo[k] = byCo[k] || { total: 0, n: 0 }; byCo[k].total += +b.balance || 0; byCo[k].n++; });
       var strip = el('div.flex.gap-2.flex-wrap.mb-2');
       Object.keys(byCo).forEach(function (k) {
         strip.appendChild(el('div.card', { style: { padding: '10px 14px', cursor: 'pointer', minWidth: '170px' }, onclick: function () { selCo = k; EPAL.router.render(); } }, [
