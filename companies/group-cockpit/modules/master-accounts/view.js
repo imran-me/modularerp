@@ -1163,6 +1163,45 @@
   // shared so other desks (Manage Loan) move bank money the SAME way — one
   // implementation keeps the bank register and the reconciliation card honest
   EPAL.bankTxnApply = bankTxnApply;
+
+  /* Add / edit a bank account — TOP-LEVEL (owner 2026-07-19) so BOTH the
+     Overview dashboard and the Manage-Banks table can open it. */
+  function editBank(b) {
+    EPAL.formModal({
+      title: b ? 'Edit Bank' : 'Add New Bank', icon: 'bank', size: 'md',
+      record: b || { type: 'Bank', accType: 'Current', bankType: 'National', status: 'Active', companyId: selCo === 'all' ? 'group' : selCo },
+      fields: [
+        { key: 'name', label: 'Bank / account name', type: 'text', required: true, placeholder: 'e.g. BRAC Bank (Travels)', col2: true },
+        { key: 'type', label: 'Payment type', type: 'select', required: true, default: 'Bank', options: ['Bank', 'bKash', 'Nagad', 'Cash Box', 'Card'] },
+        { key: 'branch', label: 'Branch', type: 'text', placeholder: 'e.g. Shantinagar Branch, Dhaka' },
+        { key: 'accountName', label: 'Account holder / entity', type: 'text', placeholder: 'e.g. EPAL TRAVELS & CONSULTANCY' },
+        { key: 'accType', label: 'Account type', type: 'select', options: ['Current', 'Savings', 'Fixed'], default: 'Current' },
+        { key: 'bankType', label: 'Bank type', type: 'select', options: ['National', 'International'], default: 'National' },
+        { key: 'routing', label: 'Routing number', type: 'text', placeholder: 'e.g. 060274289', showIf: function (x) { return x.type === 'Bank'; } },
+        { key: 'account', label: 'Account / wallet number', type: 'text', pattern: /^\d{4,20}$/,
+          hint: '4–20 digits', placeholder: '15XXXXXXXX',
+          showIf: function (x) { return x.type !== 'Cash Box'; } },
+        { key: 'companyId', label: 'Owned By', type: 'select', required: true,
+          options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+        { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Inactive'], default: 'Active' },
+        { key: 'balance', label: 'Current Balance (৳)', type: 'money', required: true }
+      ],
+      onSave: function (vals) {
+        var rec = Object.assign({}, b || { id: 'BNK-' + Date.now().toString().slice(-5), created: TODAY_STR }, vals);
+        rec.type = vals.type || 'Bank';
+        if (rec.type === 'Cash Box' && !rec.account) rec.account = '0000';
+        if (!rec.accountName) rec.accountName = coName(rec.companyId || 'group');
+        db.save('banks', rec);
+        ui.toast('Bank saved', 'success'); EPAL.router.render();
+      }
+    });
+  }
+  /* Delete a bank account (confirm → API soft-delete via db.remove). */
+  function deleteBank(b) {
+    ui.confirm({ title: 'Delete ' + b.name + '?', text: 'Balance ' + ui.money(b.balance) + ' leaves the cash position. This cannot be undone.', danger: true, confirmLabel: 'Delete' })
+      .then(function (ok) { if (!ok) return; db.remove('banks', b.id); ui.toast(b.name + ' deleted', 'success'); EPAL.router.render(); });
+  }
+
   /* ======================================================= OVERVIEW
    * Bank Accounts Dashboard (owner 2026-07-19, mirrors the production ERP):
    * every sister-concern account combined, as cards; click one → its full
@@ -1181,7 +1220,7 @@
     ]));
 
     if (canCreate()) page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
-      el('a.btn.btn-sm.btn-primary', { href: '#/group/master-accounts/banks', html: ui.icon('plus-lg') + ' Add / manage accounts' }),
+      el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-lg') + ' Add New Bank', onclick: function () { editBank(null); } }),
       el('a.btn.btn-sm.btn-outline', { href: '#/group/master-accounts/cash', html: ui.icon('cash-stack') + ' Manage cash' })
     ]));
 
@@ -1207,7 +1246,14 @@
               el('div.fw-700', { text: b.name }),
               el('div.text-mute.xs', { text: coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '') })
             ]),
-            (b.status || 'Active') === 'Inactive' ? el('span.badge', { text: 'Inactive' }) : el('span.badge.badge-good', { text: 'Active' })
+            (b.status || 'Active') === 'Inactive' ? el('span.badge', { text: 'Inactive' }) : el('span.badge.badge-good', { text: 'Active' }),
+            // edit + delete, right on the card (don't open the ledger)
+            canCreate() ? el('div.flex.gap-1', null, [
+              el('button.icon-btn.btn-sm', { title: 'Edit', html: ui.icon('pencil'),
+                onclick: function (e) { e.stopPropagation(); editBank(b); } }),
+              el('button.icon-btn.btn-sm', { title: 'Delete', html: ui.icon('trash'),
+                onclick: function (e) { e.stopPropagation(); deleteBank(b); } })
+            ]) : null
           ]),
           el('div.num.strong' + ((+b.balance || 0) < 0 ? '.text-bad' : ''), { style: { fontSize: '22px' }, text: ui.money(b.balance) }),
           el('div.text-mute.xs.mt-1', { text: (b.account ? 'A/C ' + b.account + ' · ' : '') + (last ? 'Last: ' + ui.date(last.date) : 'No transactions yet') })
@@ -1592,36 +1638,6 @@
           t.reversed = true; S.upsert('bank_txns', t);
           ui.toast('Transaction reversed', 'success'); EPAL.router.render();
         });
-    }
-    function editBank(b) {
-      EPAL.formModal({
-        title: b ? 'Edit Bank' : 'Add New Bank', icon: 'bank', size: 'md',
-        record: b || { type: 'Bank', accType: 'Current', bankType: 'National', status: 'Active', companyId: selCo === 'all' ? 'group' : selCo },
-        fields: [
-          { key: 'name', label: 'Bank / account name', type: 'text', required: true, placeholder: 'e.g. BRAC Bank (Travels)', col2: true },
-          { key: 'type', label: 'Payment type', type: 'select', required: true, default: 'Bank', options: ['Bank', 'bKash', 'Nagad', 'Cash Box', 'Card'] },
-          { key: 'branch', label: 'Branch', type: 'text', placeholder: 'e.g. Shantinagar Branch, Dhaka' },
-          { key: 'accountName', label: 'Account holder / entity', type: 'text', placeholder: 'e.g. EPAL TRAVELS & CONSULTANCY' },
-          { key: 'accType', label: 'Account type', type: 'select', options: ['Current', 'Savings', 'Fixed'], default: 'Current' },
-          { key: 'bankType', label: 'Bank type', type: 'select', options: ['National', 'International'], default: 'National' },
-          { key: 'routing', label: 'Routing number', type: 'text', placeholder: 'e.g. 060274289', showIf: function (x) { return x.type === 'Bank'; } },
-          { key: 'account', label: 'Account / wallet number', type: 'text', pattern: /^\d{4,20}$/,
-            hint: '4–20 digits', placeholder: '15XXXXXXXX',
-            showIf: function (x) { return x.type !== 'Cash Box'; } },
-          { key: 'companyId', label: 'Owned By', type: 'select', required: true,
-            options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
-          { key: 'status', label: 'Status', type: 'select', options: ['Active', 'Inactive'], default: 'Active' },
-          { key: 'balance', label: 'Current Balance (৳)', type: 'money', required: true }
-        ],
-        onSave: function (vals) {
-          var rec = Object.assign({}, b || { id: 'BNK-' + Date.now().toString().slice(-5), created: TODAY_STR }, vals);
-          rec.type = vals.type || 'Bank';
-          if (rec.type === 'Cash Box' && !rec.account) rec.account = '0000';
-          if (!rec.accountName) rec.accountName = coName(rec.companyId || 'group');
-          db.save('banks', rec);
-          ui.toast('Bank saved', 'success'); EPAL.router.render();
-        }
-      });
     }
     function transferForm() {
       var all = db.col('banks').filter(function (b) { return (b.status || 'Active') !== 'Inactive'; });

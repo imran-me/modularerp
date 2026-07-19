@@ -153,6 +153,10 @@
         rows: list, pageSize: 20, exportName: 'employee-directory.csv',
         searchKeys: ['name','designation','email','dept'],
         onRow: function (e) { openProfile(e); },
+        actions: canManage() ? [
+          { icon:'pencil', title:'Edit', onClick: function (e) { editEmployee(e, function () { EPAL.router.render(); }); } },
+          { icon:'trash', title:'Delete employee', onClick: function (e) { deleteEmployee(e); } }
+        ] : [],
         empty: { icon:'people', title:'No matches', hint:'Adjust the search or filters.' }
       });
       return el('div.card', null, [ el('div.card-body', null, [tbl.el]) ]);
@@ -217,6 +221,18 @@
   // is no punch data, so estimate from present days × the 9h standard so the
   // card never shows a bare 0h for a seeded employee.
   function hoursOf(e) { return (e.hours != null) ? e.hours : Math.round((((e.attendance || {}).present) || 0) * 9); }
+  // Delete one employee (confirm → API soft-delete via db.remove → wireWrites).
+  // Shared by the list-view row action and the profile drawer.
+  function deleteEmployee(e) {
+    ui.confirm({ title: 'Delete ' + e.name + '?', text: 'Remove ' + e.name + ' from the directory. This cannot be undone.', danger: true, confirmLabel: 'Delete' })
+      .then(function (ok) {
+        if (!ok) return;
+        db.remove('employees', e.id);
+        db.log(EPAL.auth.current().name, 'Deleted employee ' + e.name, e.companyId);
+        ui.toast(e.name + ' deleted', 'success');
+        EPAL.router.render();
+      });
+  }
 
   /* ---- PROFILE DRAWER ---------------------------------------------------*/
   function openProfile(e) {
@@ -272,16 +288,7 @@
     ui.modal({
       title:'Employee Profile', icon:'person-vcard', size:'lg', body: body,
       actions: [
-        { label:'Delete', variant:'danger', icon:'trash', onClick: function () {
-            ui.confirm({ title:'Delete employee?', text:'Remove ' + e.name + ' from the directory. This cannot be undone.', danger:true, confirmLabel:'Delete' })
-              .then(function (ok) {
-                if (!ok) return;
-                db.remove('employees', e.id);
-                db.log(EPAL.auth.current().name, 'Deleted employee ' + e.name, e.companyId);
-                ui.toast(e.name + ' deleted', 'success');
-                EPAL.router.render();
-              });
-          } },
+        { label:'Delete', variant:'danger', icon:'trash', onClick: function () { deleteEmployee(e); } },
         { label:'Download Report', variant:'ghost', icon:'file-earmark-arrow-down', keepOpen:true, onClick: function () { downloadProfile(e); } },
         { label:'Open Task Board', variant:'ghost', icon:'kanban', onClick: function () { EPAL.router.navigate('group/tasks', { emp: e.id }); } },
         { label:'Edit', variant:'primary', icon:'pencil', onClick: function () { editEmployee(e, function(){ EPAL.router.render(); }); } }
