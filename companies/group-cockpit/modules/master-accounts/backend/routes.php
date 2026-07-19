@@ -43,3 +43,5 @@ Route::delete('group/master-accounts/suppliers/{id}', [SupplierController::class
 
 // Payment schedules (real `payment_schedules` table) — frontend `acc_schedules` store.
 Route::get('group/master-accounts/schedules', [PaymentScheduleController::class, 'index']);
+Route::post('group/master-accounts/schedules', [PaymentScheduleController::class, 'store']);
+Route::delete('group/master-accounts/schedules/{id}', [PaymentScheduleController::class, 'destroy']);

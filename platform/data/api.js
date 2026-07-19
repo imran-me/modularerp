@@ -65,7 +65,8 @@
     employees: 'group/employees/directory',
     airlines:  'travels/air-ticketing/airlines',
     airports:  'travels/air-ticketing/airports',
-    visaCats:  'travels/visa-processing/categories'
+    visaCats:  'travels/visa-processing/categories',
+    acc_schedules: 'group/master-accounts/schedules'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()
