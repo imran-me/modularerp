@@ -14,3 +14,5 @@ Route::post('travels/air-ticketing/airports', [AirportController::class, 'store'
 Route::delete('travels/air-ticketing/airports/{id}', [AirportController::class, 'destroy']);
 
 Route::get('travels/air-ticketing/purchases', [TicketPurchaseController::class, 'index']);
+Route::post('travels/air-ticketing/purchases', [TicketPurchaseController::class, 'store']);
+Route::delete('travels/air-ticketing/purchases/{id}', [TicketPurchaseController::class, 'destroy']);

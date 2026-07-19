@@ -603,7 +603,7 @@
         r.total=+val.total||0; r.paid=Math.min(+val.paid||0, +val.total||0); r.due=Math.max(0, r.total-r.paid);
         r.payStatus = r.due<=0 ? 'Confirm' : (r.paid>0 ? 'Partial' : 'Pending');
         r.route = r.via ? (r.fromCode+' → '+r.via+' → '+r.toCode) : (r.fromCode+' → '+r.toCode);
-        S.upsert('air_purchases', r);
+        db.save('air_purchases', r);   // db.save (not S.upsert) so it emits data:changed → reaches the API in api mode
         ui.toast('Ticket purchase for "'+r.passenger+'" saved','success');
         if (refresh) refresh(); else EPAL.router.render();
         return true;
