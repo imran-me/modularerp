@@ -110,9 +110,10 @@ already-fixed things showing a cached build. Tell them to hard-refresh
   company-bearing controller's `index()` (Customers, Banks, Payment Schedules,
   Employees, Visa Sales, Air Purchases) to the requester's company — a company
   login no longer receives other concerns' rows; Group/super-admin unchanged.
-  Verified vs real MySQL (Travels user sees only Travels). Follow-up left:
-  scope journal_entries + performance_reviews reads, and add write-path guards
-  (`requesterMayTouch()` is in the trait, ready).
+  Verified vs real MySQL (Travels user sees only Travels; an IT user's bank is
+  forced to `it`, and is 403'd from creating a visa sale). Reads AND writes are
+  isolated across ALL company-bearing controllers (customers, banks, schedules,
+  employees, journals, perf reviews, visa sales, air purchases). Phase D DONE.
 - **Phase E** — roll out the other 4 companies' MODULE backends (Woodart, IT,
   Shop, Construction). Lower value right now: the shared master data
   (customers/employees/banks/cash) already works for all companies and the live
