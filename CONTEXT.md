@@ -67,6 +67,33 @@ ONE SECTION. Complete that section perfectly, then **cross-check it 10 times**
 API-vs-demo, print/export paths, edge inputs, regression sweep). Only after a
 100% pass move to the next section. Update CONTEXT.md after every section.
 
+**FRAMEWORK CLARIFICATIONS (owner, 2026-07-19, later the same day):**
+- CSS/JS frameworks ARE allowed ("best framework… like Bootstrap") — **frontend
+  only, NEVER for the backend**; a custom stylesheet.css alongside is fine.
+  DECISION (recorded, owner accepted by continuing): stay on **Tailwind + raw
+  JS** per the written spec — the repo's Phase-1 design lock already seeds a
+  `tw-` prefixed config verbatim from tokens.css (theme-aware var() colors,
+  preflight off, safe coexistence). Bootstrap's opinionated components would
+  fight the pixel-identical rule and the standing premium non-Bootstrap look.
+- **"Never do one view.js like now, without build code"** — the current
+  monolithic, no-build, DOM-strings-in-JS view.js pattern is OUT for converted
+  modules. Each converted module's frontend is properly structured (template
+  markup + separate logic + optional module stylesheet), and a BUILD STEP is
+  now permitted — dev-machine build with the OUTPUT committed (same pattern as
+  tailwind.built.css; the server stays a static git-pull, no node on Hostinger).
+
+**PILOT (in progress):** Travels › **Passport Management** (the simplest Travels
+screen per the brief's "start with the simplest screen to establish the parity
+workflow"; 3 sections: holders / categories / expiry). Parity harness BUILT:
+`tools/verify/parity.mjs` — screenshots routes at fixed 1440×900@1x in headless
+Chrome with EVERY animation seeked-to-0-and-paused (looping ambient keyframes
+would otherwise differ frame-to-frame), then byte-compares before/after PNGs.
+Pass bar = byte-identical. Flow:
+  node tools/verify/parity.mjs shoot .parity/before <routes> both
+  …convert…  → shoot .parity/after → parity.mjs diff .parity/before .parity/after
+NEXT STEP: baseline-shoot the 3 passport routes, then restructure the module
+frontend (template + logic + tw- utilities), diff to byte-identical, 10× checks.
+
 **⚠️ OPEN DECISION before large-scale conversion (see chat 2026-07-19):** "pure
 Tailwind + pixel-identical + module-by-module + don't touch other modules" is in
 tension with the SHARED custom-CSS component system (platform/design-system +

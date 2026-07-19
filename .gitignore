@@ -20,3 +20,4 @@ platform/backend/bootstrap/cache/*.php
 platform/backend/public/platform/
 platform/backend/public/companies/
 platform/backend/public/favicon.svg
+.parity/
