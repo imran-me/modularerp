@@ -64,7 +64,8 @@
     banks:     'group/master-accounts/banks',
     employees: 'group/employees/directory',
     airlines:  'travels/air-ticketing/airlines',
-    airports:  'travels/air-ticketing/airports'
+    airports:  'travels/air-ticketing/airports',
+    visaCats:  'travels/visa-processing/categories'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()
