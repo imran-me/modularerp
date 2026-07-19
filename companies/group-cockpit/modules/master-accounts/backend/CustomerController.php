@@ -56,6 +56,12 @@ class CustomerController
             'contact'    => $c->address ?: '',
             'phone'      => $c->phone ?: '',
             'email'      => $c->email ?: '',
+            // `since` is REAL (the customer card shows "since <year>") — from the
+            // row's created_at. `value`/`tier` have no source column and the
+            // real system has no sales history yet (sales table is empty), so
+            // they stay 0/Standard — they populate honestly as real sales get
+            // recorded, not from an invented number.
+            'since'      => $c->created_at ? substr((string) $c->created_at, 0, 7) : null,
             'value'      => 0,
             'tier'       => 'Standard',
             'status'     => (int) $c->is_active === 1 ? 'active' : 'inactive',
@@ -66,7 +72,7 @@ class CustomerController
     {
         $rows = DB::table('customers')
             ->orderBy('name')
-            ->get(['id', 'company_id', 'name', 'email', 'phone', 'address', 'is_active']);
+            ->get(['id', 'company_id', 'name', 'email', 'phone', 'address', 'is_active', 'created_at']);
 
         return response()->json([
             'success' => true,
@@ -116,7 +122,7 @@ class CustomerController
         }
 
         $saved = DB::table('customers')->where('id', $id)
-            ->first(['id', 'company_id', 'name', 'email', 'phone', 'address', 'is_active']);
+            ->first(['id', 'company_id', 'name', 'email', 'phone', 'address', 'is_active', 'created_at']);
 
         return response()->json(['success' => true, 'data' => $this->present($saved)]);
     }
