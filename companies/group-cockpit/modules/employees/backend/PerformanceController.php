@@ -2,6 +2,7 @@
 
 namespace Epal\Modules\GroupCockpit\Employees;
 
+use App\Support\ScopesToCompany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class PerformanceController
 {
+    use ScopesToCompany;
+
     private function present(object $r): array
     {
         return [
@@ -52,13 +55,15 @@ class PerformanceController
         return $row?->id;
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         if (! Schema::hasTable('performance_reviews')) {
             return response()->json(['success' => true, 'count' => 0, 'data' => []]);
         }
+        $cid = $this->requesterCompanyId($request);
         $rows = DB::table('performance_reviews as pr')
             ->leftJoin('users as u', 'u.id', '=', 'pr.user_id')
+            ->when($cid, fn ($q) => $q->where('u.company_id', $cid))   // company user: only their own people's reviews
             ->orderByDesc('pr.reviewed_on')
             ->get(['pr.id', 'pr.user_id', 'pr.period', 'pr.score', 'pr.strengths',
                 'pr.improvements', 'pr.reviewer', 'pr.reviewed_on', 'u.employee_id_no']);

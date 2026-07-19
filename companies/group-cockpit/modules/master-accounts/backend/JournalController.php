@@ -2,7 +2,9 @@
 
 namespace Epal\Modules\GroupCockpit\MasterAccounts;
 
+use App\Support\ScopesToCompany;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -26,6 +28,8 @@ use Illuminate\Support\Facades\DB;
  */
 class JournalController
 {
+    use ScopesToCompany;
+
     /** DB companies.id -> frontend company slug (matches platform/core/config.js). */
     private function companySlug($id): string
     {
@@ -36,8 +40,10 @@ class JournalController
         return $map[(int) $id] ?? 'group';
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $cid = $this->requesterCompanyId($request);
+
         // account_id -> account code, so lines carry the code the ledger keys on
         $codeById = DB::table('accounts')
             ->whereNull('deleted_at')
@@ -52,6 +58,7 @@ class JournalController
 
         $entries = DB::table('journal_entries')
             ->whereNull('deleted_at')
+            ->when($cid, fn ($q) => $q->where('company_id', $cid))   // company user: only their own entries
             ->orderBy('date')
             ->orderBy('id')
             ->get();

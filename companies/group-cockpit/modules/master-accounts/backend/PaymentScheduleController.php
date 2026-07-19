@@ -104,7 +104,7 @@ class PaymentScheduleController
      *  controllers do risks colliding with an unrelated real row. Only a
      *  STRICTLY numeric id (exactly what index() returns for a real row) is
      *  ever treated as an update; anything else is a create. */
-    public function store(\Illuminate\Http\Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $v = $request->validate([
             'id'               => 'nullable|string',
@@ -131,8 +131,15 @@ class PaymentScheduleController
             }
         }
 
+        // Company-scoped writer: force their own company, refuse another's.
+        $scope     = $this->requesterCompanyId($request);
+        $companyId = $scope ?: $this->companyId($v['companyId'] ?? null);
+        if ($scope && $existingId && (int) DB::table('payment_schedules')->where('id', $existingId)->value('company_id') !== $scope) {
+            return response()->json(['success' => false, 'message' => 'Forbidden — not your company.'], 403);
+        }
+
         $row = [
-            'company_id'         => $this->companyId($v['companyId'] ?? null),
+            'company_id'         => $companyId,
             'party_name'         => $v['party'],
             'party_type'         => $v['partyType'] ?? '',
             'type'               => ($v['kind'] ?? 'Payable') === 'Receivable' ? 'receive' : 'pay',

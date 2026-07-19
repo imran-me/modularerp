@@ -89,7 +89,7 @@ class CustomerController
 
     /** Create OR update, keyed by the frontend's 'CUS-<n>' id (n may be a
      *  client-generated temp id that doesn't exist yet — that means create). */
-    public function store(\Illuminate\Http\Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $v = $request->validate([
             'id'         => 'nullable|string',
@@ -109,12 +109,20 @@ class CustomerController
             }
         }
 
+        // Company-scoped writer: force the row to THEIR company and refuse to
+        // edit another company's record (a Group user / super-admin is free).
+        $scope     = $this->requesterCompanyId($request);
+        $companyId = $scope ?: $this->companyId($v['companyIds'][0] ?? null);
+        if ($scope && $existingId && (int) DB::table('customers')->where('id', $existingId)->value('company_id') !== $scope) {
+            return response()->json(['success' => false, 'message' => 'Forbidden — not your company.'], 403);
+        }
+
         $row = [
             'name'       => $v['name'],
             'email'      => $v['email'] ?? null,
             'phone'      => $v['phone'] ?? null,
             'address'    => $v['contact'] ?? null,
-            'company_id' => $this->companyId($v['companyIds'][0] ?? null),
+            'company_id' => $companyId,
             'is_active'  => ($v['status'] ?? 'active') === 'active' ? 1 : 0,
             'updated_at' => now(),
         ];

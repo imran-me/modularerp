@@ -114,8 +114,13 @@ class TicketPurchaseController
         ]);
     }
 
-    public function store(\Illuminate\Http\Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
+        // Ticket purchases belong to Travels (company 2); a company user of
+        // ANOTHER concern may not create them (Group / super-admin is free).
+        if (! $this->requesterMayTouch($request, 2)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden — not your company.'], 403);
+        }
         $v = $request->validate([
             'id'           => 'nullable|string',
             'ticketNo'     => 'required|string|max:255',

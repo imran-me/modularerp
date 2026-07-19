@@ -88,6 +88,11 @@ class VisaSaleController
      *  same limitation the read side already has. */
     public function store(Request $request): JsonResponse
     {
+        // Visa sales belong to Travels (company 2); a company user of ANOTHER
+        // concern may not create them (Group / super-admin is unrestricted).
+        if (! $this->requesterMayTouch($request, 2)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden — not your company.'], 403);
+        }
         $v = $request->validate([
             'id'            => 'nullable|string',
             'applicant'     => 'required|string|max:255',

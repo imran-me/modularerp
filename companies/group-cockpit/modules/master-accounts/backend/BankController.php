@@ -92,7 +92,7 @@ class BankController
      *  banks hydrate with the bare numeric DB id; a brand-new one gets a
      *  client-generated 'BNK-<timestamp>' temp id) — pull the trailing digit
      *  run out of whatever id was sent and check if THAT exists. */
-    public function store(\Illuminate\Http\Request $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
         $v = $request->validate([
             'id'          => 'nullable|string',
@@ -116,6 +116,13 @@ class BankController
             }
         }
 
+        // Company-scoped writer: force their own company, refuse another's.
+        $scope     = $this->requesterCompanyId($request);
+        $companyId = $scope ?: $this->companyId($v['companyId'] ?? null);
+        if ($scope && $existingId && (int) DB::table('banks')->where('id', $existingId)->value('company_id') !== $scope) {
+            return response()->json(['success' => false, 'message' => 'Forbidden — not your company.'], 403);
+        }
+
         // `type` is a 4-value DB enum; the frontend form offers 5 payment-type
         // options (Bank/bKash/Nagad/Cash Box/Card) — bKash and Nagad are both
         // mobile banking, Card is the closest fit to "digital wallet" in this
@@ -132,7 +139,7 @@ class BankController
         $row = [
             'name'            => $v['name'],
             'branch_name'     => $v['branch'] ?? null,
-            'account_name'    => $v['accountName'] ?: $v['name'],   // NOT NULL in the DB
+            'account_name'    => ($v['accountName'] ?? null) ?: $v['name'],   // NOT NULL in the DB (key may be absent)
             'account_type'    => strtolower($v['accType'] ?? 'current'),
             'type'            => $type,
             'routing_number'  => $v['routing'] ?? null,
@@ -140,7 +147,7 @@ class BankController
             'currency'        => 'BDT',                              // NOT NULL, no frontend field for it — group's only currency today
             'balance'         => $v['balance'] ?? 0,
             'status'          => ($v['status'] ?? 'Active') === 'Active' ? 1 : 0,
-            'company_id'      => $this->companyId($v['companyId'] ?? null),
+            'company_id'      => $companyId,
             'updated_at'      => now(),
         ];
 

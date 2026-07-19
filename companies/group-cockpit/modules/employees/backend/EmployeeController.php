@@ -272,6 +272,16 @@ class EmployeeController
         $requesterIsAdmin = $self && ((int) $self->is_super_admin === 1 || $self->company_id === null);
         $companyId  = array_search($v['companyId'] ?? null, self::COMPANY_SLUG, true) ?: null;
 
+        // Company-scoped writer: force their own company, refuse editing
+        // another company's employee (super-admin / Group user is unrestricted).
+        $scope = $this->requesterCompanyId($request);
+        if ($scope) {
+            $companyId = $scope;
+            if ($existingId && (int) DB::table('users')->where('id', $existingId)->value('company_id') !== $scope) {
+                return response()->json(['success' => false, 'message' => 'Forbidden — not your company.'], 403);
+            }
+        }
+
         if ($existingId) {
             $row = ['name' => $v['name']];
             if (array_key_exists('email', $v)) $row['email'] = $v['email'];
