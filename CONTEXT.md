@@ -82,6 +82,86 @@ writes MUST call the NEW ledger logic, never the old system's).
 
 ---
 
+## 🚧 RESUME HERE — 2026-07-19 (cont'd) · GENUINE BUILD PHASE + LOGIN FIXES + FIRST WRITE ENDPOINT
+
+**Reframe (owner, 2026-07-19):** the no-build vanilla-SPA / custom-CSS / Tailwind /
+jQuery + Laravel + MySQL **stack itself is unchanged** (see MANDATORY STACK above) —
+what's changing is the *mode*: earlier work was zero-build UI review; from here on
+**everything gets coded for real**, module by module, frontend AND backend, no more
+mockup/demo shortcuts. This section is the live backend build roadmap — update it
+every session, work it top to bottom, one module at a time.
+
+**Live-site bugs fixed today (all pushed, all boot-swept 222/222 clean):**
+- `dcecae3` — a stale `EPAL_TOKEN` left the browser stuck on demo data with no
+  login screen and no way out. Boot failures now render a visible on-screen
+  overlay (`core/app.js` `.catch()`); the login gate shows the failure reason and
+  a **"Reset session"** link that clears the token and reloads; the user menu got
+  a real **Sign out** (`EPAL.api.logout()`) instead of only demo "Reset demo data".
+- `943fe0b` — the user-menu popover (`#user-card`, sidebar footer) always opened
+  *below* its anchor; anchored at the very bottom of the screen, that pushed it
+  off-screen and made Sign out look broken ("not working" — reported live). Fixed:
+  `popover()` now flips upward when there isn't room below.
+- `2a8bcde` — **first WRITE endpoint, proven against real MySQL**: Customers
+  (create/update/delete), see architecture note below.
+
+**WRITE-THROUGH ARCHITECTURE (the pattern every future write endpoint follows):**
+- Backend: each controller gets `store()` (upsert-by-id: an id that doesn't exist
+  yet = create, ignore the client's temp id, DB assigns the real one; an id that
+  exists = update in place) and `destroy($id)`. Same translation-seam shape as
+  `index()` — strip the frontend id prefix (`CUS-`, etc.) to get the real DB id.
+- Frontend: `platform/data/api.js` → `wireWrites()` hooks the **existing**
+  `data:changed` bus event that every `db.save()`/`db.remove()` call (and the
+  specific `saveXxx` helpers) already emits — see `platform/data/database.js`.
+  Adding a module to write support is a **two-file change**: the controller's
+  `store()`/`destroy()`, and one line in `api.js`'s `WRITABLE` map. **No call site
+  anywhere in the 500+ existing screens needs to change** — same swap-seam
+  discipline as the read/hydrate side. On create, the client's temp id is swapped
+  for the server's real id once the response lands; on failure the optimistic
+  local write is rolled back and the user is toasted.
+- **Test the loop for real before trusting it**: `php artisan serve --port=8899`
+  locally + curl POST/DELETE + a raw `mysql -u root modularerp -e "SELECT..."` to
+  confirm the row actually changed — not just "the endpoint returned success".
+
+**BACKEND ROADMAP — work this list top to bottom, one item at a time, commit +
+push + `git ls-remote` verify after each:**
+
+**Phase A — safe master-data writes** (mirror the Customer pattern exactly; none
+of these touch the ledger, so they're safe to wire directly):
+1. ~~Customers~~ — **DONE** (`2a8bcde`)
+2. Suppliers (`group/master-accounts/suppliers`)
+3. Banks — master fields only (name/branch/account no.); balance stays
+   read-only/ledger-derived, never directly editable
+4. Employees (`group/employees/directory`)
+5. Airlines (`travels/air-ticketing/airlines`)
+6. Airports (`travels/air-ticketing/airports`)
+7. Visa Categories (`travels/visa-processing/categories`)
+
+**Phase B — transactional writes** (money/inventory, moderate risk, no *shared*
+ledger posting required yet — just get the raw record persisting correctly):
+8. Payment Schedules (`group/master-accounts/schedules`)
+9. Air Ticketing Purchases (`travels/air-ticketing/purchases`)
+10. Visa Sales (`travels/visa-processing/sales`)
+
+**Phase C — the big one, design BEFORE code:** Chart of Accounts writes +
+corrected journal/ledger posting logic. **MUST NOT reuse the old system's posting
+logic** — see the bookkeeping audit (−377% margin from 2 proven bugs: ৳5.01Cr
+income never posted + salary double-booked). This is a from-scratch design task
+(seller model, correct VAT to 2130, etc.), not a mechanical CRUD rollout like
+Phases A/B. Do not start this until the owner has reviewed the audit's fix order.
+
+**Phase D:** real per-company logins (today `AuthController` only distinguishes
+group-vs-one-company via `company_id IS NULL` — no actual per-company user scoping
+beyond that).
+
+**Phase E:** roll out the other 4 companies' backends (Woodart, IT, Shop,
+Construction) — same proven modular pattern, only after Group + Travels' write
+layer (Phases A-C) is solid.
+
+**NEXT CONCRETE STEP:** Phase A item 2 — Suppliers, mirroring the Customer
+controller/routes/wireWrites pattern exactly.
+
+---
+
 ## RESUME HERE — 2026-07-16 · BACKEND MIGRATION (real data + modular Laravel), historical
 
 **Phase now:** connect the new dev UI to a **real Laravel backend + MySQL**, using
