@@ -105,7 +105,9 @@
     ]);
     page.appendChild(filters);
 
-    var grid = el('div.grid-auto.stagger');
+    // Wider cards (matches the Sister-Concerns cards) so the Present/Absent/
+    // Rating stat grid renders as a 2-column cross, not a single stacked column.
+    var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
     page.appendChild(grid);
 
     function draw() {

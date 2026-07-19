@@ -24,6 +24,27 @@
   'use strict';
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
 
+  /* Country flag → HTML chip. Regional-indicator flag emoji do NOT render on
+     Windows (they show as bare "NP"/"SG" letters), so we draw a coloured pill
+     with the 2-letter ISO code instead — identical on every OS. Accepts the
+     stored value whether it's a flag emoji (🇳🇵, demo + API) or already a
+     2-letter code; a missing/unknown flag falls back to a neutral globe chip.
+     Returns an HTML string (use with ui.frag / inside template HTML). */
+  function flagChip(flag) {
+    var code = '';
+    if (flag) {
+      var cp = flag.codePointAt(0);
+      if (cp >= 0x1F1E6 && cp <= 0x1F1FF) {            // two regional-indicator symbols
+        var cp2 = flag.codePointAt(2);
+        code = String.fromCharCode(65 + (cp - 0x1F1E6)) + (cp2 ? String.fromCharCode(65 + (cp2 - 0x1F1E6)) : '');
+      } else if (/^[A-Za-z]{2}$/.test(String(flag).trim())) {
+        code = String(flag).trim().toUpperCase();
+      }
+    }
+    if (!code) return '<span class="flag-chip" style="background:#6b7280"><i class="bi bi-globe2"></i></span>';
+    return '<span class="flag-chip" style="background:' + ui.colorFor(code) + '">' + code + '</span>';
+  }
+
   var STAGES = [
     { id:'New',           color:'#8b93a7', icon:'inbox' },
     { id:'Documents',     color:'#7b5cff', icon:'folder' },
@@ -263,7 +284,7 @@
       var rows = cats().map(function (c) {
         var margin = c.sale ? Math.round((c.sale-c.cost)/c.sale*100) : 0;
         return el('tr.row-click', { onclick: (function(cc){ return function () { categoryDetail(cc, draw); }; })(c) }, [
-          td('<span style="font-size:18px">'+c.flag+'</span> <span class="strong">'+ui.escapeHtml(c.country)+'</span>'),
+          td(flagChip(c.flag)+' <span class="strong">'+ui.escapeHtml(c.country)+'</span>'),
           td(c.type), tdN(ui.money(c.cost)), tdN(ui.money(c.sale)),
           td('<span class="badge badge-good">'+margin+'%</span>'), tdN(c.days+' days'),
           td('<span class="badge '+(c.status==='active'?'badge-good':'')+'">'+c.status+'</span>')
@@ -285,7 +306,7 @@
     var actions = el('div.flex.gap-1.items-center', { style: { marginLeft: 'auto' } });
     actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { editCategory(c, refresh || function () { EPAL.router.render(); }); } }));
     body.appendChild(el('div.card', null, [ el('div.card-body', null, [ el('div.flex.items-center.gap-2.flex-wrap', null, [
-      ui.frag('<span class="notif-ico notif-info" style="font-size:20px">' + c.flag + '</span>'),
+      ui.frag('<span class="notif-ico notif-info" style="background:transparent">' + flagChip(c.flag) + '</span>'),
       el('div.flex-1', { style: { minWidth: '180px' } }, [ el('div.fw-700', { style: { fontSize: '17px' }, text: c.country + ' — ' + c.type }),
         el('div.flex.items-center.gap-2', null, [ el('span.badge.badge-good', { text: margin + '% margin' }), el('div.text-mute.sm', { text: c.days + ' days processing' }), el('span.badge' + (c.status === 'active' ? '.badge-good' : ''), { text: c.status }) ]) ]),
       actions ]) ]) ]));
@@ -296,7 +317,7 @@
     if (appsFor.length) {
       var trs = appsFor.slice().sort(function (x, y) { return (x.created < y.created) ? 1 : -1; }).slice(0, 10).map(function (x) {
         return el('tr.row-click', { onclick: (function (ap) { return function () { appDetail(ap); }; })(x) }, [
-          td('<span class="strong">' + x.id + '</span>'), td((x.flag || '') + ' ' + ui.escapeHtml(x.applicant)), td(stBadge(x.stage).outerHTML), tdN(ui.money(fees(x).customerTotal)) ]);
+          td('<span class="strong">' + x.id + '</span>'), td(flagChip(x.flag) + ' ' + ui.escapeHtml(x.applicant)), td(stBadge(x.stage).outerHTML), tdN(ui.money(fees(x).customerTotal)) ]);
       });
       body.appendChild(el('div.section-label', { text: 'Applications — ' + c.country + ' ' + c.type }));
       body.appendChild(tableCard(null, ['App', 'Applicant', 'Stage', 'Total'], trs, ''));
@@ -454,7 +475,7 @@
     var card = el('div.kb-card', { draggable:'true', 'data-id':a.id, onclick:function(){ appDetail(a, refresh); } });
     card.addEventListener('dragstart', function(e){ e.dataTransfer.setData('text/plain', a.id); card.classList.add('dragging'); });
     card.addEventListener('dragend', function(){ card.classList.remove('dragging'); });
-    card.appendChild(el('div.flex.items-center.gap-1.mb-1', null, [ el('span',{style:{fontSize:'18px'},text:a.flag}),
+    card.appendChild(el('div.flex.items-center.gap-1.mb-1', null, [ ui.frag(flagChip(a.flag)),
       el('span.kb-card-title',{style:{margin:0},text:a.applicant}) ]));
     card.appendChild(el('div.text-mute.xs', { text: a.country+' · '+a.visaType+' · '+a.id }));
     var miss = missingDocs(a);
@@ -582,7 +603,7 @@
     var rows = a.map(function (x) {
       var f=fees(x);
       return el('tr.row-click', { onclick: function () { appDetail(x); } }, [
-        td('<span class="strong">'+x.id+'</span>'), td(x.flag+' '+ui.escapeHtml(x.applicant)),
+        td('<span class="strong">'+x.id+'</span>'), td(flagChip(x.flag)+' '+ui.escapeHtml(x.applicant)),
         td(x.country+' · '+x.visaType), tdN(ui.money(f.embassy)), tdN(ui.money(f.vfs)),
         td('<span class="num text-good">'+ui.money(f.service)+'</span>'), tdN(ui.money(f.customerTotal)),
         td(payBadge(x.payStatus).outerHTML), td(stBadge(x.stage).outerHTML),
@@ -616,12 +637,14 @@
 
   /* ======================================================= VISA RATES */
   function visaRates(page) {
-    var grid = el('div.grid-auto.stagger');
+    // Wider cards (matches the Sister-Concerns cards) so the Cost/Sale/Margin/
+    // Days stat grid renders as a 2x2 cross, not a single stacked column.
+    var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
     cats().forEach(function (c) {
       var margin = c.sale ? Math.round((c.sale-c.cost)/c.sale*100) : 0;
       grid.appendChild(el('div.card.hover', { style:{cursor:'pointer'}, onclick:function(){ editCategory(c, function(){ EPAL.router.render(); }); } }, [
         el('div.card-pad', null, [
-          el('div.flex.items-center.gap-2', null, [ el('span',{style:{fontSize:'26px'},text:c.flag}),
+          el('div.flex.items-center.gap-2', null, [ ui.frag(flagChip(c.flag)),
             el('div.flex-1', null, [ el('div.fw-700',{text:c.country}), el('div.text-muted.sm',{text:c.type+' Visa'}) ]),
             el('span.badge'+(c.status==='active'?'.badge-good':''),{text:c.status}) ]),
           el('div.stat-row.mt-3', null, [
@@ -641,7 +664,7 @@
       var due = new Date(new Date(a.created).getTime() + cat.days*86400000);
       var overdue = a.stage==='Under Process' && due < new Date();
       return el('tr.row-click', { onclick:(function(ap){ return function(){ appDetail(ap); }; })(a) }, [
-        td(a.flag+' <span class="strong">'+ui.escapeHtml(a.applicant)+'</span>'),
+        td(flagChip(a.flag)+' <span class="strong">'+ui.escapeHtml(a.applicant)+'</span>'),
         td(a.country+' · '+a.visaType), td(ui.date(a.created)),
         td('<span class="'+(overdue?'text-bad':'')+'">'+ui.date(due)+'</span>'),
         td(stBadge(a.stage).outerHTML),
@@ -675,16 +698,17 @@
       var list = DOC_REQS_COUNTRY[country];
       cgrid.appendChild(el('div.card', null, [
         el('div.card-head', null, [
-          el('h3',{html:(flags[country]?flags[country]+' ':ui.icon('geo-alt-fill')+' ')+ui.escapeHtml(country)}),
-          // compact Print + Send, right in the card header (no extra row)
-          el('div.flex.items-center.gap-2', null, [
-            el('span.card-sub',{text:list.length}),
-            ui.rowActions(ui.actions({
-              print: function(){ printDocList(country, list); },
-              wa:    { phone:'', text: docListMsg(country, list) },
-              gmail: { to:'', subject:'Required documents — '+country+' visa', body: docListMsg(country, list) }
-            }))
-          ])
+          // flag + country on one line, "N documents" as the subtitle below it
+          el('div', null, [
+            el('h3',{html:(flags[country]?flagChip(flags[country])+' ':ui.icon('geo-alt-fill')+' ')+ui.escapeHtml(country)}),
+            el('div.card-sub',{text:list.length+' documents'})
+          ]),
+          // Print + Send actions, kept to the right (own room so they never clip)
+          ui.rowActions(ui.actions({
+            print: function(){ printDocList(country, list); },
+            wa:    { phone:'', text: docListMsg(country, list) },
+            gmail: { to:'', subject:'Required documents — '+country+' visa', body: docListMsg(country, list) }
+          }))
         ]),
         el('div.card-body', null, [ el('div.data-list', null, list.map(function (d){
           return el('div.data-row', null, [ ui.frag('<span class="notif-ico notif-info">'+ui.icon('file-earmark-text')+'</span>'),
@@ -698,15 +722,17 @@
     var grid = el('div.grid-auto.stagger');
     Object.keys(DOC_REQS).forEach(function (type) {
       grid.appendChild(el('div.card', null, [
-        el('div.card-head', null, [ el('h3',{html:ui.icon('folder-check')+' '+type+' Visa'}),
-          el('div.flex.items-center.gap-2', null, [
-            el('span.card-sub',{text:DOC_REQS[type].length+' documents'}),
-            ui.rowActions(ui.actions({
-              print: (function(t,l){ return function(){ printDocList(t+' Visa', l); }; })(type, DOC_REQS[type]),
-              wa:    { phone:'', text: docListMsg(type+' Visa', DOC_REQS[type]) },
-              gmail: { to:'', subject:'Required documents — '+type+' Visa', body: docListMsg(type+' Visa', DOC_REQS[type]) }
-            }))
-          ]) ]),
+        el('div.card-head', null, [
+          el('div', null, [
+            el('h3',{html:ui.icon('folder-check')+' '+type+' Visa'}),
+            el('div.card-sub',{text:DOC_REQS[type].length+' documents'})
+          ]),
+          ui.rowActions(ui.actions({
+            print: (function(t,l){ return function(){ printDocList(t+' Visa', l); }; })(type, DOC_REQS[type]),
+            wa:    { phone:'', text: docListMsg(type+' Visa', DOC_REQS[type]) },
+            gmail: { to:'', subject:'Required documents — '+type+' Visa', body: docListMsg(type+' Visa', DOC_REQS[type]) }
+          }))
+        ]),
         el('div.card-body', null, [ el('div.data-list', null, DOC_REQS[type].map(function (d){
           return el('div.data-row', null, [ ui.frag('<span class="notif-ico notif-info">'+ui.icon('file-earmark-text')+'</span>'),
             el('div.flex-1.sm',{text:d}) ]); })) ])
@@ -783,7 +809,7 @@
     return EPAL.table({
       columns:[
         { key:'id', label:'App', render:function(x){ return '<span class="mono xs text-mute">'+ui.escapeHtml(x.id||'')+'</span>'; } },
-        { key:'applicant', label:'Applicant', render:function(x){ return '<span class="strong">'+(x.flag||'')+' '+ui.escapeHtml(x.applicant||'—')+'</span>'; } },
+        { key:'applicant', label:'Applicant', render:function(x){ return '<span class="strong">'+flagChip(x.flag)+' '+ui.escapeHtml(x.applicant||'—')+'</span>'; } },
         { key:'country', label:'Destination' }, { key:'visaType', label:'Type', badge:{} },
         { key:'stage', label:'Stage', render:function(x){ return stBadge(x.stage).outerHTML; }, sortVal:function(x){ return x.stage; } },
         { key:'total', label:'Sale', num:true, sortVal:function(x){ return fees(x).customerTotal; }, render:function(x){ return ui.money(fees(x).customerTotal); } },
@@ -798,7 +824,7 @@
   function countryTable(rows){
     return EPAL.table({
       columns:[
-        { key:'country', label:'Destination', render:function(r){ return '<span class="strong">'+(r.flag||'')+' '+ui.escapeHtml(r.country)+'</span>'; } },
+        { key:'country', label:'Destination', render:function(r){ return '<span class="strong">'+flagChip(r.flag)+' '+ui.escapeHtml(r.country)+'</span>'; } },
         { key:'apps', label:'Apps', num:true }, { key:'revenue', label:'Sales', num:true, money:true },
         { key:'profit', label:'Profit', num:true, sortVal:function(r){ return r.profit; }, render:function(r){ return '<span class="num '+(r.profit>=0?'text-good':'text-bad')+'">'+ui.money(r.profit)+'</span>'; } },
         { key:'approval', label:'Approval', num:true, sortVal:function(r){ return r.decided? r.approved/r.decided*100 : 0; }, render:function(r){ return '<span class="num">'+(r.decided?Math.round(r.approved/r.decided*100):0)+'%</span>'; } }

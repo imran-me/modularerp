@@ -47,6 +47,11 @@
 .card.hover:hover { border-color: var(--card-hover); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); transform: translateY(-2px); }
 .card-pad { padding: 20px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+/* A long title must yield space, not shove the header's action icons out of
+   the card (the card clips overflow, so pushed-out actions vanish). The title
+   shrinks; the row-actions keep their full width and stay inside the card. */
+.card-head > h3 { min-width: 0; }
+.card-head .row-actions { flex: none; }
 .card-head h3 { font-size: var(--fs-lead); font-weight: 700; display: flex; align-items: center; gap: 9px; }
 .card-head h3 i { color: var(--accent); }
 .card-head .card-sub { font-size: var(--fs-tiny); color: var(--text-mute); font-weight: 400; }
@@ -209,7 +214,7 @@
        odd count fills its row instead of leaving a hole. Note that pinning to
        2 columns is NOT sufficient on its own — 3 stats in 2 columns still
        leaves the 4th area lit; it's the span that actually closes it. */
-.stat-row { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); background: var(--stat-divider); border-radius: var(--r-md); overflow: hidden; }
+.stat-row { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); background: var(--border); border-radius: var(--r-md); overflow: hidden; }
 .stat-row.stat-2 { grid-template-columns: repeat(2, 1fr); }
 .stat-row.stat-2 .stat:last-child:nth-child(odd) { grid-column: 1 / -1; }
 @media (max-width: 520px) {                      /* phones: one clean column */
@@ -218,6 +223,17 @@
 .stat { background: var(--surface); padding: 14px 16px; }
 .stat-label { font-size: var(--fs-tiny); color: var(--text-mute); font-weight: 600; }
 .stat-value { font-size: var(--fs-h3); font-weight: 700; margin-top: 4px; }
+
+/* Flag chip — a country badge that renders IDENTICALLY on every OS. Regional-
+   indicator flag emoji don't render on Windows (they degrade to bare "NP"/"SG"
+   letters), so instead of an emoji we draw a small coloured pill carrying the
+   2-letter ISO code. Per-country background colour is set inline (deterministic
+   from the code) so countries stay visually distinct, like real flags. */
+.flag-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 21px;
+  padding: 0 6px; border-radius: 5px; vertical-align: middle; color: #fff; font-weight: 800; font-size: 11px;
+  letter-spacing: .6px; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.22), 0 1px 2px rgba(0,0,0,.2); }
+.flag-chip .bi { font-size: 12px; }
 
 /* --------------------------------------------------- Company performance */
 .co-strip { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
