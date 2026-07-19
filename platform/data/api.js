@@ -61,7 +61,8 @@
   var WRITABLE = {
     customers: 'group/master-accounts/customers',
     suppliers: 'group/master-accounts/suppliers',
-    banks:     'group/master-accounts/banks'
+    banks:     'group/master-accounts/banks',
+    employees: 'group/employees/directory'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()

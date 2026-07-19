@@ -17,3 +17,5 @@ use Illuminate\Support\Facades\Route;
 // `employee_profiles`), returned in the shape the frontend employees store
 // (db.employees()) expects.
 Route::get('group/employees/directory', [EmployeeController::class, 'index']);
+Route::post('group/employees/directory', [EmployeeController::class, 'store']);
+Route::delete('group/employees/directory/{id}', [EmployeeController::class, 'destroy']);
