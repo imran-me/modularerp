@@ -84,8 +84,14 @@ class ModuleServiceProvider extends ServiceProvider
             $routes = "$dir/routes.php";
             if (is_file($routes)) {
                 // Each module owns its own path segment inside the group; the
-                // provider only supplies the shared /api prefix + api middleware.
-                Route::middleware('api')->prefix('api')->group($routes);
+                // provider supplies the shared /api prefix + api middleware AND
+                // requires a real signed-in user (auth:sanctum) — enforced HERE,
+                // centrally, so a module can never accidentally ship a route
+                // that exposes real financial/customer data with no login
+                // check. A module's own routes.php should never need to (and
+                // must not) add its own auth middleware; this is the one place
+                // it happens for every module, present or future.
+                Route::middleware(['api', 'auth:sanctum'])->prefix('api')->group($routes);
             }
             if (is_dir("$dir/migrations")) {
                 $this->loadMigrationsFrom("$dir/migrations");
