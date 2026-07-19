@@ -12,6 +12,84 @@
 
 ---
 
+## 🚧 RESUME HERE — 2026-07-19 (late) · WRITE ENDPOINTS + LIVE UI POLISH SPRINT
+
+Big session on top of the live deploy. Everything below is pushed + boot-swept
+(222/222, both themes) + backend pieces tested against real local MySQL.
+
+**Write endpoints (real create/update/delete → real DB), all following one
+pattern** — controller `store()`/`destroy()` + one line in `api.js`'s `WRITABLE`
+map + the existing `wireWrites()` bus hook, NO screen call-site touched:
+- Phase A (safe master data): Customers, Suppliers, Banks, Employees, Airlines,
+  Airports, Visa Categories — all live.
+- Phase B (transactional): Payment Schedules done. Air Ticketing Purchases is
+  **parked mid-build, UNCOMMITTED in the working tree** (TicketPurchaseController
+  has store()/destroy() written but untested — finish + test before committing).
+  Visa Sales write not started.
+- Employees is the careful one: `users` IS the login table, so writes are narrow
+  (create gets an unusable random password; role→is_super_admin escalation is
+  checked against the REQUESTER's own token, never the client), and creates run
+  in a DB::transaction() (testing caught a real orphaned-row bug).
+
+**Real-data card fixes (the live UI looked "changed" — it was demo-fabricated
+fields the API returned as 0/placeholder; ZERO view/CSS was touched for these):**
+- Visa flags: real, from the country's ISO code. Employee Present/Absent/Leave:
+  real from the `attendances` table. Employee **Hours + Overtime**: real, from
+  check_in/check_out punches, 9h/day standard (overtime = beyond 9h/day). The
+  employee card now shows Present·Absent·Hours·Overtime. Customer "since": real
+  created_at. Discovery: the live DB is a FRESH ERP — master data present but
+  almost no transactions (sales/party_invoices empty), so value/tier/revenue
+  cards are legitimately near-zero and fill in as real transactions get recorded.
+
+**Real flags, name-driven & global (`platform/core/flags.js`):**
+`EPAL.flag(nameOrCodeOrEmoji)` → real flag rendered by the bundled Twemoji flag
+webfont (`platform/design-system/fonts/TwemojiCountryFlags.woff2`, @font-face +
+unicode-range in tokens.css). Full ISO-3166 NAME→code table + aliases (UK→gb,
+USA→us, UAE→ae, Korea/Schengen…), so any country by name auto-renders, new ones
+included. Chose the webfont over flag-icons (identical flags, 1×78KB file vs
+~260 SVGs — respects the free/static rule).
+
+**UI/design changes (owner-directed this session):**
+- Single-line SCROLLABLE nav (reverses the old "wrap never scroll" rule — at 100%
+  zoom the wrapping read as broken). `.pill-tab/.nav-row/.co-sw/.tab-underline`
+  now nowrap + overflow-x + a VISIBLE thin scrollbar (so off-screen tabs stay
+  findable). `.scroll-row` utility for the company switcher.
+- Numbers never break: `.tbl` numeric cells + inline `.num/.mono` are
+  white-space:nowrap; wide tables scroll in their `.table-wrap` instead of
+  fracturing a figure ("৳300,0⏎00" bug).
+- Card hover border = violet `--card-hover #7c5cff`. (Charcoal border experiments
+  were REVERTED — keep card outlines the original faint `--border`.)
+- Employee/Visa-Rates card grids widened to minmax(300px) so their stat grids
+  render as a 2-col cross like the Sister-Concerns cards.
+- card-head overflow guard: long titles shrink so the print/wa/gmail action
+  icons never get clipped out of the card.
+- Employee: Status edit (Active/On leave) in the edit form + Delete in the
+  profile. Required-Documents cards: flag+country on line 1, "N documents"
+  subtitle below.
+
+**Bank Accounts feature (Master Accounts, mirrors the old ERP):**
+- NEW "Overview" tab = default landing = dashboard of EVERY sister-concern bank
+  account as clickable cards.
+- Click a card → `bankAccountDetail()`: that account's ledger, newest-first,
+  running Dr/Cr balance, In/Out/All + date-range (+Today) filters, Print of the
+  filtered view (all/day/range/in/out) + per-row single-transaction print, CSV.
+- Manage Banks per-company strip now respects the selected company scope.
+- Transaction data = `bank_txns` store; empty on the live fresh system until a
+  bank-transactions endpoint + real movements exist (structure done).
+
+**DEPLOY-LAG LESSON:** the owner tests the live site, which trails each push by
+the 1-min cron pull + browser cache. Several "it's broken" reports were
+already-fixed things showing a cached build. Tell them to hard-refresh
+(Ctrl+Shift+R) before diagnosing.
+
+**NEXT:** (1) finish + test the parked Air Ticketing Purchases write, then Visa
+Sales write; (2) build the real Employee performance-review/rating feature (owner
+chose this over a fake rating — card currently omits rating); (3) resume backend
+Phase C (corrected ledger — owner-review-gated) / D / E. See memory
+`epal-backend-migration` for the full phase map.
+
+---
+
 ## 🚧 RESUME HERE — 2026-07-19 · FRONTEND SWAP + DEPLOY-RESTRUCTURE DONE, PUSHED
 
 **Commit identity (owner directive):** every commit in this repo is authored as
