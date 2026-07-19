@@ -301,8 +301,11 @@
      that tab (same slot, so the order stays predictable); a new id is inserted
      right after Hard Cash, next to the book it belongs with. */
   function deskTabs(cid, opts) {
-    var tabs = BASE_TABS.filter(function (t) { return t[0] !== 'sales' || scopeHasPos(cid); })
-      .map(function (t) { return t.slice(); });
+    // Owner 2026-07-19: show "Cash in Sell" on EVERY company (not only where a
+    // POS till exists) — each concern takes cash against sales. Companies with
+    // no POS show its honest empty state until cash sales are recorded.
+    void scopeHasPos;   // retained for reference; no longer gates the tab
+    var tabs = BASE_TABS.map(function (t) { return t.slice(); });
     ((opts && opts.tabs) || []).forEach(function (x) {
       var i = -1;
       tabs.forEach(function (t, n) { if (t[0] === x[0]) i = n; });
@@ -494,14 +497,14 @@
           sortVal: keptOf, exportVal: keptOf }
       ],
       rows: rows, pageSize: 15, searchKeys: ['id', 'customer'], quickFilter: 'payStatus',
-      exportName: 'cash-sales.csv', pdfTitle: 'Cash Sales (POS)',
-      empty: { icon: 'basket', title: 'No cash sales yet', hint: 'Counter sales paid in cash (Shop POS) appear here.' }
+      exportName: 'cash-sales.csv', pdfTitle: 'Cash Sales — ' + coName(cid === 'all' ? 'group' : cid),
+      empty: { icon: 'basket', title: 'No cash sales yet for ' + coName(cid === 'all' ? 'group' : cid), hint: 'Cash taken at the counter against a sale appears here once recorded.' }
     });
     page.appendChild(el('div.card', null, [
-      el('div.card-head', null, [el('h3', { html: ui.icon('basket') + ' Cash Taken at the Counter' }),
-        el('span.card-sub', { text: 'read-only — recorded at the POS' })]),
+      el('div.card-head', null, [el('h3', { html: ui.icon('basket') + ' Cash Taken at the Counter — ' + coName(cid === 'all' ? 'group' : cid) }),
+        el('span.card-sub', { text: 'read-only — recorded against sales' })]),
       el('div.card-body', null, [
-        el('div.text-mute.sm.mb-2', { html: 'Book-keeping note: the GL posts every POS sale to <span class="mono">1200 Accounts Receivable</span>, so the drawer money below is not on <span class="mono">1000 Cash</span> until it is collected — post a <b>Cash In</b> (defaults to 1200) from the Hard Cash book to bring it on.' }),
+        el('div.text-mute.sm.mb-2', { html: 'Book-keeping note: the GL posts a cash sale to <span class="mono">1200 Accounts Receivable</span>, so the drawer money below is not on <span class="mono">1000 Cash</span> until it is collected — post a <b>Cash In</b> (defaults to 1200) from the Hard Cash book to bring it on.' }),
         t.el
       ])
     ]));
