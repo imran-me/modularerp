@@ -61,6 +61,12 @@ build BE (Laravel clean arch) → DB schema+migrations → models+relations →
 controllers/services/repos/validation → preserve every behaviour/rule → verify UI
 visually identical (screenshot-diff harness) → sign off → next.
 
+**WORKING METHOD (owner, 2026-07-19 — binding):** always start with ONE module,
+ONE SECTION. Complete that section perfectly, then **cross-check it 10 times**
+(pixel-diff, behaviour, data round-trip, both themes, zoom levels, console-clean,
+API-vs-demo, print/export paths, edge inputs, regression sweep). Only after a
+100% pass move to the next section. Update CONTEXT.md after every section.
+
 **⚠️ OPEN DECISION before large-scale conversion (see chat 2026-07-19):** "pure
 Tailwind + pixel-identical + module-by-module + don't touch other modules" is in
 tension with the SHARED custom-CSS component system (platform/design-system +
