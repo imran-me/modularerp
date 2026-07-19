@@ -40,12 +40,13 @@
   // category + sub-category screen switch with buttons at the top of it.
   // OWNER ORDER: Banks → Payroll → Schedules → Journals → Expenses →
   // Accounts → Party Types (Manage Banks is the landing section)
-  var SECTIONS = [['overview', 'Overview'], ['banks', 'Manage Banks'], ['cash', 'Manage Cash'], ['payroll', 'Master Payroll'], ['schedules', 'Payment Schedules'],
+  var SECTIONS = [['banks', 'Manage Banks'], ['cash', 'Manage Cash'], ['payroll', 'Master Payroll'], ['schedules', 'Payment Schedules'],
     ['journals', 'Manage Journals'], ['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'],
     ['party-types', 'Party Types'], ['loans', 'Manage Loan']];
   var EXP_TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Category & Sub-category']];
   var expTab = 'all';                                 // active button inside Operational Expenses
   var selCo = 'all';                                  // the company switcher state
+  var banksDash = true;                               // Manage Banks: Overview (card dashboard) vs per-company table
   // (the expense-report period state moved WITH the report into
   //  platform/kit/expenses.js — see the dispatch below)
   var taxYm = TODAY_STR.slice(0, 7);                  // VAT/AIT return period (P3)
@@ -223,10 +224,10 @@
    * ========================================================================*/
   EPAL.view('group/master-accounts', {
     render: function (ctx) {
-      var sub = ctx.subId || 'overview';
+      var sub = ctx.subId || 'banks';
       // legacy deep-links from the pre-consolidation layout land on the right tab
       if (sub === 'categories' || sub === 'budget' || sub === 'report') { expTab = sub; sub = 'expenses'; }
-      if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'overview';
+      if (!SECTIONS.some(function (s) { return s[0] === sub; })) sub = 'banks';
       var page = el('div.page');
       if (sub === 'loans' && selCo === 'all') { /* the loan desk reads 'all' fine */ }
       var titles = {}; SECTIONS.forEach(function (s) { titles[s[0]] = s[1]; });
@@ -248,11 +249,20 @@
       // On Master Payroll it rides IN the desk's section row (owner mark);
       // everywhere else it is its own row under the tabs.
       var swWrap = el('div.flex.gap-1.scroll-row.mb-3');
+      // Manage Banks gets an "Overview" button at the FRONT of the company row
+      // (owner 2026-07-19): it shows the all-companies bank card DASHBOARD;
+      // picking a company shows that company's Manage-Banks table instead.
+      if (sub === 'banks') {
+        swWrap.appendChild(el('button.btn.btn-sm' + (banksDash ? '.btn-primary' : '.btn-outline'), {
+          html: ui.icon('grid-3x3-gap-fill') + ' Overview',
+          onclick: function () { banksDash = true; EPAL.router.render(); } }));
+      }
       var swOpts = [['all', 'All Companies'], ['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; }));
       swOpts.forEach(function (o) {
         if (sub === 'payroll' && o[0] === 'all') return;      // payroll needs one company
-        swWrap.appendChild(el('button.btn.btn-sm' + ((selCo === o[0]) ? '.btn-primary' : '.btn-outline'), {
-          text: o[1], onclick: function () { selCo = o[0]; EPAL.router.render(); } }));
+        var active = (selCo === o[0]) && !(sub === 'banks' && banksDash);
+        swWrap.appendChild(el('button.btn.btn-sm' + (active ? '.btn-primary' : '.btn-outline'), {
+          text: o[1], onclick: function () { selCo = o[0]; if (sub === 'banks') banksDash = false; EPAL.router.render(); } }));
       });
       // payroll + expenses have their own sub-section row — the switcher
       // rides IN that row (one line, hairline separator); other sections
@@ -277,8 +287,8 @@
         page.appendChild(expRow);
         ({ all: expensesView, budget: budgetView, report: reportView, categories: categoriesView }[expTab] || expensesView)(page);
       } else {
-        ({ overview: overviewView, accounts: accountsView, journals: journalsView, schedules: schedulesView,
-           'party-types': partyTypesView, payroll: payrollView, banks: banksView, loans: loansSection, cash: cashSection }[sub])(page);
+        ({ accounts: accountsView, journals: journalsView, schedules: schedulesView, 'party-types': partyTypesView,
+           payroll: payrollView, banks: (banksDash ? overviewView : banksView), loans: loansSection, cash: cashSection }[sub])(page);
       }
       ctx.mount.appendChild(page);
     }
@@ -1179,10 +1189,16 @@
     if (!banks.length) { page.appendChild(el('div.card', null, [ el('div.card-pad.text-mute', { text: 'No bank accounts in this scope.' }) ])); return; }
 
     var txns = S.list('bank_txns');
+    var detailHost = el('div.mt-3');        // the clicked account's ledger renders INLINE here (not a modal)
     var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
     banks.forEach(function (b) {
       var last = txns.filter(function (t) { return t.bankId === b.id; }).sort(function (x, y) { return (x.date < y.date ? 1 : -1); })[0];
-      grid.appendChild(el('div.card.hover', { style: { cursor: 'pointer' }, onclick: function () { bankAccountDetail(b); } }, [
+      var card = el('div.card.hover', { style: { cursor: 'pointer' }, onclick: function () {
+          ui.$$('.card', grid).forEach(function (c) { c.classList.remove('sel'); });
+          card.classList.add('sel');
+          bankAccountDetail(b, detailHost);
+          detailHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } }, [
         el('div.card-pad', null, [
           el('div.flex.items-center.gap-2.mb-2', null, [
             el('div.avatar', { style: { background: ui.colorFor(b.name), width: '34px', height: '34px', fontSize: '13px' },
@@ -1196,9 +1212,13 @@
           el('div.num.strong' + ((+b.balance || 0) < 0 ? '.text-bad' : ''), { style: { fontSize: '22px' }, text: ui.money(b.balance) }),
           el('div.text-mute.xs.mt-1', { text: (b.account ? 'A/C ' + b.account + ' · ' : '') + (last ? 'Last: ' + ui.date(last.date) : 'No transactions yet') })
         ])
-      ]));
+      ]);
+      grid.appendChild(card);
     });
     page.appendChild(grid);
+    page.appendChild(detailHost);
+    // auto-open the first account so the ledger area is never blank
+    if (banks.length) { grid.firstChild.classList.add('sel'); bankAccountDetail(banks[0], detailHost); }
   }
 
   /* ---- BANK ACCOUNT DETAIL — click an account card → its full ledger.
@@ -1206,7 +1226,7 @@
    * date-range + direction (in/out) filters, and print (the current filtered
    * view = all · a single day · a custom range · only-in · only-out) plus a
    * per-row print for a single transaction. Mirrors the production ERP. */
-  function bankAccountDetail(bank) {
+  function bankAccountDetail(bank, host) {
     var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in'; };
     var all = S.list('bank_txns').filter(function (t) { return t.bankId === bank.id; });
     all.forEach(function (t, i) { t._seq = i; });
@@ -1228,76 +1248,101 @@
       }).sort(newestFirst);
     }
     function stat(l, v, cls) { return el('div.stat', null, [ el('div.stat-label', { text: l }), el('div.stat-value.num' + (cls || ''), { html: v }) ]); }
-    function printRows(list, label) {
-      var head = '<tr><th>Date</th><th>Reference</th><th>Description</th><th style="text-align:right">Debit (In)</th><th style="text-align:right">Credit (Out)</th><th style="text-align:right">Balance</th></tr>';
-      var rows = list.map(function (t) {
-        var v = +t._after || 0;
-        return '<tr><td>' + esc(ui.date(t.date)) + '</td><td>' + esc(t.ref || '') + '</td><td>' + esc(t.desc || t.type || '') + '</td>' +
-          '<td style="text-align:right">' + (isIn(t) ? ui.money(t.amount) : '') + '</td>' +
-          '<td style="text-align:right">' + (!isIn(t) ? ui.money(t.amount) : '') + '</td>' +
-          '<td style="text-align:right">' + ui.money(Math.abs(v)) + (v < 0 ? ' Cr' : ' Dr') + '</td></tr>';
-      }).join('');
-      ui.printDoc({ title: bank.name + ' — Bank Statement', subtitle: coName(bank.companyId || 'group') + ' · ' + (label || 'All transactions'),
-        meta: 'Account: ' + (bank.account || '—') + ' · Balance: ' + ui.money(bank.balance), footer: 'Epal Group — Bank Account Statement',
-        bodyHtml: '<table>' + head + rows + '</table>' });
-    }
+    function drcr(v) { v = +v || 0; return ui.money(Math.abs(v)) + (v < 0 ? ' Cr' : ' Dr'); }
     function printLabel() {
       var d = state.dir === 'in' ? 'In only' : state.dir === 'out' ? 'Out only' : 'All';
       var r = (state.from || state.to) ? ((state.from || '…') + ' → ' + (state.to || '…')) : 'All dates';
       return d + ' · ' + r;
     }
+    function printRows(list, label) {
+      var head = '<tr><th>#</th><th>Date</th><th>Reference</th><th>Source</th><th>Description / Note</th>' +
+        '<th style="text-align:right">Debit</th><th style="text-align:right">Credit</th><th style="text-align:right">Balance</th></tr>';
+      var rows = list.map(function (t, i) {
+        var v = +t._after || 0;
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(ui.date(t.date)) + '</td><td>' + esc(t.ref || '') + '</td>' +
+          '<td>' + esc(t.source || t.type || '') + '</td><td>' + esc(t.desc || t.type || '') + '</td>' +
+          '<td style="text-align:right">' + (isIn(t) ? ui.money(t.amount) : '') + '</td>' +
+          '<td style="text-align:right">' + (!isIn(t) ? ui.money(t.amount) : '') + '</td>' +
+          '<td style="text-align:right">' + drcr(v) + '</td></tr>';
+      }).join('');
+      ui.printDoc({ title: bank.name + ' — Bank Statement', subtitle: coName(bank.companyId || 'group') + ' · ' + (label || 'All transactions'),
+        meta: 'Account: ' + (bank.account || '—') + ' · Closing Balance: ' + drcr(+bank.balance || 0), footer: 'Epal Group — Bank Account Statement',
+        bodyHtml: '<table>' + head + rows + '</table>' });
+    }
 
-    var body = el('div');
-    ui.modal({ title: bank.name + ' · ' + coName(bank.companyId || 'group'), icon: 'bank', size: 'lg', body: body, footer: false });
-
+    // INLINE ledger — renders into `host` at the bottom of the Overview page
+    // (owner: not a modal), styled like the production ERP bank detail.
     function draw() {
-      body.innerHTML = '';
+      host.innerHTML = '';
       var rows = rowsNow();
       var tin = rows.filter(isIn).reduce(function (a, t) { return a + (+t.amount || 0); }, 0);
       var tout = rows.filter(function (t) { return !isIn(t); }).reduce(function (a, t) { return a + (+t.amount || 0); }, 0);
+      var opening = rows.length ? (+rows[rows.length - 1]._before || 0) : (+bank.balance || 0);
+      var closing = rows.length ? (+rows[0]._after || 0) : (+bank.balance || 0);
 
-      body.appendChild(el('div.stat-row.mb-2', null, [
-        stat('Account No.', esc(bank.account || '—')),
-        stat('Type', esc((bank.type || 'Bank') + ' · ' + (bank.accType || 'Current'))),
-        stat('Closing Balance', ui.money(bank.balance), (+bank.balance || 0) < 0 ? '.text-bad' : ''),
-        stat('Transactions', String(rows.length))
-      ]));
-      body.appendChild(el('div.stat-row.mb-3', null, [
-        stat('Total In (Debit)', '<span class="text-good">' + ui.money(tin) + '</span>'),
-        stat('Total Out (Credit)', '<span class="text-bad">' + ui.money(tout) + '</span>'),
-        stat('Net Movement', ui.money(tin - tout))
+      // ---- header band (bank name + scope + Print) ----
+      host.appendChild(el('div.card.mb-2', { style: { background: 'linear-gradient(135deg, var(--epal-royal,#123499), var(--accent,#1A43BF))', border: 'none', color: '#fff' } }, [
+        el('div.card-pad.flex.items-center.gap-2.flex-wrap', null, [
+          el('div.flex-1.min-w-0', null, [
+            el('div.fw-700', { style: { fontSize: '18px' }, html: ui.icon('bank') + ' ' + esc(bank.name) }),
+            el('div', { style: { opacity: '.85', fontSize: '12px' }, text: coName(bank.companyId || 'group') + (bank.branch ? ' · ' + bank.branch : '') + (state.from || state.to ? '  ·  ' + (state.from || '…') + ' → ' + (state.to || '…') : '') })
+          ]),
+          el('button.btn.btn-sm', { style: { background: '#fff', color: 'var(--accent, #1A43BF)', fontWeight: '700' },
+            html: ui.icon('printer') + ' Print', onclick: function () { printRows(rows, printLabel()); } })
+        ])
       ]));
 
+      // ---- account info row ----
+      host.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null, [
+        el('div.stat-row', null, [
+          stat('Account Name', esc(bank.accountName || coName(bank.companyId || 'group'))),
+          stat('Account Number', esc(bank.account || '—')),
+          stat('Type', esc((bank.type || 'Bank') + ' · ' + (bank.accType || 'Current'))),
+          stat('Company', esc(coName(bank.companyId || 'group'))),
+          stat('Transactions', String(rows.length))
+        ])
+      ]) ]));
+
+      // ---- opening / debit / credit / closing ----
+      host.appendChild(el('div.stat-row.mb-2', null, [
+        stat('Opening Balance', drcr(opening)),
+        stat('Total Debit (In)', '<span class="text-good">' + ui.money(tin) + '</span>'),
+        stat('Total Credit (Out)', '<span class="text-bad">' + ui.money(tout) + '</span>'),
+        stat('Closing Balance', drcr(closing), closing < 0 ? '.text-bad' : '')
+      ]));
+
+      // ---- filter bar ----
       var fromI = el('input.input', { type: 'date', value: state.from, style: { width: 'auto' } });
       fromI.addEventListener('change', function () { state.from = fromI.value; draw(); });
       var toI = el('input.input', { type: 'date', value: state.to, style: { width: 'auto' } });
       toI.addEventListener('change', function () { state.to = toI.value; draw(); });
       function dirBtn(k, label) { return el('button.btn.btn-sm' + (state.dir === k ? '.btn-primary' : '.btn-outline'), { text: label, onclick: function () { state.dir = k; draw(); } }); }
-      function todayBtn() {
-        return el('button.btn.btn-sm.btn-ghost', { text: 'Today', onclick: function () { var d = (new Date()).toISOString().slice(0, 10); state.from = d; state.to = d; draw(); } });
-      }
-      body.appendChild(el('div.flex.gap-2.flex-wrap.items-center.mb-2', null, [
-        el('span.text-mute.xs', { text: 'From' }), fromI, el('span.text-mute.xs', { text: 'To' }), toI, todayBtn(),
+      host.appendChild(el('div.flex.gap-2.flex-wrap.items-center.mb-2', null, [
+        el('span.text-mute.xs', { text: 'From' }), fromI, el('span.text-mute.xs', { text: 'To' }), toI,
+        el('button.btn.btn-sm.btn-ghost', { text: 'Today', onclick: function () { var d = (new Date()).toISOString().slice(0, 10); state.from = d; state.to = d; draw(); } }),
         dirBtn('all', 'All'), dirBtn('in', 'Only In'), dirBtn('out', 'Only Out'),
         el('button.btn.btn-sm.btn-outline', { html: ui.icon('x-lg') + ' Clear', onclick: function () { state.from = ''; state.to = ''; state.dir = 'all'; draw(); } }),
         el('button.btn.btn-sm.btn-primary', { style: { marginLeft: 'auto' }, html: ui.icon('printer') + ' Print', onclick: function () { printRows(rows, printLabel()); } })
       ]));
 
+      // ---- transaction table (production columns) ----
       var tbl = EPAL.table({
         columns: [
+          { key: 'idx', label: '#', render: function (t) { return String(rows.indexOf(t) + 1); } },
           { key: 'date', label: 'Date', date: true },
           { key: 'ref', label: 'Reference', render: function (t) { return t.ref ? '<span class="mono">' + esc(t.ref) + '</span>' : '<span class="text-mute">—</span>'; } },
-          { key: 'desc', label: 'Description', render: function (t) { return esc(t.desc || t.type || '') || '—'; } },
-          { key: 'in', label: 'Debit (In)', num: true, render: function (t) { return isIn(t) ? '<span class="num text-good">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return isIn(t) ? t.amount : ''; } },
-          { key: 'out', label: 'Credit (Out)', num: true, render: function (t) { return !isIn(t) ? '<span class="num text-bad">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return !isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return !isIn(t) ? t.amount : ''; } },
-          { key: 'bal', label: 'Balance', num: true, render: function (t) { var v = +t._after || 0; return '<span class="num' + (v < 0 ? ' text-bad' : '') + '">' + ui.money(Math.abs(v)) + (v < 0 ? ' Cr' : ' Dr') + '</span>'; }, sortVal: function (t) { return +t._after || 0; }, exportVal: function (t) { return t._after; } }
+          { key: 'source', label: 'Source', render: function (t) { return '<span class="badge">' + esc(t.source || t.type || '—') + '</span>'; }, sortVal: function (t) { return t.source || t.type || ''; } },
+          { key: 'desc', label: 'Description / Note', render: function (t) { return esc(t.desc || t.type || '') || '—'; } },
+          { key: 'in', label: 'Debit', num: true, render: function (t) { return isIn(t) ? '<span class="num text-good">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return isIn(t) ? t.amount : ''; } },
+          { key: 'out', label: 'Credit', num: true, render: function (t) { return !isIn(t) ? '<span class="num text-bad">' + ui.money(t.amount) + '</span>' : '—'; }, sortVal: function (t) { return !isIn(t) ? +t.amount : 0; }, exportVal: function (t) { return !isIn(t) ? t.amount : ''; } },
+          { key: 'bal', label: 'Balance', num: true, render: function (t) { var v = +t._after || 0; return '<span class="num' + (v < 0 ? ' text-bad' : '') + '">' + drcr(v) + '</span>'; }, sortVal: function (t) { return +t._after || 0; }, exportVal: function (t) { return t._after; } }
         ],
         rows: rows, pageSize: 12, exportName: 'bank-statement-' + (bank.account || bank.id) + '.csv',
-        searchKeys: ['ref', 'desc'],
+        searchKeys: ['ref', 'desc', 'source'],
         actions: [{ icon: 'printer', title: 'Print this transaction', onClick: function (t) { printRows([t], 'Single transaction'); } }],
-        empty: { icon: 'clock-history', title: 'No transactions in this view', hint: 'Adjust the date range or the In/Out filter — or this account has no movement yet.' }
+        empty: { icon: 'clock-history', title: 'No transactions found for this account in the selected period.', hint: 'Adjust the date range or the In/Out filter — or this account has no movement yet.' }
       });
-      body.appendChild(el('div.card', null, [ el('div.card-body', null, [tbl.el]) ]));
+      host.appendChild(el('div.card', null, [ el('div.card-body', null, [tbl.el]) ]));
     }
     draw();
   }

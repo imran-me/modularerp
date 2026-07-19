@@ -45,6 +45,7 @@
   box-shadow: var(--shadow-card), inset 0 1px 0 var(--hairline); position: relative; overflow: hidden; transition: border-color var(--t), box-shadow var(--t), transform var(--t);
 }
 .card.hover:hover { border-color: var(--card-hover); box-shadow: var(--shadow), inset 0 1px 0 var(--hairline); transform: translateY(-2px); }
+.card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }   /* selected (e.g. the open bank account) */
 .card-pad { padding: 20px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
 /* A long title must yield space, not shove the header's action icons out of

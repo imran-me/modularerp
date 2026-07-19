@@ -89,36 +89,99 @@
 
   /* ---- DIRECTORY --------------------------------------------------------*/
   function renderDirectory(page) {
-    var state = { q:'', company:'all' };
+    var state = { q:'', company:'all', status:'all', view:'cards' };
     var companies = EPAL.config.companies;
 
-    var filters = el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
-      el('div.search-trigger', { style:{ cursor:'text', minWidth:'260px' } }, [
+    // Search + company chips.
+    var filters = el('div.flex.items-center.gap-2.flex-wrap.mb-2', null, [
+      el('div.search-trigger', { style:{ cursor:'text', minWidth:'240px' } }, [
         ui.frag(ui.icon('search')),
         el('input.input', { placeholder:'Search name, designation, email…', style:{ border:'none', background:'none', padding:'0' },
           oninput: ui.debounce(function (e) { state.q = e.target.value.toLowerCase(); draw(); }, 150) })
       ]),
-      el('div.flex.gap-1.flex-wrap', null, [{ id:'all', name:'All' }].concat(companies).map(function (c) {
+      el('div.flex.gap-1.scroll-row', null, [{ id:'all', name:'All' }].concat(companies).map(function (c) {
         return el('button.chip' + (c.id === 'all' ? '.active' : ''), { 'data-co': c.id, text: c.short || c.name,
           onclick: function (e) { state.company = c.id; ui.$$('.chip', filters).forEach(function (x){x.classList.remove('active');}); e.target.classList.add('active'); draw(); } });
       }))
     ]);
     page.appendChild(filters);
 
-    // Wider cards (matches the Sister-Concerns cards) so the Present/Absent/
-    // Rating stat grid renders as a 2-column cross, not a single stacked column.
-    var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
-    page.appendChild(grid);
+    // Status filter + view toggle (Cards / List) + Print.
+    function statusChip(k, label) {
+      return el('button.chip' + (state.status === k ? '.active' : ''), { text: label,
+        onclick: function () { state.status = k; ui.$$('.st-chip .chip', bar2).forEach(function (x){x.classList.remove('active');}); this.classList.add('active'); draw(); } });
+    }
+    function viewBtn(k, icon, title) {
+      return el('button.btn.btn-sm' + (state.view === k ? '.btn-primary' : '.btn-outline'), { title: title, html: ui.icon(icon),
+        onclick: function () { state.view = k; ui.$$('.vw-btn button', bar2).forEach(function (x){ x.className = 'btn btn-sm btn-outline'; }); this.className = 'btn btn-sm btn-primary'; draw(); } });
+    }
+    var bar2 = el('div.flex.items-center.gap-2.flex-wrap.mb-3', null, [
+      el('span.text-mute.xs', { text: 'Status' }),
+      el('div.flex.gap-1.st-chip', null, [ statusChip('all','All'), statusChip('active','Active'), statusChip('onleave','On leave') ]),
+      el('div.flex.gap-1.vw-btn', { style:{ marginLeft:'auto' } }, [ viewBtn('cards','grid-3x3-gap-fill','Card view'), viewBtn('list','list-ul','List view') ]),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print', onclick: function () { printList(filtered()); } })
+    ]);
+    page.appendChild(bar2);
 
-    function draw() {
-      var list = db.employees().filter(function (e) {
+    var host = el('div');
+    page.appendChild(host);
+
+    function filtered() {
+      return db.employees().filter(function (e) {
         if (state.company !== 'all' && e.companyId !== state.company) return false;
+        if (state.status === 'active' && (e.status || 'active') !== 'active') return false;
+        if (state.status === 'onleave' && (e.status || 'active') === 'active') return false;
         if (state.q && (e.name + ' ' + e.designation + ' ' + e.email + ' ' + e.dept).toLowerCase().indexOf(state.q) < 0) return false;
         return true;
       });
-      grid.innerHTML = '';
+    }
+
+    function listView(list) {
+      var tbl = EPAL.table({
+        columns: [
+          { key:'name', label:'Name', render: function (e) { return '<span class="strong">' + esc(e.name) + '</span><div class="text-mute xs">' + esc(e.designation || '') + '</div>'; } },
+          { key:'company', label:'Company', render: function (e) { var co = EPAL.config.company(e.companyId) || { short:'Group' }; return '<span class="badge">' + esc(co.short || co.name || 'Group') + '</span>'; }, sortVal: function (e) { return e.companyId; } },
+          { key:'dept', label:'Department', render: function (e) { return esc(e.dept || '—'); } },
+          { key:'status', label:'Status', render: function (e) { return (e.status || 'active') === 'active' ? '<span class="badge badge-good">Active</span>' : '<span class="badge badge-warn">On leave</span>'; }, sortVal: function (e) { return e.status || 'active'; } },
+          { key:'present', label:'Present', num:true, render: function (e) { return String((e.attendance||{}).present||0); }, sortVal: function (e) { return (e.attendance||{}).present||0; } },
+          { key:'absent', label:'Absent', num:true, render: function (e) { return String((e.attendance||{}).absent||0); }, sortVal: function (e) { return (e.attendance||{}).absent||0; } },
+          { key:'hours', label:'Hours', num:true, render: function (e) { return hoursOf(e) + 'h'; }, sortVal: function (e) { return hoursOf(e); } },
+          { key:'overtime', label:'Overtime', num:true, render: function (e) { return (e.overtime||0) + 'h'; }, sortVal: function (e) { return e.overtime||0; } }
+        ],
+        rows: list, pageSize: 20, exportName: 'employee-directory.csv',
+        searchKeys: ['name','designation','email','dept'],
+        onRow: function (e) { openProfile(e); },
+        empty: { icon:'people', title:'No matches', hint:'Adjust the search or filters.' }
+      });
+      return el('div.card', null, [ el('div.card-body', null, [tbl.el]) ]);
+    }
+
+    function printList(list) {
+      var head = '<tr><th>#</th><th>Name</th><th>Designation</th><th>Company</th><th>Department</th><th>Status</th>' +
+        '<th style="text-align:right">Present</th><th style="text-align:right">Absent</th><th style="text-align:right">Hours</th><th style="text-align:right">Overtime</th></tr>';
+      var body = list.map(function (e, i) {
+        var co = EPAL.config.company(e.companyId) || { short:'Group' };
+        var a = e.attendance || {};
+        return '<tr><td>' + (i+1) + '</td><td>' + esc(e.name) + '</td><td>' + esc(e.designation||'') + '</td><td>' + esc(co.short||co.name||'Group') + '</td>' +
+          '<td>' + esc(e.dept||'') + '</td><td>' + ((e.status||'active')==='active'?'Active':'On leave') + '</td>' +
+          '<td style="text-align:right">' + (a.present||0) + '</td><td style="text-align:right">' + (a.absent||0) + '</td>' +
+          '<td style="text-align:right">' + hoursOf(e) + 'h</td><td style="text-align:right">' + (e.overtime||0) + 'h</td></tr>';
+      }).join('');
+      var scope = (state.company === 'all' ? 'All companies' : (EPAL.config.company(state.company)||{}).name || state.company) +
+        ' · ' + (state.status === 'all' ? 'All' : state.status === 'active' ? 'Active' : 'On leave');
+      ui.printDoc({ title:'Employee Directory', subtitle: list.length + ' people · ' + scope,
+        meta:'Epal Group — Workforce', footer:'Attendance & hours are for the latest recorded month.',
+        bodyHtml:'<table>' + head + body + '</table>' });
+    }
+
+    function draw() {
+      var list = filtered();
+      host.innerHTML = '';
+      if (!list.length) { host.appendChild(el('div.empty-state', null, [ ui.frag(ui.icon('search')), el('h3', { text:'No matches' }) ])); return; }
+      if (state.view === 'list') { host.appendChild(listView(list)); return; }
+      var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
       list.forEach(function (e) { grid.appendChild(employeeCard(e)); });
-      if (!list.length) grid.appendChild(el('div.empty-state', null, [ ui.frag(ui.icon('search')), el('h3', { text:'No matches' }) ]));
+      host.appendChild(grid);
     }
     draw();
   }
