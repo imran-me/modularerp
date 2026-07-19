@@ -51,13 +51,17 @@ class EmployeeController
         6 => 'woodart',       // WOOD ART INTERIORS
     ];
 
+    /** Standard working hours in a day — overtime is time worked BEYOND this. */
+    private const STANDARD_DAY_HOURS = 9;
+
     /**
-     * Per-user attendance tallies for the LATEST month that has data, keyed by
-     * user_id → ['present'=>n,'absent'=>n,'leave'=>n]. The employee cards show
-     * a month's Present/Absent (demo seeded ~20/month), so all-time totals
-     * (hundreds) would misrepresent the card — one calendar month matches its
-     * intent. `late` has no status in the real enum
-     * (present|absent|leave|holiday), so it stays 0 (the demo's own default).
+     * Per-user attendance for the LATEST month that has data, keyed by user_id.
+     * Each entry carries the status tallies (present/absent/leave) AND the real
+     * worked hours: 'hours' (Σ check_out−check_in over the month) and 'overtime'
+     * (Σ of each day's hours beyond the 9h standard). One calendar month matches
+     * what the cards show; all-time totals would misrepresent them. `late` has
+     * no value in the real status enum (present|absent|leave|holiday) so it
+     * stays 0.
      */
     private function attendanceByUser(): array
     {
@@ -66,16 +70,35 @@ class EmployeeController
             return [];
         }
         $ym = substr((string) $latest, 0, 7);   // 'YYYY-MM'
+        $out = [];
 
-        $rows = DB::table('attendances')
+        // Status counts (present / absent / leave / holiday).
+        $counts = DB::table('attendances')
             ->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$ym])
             ->select('user_id', 'status', DB::raw('count(*) as cnt'))
             ->groupBy('user_id', 'status')
             ->get();
-
-        $out = [];
-        foreach ($rows as $r) {
+        foreach ($counts as $r) {
             $out[(int) $r->user_id][$r->status] = (int) $r->cnt;
+        }
+
+        // Worked hours + overtime from the real check_in/check_out times.
+        // TIMEDIFF handles same-day shifts; only rows with both punches count.
+        $std = self::STANDARD_DAY_HOURS;
+        $hours = DB::table('attendances')
+            ->whereRaw("DATE_FORMAT(date, '%Y-%m') = ?", [$ym])
+            ->whereNotNull('check_in')
+            ->whereNotNull('check_out')
+            ->select(
+                'user_id',
+                DB::raw('SUM(TIME_TO_SEC(TIMEDIFF(check_out, check_in)))/3600 AS total_hours'),
+                DB::raw("SUM(GREATEST(0, TIME_TO_SEC(TIMEDIFF(check_out, check_in))/3600 - {$std})) AS overtime_hours")
+            )
+            ->groupBy('user_id')
+            ->get();
+        foreach ($hours as $r) {
+            $out[(int) $r->user_id]['hours'] = round((float) $r->total_hours, 1);
+            $out[(int) $r->user_id]['overtime'] = round((float) $r->overtime_hours, 1);
         }
 
         return $out;
@@ -127,16 +150,19 @@ class EmployeeController
                 'joinDate'    => $e->joining_date,
                 'salary'      => (float) $e->salary,
                 'status'      => $e->status ?: 'active',
-                // Present/Absent/Leave are REAL, from the `attendances` table
-                // (latest month). `late` and `rating` have no source column in
-                // the real DB (the demo invented them) — left 0 until a real
-                // performance/late-tracking source exists.
+                // Present/Absent/Leave + worked hours are REAL, from the
+                // `attendances` table (latest month). `late` and `rating` have
+                // no source column (the demo invented them) — left 0 until a
+                // real late-tracking / performance-review source exists.
                 'attendance'  => [
                     'present' => $a['present'] ?? 0,
                     'absent'  => $a['absent'] ?? 0,
                     'late'    => 0,
                     'leave'   => $a['leave'] ?? 0,
                 ],
+                // Monthly worked hours and overtime (>9h/day), REAL from punches.
+                'hours'       => $a['hours'] ?? 0,
+                'overtime'    => $a['overtime'] ?? 0,
                 'rating'      => 0,
             ];
         })->values();

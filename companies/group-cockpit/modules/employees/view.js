@@ -140,13 +140,18 @@
         el('div.stat-row.mt-3', null, [
           miniStat('Present', att.present),
           miniStat('Absent', att.absent),
-          miniStat('Rating', (e.rating || 0).toFixed(1))
+          miniStat('Hours', hoursOf(e) + 'h'),
+          miniStat('Overtime', (e.overtime || 0) + 'h')
         ])
       ])
     ]);
     return card;
   }
   function miniStat(l, v) { return el('div.stat', null, [ el('div.stat-label', { text:l }), el('div.stat-value', { text:String(v) }) ]); }
+  // Monthly worked hours: REAL from the API (check-in/out); in demo mode there
+  // is no punch data, so estimate from present days × the 9h standard so the
+  // card never shows a bare 0h for a seeded employee.
+  function hoursOf(e) { return (e.hours != null) ? e.hours : Math.round((((e.attendance || {}).present) || 0) * 9); }
 
   /* ---- PROFILE DRAWER ---------------------------------------------------*/
   function openProfile(e) {
@@ -172,8 +177,8 @@
     // key stats
     body.appendChild(el('div.stat-row.mb-3', null, [
       miniStat('Present', att.present || 0), miniStat('Absent', att.absent || 0),
-      miniStat('Late', att.late || 0), miniStat('Leave', att.leave || 0),
-      miniStat('Rating', (e.rating || 0).toFixed(1))
+      miniStat('Leave', att.leave || 0),
+      miniStat('Hours', hoursOf(e) + 'h'), miniStat('Overtime', (e.overtime || 0) + 'h')
     ]));
 
     // details grid
