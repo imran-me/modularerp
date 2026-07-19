@@ -12,7 +12,77 @@
 
 ---
 
-## 🚧 RESUME HERE — 2026-07-16 · BACKEND MIGRATION (real data + modular Laravel)
+## 🚧 RESUME HERE — 2026-07-19 · FRONTEND SWAP + DEPLOY-RESTRUCTURE DONE, PUSHED
+
+**Commit identity (owner directive):** every commit in this repo is authored as
+**Md Imran Hossain** `<me.imran.personal@gmail.com>` (`git config user.name` set
+repo-locally 2026-07-19). Don't override it per-commit.
+
+**Push-verification rule (learned the hard way today — follow it every session):**
+never trust a comparison against a previously-fetched `origin/main` ref; it can be
+stale (a corrupted local git index once made "already pushed" a false positive).
+**Always confirm with a live query:** `git ls-remote origin refs/heads/main`
+compared byte-for-byte against `git rev-parse HEAD`, AFTER pushing, before telling
+anyone it's live.
+
+**What's done since 2026-07-16 (both commits pushed, both E2E-proven in headless
+Chrome — not just curl):**
+
+1. **Frontend swap (`4c29ec6`)** — the milestone: log in with a real password, see
+   real data on the new UI.
+   - `platform/data/api.js` — resolves demo-vs-real ONCE per load. Real mode needs
+     EITHER an explicit `EPAL_API_BASE` (local cross-origin dev) OR a same-origin
+     `/api/health` that returns the *exact* JSON marker `{"service":"epal-kernel"}`
+     — a bare `200` isn't enough (a static host's SPA-fallback would also return
+     200, which is exactly what would have falsely flipped the static preview site
+     into "real mode" with nothing real behind it).
+   - `hydrate()` fetches every backed collection in parallel straight into the
+     SAME `EPAL.store` cache the whole app already reads synchronously — no
+     rewrite of the 500+ existing call sites.
+   - `platform/auth-rbac/login-screen.js` — the pre-boot sign-in gate (real mode
+     only; demo mode never renders it).
+   - `platform/core/app.js` — boot now resolves mode FIRST; demo seeding only
+     runs in demo mode, never mixed with real data.
+   - Local dev login: `dev@epal.local` / `dev12345` (group scope).
+
+2. **Deploy-restructure (`bfebecb`)** — makes ONE origin serve both the SPA and
+   `/api`, as the owner asked (like the old ERP — no second subdomain, no CORS).
+   - **The one security decision that matters:** `platform/backend/deploy.sh`
+     symlinks the SPA's static assets into `public/`, but **`platform/backend/`
+     itself — which holds `.env` with the real DB password — is NEVER symlinked
+     as a whole.** Only `platform/`'s individual frontend subfolders are linked
+     one at a time (`backend` excluded by name). `companies/` is safe to link
+     wholesale (no secrets live there). `.htaccess` is also hardened (deny
+     dotfiles + stray `.php`) as defense in depth on top of that boundary.
+   - `routes/web.php`: `/` now returns the real `index.html` directly via
+     `response()->file(...)` — not relying on Apache's DirectoryIndex to guess
+     between a symlinked `index.html` and Laravel's own `index.php`.
+   - **Route caching is deliberately never run** — this app discovers module
+     routes live on every request; caching would freeze the drop-a-folder
+     behaviour until someone remembered to re-cache.
+   - `deploy.sh` is idempotent — safe to re-run after every `git pull`.
+
+**AWAITING THE OWNER (next concrete step):** SSH into Hostinger (same session used
+for the original git-clone setup), `cd` to the repo's `platform/backend`, run
+`bash deploy.sh` (creates `.env` from the example on first run — needs the real
+`DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` filled in by hand, then re-run to
+finish), then repoint the `dev.epal.com.bd` subdomain's document root (one hPanel
+field, same panel as the original subdomain setup) from the repo root to
+`platform/backend/public`.
+
+**Recurring local gotcha:** Laragon's MySQL does not survive between sessions —
+always `mysql -u root -e "SELECT 1"` first; if refused, restart it and wait ~20s
+for InnoDB init before it accepts connections. A Laravel 500 saying "connection
+actively refused" on port 3306 is this, not a routing bug — check MySQL first.
+
+**After the live deploy:** roll out the rest of Group + Travels modules (same
+proven pattern — one `backend/` folder each, most already have a
+`LARAVEL-BLUEPRINT.md`), then write endpoints (everything today is GET-only, and
+writes MUST call the NEW ledger logic, never the old system's).
+
+---
+
+## RESUME HERE — 2026-07-16 · BACKEND MIGRATION (real data + modular Laravel), historical
 
 **Phase now:** connect the new dev UI to a **real Laravel backend + MySQL**, using
 the owner's **real production data**. Scope: **GROUP + TRAVELS first** (prove, then
@@ -89,7 +159,7 @@ are gitignored (Laravel default). The kernel CODE + module `backend/` files ARE 
 so the work is preserved; `composer install` regenerates vendor on the server at deploy.
 
 **NEXT (resume order):**
-1. **Fix visa-processing/categories** (returns 0 rows though table has 46 — mapping/filter bug).
+1. ~~Fix visa-processing/categories (returns 0 rows though table has 46)~~ — RESOLVED, was a stale mid-build observation; re-verified 2026-07-19, returns 25 correctly-shaped rows.
 2. **Frontend swap** = the milestone: a login screen before boot; `platform/data/state.js`
    load-at-boot — fetch the module endpoints into the in-memory cache, map into stores
    (`coa` ← /api/group/master-accounts/accounts, etc.), so the user logs in with a real
