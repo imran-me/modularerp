@@ -24,25 +24,22 @@
   'use strict';
   var ui = EPAL.ui, el = ui.el, db = EPAL.db, S = EPAL.store;
 
-  /* Country flag → HTML chip. Regional-indicator flag emoji do NOT render on
-     Windows (they show as bare "NP"/"SG" letters), so we draw a coloured pill
-     with the 2-letter ISO code instead — identical on every OS. Accepts the
-     stored value whether it's a flag emoji (🇳🇵, demo + API) or already a
-     2-letter code; a missing/unknown flag falls back to a neutral globe chip.
-     Returns an HTML string (use with ui.frag / inside template HTML). */
+  /* Country flag → real flag glyph. The bundled 'Twemoji Country Flags' web
+     font (see tokens.css @font-face) renders regional-indicator emoji as
+     proper flag images even on Windows, where Chromium otherwise shows bare
+     "NP"/"SG" letters. Accepts the stored value whether it's already a flag
+     emoji (🇳🇵, demo + API) or a 2-letter ISO code (converted to the emoji);
+     a missing/unknown value falls back to a neutral globe. Returns an HTML
+     string wrapped in .flag-emoji for consistent sizing. */
   function flagChip(flag) {
-    var code = '';
-    if (flag) {
-      var cp = flag.codePointAt(0);
-      if (cp >= 0x1F1E6 && cp <= 0x1F1FF) {            // two regional-indicator symbols
-        var cp2 = flag.codePointAt(2);
-        code = String.fromCharCode(65 + (cp - 0x1F1E6)) + (cp2 ? String.fromCharCode(65 + (cp2 - 0x1F1E6)) : '');
-      } else if (/^[A-Za-z]{2}$/.test(String(flag).trim())) {
-        code = String(flag).trim().toUpperCase();
-      }
+    var f = flag ? String(flag).trim() : '';
+    if (/^[A-Za-z]{2}$/.test(f)) {                     // a 2-letter code -> flag emoji
+      var cc = f.toUpperCase();
+      f = String.fromCodePoint(0x1F1E6 + cc.charCodeAt(0) - 65) +
+          String.fromCodePoint(0x1F1E6 + cc.charCodeAt(1) - 65);
     }
-    if (!code) return '<span class="flag-chip" style="background:#6b7280"><i class="bi bi-globe2"></i></span>';
-    return '<span class="flag-chip" style="background:' + ui.colorFor(code) + '">' + code + '</span>';
+    if (!f) f = '🌍';
+    return '<span class="flag-emoji">' + f + '</span>';
   }
 
   var STAGES = [

@@ -12,11 +12,26 @@
  * be re-skinned by editing ONE file.
  * ==========================================================================*/
 
+/* REAL COUNTRY FLAGS on every OS. Chromium on Windows ships NO country-flag
+   glyphs, so 🇳🇵/🇸🇬 degrade to bare "NP"/"SG" letters. This bundled Twemoji
+   flags subset (~78 KB, self-hosted — no external host, honours the
+   free/static rule) provides them. `unicode-range` scopes the font to ONLY
+   the regional-indicator codepoints, so it is used for flags and NOTHING
+   else — every other character falls through to the real UI fonts, and
+   browsers with native flags simply ignore it. Prefixed onto the font stacks
+   below so any flag emoji anywhere renders as a proper flag image. */
+@font-face {
+  font-family: 'Twemoji Country Flags';
+  src: url('../fonts/TwemojiCountryFlags.woff2') format('woff2');
+  unicode-range: U+1F1E6-1F1FF;
+  font-display: swap;
+}
+
 :root {
   /* Typography ------------------------------------------------------------*/
-  --font-sans: 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Sora', 'Plus Jakarta Sans', var(--font-sans);
-  --font-mono: 'JetBrains Mono', 'DM Mono', ui-monospace, 'SF Mono', monospace;
+  --font-sans: 'Twemoji Country Flags', 'Inter', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Twemoji Country Flags', 'Sora', 'Plus Jakarta Sans', var(--font-sans);
+  --font-mono: 'Twemoji Country Flags', 'JetBrains Mono', 'DM Mono', ui-monospace, 'SF Mono', monospace;
 
   /* TYPE SCALE — 8 steps, and only these 8 (owner review 2026-07-15).
      The scale had sprawled to 15 rendered sizes (10.5 · 11 · 11.5 · 12 · 12.5 ·
