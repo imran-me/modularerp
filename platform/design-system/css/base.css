@@ -157,6 +157,17 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 .tbl .row-click { cursor: pointer; }
 /* left-align numeric figures in a cell while keeping tabular spacing (phones, refs) */
 .tbl td.lnum, .tnum { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* DENSE variant for very-wide financial sheets (12+ columns, e.g. the Master
+   Payroll salary sheet) — fits at 90-100% Windows zoom with NO horizontal
+   scrollbar (owner premium directive). Bloomberg/IBM-style density: one step
+   smaller tabular font + tighter cells, so the extra money columns + status +
+   actions all stay on screen. Apply `.tbl-dense` to the .card-body / wrapper
+   that holds the wide table; normal tables are untouched. */
+.tbl-dense table.tbl { font-size: var(--fs-tiny); }
+.tbl-dense .tbl thead th { padding: 6px 7px; letter-spacing: .02em; }
+.tbl-dense .tbl tbody td { padding: 4px 7px; }
+.tbl-dense .tbl td.num, .tbl-dense .tbl th.num { padding-left: 5px; padding-right: 7px; }
+.tbl-dense .tbl td.dt-actions { padding-left: 4px; padding-right: 4px; }
 /* Any inline number/money span is atomic too — never break a figure. */
 .num, .mono { white-space: nowrap; }
 

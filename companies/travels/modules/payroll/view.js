@@ -227,7 +227,10 @@
       })),
       empty: { icon: 'cash-stack', title: 'No employees to pay' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash-stack') + ' Salary Sheet — ' + PR().mLabel(ym) }), el('span.card-sub', { text: 'click a row = payslip · 💰 manage pay/due/status · ✎ adjust' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+    // .tbl-dense: this salary sheet carries 13 columns (gross + 6 add/deduct +
+    // net/paid/due + status + actions) — the dense variant fits it without a
+    // horizontal scrollbar at normal zoom (owner premium directive).
+    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash-stack') + ' Salary Sheet — ' + PR().mLabel(ym) }), el('span.card-sub', { text: 'click a row = payslip · 💰 manage pay/due/status · ✎ adjust' }) ]), el('div.card-body.tbl-dense', null, [ tbl.el ]) ]));
 
     if (st !== 'draft' && due > 0 && canCreate()) {
       var grid = el('div.grid-auto.kpi-compact');
