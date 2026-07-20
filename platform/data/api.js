@@ -188,11 +188,21 @@
           call(path, { method: 'POST', body: e.record }).then(function (j) {
             if (j.data && j.data.id && j.data.id !== before) {
               S.removeFrom(e.store, before);   // temp client id -> real server id
+              if (j.data) S.upsert(e.store, j.data);
+              // The optimistic row still carries the TEMP id on screen; re-render
+              // so the list shows the server-confirmed record (real id) and later
+              // row-actions target it, not the now-removed temp id.
+              if (EPAL.router && EPAL.router.render) EPAL.router.render();
+            } else if (j.data) {
+              S.upsert(e.store, j.data);       // same id — in-place refresh, no re-render needed
             }
-            if (j.data) S.upsert(e.store, j.data);
           }, function (err) {
             S.removeFrom(e.store, before);     // roll back the optimistic local write
             EPAL.bus.emit('notify', { text: 'Save failed: ' + (err.message || err), level: 'danger', title: 'Not saved' });
+            // Re-render so the rolled-back row actually disappears from the screen
+            // — otherwise the UI keeps showing a record the server rejected, which
+            // is exactly the "it said saved but never persisted" confusion.
+            if (EPAL.router && EPAL.router.render) EPAL.router.render();
           });
         } else if (e.action === 'delete') {
           call(path + '/' + e.id, { method: 'DELETE' }).catch(function (err) {

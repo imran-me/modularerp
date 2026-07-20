@@ -284,7 +284,10 @@ class EmployeeController
 
         if ($existingId) {
             $row = ['name' => $v['name']];
-            if (array_key_exists('email', $v)) $row['email'] = $v['email'];
+            // Only overwrite email when the form actually carries one — `email` is
+            // NOT NULL, so writing a blank/null would break the update (and you
+            // cannot "clear" a login email anyway).
+            if (! empty($v['email'])) $row['email'] = $v['email'];
             if (array_key_exists('phone', $v)) $row['phone'] = $v['phone'];
             if ($companyId) $row['company_id'] = $companyId;
             if (!empty($v['status'])) $row['status'] = $v['status'];
@@ -329,9 +332,16 @@ class EmployeeController
             // row behind (caught by testing: it did, before this transaction).
             $id = DB::transaction(function () use ($v, $companyId, $requesterIsAdmin, $deptId, $desigId) {
                 $username = Str::slug($v['name']) . '-' . substr(uniqid(), -6);
+                // `users.email` is UNIQUE and NOT NULL (it is the login table). The
+                // Add-Employee form allows a blank email, so synthesise a unique
+                // placeholder when it is empty — otherwise MySQL rejects the insert
+                // ("Column 'email' cannot be null") and the whole add silently rolls
+                // back client-side. Mirrors the unusable-password approach: the row
+                // exists but cannot log in until real credentials are set later.
+                $email = ! empty($v['email']) ? $v['email'] : $username . '@no-email.epal.local';
                 $newId = DB::table('users')->insertGetId([
                     'name'           => $v['name'],
-                    'email'          => $v['email'] ?? null,
+                    'email'          => $email,
                     'phone'          => $v['phone'] ?? null,
                     'company_id'     => $companyId,
                     'status'         => $v['status'] ?? 'active',
