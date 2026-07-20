@@ -517,7 +517,10 @@
     var pick = el('div.card.mb-3', null, [ el('div.card-body', null, [ el('div.flex.gap-2.flex-wrap.items-end', null, [
       field('Employee', (function () { var s = el('select.input', { id: 'ps-emp' }); t.forEach(function (e) { s.appendChild(el('option', { value: e.id, text: e.name })); }); return s; })()),
       field('Month', (function () { var s = el('select.input', { id: 'ps-ym' }); (months.length ? months : [PR().curYm()]).forEach(function (m) { s.appendChild(el('option', { value: m, text: PR().mLabel(m) })); }); return s; })()),
-      el('button.btn.btn-primary', { html: ui.icon('receipt') + ' View Statement', onclick: function () { var e = empById(document.getElementById('ps-emp').value); var ym = document.getElementById('ps-ym').value; if (e) statement(e, ym); } })
+      // wrapped in a field cell with an invisible (nbsp) label so it aligns to
+      // the Employee/Month inputs' row instead of towering over them (owner:
+      // control sizes must match — premium directive).
+      field(' ', el('button.btn.btn-primary', { html: ui.icon('receipt') + ' View Statement', onclick: function () { var e = empById(document.getElementById('ps-emp').value); var ym = document.getElementById('ps-ym').value; if (e) statement(e, ym); } }))
     ]) ]) ]);
     page.appendChild(pick);
 
