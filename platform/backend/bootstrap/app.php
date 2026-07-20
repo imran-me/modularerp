@@ -28,4 +28,21 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+        // A DB constraint failure on a write (NOT NULL / UNIQUE / FK) otherwise
+        // surfaces as an opaque 500 "Server Error" when APP_DEBUG is off — the
+        // SPA then silently rolls the optimistic row back and the user sees a
+        // save that "didn't stick" with no reason (the exact Employees / Banks
+        // class of bug). Return the real driver message (just the reason, not
+        // the bound SQL) so EVERY write endpoint self-reports and the failure is
+        // visible in the UI toast.
+        $exceptions->render(function (\Illuminate\Database\QueryException $e, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+            $reason = $e->errorInfo[2] ?? $e->getMessage();   // PDO driver message, not the full query
+            return response()->json([
+                'success' => false,
+                'message' => 'Database rejected the write: ' . $reason,
+            ], 422);
+        });
     })->create();
