@@ -1,0 +1,39 @@
+<!-- ============================================================================
+  TRAVELS · ANALYTICS & INTELLIGENCE · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/analytics.js). Cloned +
+  filled at runtime via [data-tpl] / [data-slot] hooks.
+
+  Four tabs (overview / profit-leak / fraud / travel-dna) — each builds KPI
+  cards, chart cards and shared datatables from live data. STYLING = the house
+  design system verbatim; the only tw- utility is `tw-relative` (was the chart
+  container's inline position:relative). The chart box HEIGHT stays a runtime
+  inline style (240/300px, passed per chart) and the RFM avatar keeps its legacy
+  inline style in the table-cell render string (not part of the templated shell).
+
+  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
+  the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section band ----------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- KPI grid + one KPI card (tone applied to the value in logic) ------------>
+<template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+
+<!-- generic layout bits: section label + a two-up auto grid ----------------->
+<template data-tpl="section-label"><div class="section-label"></div></template>
+<template data-tpl="grid-auto"><div class="grid-auto"></div></template>
+
+<!-- chart card: head (icon+title, sub) + body (relative box + canvas) ------->
+<template data-tpl="chart-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body"><div class="tw-relative" data-slot="box"><canvas data-slot="canvas"></canvas></div></div></div></template>
+
+<!-- build-banner (icon + message) — used by profit-leak & fraud ------------->
+<template data-tpl="build-banner"><div class="build-banner mb-3"><i class="bi" data-slot="ico"></i><div data-slot="msg"></div></div></template>
+
+<!-- table cards: plain (card-body only) + register (head + body) ----------->
+<template data-tpl="table-card"><div class="card"><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="reg-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
