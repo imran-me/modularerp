@@ -1,0 +1,36 @@
+<!-- ============================================================================
+  TRAVELS · CONTRACT FILE · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/contract-file.js).
+  Cloned + filled at runtime via [data-tpl] / [data-slot] hooks.
+
+  STYLING = the house design system (base.css / components.css) verbatim. The
+  three captured screens (contracts / add / documents) use NO inline styles, so
+  there are no Tailwind tw- utilities here. The row-click contract MODAL keeps
+  its legacy el()-built DOM (with its inline styles) in the logic file untouched
+  — it is not part of the default render (opens on click), so it stays byte-for-
+  byte the verified-equivalent legacy code (R4).
+
+  Each fragment is authored on ONE line — no inter-tag whitespace — so a clone
+  is byte-for-byte the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section band ----------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- one KPI card (also reused by the contract modal in logic) --------------->
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+
+<!-- all contracts: card shell wrapping the shared datatable ----------------->
+<template data-tpl="register-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
+
+<!-- new contract: the hand-built form (fields grid + save/cancel) ----------->
+<template data-tpl="add-card"><div class="card"><div class="card-body"><div class="grid-auto" data-slot="fields"></div><div class="mt-3"><button class="btn btn-primary" data-slot="save"><i class="bi bi-check-lg"></i> Save Contract</button><a class="btn btn-ghost ml-2" href="#/travels/contract-file/contracts">Cancel</a></div></div></div></template>
+<template data-tpl="field-text"><div class="field"><label data-slot="label"></label><input class="input" data-slot="input"></div></template>
+<template data-tpl="field-select"><div class="field"><label data-slot="label"></label><select class="select" data-slot="input"></select></div></template>
+
+<!-- documents: card shell + table + one row --------------------------------->
+<template data-tpl="docs-card"><div class="card"><div class="card-head"><h3><i class="bi bi-folder2-open"></i> Documents</h3><span class="card-sub" data-slot="sub"></span></div><div class="table-wrap"><table class="tbl"><thead><tr><th>Document</th><th>Contract</th><th>Counterparty</th><th>Validity</th><th>Status</th></tr></thead><tbody data-slot="rows"></tbody></table></div></div></template>
+<template data-tpl="docs-row"><tr><td><span><i class="bi bi-file-earmark-pdf"></i> </span><span class="strong" data-slot="doc"></span></td><td data-slot="ref"></td><td data-slot="counterparty"></td><td data-slot="validity"></td><td data-slot="status"></td></tr></template>
