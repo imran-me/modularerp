@@ -227,7 +227,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    fit, the row scrolls sideways. A thin but VISIBLE scrollbar keeps off-screen
    tabs discoverable — the concern that originally motivated wrapping. */
 .pill-tab { display:inline-flex; gap:4px; background: var(--surface-2); border:1px solid var(--border);
-  border-radius: var(--r-pill); padding:4px; max-width:100%; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; scrollbar-width:thin; }
+  border-radius: var(--r-pill); padding:4px; max-width:100%; flex-wrap:wrap; }
 /* Type is a fixed scale step; only the PADDING stays fluid. The nav used to size
    its text with clamp(…vw…) to force one row — but that produced off-scale sizes
    (11.5 / 12.5 / 16.4px, part of the 15-size sprawl) AND it still clipped, which
