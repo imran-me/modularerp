@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Route;
 // Chart of Accounts — the group-wide account list (real `accounts` table),
 // returned in the shape the frontend ledger expects.
 Route::get('group/master-accounts/accounts', [AccountController::class, 'index']);
+Route::post('group/master-accounts/accounts', [AccountController::class, 'store']);
 
 // Bank accounts (real `banks` table) — frontend `banks` store.
 Route::get('group/master-accounts/banks', [BankController::class, 'index']);

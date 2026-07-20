@@ -60,6 +60,7 @@
    * ledger-affecting stores like coa/gl_entries stay read-only until the
    * corrected posting logic is built). Rolled out module by module. */
   var WRITABLE = {
+    coa:       'group/master-accounts/accounts',   // ADD a chart-of-accounts head only (definition, not a posting) — via db.save('coa', rec)
     customers: 'group/master-accounts/customers',
     suppliers: 'group/master-accounts/suppliers',
     banks:     'group/master-accounts/banks',

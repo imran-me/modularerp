@@ -1051,9 +1051,12 @@
           var coa = S.list('coa');
           if (coa.some(function (a) { return a.code === code; })) { ui.toast('Account ' + code + ' already exists', 'error'); return false; }
           var type = val.type;
-          coa.push({ id: code, code: code, name: (val.name || '').trim() || code, type: type,
+          // db.save (NOT S.set) so the write-through layer sees a data:changed
+          // event and persists the new head to the real accounts table (coa is
+          // WRITABLE for ADD only — see platform/data/api.js). Demo mode just
+          // keeps it local, exactly as before.
+          db.save('coa', { id: code, code: code, name: (val.name || '').trim() || code, type: type,
             normal: (type === 'asset' || type === 'expense') ? 'debit' : 'credit', group: val.group || 'Other', intercompany: false });
-          S.set('coa', coa);
           ui.toast('Account ' + code + ' added', 'success'); EPAL.router.render(); return true;
         }
       });
