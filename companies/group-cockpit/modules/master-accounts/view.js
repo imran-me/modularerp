@@ -1322,6 +1322,17 @@
       }).sort(newestFirst);
     }
     function stat(l, v, cls) { return el('div.stat', null, [ el('div.stat-label', { text: l }), el('div.stat-value.num' + (cls || ''), { html: v }) ]); }
+    // richer stat for the headline balances — a colour-coded icon chip + label +
+    // value (premium hierarchy; owner: make the bank detail more beautiful).
+    function bstat(label, value, icon, tone, valCls) {
+      return el('div.stat', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
+        el('span.notif-ico.notif-' + (tone || 'info'), { html: ui.icon(icon) }),
+        el('div.min-w-0.flex-1', null, [
+          el('div.stat-label', { text: label }),
+          el('div.stat-value.num' + (valCls || ''), { html: value })
+        ])
+      ]);
+    }
     function drcr(v) { v = +v || 0; return ui.money(Math.abs(v)) + (v < 0 ? ' Cr' : ' Dr'); }
     function printLabel() {
       var d = state.dir === 'in' ? 'In only' : state.dir === 'out' ? 'Out only' : 'All';
@@ -1379,10 +1390,10 @@
 
       // ---- opening / debit / credit / closing ----
       host.appendChild(el('div.stat-row.mb-2', null, [
-        stat('Opening Balance', drcr(opening)),
-        stat('Total Debit (In)', '<span class="text-good">' + ui.money(tin) + '</span>'),
-        stat('Total Credit (Out)', '<span class="text-bad">' + ui.money(tout) + '</span>'),
-        stat('Closing Balance', drcr(closing), closing < 0 ? '.text-bad' : '')
+        bstat('Opening Balance', drcr(opening), 'flag-fill', 'info'),
+        bstat('Total Debit (In)', ui.money(tin), 'arrow-down-left-circle-fill', 'good', '.text-good'),
+        bstat('Total Credit (Out)', ui.money(tout), 'arrow-up-right-circle-fill', 'error', '.text-bad'),
+        bstat('Closing Balance', drcr(closing), 'safe2', closing < 0 ? 'error' : 'accent', closing < 0 ? '.text-bad' : '')
       ]));
 
       // ---- filter bar ----
