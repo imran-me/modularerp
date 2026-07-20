@@ -298,19 +298,60 @@
   function kv(k, v) { return el('div.field', null, [ el('label', { text:k }), el('div.fw-600', { text: v == null ? '—' : String(v) }) ]); }
 
   /* ---- ATTENDANCE -------------------------------------------------------*/
+  /* Local YYYY-MM-DD for an offset from today (0 = today, -1 = yesterday). */
+  function ymd(offset) { var d = new Date(); d.setDate(d.getDate() + (offset || 0)); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+  /* DAY-BASIS attendance totals for one date. On the real backend this hits the
+   * per-day endpoint (GET group/employees/attendance?date=…); in demo mode it
+   * counts the local attendance_log punches for that date. Always calls back. */
+  function attendanceDayTotals(date, cb) {
+    var zero = { present:0, absent:0, late:0, leave:0 };
+    if (EPAL.api && EPAL.api.enabled && EPAL.api.enabled()) {
+      EPAL.api.call('group/employees/attendance?date=' + encodeURIComponent(date))
+        .then(function (j) { cb((j && j.totals) || zero); }, function () { cb(zero); });
+    } else {
+      var t = { present:0, absent:0, late:0, leave:0 };
+      (db.col ? db.col('attendance_log') : []).forEach(function (r) { if (r.date === date && t[r.status] != null) t[r.status]++; });
+      cb(t);
+    }
+  }
+
   function renderAttendance(page) {
     var host = el('div');
     page.appendChild(host);
+    var selDate = ymd(0);                       // day-basis KPI date — defaults to today
     draw();
 
     function draw() {
       host.innerHTML = '';
       var emps = db.employees();
-      var totals = emps.reduce(function (a, e) { var t = e.attendance || {}; a.p += t.present||0; a.ab += t.absent||0; a.l += t.late||0; a.lv += t.leave||0; return a; }, { p:0, ab:0, l:0, lv:0 });
-      host.appendChild(el('div.kpi-grid', null, [
-        kpi('Total Present', totals.p, 'check2-circle'), kpi('Total Absent', totals.ab, 'x-circle'),
-        kpi('Late Arrivals', totals.l, 'alarm'), kpi('On Leave', totals.lv, 'airplane')
+
+      // Day selector — Today / Yesterday / custom date. Drives the KPI strip only
+      // (owner: matrix stays month-basis). Present/Absent/Late/On Leave then read
+      // the chosen calendar day, not the running month.
+      var today = ymd(0), yday = ymd(-1);
+      host.appendChild(el('div.flex.items-center.gap-2.mb-3.flex-wrap', null, [
+        el('span.text-mute.sm', { text: 'KPIs for' }),
+        el('button.btn.btn-sm' + (selDate === today ? '.btn-primary' : '.btn-ghost'), { text: 'Today', onclick: function () { selDate = today; draw(); } }),
+        el('button.btn.btn-sm' + (selDate === yday ? '.btn-primary' : '.btn-ghost'), { text: 'Yesterday', onclick: function () { selDate = yday; draw(); } }),
+        el('input.input', { type: 'date', value: selDate, max: today, style: { maxWidth: '170px' }, onchange: function (e) { if (e.target.value) { selDate = e.target.value; draw(); } } })
       ]));
+
+      // KPI strip — day-basis. Rendered immediately, filled once the totals resolve
+      // (a round-trip on the real backend); a placeholder keeps the layout stable.
+      var kgrid = el('div.kpi-grid', null, [
+        kpi('Total Present', '…', 'check2-circle'), kpi('Total Absent', '…', 'x-circle'),
+        kpi('Late Arrivals', '…', 'alarm'), kpi('On Leave', '…', 'airplane')
+      ]);
+      host.appendChild(kgrid);
+      attendanceDayTotals(selDate, function (t) {
+        kgrid.innerHTML = '';
+        kgrid.appendChild(kpi('Total Present', t.present, 'check2-circle'));
+        kgrid.appendChild(kpi('Total Absent', t.absent, 'x-circle'));
+        kgrid.appendChild(kpi('Late Arrivals', t.late, 'alarm'));
+        kgrid.appendChild(kpi('On Leave', t.leave, 'airplane'));
+      });
+
       host.appendChild(el('div.flex.justify-between.items-center.mb-2', null, [
         el('div.section-label', { style:{ margin:'0' }, text:'Attendance Matrix · ' + payPeriod() }),
         el('button.btn.btn-primary.btn-sm', { html: ui.icon('clock') + ' Punch / Adjust', onclick: function () { punchModal(null, draw); } })

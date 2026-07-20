@@ -179,6 +179,49 @@ class EmployeeController
         ]);
     }
 
+    /**
+     * DAY-BASIS attendance totals for the KPI strip (Present / Absent / Late /
+     * On Leave) — one calendar date, across the requester's visible workforce.
+     * The real `attendances` status enum is present|absent|leave|holiday (no
+     * 'late'), so Late is DERIVED: a present punch whose check-in is after the
+     * grace cutoff (default 09:15) is a late arrival (still counted present).
+     *   GET group/employees/attendance?date=YYYY-MM-DD   (date defaults to today)
+     */
+    public function attendanceByDate(Request $request): JsonResponse
+    {
+        $date   = $request->query('date') ?: now()->toDateString();
+        $cutoff = $request->query('lateAfter') ?: '09:15:00';
+        $cid    = $this->requesterCompanyId($request);
+
+        $rows = DB::table('attendances as a')
+            ->join('users as u', 'u.id', '=', 'a.user_id')
+            ->whereNull('u.deleted_at')
+            ->when($cid, fn ($q) => $q->where('u.company_id', $cid))
+            ->whereDate('a.date', $date)
+            ->get(['a.status', 'a.check_in']);
+
+        $present = 0; $absent = 0; $leave = 0; $late = 0;
+        foreach ($rows as $r) {
+            if ($r->status === 'present') {
+                $present++;
+                $t = $r->check_in ? date('H:i:s', strtotime((string) $r->check_in)) : null;
+                if ($t && $t > $cutoff) {
+                    $late++;
+                }
+            } elseif ($r->status === 'absent') {
+                $absent++;
+            } elseif ($r->status === 'leave') {
+                $leave++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'date'    => $date,
+            'totals'  => ['present' => $present, 'absent' => $absent, 'late' => $late, 'leave' => $leave],
+        ]);
+    }
+
     private function present(object $e): array
     {
         $companyId = self::COMPANY_SLUG[(int) $e->company_id] ?? 'group';

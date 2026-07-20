@@ -21,6 +21,10 @@ Route::get('group/employees/directory', [EmployeeController::class, 'index']);
 Route::post('group/employees/directory', [EmployeeController::class, 'store']);
 Route::delete('group/employees/directory/{id}', [EmployeeController::class, 'destroy']);
 
+// Day-basis attendance KPI totals (Present / Absent / Late / On Leave) for one
+// date — drives the date selector on the Attendance screen. Read-only.
+Route::get('group/employees/attendance', [EmployeeController::class, 'attendanceByDate']);
+
 // Performance reviews — the real rating source (frontend `perf_reviews` store).
 Route::get('group/employees/reviews', [PerformanceController::class, 'index']);
 Route::post('group/employees/reviews', [PerformanceController::class, 'store']);
