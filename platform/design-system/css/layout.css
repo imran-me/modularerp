@@ -70,27 +70,37 @@
   background: color-mix(in srgb, var(--surface) 65%, var(--bg));
   border-right: 1px solid var(--border); min-height: 0; z-index: 30;
 }
-.sidebar-head { padding: 16px 16px 12px; border-bottom: 1px solid var(--border); }
+/* Header padding scales with viewport height so it gives the nav more room on
+   short windows / high zoom (part of the responsive-fit behaviour below). */
+.sidebar-head { padding: clamp(9px, 1.5vh, 16px) 16px clamp(7px, 1.1vh, 12px); border-bottom: 1px solid var(--border); }
 .side-co { display: flex; align-items: center; gap: 12px; }
 .side-co-ico {
-  width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none;
-  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 19px;   /* icon glyph box, not type */
+  width: clamp(30px, 4.4vh, 40px); height: clamp(30px, 4.4vh, 40px); border-radius: 12px; display: grid; place-items: center; flex: none;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: clamp(15px, 2.4vh, 19px);   /* icon glyph box, not type */
   border: 1px solid var(--border-accent);
 }
-.side-co-name { font-family: var(--font-display); font-weight: 700; font-size: var(--fs-lead); line-height: 1.15; }
+.side-co-name { font-family: var(--font-display); font-weight: 700; font-size: clamp(14px, 1.95vh, var(--fs-lead)); line-height: 1.15; }
 .side-co-tag { font-size: var(--fs-tiny); color: var(--text-mute); margin-top: 2px; }
 
-.nav { flex: 1; overflow-y: auto; padding: 10px 10px 20px; display: flex; flex-direction: column; gap: 2px; }
-.nav::-webkit-scrollbar { width: 6px; }
+/* RESPONSIVE-FIT NAV (owner directive): the menu must fit the window at 100% and
+   keep fitting as you zoom — instead of a fixed-px list that overflows into a
+   scrollbar on shorter windows. Item padding / font / icon / gap are sized in
+   `vh` (a fraction of the viewport height) clamped between a readable min and the
+   original size, so the whole menu scales down to fit and grows back on tall
+   screens. overflow-y stays auto purely as a safety net for extreme cases. */
+.nav { flex: 1; overflow-y: auto; padding: clamp(3px, 0.7vh, 10px) 10px clamp(6px, 1.2vh, 20px); display: flex; flex-direction: column; gap: clamp(0px, 0.08vh, 2px); }
+/* overlay-style thin scrollbar (only the extreme case ever needs it) */
+.nav { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.nav::-webkit-scrollbar { width: 4px; }
 .nav-item {
-  display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: var(--r-sm);
-  color: var(--text-dim); font-weight: 500; font-size: var(--fs-body); position: relative; transition: all var(--t-fast);
+  display: flex; align-items: center; gap: 10px; padding: clamp(1.5px, 0.5vh, 9px) 11px; border-radius: var(--r-sm);
+  color: var(--text-dim); font-weight: 500; font-size: clamp(10.5px, 1.35vh, var(--fs-body)); line-height: 1.2; position: relative; transition: all var(--t-fast);
 }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item.active { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font-weight: 600; }
 .nav-item.active .nav-ico { color: var(--accent); }
 .nav-item.active::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:3px; background: var(--accent); }
-.nav-ico { width: 22px; display: grid; place-items: center; color: var(--text-mute); font-size: 15px; transition: color var(--t-fast); }
+.nav-ico { width: 22px; display: grid; place-items: center; color: var(--text-mute); font-size: clamp(13px, 1.7vh, 15px); transition: color var(--t-fast); }
 .nav-label { flex: 1; }
 .nav-badge { font-size: var(--fs-micro); font-weight: 800; padding: 2px 7px; border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); text-transform: uppercase; letter-spacing: .03em; }
@@ -107,8 +117,8 @@
 .nav-group.open .nav-subs { grid-template-rows: 1fr; }
 .nav-subs-inner { overflow: hidden; min-height: 0; padding-left: 22px; }
 .nav-sub {
-  display: flex; align-items: center; gap: 10px; padding: 7px 11px; border-radius: var(--r-xs);
-  color: var(--text-mute); font-size: var(--fs-small); transition: all var(--t-fast);
+  display: flex; align-items: center; gap: 10px; padding: clamp(1px, 0.36vh, 7px) 11px; border-radius: var(--r-xs);
+  color: var(--text-mute); font-size: clamp(9.5px, 1.18vh, var(--fs-small)); line-height: 1.2; transition: all var(--t-fast);
 }
 .nav-sub:hover { color: var(--text); background: var(--surface-2); }
 .nav-sub.active { color: var(--accent); font-weight: 600; }
@@ -117,9 +127,10 @@
 
 /* user card at sidebar foot */
 .user-card {
-  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; padding: clamp(6px, 1vh, 12px) 14px; border-top: 1px solid var(--border);
   cursor: pointer; transition: background var(--t);
 }
+.user-card .avatar { width: clamp(28px, 3.9vh, 34px); height: clamp(28px, 3.9vh, 34px); }   /* shrink only the sidebar-foot avatar on short windows */
 .user-card:hover { background: var(--surface-2); }
 .avatar { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 12.5px; flex: none; }
 .avatar.lg { width: 46px; height: 46px; border-radius: 13px; font-size: 15px; }
