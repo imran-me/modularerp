@@ -424,8 +424,11 @@ class EmployeeController
     }
 
     /** Soft-delete only (this is the login table — a hard delete of a `users`
-     *  row would cascade oddly against anything still referencing it). */
-    public function destroy(string $id): JsonResponse
+     *  row would cascade oddly against anything still referencing it).
+     *  GUARDED: a super-admin is a LOGIN account, and so is the requester —
+     *  deleting the super-admin from the workforce soft-deleted the login row
+     *  and locked everyone out (real incident 2026-07-20). Both are refused. */
+    public function destroy(Request $request, string $id): JsonResponse
     {
         $userId = null;
         if (preg_match('/^U-(\d+)$/', $id, $m)) {
@@ -435,6 +438,13 @@ class EmployeeController
             $userId = $row?->id;
         }
         if ($userId) {
+            $target = DB::table('users')->where('id', $userId)->first(['is_super_admin']);
+            if ($target && (int) $target->is_super_admin === 1) {
+                return response()->json(['success' => false, 'message' => 'A super-admin is a login account and cannot be deleted from the workforce.'], 403);
+            }
+            if ((int) $userId === (int) ($request->user()->id ?? 0)) {
+                return response()->json(['success' => false, 'message' => 'You cannot delete your own account.'], 403);
+            }
             DB::table('users')->where('id', $userId)->update(['deleted_at' => now()]);
         }
 

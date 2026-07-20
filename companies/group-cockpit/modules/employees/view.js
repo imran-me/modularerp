@@ -224,6 +224,12 @@
   // Delete one employee (confirm → API soft-delete via db.remove → wireWrites).
   // Shared by the list-view row action and the profile drawer.
   function deleteEmployee(e) {
+    // A super-admin (role admin/owner) is a LOGIN account — deleting it from the
+    // workforce soft-deletes the login row and locks everyone out (real incident
+    // 2026-07-20). Refuse here too, so the button never fires the guarded API.
+    var cur = EPAL.auth.current() || {};
+    if (['admin', 'owner'].indexOf(e.role) >= 0) { ui.toast('A super-admin is a login account and cannot be deleted here.', 'error'); return; }
+    if (e.id === cur.id || (e.email && e.email === cur.email)) { ui.toast('You cannot delete your own account.', 'error'); return; }
     ui.confirm({ title: 'Delete ' + e.name + '?', text: 'Remove ' + e.name + ' from the directory. This cannot be undone.', danger: true, confirmLabel: 'Delete' })
       .then(function (ok) {
         if (!ok) return;
