@@ -1,0 +1,36 @@
+<!-- ============================================================================
+  TRAVELS · FILE MANAGEMENT · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/file-management.js).
+  Cloned + filled at runtime via [data-tpl] / [data-slot] hooks.
+
+  STYLING = the house design system (base.css / components.css) verbatim — the
+  legacy view used NO inline styles here, so there are no Tailwind tw- utilities
+  on this screen. The full register table is built by the shared EPAL.table
+  engine and dropped into the register-card body.
+
+  Each fragment is authored on ONE line — no inter-tag whitespace — so a clone
+  is byte-for-byte the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section band ----------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- KPI grids + one KPI card ------------------------------------------------->
+<template data-tpl="kpi-grid"><div class="kpi-grid stagger"></div></template>
+<template data-tpl="kpi-grid-compact"><div class="kpi-grid kpi-compact stagger"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+
+<!-- all files: card shell wrapping the shared datatable --------------------->
+<template data-tpl="register-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
+
+<!-- add-file: permission-locked state + the intro/new-file card ------------->
+<template data-tpl="add-locked"><div class="empty-state"><i class="bi bi-lock"></i><h3>Not permitted</h3></div></template>
+<template data-tpl="add-card"><div class="card"><div class="card-body"><p class="text-muted mb-3">Create a new embassy file. It appears immediately in All Files and the Slot Tracker.</p><button class="btn btn-primary" data-slot="new"><i class="bi bi-folder-plus"></i> New Embassy File</button></div></div></template>
+
+<!-- slot tracker: empty state + card table + one row ------------------------>
+<template data-tpl="slot-empty"><div class="empty-state"><i class="bi bi-calendar-check"></i><h3>No upcoming slots</h3><p class="text-muted">Booked slots and decisions due within 30 days appear here.</p></div></template>
+<template data-tpl="tracker-card"><div class="card"><div class="card-head"><h3><i class="bi bi-calendar-week"></i> Slot &amp; Decision Tracker</h3></div><div class="table-wrap"><table class="tbl"><thead><tr><th>File</th><th>Applicant</th><th>Country</th><th>Decision Due</th><th>Window</th><th>Status</th></tr></thead><tbody data-slot="rows"></tbody></table></div></div></template>
+<template data-tpl="slot-row"><tr class="row-click"><td data-slot="id"></td><td data-slot="applicant"></td><td data-slot="country"></td><td data-slot="due"></td><td data-slot="window"></td><td data-slot="status"></td></tr></template>
