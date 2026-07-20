@@ -53,8 +53,19 @@
         event line platform/bridge/bridge.js (emit/on + normalized bridge.maps) with
         verify() asserting on-read == sum-of-present (match:true). Additive; on-read
         stays the live source (R4).
-- [ ] **Phase 4 — Tailwind conversion** (screen-by-screen; side-by-side visual
-      diff sign-off; delete old CSS only after ALL screens using it are signed off)
+- [~] **Phase 4 — FRONTEND REBUILD** (owner re-scoped 2026-07-20: not just
+      Tailwind swap — each module's frontend becomes `frontend/template.html`
+      (markup) + `frontend/<id>.js` (logic) + optional `.css`, compiled by
+      `tools/build/build-module.mjs` → the same-path `view.js` the SPA loads.
+      Pixel + behaviour identical, screen-by-screen, verified by
+      `tools/verify/parity.mjs`. Design-system classes stay verbatim (they ARE
+      the frozen pixels); `tw-` utilities used only where inline styles were.
+      **Travels first, then the other companies — one module per commit.**)
+  - [x] **PILOT: passport-mgmt** (3 routes) — PROVEN pixel-identical (parity
+        6/6: light byte-perfect, dark ≤2px AA jitter) + sweep 222/222 both
+        themes, 0 errors. Establishes the pattern + build chain. Commit 7498ec0.
+  - [ ] Scale across the rest of Travels (visa-processing, air-ticketing, crm,
+        vendor-agent, contract-*, …), same pattern, parity-verified per module.
 
 
 ## ⏸ PAUSED at Phase 4 (2026-07-09) — feature-update window
