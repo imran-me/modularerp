@@ -1,0 +1,41 @@
+<!-- ============================================================================
+  TRAVELS · AUTOMATION · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/automation.js). Cloned +
+  filled at runtime via [data-tpl] / [data-slot] hooks.
+
+  Four tabs (overview / rules / radar / markup). The rule-detail MODAL keeps its
+  legacy el()-built DOM in the logic file (with its inline styles) — it opens on
+  click, not part of the default render. STYLING = the house design system;
+  tw- utils only where the legacy captured screens used a static inline style:
+    tw-cursor-pointer == style="cursor:pointer"   (clickable action rows)
+    tw-max-w-[220px]  == style="max-width:220px"    (calculator service select)
+    tw-max-w-[180px]  == style="max-width:180px"    (calculator net-fare input)
+
+  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
+  the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section band ----------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- KPI grid + plain KPI card + drill KPI card ------------------------------>
+<template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+<template data-tpl="kpi-drill"><div class="kpi-card drill"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div><div class="kpi-foot" data-slot="foot"></div></div></template>
+
+<!-- generic bits: section label, plain card (card-body), register card ------>
+<template data-tpl="section-label"><div class="section-label"></div></template>
+<template data-tpl="card-body-card"><div class="card"><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="reg-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
+
+<!-- overview: one "bots would do now" action row (chevron static) ----------->
+<template data-tpl="act-row"><div class="data-row tw-cursor-pointer"><span class="notif-ico" data-slot="ico"></span><div class="flex-1"><span class="strong" data-slot="name"></span><span class="text-dim" data-slot="text"></span></div><span class="badge badge-warn" data-slot="count"></span><span class="text-mute"><i class="bi bi-chevron-right"></i></span></div></template>
+
+<!-- build-banner (icon + html message) ------------------------------------->
+<template data-tpl="build-banner"><div class="build-banner mb-3"><i class="bi" data-slot="ico"></i><div data-slot="msg"></div></div></template>
+
+<!-- markup: live price calculator (service select + net input + result row) -->
+<template data-tpl="calc-card"><div class="card"><div class="card-head"><h3><i class="bi bi-calculator"></i> Live Price Calculator</h3></div><div class="card-body"><div class="flex gap-2 items-end flex-wrap"><div><div class="text-mute sm mb-1">Service</div><select class="select tw-max-w-[220px]" data-slot="svc"></select></div><div><div class="text-mute sm mb-1">Net fare</div><input class="input tw-max-w-[180px]" type="number" min="0" placeholder="Net fare (৳)" data-slot="net"></div></div><div class="stat-row mt-3" data-slot="out"></div></div></div></template>
