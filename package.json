@@ -5,6 +5,7 @@
   "scripts": {
     "tw:build": "tailwindcss -c platform/design-system/tailwind.config.js -i platform/design-system/tailwind.src.css -o platform/design-system/css/tailwind.built.css --minify",
     "tw:watch": "tailwindcss -c platform/design-system/tailwind.config.js -i platform/design-system/tailwind.src.css -o platform/design-system/css/tailwind.built.css --watch",
+    "build:modules": "node tools/build/build-module.mjs --all",
     "verify": "node tools/verify/sweep.mjs both",
     "verify:books": "node tools/verify/books.mjs trial"
   },

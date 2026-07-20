@@ -1,0 +1,42 @@
+<!-- ============================================================================
+  PASSPORT MANAGEMENT · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/passport-mgmt.js).
+  Cloned + filled at runtime by that file via [data-tpl] / [data-slot] hooks.
+
+  STYLING = the house design system (base.css / components.css) — those classes
+  ARE the pixels the owner froze, so they stay verbatim (e.g. `flex items-center
+  gap-2` is the house 12px-gap flex row, NOT Tailwind's tw-gap-2=8px). Tailwind
+  tw- utilities appear ONLY where the legacy view used an inline style:
+  `tw-text-[24px]` == the old `style="font-size:24px"` (font-size only → no
+  line-height drift). Add more tw- utilities here as new styling is needed.
+
+  Each fragment is authored on ONE line — no inter-tag whitespace — so a
+  clone is byte-for-byte the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section band ------------------------------------------------>
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- KPI grids + one KPI card ------------------------------------------------->
+<template data-tpl="kpi-grid"><div class="kpi-grid stagger"></div></template>
+<template data-tpl="kpi-grid-compact"><div class="kpi-grid kpi-compact stagger"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+
+<!-- categories: label + grid + one document-type card ----------------------->
+<template data-tpl="section-label"><div class="section-label mt-0"></div></template>
+<template data-tpl="type-grid"><div class="grid-auto kpi-compact stagger"></div></template>
+<template data-tpl="type-card"><a class="card tier-card"><div class="card-pad"><div class="flex items-center gap-2"><span class="notif-ico notif-info" data-slot="ico"></span><div class="flex-1"><div class="fw-700" data-slot="type"></div><div class="text-mute sm">document type</div></div><div class="kpi-value tw-text-[24px]" data-slot="count"></div></div></div></a></template>
+
+<!-- holders: card shell wrapping the shared datatable ----------------------->
+<template data-tpl="register-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
+
+<!-- expiry radar: card shell (table-wrap body, not card-body) + table + row -->
+<template data-tpl="radar-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="table-wrap" data-slot="tablewrap"></div></div></template>
+<template data-tpl="radar-table"><table class="tbl"><thead><tr><th>Holder</th><th>Passport No</th><th>Type</th><th>Expiry</th><th>Window</th><th></th></tr></thead><tbody data-slot="rows"></tbody></table></template>
+<template data-tpl="radar-row"><tr class="row-click"><td data-slot="holder"></td><td data-slot="passportNo"></td><td data-slot="type"></td><td data-slot="expiry"></td><td data-slot="window"></td><td data-slot="actions"></td></tr></template>
+
+<!-- expiry radar: empty state ------------------------------------------------>
+<template data-tpl="empty"><div class="empty-state"><i class="bi bi-radar"></i><h3>Nothing expiring soon</h3><p class="text-muted">Passports expiring within 12 months appear here.</p></div></template>
