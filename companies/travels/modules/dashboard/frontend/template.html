@@ -1,0 +1,57 @@
+<!-- ============================================================================
+  TRAVELS · DASHBOARD · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/dashboard.js). Cloned +
+  filled at runtime via [data-tpl] / [data-slot] hooks.
+
+  STYLING = the house design system verbatim. Tailwind tw- utilities appear ONLY
+  where the legacy view used a static inline style, one property each (zero drift):
+    tw-cursor-pointer == style="cursor:pointer"   (click-through rows)
+    tw-ml-auto        == style="margin-left:auto"  (card-head right cluster)
+    tw-h-[260px]      == style="height:260px"       (chart containers)
+    tw-relative       == style="position:relative"
+    tw-w-[90px]       == style="width:90px"          (destination progress track)
+    tw-text-[20px]/[18px] == style="font-size:20/18px" (flag glyphs)
+  The DYNAMIC progress-bar width (data-driven %) stays an inline style, set in
+  logic — a runtime value, not expressible as a static utility.
+
+  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
+  the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell ------------------------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+
+<!-- KPI card (drill variant + trend foot added in logic) ------------------->
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div><div class="kpi-foot" data-slot="foot"></div></div></template>
+<template data-tpl="kpi-grid"><div class="kpi-grid stagger"></div></template>
+
+<!-- generic section label + two-column row shell --------------------------->
+<template data-tpl="section-label"><div class="section-label"></div></template>
+<template data-tpl="two-col"><div class="two-col"></div></template>
+
+<!-- Action Center: card + one alert row (chevron is static) ---------------->
+<template data-tpl="ac-card"><div class="card"><div class="card-body" data-slot="rows"></div></div></template>
+<template data-tpl="ac-row"><div class="data-row tw-cursor-pointer"><span class="notif-ico" data-slot="ico"></span><div class="flex-1"><span class="strong" data-slot="n"></span><span class="text-dim" data-slot="text"></span></div><span class="text-mute"><i class="bi bi-chevron-right"></i></span></div></template>
+
+<!-- Payment Schedule widget: card (custom head) + stat row + row + empty --->
+<template data-tpl="sched-card"><div class="card mb-3"><div class="card-head"><h3><i class="bi bi-calendar-week"></i> Payment Schedule</h3><div class="flex gap-1 tw-ml-auto"><button class="btn btn-sm btn-ghost" data-slot="print"><i class="bi bi-printer"></i> Print Sheet</button><button class="btn btn-sm btn-primary" data-slot="add"><i class="bi bi-plus-lg"></i> Add Schedule</button></div></div><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="sched-stats"><div class="stat-row mb-2"><div class="stat"><div class="stat-label">Next 7 days</div><div class="stat-value" data-slot="s7"></div></div><div class="stat"><div class="stat-label">Next 15 days</div><div class="stat-value" data-slot="s15"></div></div></div></template>
+<template data-tpl="sched-empty"><div class="text-mute sm">Nothing due in the next 15 days.</div></template>
+<template data-tpl="sched-row"><div class="data-row tw-cursor-pointer"><span class="notif-ico" data-slot="ico"></span><div class="flex-1"><div class="fw-600 sm" data-slot="party"></div><div class="text-mute xs" data-slot="desc"></div></div><div class="strong" data-slot="amount"></div></div></template>
+
+<!-- Flight Deadlines widget: card (head with static board link) + shared row -->
+<template data-tpl="flight-card"><div class="card mb-3"><div class="card-head"><h3><i class="bi bi-broadcast"></i> Flight Deadlines</h3><a class="btn btn-sm btn-ghost tw-ml-auto" href="#/travels/contract-flight/day-board"><i class="bi bi-calendar-day"></i> Departures Board</a></div><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="flight-row"><div class="data-row tw-cursor-pointer"><span class="notif-ico" data-slot="ico"></span><div class="flex-1"><div class="fw-600 sm" data-slot="title"></div><div class="text-mute xs" data-slot="sub"></div></div><span class="badge" data-slot="badge"></span></div></template>
+
+<!-- trend + visa-funnel cards (canvas containers are static) --------------->
+<template data-tpl="trend-card"><div class="card"><div class="card-head"><h3><i class="bi bi-activity"></i> Sales &amp; Profit Trend</h3><span class="card-sub">monthly</span></div><div class="card-body"><div class="tw-h-[260px] tw-relative"><canvas id="tv-trend"></canvas></div></div></div></template>
+<template data-tpl="stages-card"><div class="card"><div class="card-head"><h3><i class="bi bi-diagram-2"></i> Visa Pipeline</h3></div><div class="card-body"><div class="tw-h-[260px] tw-relative"><canvas id="tv-stages"></canvas></div></div></div></template>
+
+<!-- Top destinations card + row (progress-bar width set in logic) ---------->
+<template data-tpl="dest-card"><div class="card"><div class="card-head"><h3><i class="bi bi-geo-alt-fill"></i> Top Destinations</h3></div><div class="card-body"><div class="data-list" data-slot="rows"></div></div></div></template>
+<template data-tpl="dest-row"><div class="data-row"><span class="tw-text-[20px]" data-slot="flag"></span><div class="flex-1 fw-600" data-slot="country"></div><div class="progress tw-w-[90px]"><div class="progress-bar" data-slot="bar"></div></div><span class="badge badge-accent" data-slot="apps"></span></div></template>
+
+<!-- Recent applications card + row ---------------------------------------->
+<template data-tpl="recent-card"><div class="card"><div class="card-head"><h3><i class="bi bi-clock-history"></i> Recent Applications</h3><a class="link-btn" href="#/travels/visa-processing/application-board">View board</a></div><div class="card-body"><div class="data-list" data-slot="rows"></div></div></div></template>
+<template data-tpl="recent-row"><div class="data-row tw-cursor-pointer"><span class="tw-text-[18px]" data-slot="flag"></span><div class="flex-1"><div class="fw-600 sm" data-slot="applicant"></div><div class="text-mute xs" data-slot="sub"></div></div><span data-slot="badge"></span></div></template>
