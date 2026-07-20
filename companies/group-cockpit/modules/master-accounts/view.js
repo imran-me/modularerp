@@ -1233,8 +1233,23 @@
     var txns = S.list('bank_txns');
     var detailHost = el('div.mt-3');        // the clicked account's ledger renders INLINE here (not a modal)
     var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
+    // in/out sense for a txn — used to walk a bank's opening back from its
+    // current (closing) balance, and to label the last movement on the card.
+    var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in'; };
+    // one line of the green Opening/Closing/Last-Tranx meta column — a quiet
+    // green label + a strong value, 10% smaller than the card body (owner spec).
+    function metaRow(label, value, valCls) {
+      return el('div', { style: { whiteSpace: 'nowrap', lineHeight: '1.5' } }, [
+        el('span', { style: { color: 'var(--good)' }, text: label + ': ' }),
+        el('span.strong' + (valCls || ''), { text: value })
+      ]);
+    }
     banks.forEach(function (b) {
-      var last = txns.filter(function (t) { return t.bankId === b.id; }).sort(function (x, y) { return (x.date < y.date ? 1 : -1); })[0];
+      var mine = txns.filter(function (t) { return t.bankId === b.id; });
+      var last = mine.slice().sort(function (x, y) { return (x.date < y.date ? 1 : -1); })[0];
+      var closing = +b.balance || 0;
+      var opening = closing - mine.reduce(function (a, t) { return a + (isIn(t) ? (+t.amount || 0) : -(+t.amount || 0)); }, 0);
+      var lastStr = last ? ui.money(last.amount) + (last.memo ? ' (' + last.memo + ')' : '') : '—';
       var card = el('div.card.hover', { style: { cursor: 'pointer' }, onclick: function () {
           ui.$$('.card', grid).forEach(function (c) { c.classList.remove('sel'); });
           card.classList.add('sel');
@@ -1242,15 +1257,15 @@
           detailHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } }, [
         el('div.card-pad', null, [
+          // header — avatar · name/branch · status · edit/delete (unchanged actions)
           el('div.flex.items-center.gap-2.mb-2', null, [
-            el('div.avatar', { style: { background: ui.colorFor(b.name), width: '34px', height: '34px', fontSize: '13px' },
+            el('div.avatar', { style: { background: ui.colorFor(b.name), width: '32px', height: '32px', fontSize: '12px' },
               html: '<i class="bi bi-' + (b.type === 'Cash Box' ? 'cash-stack' : 'bank') + '"></i>' }),
             el('div.flex-1.min-w-0', null, [
-              el('div.fw-700', { text: b.name }),
+              el('div.fw-700', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: b.name }),
               el('div.text-mute.xs', { text: coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '') })
             ]),
             (b.status || 'Active') === 'Inactive' ? el('span.badge', { text: 'Inactive' }) : el('span.badge.badge-good', { text: 'Active' }),
-            // edit + delete, right on the card (don't open the ledger)
             canCreate() ? el('div.flex.gap-1', null, [
               el('button.icon-btn.btn-sm', { title: 'Edit', html: ui.icon('pencil'),
                 onclick: function (e) { e.stopPropagation(); editBank(b); } }),
@@ -1258,8 +1273,18 @@
                 onclick: function (e) { e.stopPropagation(); deleteBank(b); } })
             ]) : null
           ]),
-          el('div.num.strong' + ((+b.balance || 0) < 0 ? '.text-bad' : ''), { style: { fontSize: '22px' }, text: ui.money(b.balance) }),
-          el('div.text-mute.xs.mt-1', { text: (b.account ? 'A/C ' + b.account + ' · ' : '') + (last ? 'Last: ' + ui.date(last.date) : 'No transactions yet') })
+          // body — balance + A/C on the left, green Opening/Closing/Last-Tranx on the right
+          el('div.flex.items-end.justify-between.gap-3', null, [
+            el('div.min-w-0', null, [
+              el('div.num.strong' + (closing < 0 ? '.text-bad' : ''), { style: { fontSize: '20px', lineHeight: '1.15' }, text: ui.money(b.balance) }),
+              el('div.text-mute.xs.mt-1', { text: b.account ? 'A/C ' + b.account : '—' })
+            ]),
+            el('div', { style: { borderLeft: '2px solid var(--good)', paddingLeft: '10px', fontSize: '90%' } }, [
+              metaRow('Opening', ui.money(opening)),
+              metaRow('Closing', ui.money(closing), closing < 0 ? '.text-bad' : ''),
+              metaRow('Last Tranx', lastStr)
+            ])
+          ])
         ])
       ]);
       grid.appendChild(card);
