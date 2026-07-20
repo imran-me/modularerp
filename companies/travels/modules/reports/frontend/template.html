@@ -1,0 +1,37 @@
+<!-- ============================================================================
+  TRAVELS · REPORTS · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/reports.js). Cloned +
+  filled at runtime via [data-tpl] / [data-slot] hooks.
+
+  This screen is a searchable CATALOGUE of report cards. Each report's data
+  (build() → {kpis, columns, rows}) and its PREVIEW MODAL / print sheet stay in
+  the logic file — the modal is not part of the default render, so it keeps its
+  legacy el()-built DOM. STYLING = the house design system verbatim; tw- utils
+  only where the legacy view used a static inline style:
+    tw-cursor-pointer == style="cursor:pointer"  (clickable report card)
+    tw-max-w-[320px]   == style="max-width:320px" (the search box)
+
+  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
+  the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell -------------------------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+
+<!-- KPI grid + one KPI card (also reused by the preview modal in logic) ----->
+<template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+
+<!-- catalogue header row: label + live search box --------------------------->
+<template data-tpl="search-row"><div class="flex justify-between items-center flex-wrap gap-2 mb-2"><div class="section-label mt-0">Report Catalogue</div><input class="input tw-max-w-[320px]" type="search" placeholder="Search reports…" data-slot="q"></div></template>
+
+<!-- a group heading (icon + label set in logic) + the cards grid ----------->
+<template data-tpl="group-label"><div class="section-label"></div></template>
+<template data-tpl="grid-auto"><div class="grid-auto stagger"></div></template>
+
+<!-- one report card (opens its preview on click) --------------------------->
+<template data-tpl="report-card"><div class="card hover tw-cursor-pointer"><div class="card-body"><div class="flex items-center gap-2"><div class="scaffold-ico" data-slot="ico"></div><div class="flex-1"><h4 data-slot="title"></h4><p class="text-mute sm" data-slot="desc"></p></div><i class="bi bi-eye text-accent"></i></div></div></div></template>
+
+<!-- empty state (no search matches) ---------------------------------------->
+<template data-tpl="empty-state"><div class="empty-state"><i class="bi bi-search"></i><h3>No matching reports</h3></div></template>
