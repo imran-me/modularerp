@@ -1,0 +1,45 @@
+<!-- ============================================================================
+  TRAVELS · PAYROLL · MARKUP  (company-agnostic — registered for every concern)
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +
+  filled at runtime via [data-tpl] / [data-slot] hooks.
+
+  Six tabs (template / manage / loans / payslip / advance / reports), rendered
+  BOTH standalone (cid/payroll/…) and embedded in Master Accounts via
+  EPAL.payrollDesk. Every modal/form (manage-salary, correction/edit, print-
+  sheet, pay, money, encashment) keeps its legacy el()-built DOM, as do the
+  compound-styled leaf helpers formField() and field() (label+control rows with
+  inline padding/width — impractical as utilities). STYLING = the house design
+  system; the only new tw util is tw-max-w-[230px] (the run's month select). The
+  salary-sheet body keeps its .tbl-dense modifier (owner: fit without h-scroll).
+
+  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
+  the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section band ----------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- KPI grid + one KPI card + a two-column row ------------------------------>
+<template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+<template data-tpl="two-col"><div class="two-col"></div></template>
+
+<!-- generic cards: plain (body), register (head+sub+body), head-only -------->
+<template data-tpl="card-body-card"><div class="card"><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="reg-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="head-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3></div><div class="card-body" data-slot="body"></div></div></template>
+
+<!-- Salary Manage: the run-control card + the .tbl-dense salary sheet -------->
+<template data-tpl="run-card"><div class="card mb-3"><div class="card-body"><div class="flex justify-between items-center flex-wrap gap-2"><div class="flex items-center gap-2 flex-wrap" data-slot="left"></div><div class="flex gap-1 flex-wrap" data-slot="actions"></div></div><div class="text-mute sm mt-2" data-slot="status"></div></div></div></template>
+<template data-tpl="salary-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body tbl-dense" data-slot="body"></div></div></template>
+<template data-tpl="grid-auto-compact"><div class="grid-auto kpi-compact"></div></template>
+<template data-tpl="pay-tier-card"><div class="card tier-card"><div class="card-pad"><div class="fw-700" data-slot="name"></div><div class="text-mute sm" data-slot="out"></div><span class="badge" data-slot="badge"></span></div></div></template>
+
+<!-- Payslip: the employee/month/view-statement picker row ------------------->
+<template data-tpl="pick-card"><div class="card mb-3"><div class="card-body"><div class="flex gap-2 flex-wrap items-end" data-slot="row"></div></div></div></template>
+
+<!-- a plain "New …" button row (loans/advance disburse) -------------------->
+<template data-tpl="btn-row"><div class="mb-3"><button class="btn btn-primary" data-slot="btn"></button></div></template>
