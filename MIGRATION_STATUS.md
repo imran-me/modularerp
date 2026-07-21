@@ -64,8 +64,15 @@
   - [x] **PILOT: passport-mgmt** (3 routes) — PROVEN pixel-identical (parity
         6/6: light byte-perfect, dark ≤2px AA jitter) + sweep 222/222 both
         themes, 0 errors. Establishes the pattern + build chain. Commit 7498ec0.
-  - [ ] Scale across the rest of Travels (visa-processing, air-ticketing, crm,
-        vendor-agent, contract-*, …), same pattern, parity-verified per module.
+  - [~] **Scaling across Travels — 11 of 18 modules converted** (each has
+        `frontend/{template.html,<id>.js}` + built `view.js`, committed as
+        `feat(rebuild): …`): settings, file-management, contract-file, dashboard,
+        analytics, reports, automation, crm, ledgers, payroll, passport-mgmt.
+        **Remaining legacy (7):** marketing, contract-flight, hrm, visa-processing,
+        accounts, vendor-agent, air-ticketing (smallest → largest). Verified on
+        this machine 2026-07-21 via the AUTO-GENERATED header + frontend/ presence
+        (the trackers had lagged behind the actual commits on origin/main).
+  - [ ] Convert the remaining 7, simplest-first, same parity-verified pattern.
 
 
 ## ⏸ PAUSED at Phase 4 (2026-07-09) — feature-update window

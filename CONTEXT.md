@@ -38,19 +38,35 @@ honoured — edits are file-only. Options (owner call): (1) `git clone` fresh + 
 today's edits, (2) reconnect this folder to the remote, or (3) keep working file-only
 and reconcile later. Flagged, not guessed.
 
-**Sidebar nav text too small — FIXED.** On a short window (~662px tall) the Travels
-sidebar's "responsive-fit" font (sized in `vh` so the menu fits without a scrollbar,
-`platform/design-system/css/layout.css`) bottomed out at its floor — 10.5px items /
-9.5px sub-items — hence tiny. Fix (font-size only, everything else untouched per owner):
-- `.nav-item`  `clamp(10.5px,1.35vh,14px)` → **`clamp(13px,1.6vh,14px)`**
-- `.nav-sub`   `clamp(9.5px,1.18vh,13px)`  → **`clamp(12px,1.4vh,13px)`**
-Floors raised to a readable size; full-size ceilings unchanged; the list still scrolls
-beyond the floor (`overflow-y:auto`). **Verified:** boot sweep **222/222 · 0 errors ·
-0 render failures** both themes + a 1300×662 visual capture.
+**Sidebar polish — DONE (owner-directed, iterated to a reference).** The "responsive
+-fit" nav (sized in `vh`, `platform/design-system/css/layout.css`) bottomed out at
+tiny floors on a short window. Owner shared a reference (old `newerp` build) and asked
+to match its **text size + spacing between items**, plus soft group dividers at three
+marked boundaries. Final values:
+- `.nav-item`  font `clamp(14.5px,1.75vh,15.5px)` · padding `clamp(7px,1vh,11px)`
+- `.nav-sub`   font `clamp(13.5px,1.6vh,14.5px)` · padding `clamp(5px,0.7vh,8px)`
+- `.nav` gap `clamp(2px,0.3vh,4px)`; new `.nav-divider` = soft shadow-like hairline
+  that fades at the ends, theme-aware.
+- Dividers are config-driven: `m()` carries `sectionEnd` (config.js), tagged on
+  `tasks` / `passport-mgmt` / `analytics`; `app.js` renders a divider after a
+  sectionEnd module **only when items follow** (a hidden module can't leave a
+  dangling line). **Verified:** sweep 222/222, both themes + visual captures.
 
-**Next this session:** Air-Ticketing feature-polish (`docs/TRAVELS-PROGRESS.md` Due #1).
-Already has the house pattern; remaining gaps = `sendModal` (WhatsApp/Gmail) + passenger
-`Travel Profile` fields → bring to the Vendor/Agent gold standard.
+**Tracker reconciliation (important).** MIGRATION_STATUS/CONTEXT were STALE: they
+showed only the passport-mgmt pilot, but **11 of 18 Travels modules are already
+converted** (frontend/ + built view.js, committed as `feat(rebuild): …` on origin):
+settings, file-management, contract-file, dashboard, analytics, reports, automation,
+crm, ledgers, payroll, passport-mgmt. **Remaining legacy (7, simplest→largest):**
+marketing, contract-flight, hrm, visa-processing, accounts, vendor-agent, air-ticketing.
+Also: the old work folder `H:\Imran\New folder\newerp` is present on this machine at
+HEAD `a3bcbde` with NO uncommitted work — everything is on origin, nothing stranded.
+
+**Now: continuing the FRONTEND REBUILD** (owner: "code the frontend my way, 10× loop").
+Converting the remaining legacy modules one at a time — copy/baseline the current
+view.js (parity `before`) → author `frontend/{template.html,<id>.js}` (HTML5 + Tailwind
+`tw-` + raw JS) → build → parity `diff` byte-identical → 10× checks → commit. NOTE:
+this is a STRUCTURE-ONLY, pixel+behaviour-identical rebuild — NO feature changes (the
+earlier Air-Ticketing "Travel-Profile" idea was a feature, so it's OUT of this track).
 
 ---
 
