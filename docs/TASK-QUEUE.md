@@ -7,7 +7,16 @@
 
 ## ⏳ OPEN
 
-_(nothing open — T1 and T2 completed 2026-07-21)_
+### T5 — searchable / type-to-filter account select (the Credit/Debit journal pickers)
+**Reported:** 2026-07-21, screenshot of the "Credit Journal — Money In" modal, "Credit
+account" dropdown (2000 · LIABILITIES … a long chart-of-accounts list).
+**Owner likes** the current select; wants it **type-to-search**: when you type a number
+(account code) or text, matching accounts jump to the TOP / filter the list.
+**Scope:** the account-code selects in the Credit/Debit journal forms (Master Accounts).
+Ideally the shared select control so it benefits everywhere.
+**Approach:** enhance the form select into a combobox (filter + reorder matches to top on
+input) — check `platform/kit/forms.js` / `platform/core/ui.js` select rendering first;
+prefer upgrading the shared control so it's global, keeping current look + behaviour.
 
 <details><summary>Completed T1 / T2 (kept for context)</summary>
 
@@ -40,10 +49,10 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
 - **T2** Group sidebar dividers (Sister Concerns / Group CRM / Document Center).
 - **Bank add fix VERIFIED** end-to-end (local PHP+MySQL, 16/16) + follow-up c3484c6.
 - **T3** bank-account statement header — smaller, premium `.stat-compact` values.
-- **T4** bank account CARDS fully redesigned — removed the cheap green; per-bank
-  identity hue (chip + faint header wash + watermark glyph via `--bank-hue`),
-  status dot on the icon, hero balance, mono A/C caption, segmented footer,
-  hover-reveal action chip. New `.bank-card*` classes. Both themes.
+- **T4** bank account CARDS — **world-class redesign** (v2 after owner feedback):
+  brand accent rail + gradient identity chip + status dot, display-font name,
+  refined Active pill, CURRENT BALANCE hero, mono A/C, hairline footer, hover
+  lift + brand-tinted shadow + light sweep. Per-bank `--bank-hue`. Both themes.
 - **Local backend now runnable/testable** (PHP 8.3 + Laragon MySQL 5.7 + composer install).
 
 ## 🔧 PARTIAL (leftover)

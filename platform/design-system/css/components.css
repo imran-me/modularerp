@@ -232,56 +232,77 @@
 .stat-row.stat-compact .stat-label { font-size: var(--fs-micro); letter-spacing: .4px; text-transform: uppercase; }
 
 /* ============================ BANK ACCOUNT CARD ==========================
- * Premium, restrained account card (Master Accounts › Manage Banks). Neutral /
- * monochrome — the ONLY colour is the small identity chip in the bank's own
- * hue; the balance is the hero, the rest is quiet. Segmented footer + hover-
- * revealed row actions for an "expensive", uncluttered feel. Replaces the old
- * green-left-border meta block. */
-.bank-card { --bank-hue: var(--accent); position: relative; padding: 0; overflow: hidden;
-  transition: box-shadow var(--t), border-color var(--t), transform var(--t); }
-.bank-card:hover { box-shadow: 0 14px 34px -14px rgba(7, 12, 30, .28); transform: translateY(-3px); }
-.bank-card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 14px 34px -14px rgba(7, 12, 30, .26); }
-/* identity wash — a faint gradient of the bank's own colour across the header */
-.bank-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 108px; pointer-events: none;
-  background: linear-gradient(165deg, color-mix(in srgb, var(--bank-hue) 12%, transparent) 0%, transparent 62%); }
-/* oversized faint glyph watermark, in the bank's hue, bleeding off the top-right */
-.bank-card-mark { position: absolute; top: -14px; right: -10px; font-size: 96px; line-height: 1; pointer-events: none;
-  color: var(--bank-hue); opacity: .07; transform: rotate(-10deg); z-index: 0; }
+ * World-class account card (Master Accounts › Manage Banks). Each card wears its
+ * bank's identity hue (--bank-hue, set per-card in view.js) as a left accent
+ * RAIL + a faint corner glow + a gradient chip; the bank name (display face) and
+ * the balance (tabular mono) are the two heroes. Refined status pill, hairline
+ * footer, and premium micro-interactions: hover lift with a brand-tinted shadow,
+ * the rail grows, a soft light sweep crosses the surface. Everything else stays
+ * monochrome so it reads expensive, never busy. */
+.bank-card { --bank-hue: var(--accent); position: relative; padding: 0; overflow: hidden; border-radius: 16px;
+  background: radial-gradient(135% 95% at 100% 0%, color-mix(in srgb, var(--bank-hue) 8%, transparent), transparent 56%), var(--surface);
+  box-shadow: 0 1px 2px rgba(7, 12, 30, .06), 0 3px 10px -5px rgba(7, 12, 30, .10);
+  transition: transform .28s cubic-bezier(.2, .7, .2, 1), box-shadow .28s cubic-bezier(.2, .7, .2, 1), border-color .2s; }
+.bank-card:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--bank-hue) 42%, var(--border));
+  box-shadow: 0 24px 46px -22px color-mix(in srgb, var(--bank-hue) 48%, rgba(7, 12, 30, .55)), 0 8px 18px -10px rgba(7, 12, 30, .20); }
+.bank-card.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 24px 46px -22px rgba(7, 12, 30, .30); }
+/* brand accent rail down the left edge — thickens on hover / select */
+.bank-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; z-index: 2;
+  background: linear-gradient(180deg, var(--bank-hue), color-mix(in srgb, var(--bank-hue) 42%, transparent));
+  transition: width .28s cubic-bezier(.2, .7, .2, 1); }
+.bank-card:hover::before, .bank-card.sel::before { width: 6px; }
+/* soft light sweep on hover */
+.bank-card::after { content: ''; position: absolute; top: 0; left: -70%; width: 55%; height: 100%; z-index: 3; pointer-events: none;
+  background: linear-gradient(105deg, transparent, color-mix(in srgb, #fff 22%, transparent), transparent); transform: skewX(-18deg);
+  transition: left .65s ease; }
+.bank-card:hover::after { left: 140%; }
 .bank-card-top, .bank-card-hero, .bank-card-foot { position: relative; z-index: 1; }
-.bank-card-top { display: flex; align-items: center; gap: 11px; padding: 15px 16px 13px; }
-.bank-card-ico { position: relative; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none;
-  background: var(--bank-hue); color: #fff; font-size: 16px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22), 0 4px 10px -3px color-mix(in srgb, var(--bank-hue) 55%, transparent); }
-.bank-card-id { flex: 1; min-width: 0; }
-.bank-card-name { font-weight: 700; font-size: 14.5px; letter-spacing: -.1px; line-height: 1.25;
+.bank-card-top { display: flex; align-items: flex-start; gap: 12px; padding: 17px 18px 0 21px; }
+.bank-card-ico { position: relative; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; flex: none;
+  color: #fff; font-size: 18px; transition: transform .28s cubic-bezier(.2, .7, .2, 1);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--bank-hue) 82%, #fff), var(--bank-hue));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 7px 15px -5px color-mix(in srgb, var(--bank-hue) 62%, transparent); }
+.bank-card:hover .bank-card-ico { transform: translateY(-1px) scale(1.05); }
+.bank-card-ico::after { content: ''; position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border-radius: 50%;
+  border: 2.5px solid var(--surface); background: var(--text-mute); }
+.bank-card-ico.is-active::after { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+.bank-card-id { flex: 1; min-width: 0; padding-top: 1px; }
+.bank-card-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: -.2px; line-height: 1.25;
+  color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bank-card-sub { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 2px; font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bank-card-sub { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 1px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* status shown as a presence dot ON the identity chip — frees the ENTIRE header
-   row for the account name (no pill competing for width). */
-.bank-card-ico::after { content: ''; position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px;
-  border-radius: 50%; border: 2.5px solid var(--surface); background: var(--text-mute); }
-.bank-card-ico.is-active::after { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 20%, transparent); }
-/* row actions float as a small frosted chip, revealed on hover / when selected —
-   they never reserve header width, so the name is never squeezed. */
-.bank-card-actions { position: absolute; top: 11px; right: 12px; z-index: 3; display: flex; gap: 1px; flex: none;
-  opacity: 0; transform: translateY(-3px); transition: opacity var(--t-fast), transform var(--t-fast);
-  background: color-mix(in srgb, var(--surface) 82%, transparent); border: 1px solid var(--border); border-radius: 9px; backdrop-filter: blur(4px); }
+.bank-card-status { flex: none; font-size: 10px; font-weight: 700; letter-spacing: .3px; padding: 4px 9px 4px 8px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 5px; border: 1px solid transparent; }
+.bank-card-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 22%, transparent); }
+.bank-card-status.is-active { color: var(--good); background: color-mix(in srgb, var(--good) 11%, transparent); border-color: color-mix(in srgb, var(--good) 24%, transparent); }
+.bank-card-status.is-inactive { color: var(--text-mute); background: var(--surface-2); }
+/* row actions float in as a frosted chip on hover / select — never reserve width */
+.bank-card-actions { position: absolute; top: 14px; right: 14px; z-index: 4; display: flex; gap: 1px; flex: none;
+  opacity: 0; transform: translateY(-4px); transition: opacity var(--t-fast), transform var(--t-fast);
+  background: color-mix(in srgb, var(--surface) 85%, transparent); border: 1px solid var(--border); border-radius: 10px; backdrop-filter: blur(6px); }
 .bank-card:hover .bank-card-actions, .bank-card.sel .bank-card-actions { opacity: 1; transform: none; }
 @media (hover: none) { .bank-card-actions { opacity: 1; transform: none; } }
-.bank-card-hero { padding: 3px 16px 15px; }
-.bank-card-bal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 700;
-  line-height: 1.05; letter-spacing: -.6px; color: var(--text); }
+/* balance hero */
+.bank-card-hero { padding: 15px 21px 15px; }
+.bank-card-caplabel { font-size: 9.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--text-mute); }
+.bank-card-bal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 27px; font-weight: 700;
+  line-height: 1.1; letter-spacing: -.8px; color: var(--text); margin-top: 5px; }
 .bank-card-bal.text-bad { color: var(--bad, #e0356e); }
-.bank-card-cap { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 4px; font-family: var(--font-mono);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .2px; }
-.bank-card-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
-  background: var(--border); border-top: 1px solid var(--border); }
-.bank-card-metric { background: var(--surface); padding: 9px 16px 11px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.bank-card-metric .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-mute); font-weight: 700; }
-.bank-card-metric .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600;
-  color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bank-card.sel .bank-card-metric { background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
+.bank-card-acct { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 8px; font-family: var(--font-mono); letter-spacing: .3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* hairline footer */
+.bank-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 21px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
+.bank-card-metric { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bank-card-metric.right { align-items: flex-end; }
+.bank-card-metric .k { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-mute); font-weight: 700; }
+.bank-card-metric .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 600;
+  color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  .bank-card, .bank-card::before, .bank-card::after, .bank-card-ico { transition: none; }
+  .bank-card:hover { transform: none; } .bank-card:hover::after { left: -70%; } }
 
 /* Flag glyph — the real country flag, rendered via the bundled Twemoji Country
    Flags web font (tokens.css @font-face) so it shows as a proper flag image on

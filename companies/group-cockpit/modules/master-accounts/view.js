@@ -1250,19 +1250,19 @@
       // Premium account card: monochrome, with the bank's own hue used only for a
       // faint header wash, the identity chip and a large watermark glyph. Hero =
       // current (closing) balance; Opening / Last-movement sit in a segmented foot.
-      var card = el('div.card.hover.bank-card', { style: { cursor: 'pointer' }, onclick: function () {
+      var card = el('div.card.bank-card', { style: { cursor: 'pointer' }, onclick: function () {
           ui.$$('.card', grid).forEach(function (c) { c.classList.remove('sel'); });
           card.classList.add('sel');
           bankAccountDetail(b, detailHost);
           detailHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } }, [
-        ui.frag('<i class="bank-card-mark bi bi-' + glyph + '"></i>'),
         el('div.bank-card-top', null, [
           el('div.bank-card-ico' + (active ? '.is-active' : ''), { title: active ? 'Active' : 'Inactive', html: '<i class="bi bi-' + glyph + '"></i>' }),
           el('div.bank-card-id', null, [
             el('div.bank-card-name', { title: b.name, text: b.name }),
             el('div.bank-card-sub', { text: coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '') })
           ]),
+          el('span.bank-card-status' + (active ? '.is-active' : '.is-inactive'), { text: active ? 'Active' : 'Inactive' }),
           canCreate() ? el('div.bank-card-actions', null, [
             el('button.icon-btn.btn-sm', { title: 'Edit', html: ui.icon('pencil'),
               onclick: function (e) { e.stopPropagation(); editBank(b); } }),
@@ -1271,12 +1271,13 @@
           ]) : null
         ]),
         el('div.bank-card-hero', null, [
+          el('div.bank-card-caplabel', { text: b.type === 'Cash Box' ? 'Cash on hand' : 'Current balance' }),
           el('div.bank-card-bal' + (closing < 0 ? '.text-bad' : ''), { text: ui.money(b.balance) }),
-          el('div.bank-card-cap', { text: b.account ? 'A/C ' + b.account : 'No account number' })
+          el('div.bank-card-acct', { text: b.account ? 'A/C ' + b.account : 'No account number' })
         ]),
         el('div.bank-card-foot', null, [
-          el('div.bank-card-metric', null, [ el('span.k', { text: 'Opening' }), el('span.v', { text: ui.money(opening) }) ]),
-          el('div.bank-card-metric', null, [ el('span.k', { text: 'Last movement' }), el('span.v', { text: lastStr }) ])
+          el('div.bank-card-metric', null, [ el('span.k', { text: 'Opening' }), el('div.v', { text: ui.money(opening) }) ]),
+          el('div.bank-card-metric.right', null, [ el('span.k', { text: 'Last movement' }), el('div.v', { text: lastStr }) ])
         ])
       ]);
       // custom property must be set via setProperty (el()'s style object can't) —
