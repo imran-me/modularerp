@@ -61,7 +61,15 @@ marketing, contract-flight, hrm, visa-processing, accounts, vendor-agent, air-ti
 Also: the old work folder `H:\Imran\New folder\newerp` is present on this machine at
 HEAD `a3bcbde` with NO uncommitted work — everything is on origin, nothing stranded.
 
-**Now: continuing the FRONTEND REBUILD** (owner: "code the frontend my way, 10× loop").
+**DONE 2026-07-21 — marketing converted (12/18).** First rebuild of this new-machine
+session: Travels **Marketing & Messaging** → `frontend/{template.html,marketing.js}`
++ built `view.js` (cddc157). Parity **8/8 pixel-identical** across all 4 tabs
+(campaigns/templates/bot/send-log) both themes (4 light byte-perfect, 4 dark ≤1px AA
+jitter); sweep 222/222. Method proof: marketing honours `ctx.subId`, so parity.mjs
+shoots each tab via `#/travels/marketing/<tab>`. **Remaining legacy (6):**
+contract-flight, hrm, visa-processing, accounts, vendor-agent, air-ticketing.
+
+**Continuing the FRONTEND REBUILD** (owner: "code the frontend my way, 10× loop").
 Converting the remaining legacy modules one at a time — copy/baseline the current
 view.js (parity `before`) → author `frontend/{template.html,<id>.js}` (HTML5 + Tailwind
 `tw-` + raw JS) → build → parity `diff` byte-identical → 10× checks → commit. NOTE:
