@@ -272,6 +272,11 @@
 .bank-card-ico::after { content: ''; position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border-radius: 50%;
   border: 2.5px solid var(--surface); background: var(--text-mute); }
 .bank-card-ico.is-active::after { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+/* small company-identity badge on the chip — which sister concern owns this bank
+   (Travels ✈ / IT cpu / Group hexagon / …), so each card is company-wise. */
+.bank-card-coico { position: absolute; left: -5px; top: -5px; width: 18px; height: 18px; border-radius: 50%; z-index: 2;
+  background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center;
+  font-size: 9.5px; line-height: 1; color: var(--text-dim); box-shadow: 0 1px 3px rgba(7, 12, 30, .18); }
 .bank-card-id { flex: 1; min-width: 0; padding-top: 1px; }
 .bank-card-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: -.2px; line-height: 1.25;
   color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

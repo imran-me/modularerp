@@ -1275,7 +1275,10 @@
           detailHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } }, [
         el('div.bank-card-top', null, [
-          el('div.bank-card-ico' + (active ? '.is-active' : ''), { title: active ? 'Active' : 'Inactive', html: '<i class="bi bi-' + glyph + '"></i>' }),
+          el('div.bank-card-ico' + (active ? '.is-active' : ''), { title: active ? 'Active' : 'Inactive' }, [
+            ui.frag('<i class="bi bi-' + glyph + '"></i>'),
+            ui.frag('<span class="bank-card-coico" title="' + esc(coName(b.companyId || 'group')) + '"><i class="bi bi-' + ((EPAL.config.company(b.companyId || 'group') || {}).icon || 'building') + '"></i></span>')
+          ]),
           el('div.bank-card-id', null, [
             el('div.bank-card-name', { title: b.name, text: b.name }),
             el('div.bank-card-sub', { text: coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '') })
