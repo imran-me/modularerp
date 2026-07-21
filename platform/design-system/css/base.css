@@ -263,8 +263,11 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 @media (max-width: 720px) { .tab-underline { margin-left:-16px; margin-right:-16px; } }
 /* flex:1 0 auto = fill the bar when the tabs fit, keep natural width and
    scroll when they don't (never shrink below the label). */
-.tab-underline button { flex:1 0 auto; min-width:0; text-align:center; padding:12px clamp(8px, 1.2vw, 18px) 13px; border-bottom:3px solid transparent; margin-bottom:-1px;
-  font-size: var(--fs-small); font-weight:700; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
+/* --tab-fs / --tab-px are set per-bar by App.fitTabs (app.js): it shrinks the
+   tabs just enough to keep the whole band on ONE line at 90–100% zoom, and lets
+   it wrap only when it hits the readable floor (110%+ zoom). Unset = natural size. */
+.tab-underline button { flex:1 0 auto; min-width:0; text-align:center; padding:12px var(--tab-px, clamp(8px, 1.2vw, 18px)) 13px; border-bottom:3px solid transparent; margin-bottom:-1px;
+  font-size: var(--tab-fs, var(--fs-small)); font-weight:700; color:var(--text-dim); white-space:nowrap; letter-spacing:.1px;
   border-radius:0; background:none; transition: color var(--t), border-color var(--t), background var(--t); }
 .tab-underline button + button { border-left:1px solid var(--border); }   /* 1px line between sections */
 .tab-underline button:hover { color: var(--text); background: color-mix(in srgb, var(--accent) 9%, transparent); }
@@ -272,7 +275,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 /* .tabs-dense — for long rows (Consolidated Finance's 13 sections): the same
    look, compressed harder so every label stays on one line before the
    hidden-scrollbar fallback ever engages. */
-.tab-underline.tabs-dense button { padding:12px clamp(4px, 0.62vw, 14px) 13px; font-size: var(--fs-tiny); letter-spacing:0; }
+.tab-underline.tabs-dense button { padding:12px var(--tab-px, clamp(4px, 0.62vw, 14px)) 13px; font-size: var(--tab-fs, var(--fs-tiny)); letter-spacing:0; }
 
 /* .scroll-row — utility: a flex row of chips/buttons that stays on ONE line
    and scrolls sideways instead of wrapping (e.g. the standalone company

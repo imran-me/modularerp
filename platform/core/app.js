@@ -92,6 +92,14 @@
       EPAL.bus.on('route:changed', this.onRoute.bind(this));
       EPAL.router.start();               // 7. go
       if (EPAL.bootEngines) EPAL.bootEngines();  // 8. start Deep Core engines (scheduler, audit…)
+      // Auto-fit the inner section-nav (.tab-underline) to ONE line at 90–100%
+      // zoom — shrink the tabs to fit the row; wrap only when they hit the
+      // readable floor (110%+ zoom). Runs after every route render + on resize.
+      var refit = function () { requestAnimationFrame(function () { App.fitTabs(); }); };
+      EPAL.bus.on('route:changed', refit);
+      var _rt; window.addEventListener('resize', function () { clearTimeout(_rt); _rt = setTimeout(refit, 120); });
+      refit();
+
       // reactive re-renders
       EPAL.bus.on('modules:changed', this.refreshNav.bind(this));
       EPAL.bus.on('auth:changed', function () { App.renderShell(); EPAL.router.render(); });
@@ -124,6 +132,28 @@
       EPAL.store.set('ui.theme', t);
       EPAL.bus.emit('theme:changed', { theme: t });
       var i = $('#theme-ico'); if (i) i.className = 'bi bi-' + (t === 'dark' ? 'moon-stars-fill' : 'sun-fill');
+    },
+
+    /* ---- SECTION-NAV AUTO-FIT (owner 2026-07-21) -------------------------
+     * Every module's inner tab band (.tab-underline) must stay on ONE line at
+     * 90–100% zoom, shrinking the tabs to fit the row rather than wrapping to a
+     * second line. It may wrap only when the tabs hit a readable floor (~10px)
+     * — i.e. at 110%+ zoom. Pure CSS can't do this (it can't know the tab count
+     * / label lengths), so measure each bar and set --tab-fs / --tab-px until it
+     * fits one row or bottoms out. Cheap: only shrinks bars that actually wrap. */
+    fitTabs: function () {
+      ui.$$('.tab-underline').forEach(function (bar) {
+        var btns = bar.children;
+        if (!btns || btns.length < 2) return;
+        var wraps = function () { return btns[btns.length - 1].offsetTop > btns[0].offsetTop + 1; };
+        bar.style.removeProperty('--tab-fs');       // reset to natural size first
+        bar.style.removeProperty('--tab-px');
+        if (!wraps()) return;                        // already one line — done
+        for (var fs = 12.5, px = 12; wraps() && fs >= 10; fs -= 0.5, px -= 1) {
+          bar.style.setProperty('--tab-fs', fs + 'px');
+          bar.style.setProperty('--tab-px', Math.max(4, px) + 'px');
+        }
+      });
     },
 
     /* ---- SHELL -----------------------------------------------------------*/
