@@ -304,6 +304,22 @@
   .bank-card, .bank-card::before, .bank-card::after, .bank-card-ico { transition: none; }
   .bank-card:hover { transform: none; } .bank-card:hover::after { left: -70%; } }
 
+/* ---------------------------- SEARCHABLE COMBOBOX ------------------------
+ * The type-to-filter select (forms.js makeCombobox). Reads as a normal input; a
+ * floating panel lists options and floats matches to the TOP as you type. */
+.combo { position: relative; }
+.combo-input { width: 100%; padding-right: 32px; cursor: text; }
+.combo-caret { position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--text-mute); font-size: 12px; cursor: pointer; }
+.combo-panel { position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 5px); max-height: 264px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: 0 16px 38px -12px rgba(7, 12, 30, .32); padding: 5px; display: none; }
+.combo.open .combo-panel { display: block; }
+.combo-opt { padding: 8px 11px; border-radius: 8px; font-size: var(--fs-small); color: var(--text-dim); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.combo-opt.is-active { background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--text); }
+.combo-opt.is-sel { font-weight: 700; color: var(--accent); }
+.combo-empty { padding: 12px; text-align: center; color: var(--text-mute); font-size: var(--fs-small); }
+
 /* Flag glyph — the real country flag, rendered via the bundled Twemoji Country
    Flags web font (tokens.css @font-face) so it shows as a proper flag image on
    every OS, Windows included. Just a sizing/alignment wrapper; the font does

@@ -53,6 +53,74 @@
   'use strict';
   var ui = EPAL.ui, el = ui.el;
 
+  /* Searchable combobox over a native <select> — opt in with field.searchable:true
+   * (great for long lists like the chart of accounts). The real <select> stays in
+   * the DOM but hidden, so the form's value contract is UNCHANGED (ctrls.input is
+   * still the <select>: values()/validate()/showIf all keep working). The visible
+   * input filters as you type and floats matches to the TOP (a typed account CODE
+   * surfaces first), writing the pick back to the <select> + dispatching change. */
+  function makeCombobox(sel, f) {
+    var norm = [].map.call(sel.options, function (o) { return { v: o.value, label: o.textContent }; });
+    var wrap = el('div.combo');
+    var display = el('input.input.combo-input', { type: 'text', autocomplete: 'off', spellcheck: 'false',
+      placeholder: f.placeholder || 'Type to search…' });
+    var caret = el('span.combo-caret', { html: '<i class="bi bi-chevron-expand"></i>' });
+    var panel = el('div.combo-panel');
+    sel.style.display = 'none';
+    wrap.appendChild(display); wrap.appendChild(caret); wrap.appendChild(sel); wrap.appendChild(panel);
+
+    var shown = norm.slice(), active = -1;
+    function labelFor(v) { var m = norm.filter(function (o) { return o.v === String(v); })[0]; return m ? m.label : ''; }
+    display.value = labelFor(sel.value);
+
+    function score(o, q) {
+      var lab = o.label.toLowerCase(), v = o.v.toLowerCase();
+      if (v === q || lab === q) return 0;
+      if (v.indexOf(q) === 0 || lab.indexOf(q) === 0) return 1;   // starts-with → top
+      if (v.indexOf(q) >= 0 || lab.indexOf(q) >= 0) return 2;     // contains
+      return -1;
+    }
+    function filter(q) {
+      q = (q || '').trim().toLowerCase();
+      if (!q) { shown = norm.slice(); }
+      else {
+        shown = norm.map(function (o) { return { o: o, s: score(o, q) }; })
+          .filter(function (x) { return x.s >= 0; })
+          .sort(function (a, b) { return a.s - b.s; })
+          .map(function (x) { return x.o; });
+      }
+      active = shown.length ? 0 : -1;
+      paint();
+    }
+    function paint() {
+      panel.innerHTML = '';
+      if (!shown.length) { panel.appendChild(el('div.combo-empty', { text: 'No match' })); return; }
+      shown.forEach(function (o, i) {
+        var row = el('div.combo-opt' + (o.v === sel.value ? '.is-sel' : '') + (i === active ? '.is-active' : ''), { text: o.label });
+        row.addEventListener('mousedown', function (e) { e.preventDefault(); choose(o); });
+        panel.appendChild(row);
+      });
+      var act = panel.children[active]; if (act && act.scrollIntoView) act.scrollIntoView({ block: 'nearest' });
+    }
+    function open() { if (wrap.classList.contains('open')) return; wrap.classList.add('open'); filter(''); }
+    function close() { wrap.classList.remove('open'); display.value = labelFor(sel.value); }
+    function choose(o) { sel.value = o.v; display.value = o.label; wrap.classList.remove('open'); sel.dispatchEvent(new Event('change', { bubbles: true })); }
+
+    display.addEventListener('focus', open);
+    display.addEventListener('input', function () { wrap.classList.add('open'); filter(display.value); });
+    display.addEventListener('keydown', function (e) {
+      var open_ = wrap.classList.contains('open');
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (!open_) { open(); return; } active = Math.min(shown.length - 1, active + 1); paint(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active - 1); paint(); }
+      else if (e.key === 'Enter') { if (open_ && shown[active]) { e.preventDefault(); choose(shown[active]); } }
+      else if (e.key === 'Escape') { if (open_) { e.preventDefault(); close(); } }
+    });
+    caret.addEventListener('mousedown', function (e) { e.preventDefault(); if (wrap.classList.contains('open')) close(); else { display.focus(); open(); } });
+    document.addEventListener('mousedown', function (e) { if (!wrap.contains(e.target)) close(); });
+    sel.addEventListener('change', function () { if (!wrap.classList.contains('open')) display.value = labelFor(sel.value); });
+    return wrap;
+  }
+
   EPAL.form = function (fields, record) {
     record = record || {};
     var root = el('div.form-grid');
@@ -98,6 +166,7 @@
       }
 
       var input;
+      var fieldEl = null;   // DOM to append (defaults to `input`; a searchable select wraps it in a combobox)
       var val = record[f.key] != null ? record[f.key] : (f.default != null ? f.default : '');
 
       if (f.type === 'select') {
@@ -109,6 +178,7 @@
           if (String(v) === String(val)) op.selected = true;
           input.appendChild(op);
         });
+        if (f.searchable && opts.length) { fieldEl = makeCombobox(input, f); }
       } else if (f.type === 'textarea') {
         input = el('textarea.input', { id: 'f-' + f.key, rows: f.rows || 3, placeholder: f.placeholder || '' });
         input.value = val;
@@ -126,7 +196,7 @@
       var errEl = el('div.field-error');
       var wrap = el('div.field' + (f.col2 ? '.col-2' : ''), null, [
         el('label', { html: ui.escapeHtml(f.label || f.key) + (f.required ? ' <span class="req">*</span>' : '') }),
-        f.type === 'checkbox' ? el('label.switch', null, [ input, el('span.track') ]) : input,
+        f.type === 'checkbox' ? el('label.switch', null, [ input, el('span.track') ]) : (fieldEl || input),
         f.hint ? el('div.hint', { text: f.hint }) : null,
         errEl
       ]);

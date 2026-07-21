@@ -7,6 +7,10 @@
 
 ## ⏳ OPEN
 
+_(nothing open)_
+
+<details><summary>T5 — searchable account select ✅ DONE</summary>
+
 ### T5 — searchable / type-to-filter account select (the Credit/Debit journal pickers)
 **Reported:** 2026-07-21, screenshot of the "Credit Journal — Money In" modal, "Credit
 account" dropdown (2000 · LIABILITIES … a long chart-of-accounts list).
@@ -14,9 +18,14 @@ account" dropdown (2000 · LIABILITIES … a long chart-of-accounts list).
 (account code) or text, matching accounts jump to the TOP / filter the list.
 **Scope:** the account-code selects in the Credit/Debit journal forms (Master Accounts).
 Ideally the shared select control so it benefits everywhere.
-**Approach:** enhance the form select into a combobox (filter + reorder matches to top on
-input) — check `platform/kit/forms.js` / `platform/core/ui.js` select rendering first;
-prefer upgrading the shared control so it's global, keeping current look + behaviour.
+**Done:** added a shared, opt-in combobox to `platform/kit/forms.js` (`makeCombobox`,
+enable with `searchable:true` on any select). Wraps a hidden native `<select>` so the
+form value contract is unchanged; type to filter, matches sorted to the TOP (starts-with
+first), arrow/enter/esc keys, click-outside close. Enabled on the Credit/Debit + journal
+account pickers. `.combo*` CSS in components.css. Verified visually (typing "21" floats
+2100/2110/2111) + sweep 222/222.
+
+</details>
 
 <details><summary>Completed T1 / T2 (kept for context)</summary>
 

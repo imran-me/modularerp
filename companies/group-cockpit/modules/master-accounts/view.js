@@ -503,7 +503,7 @@
         { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
         { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
         { key: 'bankId', label: 'Bank', type: 'select', required: true, options: banks.map(function (b) { return [b.id, b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; }) },
-        { key: 'account', label: isCr ? 'Credit account' : 'Debit account', type: 'select', required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
+        { key: 'account', label: isCr ? 'Credit account' : 'Debit account', type: 'select', searchable: true, required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
         { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
         // AUDIT P3 (BD tax cycle): optional split — collected VAT rides to
         // 2130 on money-in; withheld AIT/TDS rides to 2140 on money-out
@@ -587,7 +587,7 @@
         { key: 'date', label: 'As-of date', type: 'date', required: true },
         { key: 'items', type: 'items', label: 'Asset rows', required: true, min: 1, addLabel: 'Add asset',
           columns: [
-            { key: 'account', label: 'Asset account', type: 'select', options: assets.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }), width: '1.6fr' },
+            { key: 'account', label: 'Asset account', type: 'select', searchable: true, options: assets.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }), width: '1.6fr' },
             { key: 'amount', label: 'Amount', type: 'money', width: '1fr' }
           ] }
       ],
@@ -1066,7 +1066,7 @@
         title: 'Post Opening Balance', icon: 'flag', size: 'md', record: { date: '2026-07-01', companyId: selCo === 'all' ? 'group' : selCo },
         fields: [
           { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
-          { key: 'account', label: 'Account', type: 'select', required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
+          { key: 'account', label: 'Account', type: 'select', searchable: true, required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
           { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 0 },
           { key: 'date', label: 'As-of date', type: 'date', default: '2026-07-01' }
         ],
