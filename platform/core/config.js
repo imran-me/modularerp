@@ -52,6 +52,7 @@
       admin: !!opts.admin,                // admin/owner-only module
       badge: opts.badge || null,          // e.g. 'New', or a count
       roles: opts.roles || null,          // null = inherit company access rules
+      sectionEnd: !!opts.sectionEnd,      // draw a group divider after this item in the sidebar
       subs: (opts.subs || []).map(function (s) {
         // A submodule may be a bare string id, [id,label] or [id,label,icon]
         if (typeof s === 'string') return { id: s, label: titleize(s), icon: 'dot' };
@@ -108,7 +109,7 @@
    * ========================================================================*/
   var TRAVELS_MODULES = [
     m('dashboard',       'Dashboard',        'speedometer2', { desc:'Travels performance, sales, pipeline, alerts.' }),
-    m('tasks',           'My Task',          'kanban', { desc:'Personal Kanban board with phase timers.' }),
+    m('tasks',           'My Task',          'kanban', { desc:'Personal Kanban board with phase timers.', sectionEnd:true }),
     m('vendor-agent',    'Vendor, Agent & Customer', 'people', { desc:'Vendors, agents, customers, portals, commission & party ledgers.',
         subs:[['vendors','Manage Vendors'],['agents','Manage Agents'],['customers','Customers'],['portals','Portals / GDS'],
               ['accounts','Party Accounts'],['commission','Commission']] }),
@@ -127,7 +128,7 @@
     m('file-management', 'File Management',  'folder-fill', { desc:'Embassy files, submission slots, decision tracking.',
         subs:[['files','All Files'],['add-file','Add File'],['slot-tracker','Slot Tracker']] }),
     m('passport-mgmt',   'Passport Management', 'person-vcard', { desc:'Passport holders, categories, expiry radar.',
-        subs:[['holders','Holders'],['categories','Categories'],['expiry','Expiry Radar']] }),
+        subs:[['holders','Holders'],['categories','Categories'],['expiry','Expiry Radar']], sectionEnd:true }),
     // Every section the view actually renders is listed here, in the band's
     // order — the sidebar, the band and the view must agree (Master Accounts is
     // the reference). This used to list only 5 of the 10, so Recurring, Cheques,
@@ -137,7 +138,7 @@
               ['recurring','Recurring'],['banks','Banks'],['cash','Manage Cash'],['journals','Journals'],['schedules','Payment Schedules']] }),
     m('ledgers',         'Ledgers',          'journal-text', { desc:'General & party ledgers, trial balance.' }),
     m('reports',         'Reports',          'file-earmark-spreadsheet', { desc:'Sales, visa, ticketing, financial reports.' }),
-    m('analytics',       'Analytics',        'graph-up', { desc:'Profit leak, fraud sentinel, travel-DNA.' }),
+    m('analytics',       'Analytics',        'graph-up', { desc:'Profit leak, fraud sentinel, travel-DNA.', sectionEnd:true }),
     m('hrm',             'HRM',              'people-fill', { desc:'Travels team — attendance, leaves, payroll.' }),
     m('marketing',       'Marketing',        'megaphone-fill', { desc:'Email / SMS / WhatsApp campaigns.' }),
     m('crm',             'CRM',              'person-lines-fill', { desc:'Leads, follow-ups, communication hub.',

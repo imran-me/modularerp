@@ -88,18 +88,23 @@
    `vh` (a fraction of the viewport height) clamped between a readable min and the
    original size, so the whole menu scales down to fit and grows back on tall
    screens. overflow-y stays auto purely as a safety net for extreme cases. */
-.nav { flex: 1; overflow-y: auto; padding: clamp(3px, 0.7vh, 10px) 10px clamp(6px, 1.2vh, 20px); display: flex; flex-direction: column; gap: clamp(0px, 0.08vh, 2px); }
+.nav { flex: 1; overflow-y: auto; padding: clamp(3px, 0.7vh, 10px) 10px clamp(6px, 1.2vh, 20px); display: flex; flex-direction: column; gap: clamp(2px, 0.3vh, 4px); }
 /* overlay-style thin scrollbar (only the extreme case ever needs it) */
 .nav { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 .nav::-webkit-scrollbar { width: 4px; }
 .nav-item {
-  display: flex; align-items: center; gap: 10px; padding: clamp(1.5px, 0.5vh, 9px) 11px; border-radius: var(--r-sm);
-  color: var(--text-dim); font-weight: 500; font-size: clamp(13px, 1.6vh, var(--fs-body)); line-height: 1.2; position: relative; transition: all var(--t-fast);
+  display: flex; align-items: center; gap: 10px; padding: clamp(7px, 1vh, 11px) 11px; border-radius: var(--r-sm);
+  color: var(--text-dim); font-weight: 500; font-size: clamp(14.5px, 1.75vh, 15.5px); line-height: 1.2; position: relative; transition: all var(--t-fast);
 }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item.active { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font-weight: 600; }
 .nav-item.active .nav-ico { color: var(--accent); }
 .nav-item.active::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:3px; background: var(--accent); }
+/* group divider (config sectionEnd) — a soft, shadow-like hairline that fades at
+   the ends, separating logical sidebar sections. Placed only between groups. */
+.nav-divider { height:1px; flex:none; margin: clamp(5px, 1vh, 10px) 12px;
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--text) 5%, transparent); }
 .nav-ico { width: 22px; display: grid; place-items: center; color: var(--text-mute); font-size: clamp(13px, 1.7vh, 15px); transition: color var(--t-fast); }
 .nav-label { flex: 1; }
 .nav-badge { font-size: var(--fs-micro); font-weight: 800; padding: 2px 7px; border-radius: 999px;
@@ -117,8 +122,8 @@
 .nav-group.open .nav-subs { grid-template-rows: 1fr; }
 .nav-subs-inner { overflow: hidden; min-height: 0; padding-left: 22px; }
 .nav-sub {
-  display: flex; align-items: center; gap: 10px; padding: clamp(1px, 0.36vh, 7px) 11px; border-radius: var(--r-xs);
-  color: var(--text-mute); font-size: clamp(12px, 1.4vh, var(--fs-small)); line-height: 1.2; transition: all var(--t-fast);
+  display: flex; align-items: center; gap: 10px; padding: clamp(5px, 0.7vh, 8px) 11px; border-radius: var(--r-xs);
+  color: var(--text-mute); font-size: clamp(13.5px, 1.6vh, 14.5px); line-height: 1.2; transition: all var(--t-fast);
 }
 .nav-sub:hover { color: var(--text); background: var(--surface-2); }
 .nav-sub.active { color: var(--accent); font-weight: 600; }

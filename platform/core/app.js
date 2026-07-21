@@ -266,7 +266,12 @@
       var accessible = co.modules.filter(function (mm) {
         return EPAL.modules.isEnabled(co.id, mm.id) && EPAL.auth.can(co.id, mm.id);
       });
-      accessible.forEach(function (mm) { nav.appendChild(App.buildNavItem(co, mm)); });
+      accessible.forEach(function (mm, i) {
+        nav.appendChild(App.buildNavItem(co, mm));
+        // group divider (config sectionEnd) — only when items still follow, so a
+        // module hidden by discovery/permissions never leaves a dangling line.
+        if (mm.sectionEnd && i < accessible.length - 1) nav.appendChild(el('div.nav-divider', { 'aria-hidden':'true' }));
+      });
       if (!accessible.length) nav.appendChild(el('div.nav-empty', { text:'No modules available for your role here.' }));
       this.highlightNav(EPAL.router.parse());
     },
