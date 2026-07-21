@@ -1239,57 +1239,49 @@
     // in/out sense for a txn — used to walk a bank's opening back from its
     // current (closing) balance, and to label the last movement on the card.
     var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in'; };
-    // one line of the green Opening/Closing/Last-Tranx meta column — a quiet
-    // green label + a strong value, 10% smaller than the card body (owner spec).
-    function metaRow(label, value, valCls) {
-      return el('div', { style: { whiteSpace: 'nowrap', lineHeight: '1.5' } }, [
-        el('span', { style: { color: 'var(--good)' }, text: label + ': ' }),
-        el('span.strong' + (valCls || ''), { text: value })
-      ]);
-    }
     banks.forEach(function (b) {
       var mine = txns.filter(function (t) { return t.bankId === b.id; });
       var last = mine.slice().sort(function (x, y) { return (x.date < y.date ? 1 : -1); })[0];
       var closing = +b.balance || 0;
       var opening = closing - mine.reduce(function (a, t) { return a + (isIn(t) ? (+t.amount || 0) : -(+t.amount || 0)); }, 0);
-      var lastStr = last ? ui.money(last.amount) + (last.memo ? ' (' + last.memo + ')' : '') : '—';
-      var card = el('div.card.hover', { style: { cursor: 'pointer' }, onclick: function () {
+      var lastStr = last ? ui.money(last.amount) : '—';
+      var active = (b.status || 'Active') !== 'Inactive';
+      var glyph = b.type === 'Cash Box' ? 'cash-stack' : 'bank';
+      // Premium account card: monochrome, with the bank's own hue used only for a
+      // faint header wash, the identity chip and a large watermark glyph. Hero =
+      // current (closing) balance; Opening / Last-movement sit in a segmented foot.
+      var card = el('div.card.hover.bank-card', { style: { cursor: 'pointer' }, onclick: function () {
           ui.$$('.card', grid).forEach(function (c) { c.classList.remove('sel'); });
           card.classList.add('sel');
           bankAccountDetail(b, detailHost);
           detailHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } }, [
-        el('div.card-pad', null, [
-          // header — avatar · name/branch · status · edit/delete (unchanged actions)
-          el('div.flex.items-center.gap-2.mb-2', null, [
-            el('div.avatar', { style: { background: ui.colorFor(b.name), width: '32px', height: '32px', fontSize: '12px' },
-              html: '<i class="bi bi-' + (b.type === 'Cash Box' ? 'cash-stack' : 'bank') + '"></i>' }),
-            el('div.flex-1.min-w-0', null, [
-              el('div.fw-700', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, text: b.name }),
-              el('div.text-mute.xs', { text: coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '') })
-            ]),
-            (b.status || 'Active') === 'Inactive' ? el('span.badge', { text: 'Inactive' }) : el('span.badge.badge-good', { text: 'Active' }),
-            canCreate() ? el('div.flex.gap-1', null, [
-              el('button.icon-btn.btn-sm', { title: 'Edit', html: ui.icon('pencil'),
-                onclick: function (e) { e.stopPropagation(); editBank(b); } }),
-              el('button.icon-btn.btn-sm', { title: 'Delete', html: ui.icon('trash'),
-                onclick: function (e) { e.stopPropagation(); deleteBank(b); } })
-            ]) : null
+        ui.frag('<i class="bank-card-mark bi bi-' + glyph + '"></i>'),
+        el('div.bank-card-top', null, [
+          el('div.bank-card-ico' + (active ? '.is-active' : ''), { title: active ? 'Active' : 'Inactive', html: '<i class="bi bi-' + glyph + '"></i>' }),
+          el('div.bank-card-id', null, [
+            el('div.bank-card-name', { title: b.name, text: b.name }),
+            el('div.bank-card-sub', { text: coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '') })
           ]),
-          // body — balance + A/C on the left, green Opening/Closing/Last-Tranx on the right
-          el('div.flex.items-end.justify-between.gap-3', null, [
-            el('div.min-w-0', null, [
-              el('div.num.strong' + (closing < 0 ? '.text-bad' : ''), { style: { fontSize: '20px', lineHeight: '1.15' }, text: ui.money(b.balance) }),
-              el('div.text-mute.xs.mt-1', { text: b.account ? 'A/C ' + b.account : '—' })
-            ]),
-            el('div', { style: { borderLeft: '2px solid var(--good)', paddingLeft: '10px', fontSize: '90%' } }, [
-              metaRow('Opening', ui.money(opening)),
-              metaRow('Closing', ui.money(closing), closing < 0 ? '.text-bad' : ''),
-              metaRow('Last Tranx', lastStr)
-            ])
-          ])
+          canCreate() ? el('div.bank-card-actions', null, [
+            el('button.icon-btn.btn-sm', { title: 'Edit', html: ui.icon('pencil'),
+              onclick: function (e) { e.stopPropagation(); editBank(b); } }),
+            el('button.icon-btn.btn-sm', { title: 'Delete', html: ui.icon('trash'),
+              onclick: function (e) { e.stopPropagation(); deleteBank(b); } })
+          ]) : null
+        ]),
+        el('div.bank-card-hero', null, [
+          el('div.bank-card-bal' + (closing < 0 ? '.text-bad' : ''), { text: ui.money(b.balance) }),
+          el('div.bank-card-cap', { text: b.account ? 'A/C ' + b.account : 'No account number' })
+        ]),
+        el('div.bank-card-foot', null, [
+          el('div.bank-card-metric', null, [ el('span.k', { text: 'Opening' }), el('span.v', { text: ui.money(opening) }) ]),
+          el('div.bank-card-metric', null, [ el('span.k', { text: 'Last movement' }), el('span.v', { text: lastStr }) ])
         ])
       ]);
+      // custom property must be set via setProperty (el()'s style object can't) —
+      // drives the identity chip, the header wash and the watermark glyph.
+      card.style.setProperty('--bank-hue', ui.colorFor(b.name));
       grid.appendChild(card);
     });
     page.appendChild(grid);

@@ -40,6 +40,10 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
 - **T2** Group sidebar dividers (Sister Concerns / Group CRM / Document Center).
 - **Bank add fix VERIFIED** end-to-end (local PHP+MySQL, 16/16) + follow-up c3484c6.
 - **T3** bank-account statement header — smaller, premium `.stat-compact` values.
+- **T4** bank account CARDS fully redesigned — removed the cheap green; per-bank
+  identity hue (chip + faint header wash + watermark glyph via `--bank-hue`),
+  status dot on the icon, hero balance, mono A/C caption, segmented footer,
+  hover-reveal action chip. New `.bank-card*` classes. Both themes.
 - **Local backend now runnable/testable** (PHP 8.3 + Laragon MySQL 5.7 + composer install).
 
 ## 🔧 PARTIAL (leftover)
