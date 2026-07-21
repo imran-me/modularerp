@@ -64,15 +64,15 @@
   - [x] **PILOT: passport-mgmt** (3 routes) — PROVEN pixel-identical (parity
         6/6: light byte-perfect, dark ≤2px AA jitter) + sweep 222/222 both
         themes, 0 errors. Establishes the pattern + build chain. Commit 7498ec0.
-  - [~] **Scaling across Travels — 12 of 18 modules converted** (each has
+  - [~] **Scaling across Travels — 13 of 18 modules converted** (each has
         `frontend/{template.html,<id>.js}` + built `view.js`, committed as
         `feat(rebuild): …`): settings, file-management, contract-file, dashboard,
         analytics, reports, automation, crm, ledgers, payroll, passport-mgmt,
-        **marketing** (2026-07-21, cddc157 — parity 8/8 across all 4 tabs both
-        themes, sweep 222/222).
-        **Remaining legacy (6):** contract-flight, hrm, visa-processing,
-        accounts, vendor-agent, air-ticketing (smallest → largest).
-  - [ ] Convert the remaining 6, simplest-first, same parity-verified pattern.
+        marketing (cddc157), **contract-flight** (2026-07-21, cd8b223 — parity
+        8/8 BYTE-IDENTICAL across all 4 routes both themes incl. charts).
+        **Remaining legacy (5):** hrm, visa-processing, accounts, vendor-agent,
+        air-ticketing (smallest → largest).
+  - [ ] Convert the remaining 5, simplest-first, same parity-verified pattern.
 
 
 ## ⏸ PAUSED at Phase 4 (2026-07-09) — feature-update window
