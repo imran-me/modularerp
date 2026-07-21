@@ -1262,7 +1262,10 @@
       var last = mine.slice().sort(function (x, y) { return (x.date < y.date ? 1 : -1); })[0];
       var closing = +b.balance || 0;
       var opening = closing - mine.reduce(function (a, t) { return a + (isIn(t) ? (+t.amount || 0) : -(+t.amount || 0)); }, 0);
-      var lastStr = last ? ui.money(last.amount) : '—';
+      var net = closing - opening;                 // net movement since opening (the trend an accountant reads first)
+      var txCount = mine.length;
+      var lastDate = last ? ui.date(last.date) : null;
+      var activityStr = txCount ? (txCount + ' txn' + (txCount === 1 ? '' : 's') + (lastDate ? ' · ' + lastDate : '')) : 'No activity yet';
       var active = (b.status || 'Active') !== 'Inactive';
       var glyph = b.type === 'Cash Box' ? 'cash-stack' : 'bank';
       var card = el('div.card.bank-card', { style: { cursor: 'pointer' }, onclick: function () {
@@ -1286,13 +1289,18 @@
           ]) : null
         ]),
         el('div.bank-card-hero', null, [
-          el('div.bank-card-caplabel', { text: b.type === 'Cash Box' ? 'Cash on hand' : 'Current balance' }),
+          el('div.bank-card-caprow', null, [
+            el('span.bank-card-caplabel', { text: b.type === 'Cash Box' ? 'Cash on hand' : 'Current balance' }),
+            net === 0
+              ? el('span.bank-card-delta.is-flat', { text: 'No change' })
+              : el('span.bank-card-delta.' + (net > 0 ? 'is-up' : 'is-down'), { html: ui.icon(net > 0 ? 'arrow-up-short' : 'arrow-down-short') + ui.money(Math.abs(net)) })
+          ]),
           el('div.bank-card-bal' + (closing < 0 ? '.text-bad' : ''), { text: ui.money(b.balance) }),
           el('div.bank-card-acct', { text: b.account ? 'A/C ' + b.account : 'No account number' })
         ]),
         el('div.bank-card-foot', null, [
           el('div.bank-card-metric', null, [ el('span.k', { text: 'Opening' }), el('div.v', { text: ui.money(opening) }) ]),
-          el('div.bank-card-metric.right', null, [ el('span.k', { text: 'Last movement' }), el('div.v', { text: lastStr }) ])
+          el('div.bank-card-metric.right', null, [ el('span.k', { text: 'Activity' }), el('div.v', { title: activityStr, text: activityStr }) ])
         ])
       ]);
       card.style.setProperty('--bank-hue', ui.colorFor(b.name));   // el()'s style object can't set a custom prop

@@ -251,11 +251,13 @@
   background: linear-gradient(180deg, var(--bank-hue), color-mix(in srgb, var(--bank-hue) 42%, transparent));
   transition: width .28s cubic-bezier(.2, .7, .2, 1); }
 .bank-card:hover::before, .bank-card.sel::before { width: 6px; }
-/* soft light sweep on hover */
-.bank-card::after { content: ''; position: absolute; top: 0; left: -70%; width: 55%; height: 100%; z-index: 3; pointer-events: none;
-  background: linear-gradient(105deg, transparent, color-mix(in srgb, #fff 22%, transparent), transparent); transform: skewX(-18deg);
-  transition: left .65s ease; }
-.bank-card:hover::after { left: 140%; }
+/* moving glaze — a soft white light with a bright glint core that sweeps across
+   on hover (brighter + wider than a plain sheen, so it clearly reads on white). */
+.bank-card::after { content: ''; position: absolute; top: 0; left: -75%; width: 62%; height: 100%; z-index: 3; pointer-events: none;
+  background: linear-gradient(105deg, transparent 12%, color-mix(in srgb, #fff 30%, transparent) 42%,
+    color-mix(in srgb, #fff 55%, transparent) 50%, color-mix(in srgb, #fff 30%, transparent) 58%, transparent 88%);
+  transform: skewX(-18deg); transition: left .7s ease; }
+.bank-card:hover::after { left: 145%; }
 .bank-card-top, .bank-card-hero, .bank-card-foot { position: relative; z-index: 1; }
 .bank-card-top { display: flex; align-items: flex-start; gap: 12px; padding: 17px 18px 0 21px; }
 .bank-card-ico { position: relative; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; flex: none;
@@ -285,7 +287,14 @@
 @media (hover: none) { .bank-card-actions { opacity: 1; transform: none; } }
 /* balance hero */
 .bank-card-hero { padding: 15px 21px 15px; }
+.bank-card-caprow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .bank-card-caplabel { font-size: 9.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--text-mute); }
+/* net movement since opening — the accountant's at-a-glance trend */
+.bank-card-delta { display: inline-flex; align-items: center; gap: 1px; flex: none; font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700; padding: 2px 8px 2px 5px; border-radius: 999px; }
+.bank-card-delta.is-up { color: var(--good); background: color-mix(in srgb, var(--good) 13%, transparent); }
+.bank-card-delta.is-down { color: var(--bad, #e0356e); background: color-mix(in srgb, var(--bad, #e0356e) 13%, transparent); }
+.bank-card-delta.is-flat { color: var(--text-mute); background: var(--surface-2); }
 .bank-card-bal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 27px; font-weight: 700;
   line-height: 1.1; letter-spacing: -.8px; color: var(--text); margin-top: 5px; }
 .bank-card-bal.text-bad { color: var(--bad, #e0356e); }
@@ -302,7 +311,7 @@
   color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .bank-card, .bank-card::before, .bank-card::after, .bank-card-ico { transition: none; }
-  .bank-card:hover { transform: none; } .bank-card:hover::after { left: -70%; } }
+  .bank-card:hover { transform: none; } .bank-card:hover::after { left: -75%; } }
 
 /* ---------------------------- SEARCHABLE COMBOBOX ------------------------
  * The type-to-filter select (forms.js makeCombobox). Reads as a normal input; a
