@@ -116,9 +116,24 @@
       else if (e.key === 'Escape') { if (open_) { e.preventDefault(); close(); } }
     });
     caret.addEventListener('mousedown', function (e) { e.preventDefault(); if (wrap.classList.contains('open')) close(); else { display.focus(); open(); } });
-    document.addEventListener('mousedown', function (e) { if (!wrap.contains(e.target)) close(); });
     sel.addEventListener('change', function () { if (!wrap.classList.contains('open')) display.value = labelFor(sel.value); });
     return wrap;
+  }
+  // ONE delegated outside-click handler for every combobox (avoids a per-combo
+  // listener leaking as forms open/close): close any open combo whose target is
+  // outside it, and reset its display to the real <select> value.
+  if (typeof document !== 'undefined' && !makeCombobox._docInit) {
+    makeCombobox._docInit = true;
+    document.addEventListener('mousedown', function (e) {
+      var opens = document.querySelectorAll('.combo.open');
+      for (var i = 0; i < opens.length; i++) {
+        if (!opens[i].contains(e.target)) {
+          opens[i].classList.remove('open');
+          var inp = opens[i].querySelector('.combo-input'), s = opens[i].querySelector('select');
+          if (inp && s) { var o = s.options[s.selectedIndex]; inp.value = o ? o.textContent : ''; }
+        }
+      }
+    });
   }
 
   EPAL.form = function (fields, record) {
@@ -178,7 +193,10 @@
           if (String(v) === String(val)) op.selected = true;
           input.appendChild(op);
         });
-        if (f.searchable && opts.length) { fieldEl = makeCombobox(input, f); }
+        // Auto-upgrade any longer select (>= 8 options) to the searchable combobox
+        // — banks, vendors, chart of accounts, etc. Force on with searchable:true
+        // (any length) or off with searchable:false.
+        if (opts.length && (f.searchable === true || (f.searchable !== false && opts.length >= 8))) { fieldEl = makeCombobox(input, f); }
       } else if (f.type === 'textarea') {
         input = el('textarea.input', { id: 'f-' + f.key, rows: f.rows || 3, placeholder: f.placeholder || '' });
         input.value = val;
