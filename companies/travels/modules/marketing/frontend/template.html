@@ -1,0 +1,31 @@
+<!-- ============================================================================
+  TRAVELS · MARKETING & MESSAGING · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's static HTML, separated from its logic (frontend/marketing.js) and
+  cloned + filled at runtime via [data-tpl] / [data-slot] hooks.
+
+  Four tabs (campaigns / templates / bot / send-log) driven by local pill state
+  (ctx.subId honoured). Only the reusable STRUCTURAL shells live here — the house
+  design-system classes, verbatim. The campaign + send-log tables are built by the
+  shared EPAL.table engine; the WhatsApp-bot phone panel, chat bubbles, delivery-
+  funnel bars and every modal/form keep their legacy el()-built DOM (with their
+  dynamic inline styles) in the logic file, exactly as before. So there are no
+  Tailwind tw- utilities on this screen — the legacy static markup used none.
+
+  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
+  the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section-nav band ------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- KPI grids (stagger for campaigns, plain for send-log) + one KPI card ---->
+<template data-tpl="kpi-grid"><div class="kpi-grid stagger"></div></template>
+<template data-tpl="kpi-grid-plain"><div class="kpi-grid"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+
+<!-- generic layout bits: the New-* header row and the two-column split -------->
+<template data-tpl="head-row"><div class="flex justify-between items-center my-3"></div></template>
+<template data-tpl="two-col"><div class="two-col"></div></template>
