@@ -1,0 +1,24 @@
+<!-- ============================================================================
+  TRAVELS · ACCOUNTS · MARKUP
+  ----------------------------------------------------------------------------
+  Static shells only, separated from the logic (frontend/accounts.js) and cloned +
+  filled via [data-tpl] / [data-slot]. The money desk is highly dynamic — the
+  overview cockpit + Action Center, income/expense registers, the double-entry
+  journal poster, payment-schedule tracker, recurring/cheque/petty/cash-book
+  desks, the shared cash/expense/payroll kits, and every table/modal/form keep
+  their legacy el()-built DOM (with their inline styles) in the logic file, exactly
+  as before. Only the reusable page / section-nav / KPI shells live here, house
+  design-system classes verbatim (no Tailwind tw- utilities).
+
+  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
+  the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section-nav band (this module uses the DENSE underline band) -->
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline tabs-dense mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- KPI grid (compact, one row) + one KPI card -->
+<template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
