@@ -1197,8 +1197,19 @@
         // (a second cash box would be rejected as a duplicate).
         if (rec.type === 'Cash Box' && !rec.account) rec.account = 'CASH-' + Date.now().toString().slice(-9);
         if (!rec.accountName) rec.accountName = coName(rec.companyId || 'group');
+        // Account numbers are UNIQUE group-wide. Catch a clash on the client for an
+        // INSTANT, clear message + keep the form open — instead of the optimistic
+        // "Bank saved" toast followed by the server's "Not saved" rejection.
+        if (rec.account) {
+          var clash = db.col('banks').filter(function (x) { return String(x.id) !== String(rec.id) && String(x.account || '') === String(rec.account); })[0];
+          if (clash) {
+            ui.toast('Account number ' + rec.account + ' is already used by "' + clash.name + '". Please use a different number.', 'error');
+            return false;   // keep the modal open so the user can fix the number
+          }
+        }
         db.save('banks', rec);
         ui.toast('Bank saved', 'success'); EPAL.router.render();
+        return true;
       }
     });
   }
