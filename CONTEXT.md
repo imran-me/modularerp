@@ -10,6 +10,48 @@
 > `C:\Users\User\.claude\projects\e--Imran-New-folder-newerp\memory\` (local, not
 > pushed) — this file is the public mirror of the load-bearing parts.
 
+> ⚠️ **AI-memory path moved (new machine, 2026-07-21):** the local memory that used
+> to live at `C:\Users\User\.claude\projects\e--Imran-New-folder-newerp\memory\` is
+> NOT on this machine. New path:
+> `C:\Users\Epal\.claude\projects\h--Imran-Modular-ERP-Continious-File-modularerp-main\memory\`
+> (currently empty — memories like `epal-bookkeeping-audit`, `epal-backend-migration`
+> did not travel). This context.md is the surviving source of truth.
+
+---
+
+## 🆕 SESSION — 2026-07-21 · NEW MACHINE BRING-UP + SIDEBAR TEXT FIX
+
+**Machine move.** Owner is on a new Windows 11 box with nothing dev-related
+installed. Installed via `winget` (approved): **Node** `v24.18.0` + **npm**
+`11.16.0`, **Git** `2.55.0`. Chrome was already present. The verify/build harness
+(`tools/verify/*.mjs`, `tools/build/build-module.mjs`) uses **only Node built-ins**
+— no `npm install` needed to boot-sweep; `npm install` is only for the Tailwind CLI
+(Phase 4, paused). PATH gotcha: tools installed mid-session aren't on already-open
+shells — prefix commands with
+`$env:Path=[Environment]::GetEnvironmentVariable("Path","Machine")+";"+[Environment]::GetEnvironmentVariable("Path","User")`,
+or open a fresh terminal.
+
+**⚠️ OPEN DECISION — this folder is NOT a git repo.** It was copied here without its
+`.git` history (real history + remote are on GitHub). Until resolved, R6 "small
+reviewable commits" and the standing "push context.md every session" rule can't be
+honoured — edits are file-only. Options (owner call): (1) `git clone` fresh + re-apply
+today's edits, (2) reconnect this folder to the remote, or (3) keep working file-only
+and reconcile later. Flagged, not guessed.
+
+**Sidebar nav text too small — FIXED.** On a short window (~662px tall) the Travels
+sidebar's "responsive-fit" font (sized in `vh` so the menu fits without a scrollbar,
+`platform/design-system/css/layout.css`) bottomed out at its floor — 10.5px items /
+9.5px sub-items — hence tiny. Fix (font-size only, everything else untouched per owner):
+- `.nav-item`  `clamp(10.5px,1.35vh,14px)` → **`clamp(13px,1.6vh,14px)`**
+- `.nav-sub`   `clamp(9.5px,1.18vh,13px)`  → **`clamp(12px,1.4vh,13px)`**
+Floors raised to a readable size; full-size ceilings unchanged; the list still scrolls
+beyond the floor (`overflow-y:auto`). **Verified:** boot sweep **222/222 · 0 errors ·
+0 render failures** both themes + a 1300×662 visual capture.
+
+**Next this session:** Air-Ticketing feature-polish (`docs/TRAVELS-PROGRESS.md` Due #1).
+Already has the house pattern; remaining gaps = `sendModal` (WhatsApp/Gmail) + passenger
+`Travel Profile` fields → bring to the Vendor/Agent gold standard.
+
 ---
 
 ## 📐 MIGRATION SPEC (owner, 2026-07-19) — the binding brief for the rebuild
