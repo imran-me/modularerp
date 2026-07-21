@@ -54,6 +54,11 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
 </details>
 
 ## ✅ DONE (this session, 2026-07-21)
+- **T6** instant client-side duplicate-account_number check on bank save (7a65fab).
+- **T7** searchable combobox auto-enabled for all long selects app-wide (1eccb4f).
+- **T8** carried the premium card treatment into the per-company + detail views —
+  extracted a shared `renderBankCardGrid`, added cards to `banksView`, and branded
+  the bank-detail header in the bank's own hue.
 - **T1** inner tab-band one-line auto-fit (4436e7a).
 - **T2** Group sidebar dividers (Sister Concerns / Group CRM / Document Center).
 - **Bank add fix VERIFIED** end-to-end (local PHP+MySQL, 16/16) + follow-up c3484c6.

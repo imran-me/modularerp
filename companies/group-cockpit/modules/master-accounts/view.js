@@ -1242,13 +1242,20 @@
     ]));
 
     page.appendChild(el('div.section-label', { text: 'Bank Accounts — ' + (selCo === 'all' ? 'all sister concerns' : coName(selCo)) }));
-    if (!banks.length) { page.appendChild(el('div.card', null, [ el('div.card-pad.text-mute', { text: 'No bank accounts in this scope.' }) ])); return; }
+    renderBankCardGrid(banks, page);
+  }
 
+  /* Shared PREMIUM bank-account card grid — used by both the Overview and the
+   * per-company views so the cards look identical everywhere. opts.autoOpen
+   * (default true) opens the first account's inline ledger below the grid. */
+  function renderBankCardGrid(banks, page, opts) {
+    opts = opts || {};
+    if (!banks.length) { page.appendChild(el('div.card', null, [ el('div.card-pad.text-mute', { text: 'No bank accounts in this scope.' }) ])); return; }
     var txns = S.list('bank_txns');
     var detailHost = el('div.mt-3');        // the clicked account's ledger renders INLINE here (not a modal)
     var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
-    // in/out sense for a txn — used to walk a bank's opening back from its
-    // current (closing) balance, and to label the last movement on the card.
+    // in/out sense for a txn — walks a bank's opening back from its closing
+    // balance, and labels the last movement on the card.
     var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in'; };
     banks.forEach(function (b) {
       var mine = txns.filter(function (t) { return t.bankId === b.id; });
@@ -1258,9 +1265,6 @@
       var lastStr = last ? ui.money(last.amount) : '—';
       var active = (b.status || 'Active') !== 'Inactive';
       var glyph = b.type === 'Cash Box' ? 'cash-stack' : 'bank';
-      // Premium account card: monochrome, with the bank's own hue used only for a
-      // faint header wash, the identity chip and a large watermark glyph. Hero =
-      // current (closing) balance; Opening / Last-movement sit in a segmented foot.
       var card = el('div.card.bank-card', { style: { cursor: 'pointer' }, onclick: function () {
           ui.$$('.card', grid).forEach(function (c) { c.classList.remove('sel'); });
           card.classList.add('sel');
@@ -1291,15 +1295,12 @@
           el('div.bank-card-metric.right', null, [ el('span.k', { text: 'Last movement' }), el('div.v', { text: lastStr }) ])
         ])
       ]);
-      // custom property must be set via setProperty (el()'s style object can't) —
-      // drives the identity chip, the header wash and the watermark glyph.
-      card.style.setProperty('--bank-hue', ui.colorFor(b.name));
+      card.style.setProperty('--bank-hue', ui.colorFor(b.name));   // el()'s style object can't set a custom prop
       grid.appendChild(card);
     });
     page.appendChild(grid);
     page.appendChild(detailHost);
-    // auto-open the first account so the ledger area is never blank
-    if (banks.length) { grid.firstChild.classList.add('sel'); bankAccountDetail(banks[0], detailHost); }
+    if (opts.autoOpen !== false) { grid.firstChild.classList.add('sel'); bankAccountDetail(banks[0], detailHost); }
   }
 
   /* ---- BANK ACCOUNT DETAIL — click an account card → its full ledger.
@@ -1372,12 +1373,18 @@
       var opening = rows.length ? (+rows[rows.length - 1]._before || 0) : (+bank.balance || 0);
       var closing = rows.length ? (+rows[0]._after || 0) : (+bank.balance || 0);
 
-      // ---- header band (bank name + scope + Print) ----
-      host.appendChild(el('div.card.mb-2', { style: { background: 'linear-gradient(135deg, var(--epal-royal,#123499), var(--accent,#1A43BF))', border: 'none', color: '#fff' } }, [
-        el('div.card-pad.flex.items-center.gap-2.flex-wrap', null, [
+      // ---- header band (branded in the bank's own hue, matching its card) ----
+      var hue = ui.colorFor(bank.name);
+      var dGlyph = bank.type === 'Cash Box' ? 'cash-stack' : 'bank';
+      host.appendChild(el('div.card.mb-2', { style: { border: 'none', color: '#fff', overflow: 'hidden',
+        background: 'linear-gradient(135deg, color-mix(in srgb, ' + hue + ' 82%, #0a1330), color-mix(in srgb, ' + hue + ' 44%, #0a1330))' } }, [
+        el('div.card-pad.flex.items-center.gap-3.flex-wrap', null, [
+          el('div', { style: { width: '46px', height: '46px', borderRadius: '13px', display: 'grid', placeItems: 'center', flex: 'none',
+            fontSize: '20px', background: 'rgba(255,255,255,.15)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.28)' },
+            html: '<i class="bi bi-' + dGlyph + '"></i>' }),
           el('div.flex-1.min-w-0', null, [
-            el('div.fw-700', { style: { fontSize: '18px' }, html: ui.icon('bank') + ' ' + esc(bank.name) }),
-            el('div', { style: { opacity: '.85', fontSize: '12px' }, text: coName(bank.companyId || 'group') + (bank.branch ? ' · ' + bank.branch : '') + (state.from || state.to ? '  ·  ' + (state.from || '…') + ' → ' + (state.to || '…') : '') })
+            el('div.fw-700', { style: { fontSize: '19px', letterSpacing: '-.2px' }, text: bank.name }),
+            el('div', { style: { opacity: '.85', fontSize: '12.5px', marginTop: '2px' }, text: coName(bank.companyId || 'group') + (bank.branch ? ' · ' + bank.branch : '') + (bank.account ? '  ·  A/C ' + bank.account : '') + (state.from || state.to ? '   ·   ' + (state.from || '…') + ' → ' + (state.to || '…') : '') })
           ]),
           el('button.btn.btn-sm', { style: { background: '#fff', color: 'var(--accent, #1A43BF)', fontWeight: '700' },
             html: ui.icon('printer') + ' Print', onclick: function () { printRows(rows, printLabel()); } })
@@ -1508,6 +1515,12 @@
         el('a.btn.btn-sm.btn-outline', { href: '#/group/finance/banks', html: ui.icon('pie-chart') + ' Charts view' })
       ]));
     }
+
+    // Premium account CARDS (identical to the Overview), scoped to this company —
+    // the visual layer; the detailed register with per-row actions + export is the
+    // "All Banks" table below. Click a card to drill into its ledger inline.
+    page.appendChild(el('div.section-label', { text: 'Accounts' }));
+    renderBankCardGrid(banks, page, { autoOpen: false });
 
     // ---- 2) ALL BANKS (production columns + filters) -------------------------
     var cols = [
