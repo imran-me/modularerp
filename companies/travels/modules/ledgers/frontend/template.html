@@ -1,0 +1,53 @@
+<!-- ============================================================================
+  TRAVELS · LEDGERS · MARKUP
+  ----------------------------------------------------------------------------
+  The screen's HTML, separated from its logic (frontend/ledgers.js). Cloned +
+  filled at runtime via [data-tpl] / [data-slot] hooks. Tabs are driven by the
+  ?tab= query param.
+
+  The drill-down MODALS (account ledger, party statement, journal, receive-
+  payment form) and every branded PDF (EPAL.doc.open) keep their legacy el()-
+  built DOM in the logic file. The income-statement rows (pnlLine) also stay a
+  legacy el() helper — a compound inline style (padding + an rgba divider) that
+  is impractical to express as a utility. STYLING = the house design system;
+  tw- utils only where a captured screen used a static inline style:
+    tw-max-w-[360px] == style="max-width:360px"  (General-Ledger account select)
+    tw-relative      == style="position:relative"  (chart box; height runtime)
+
+  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
+  the DOM the old ui.el() calls produced.
+  ============================================================================ -->
+
+<!-- page shell + section band ----------------------------------------------->
+<template data-tpl="page"><div class="page"></div></template>
+<template data-tpl="nav"><div class="tab-underline mb-3"></div></template>
+<template data-tpl="nav-btn"><button></button></template>
+
+<!-- KPI grids + plain + drill KPI card -------------------------------------->
+<template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
+<template data-tpl="kpi-grid-plain"><div class="kpi-grid kpi-compact"></div></template>
+<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+<template data-tpl="kpi-drill"><div class="kpi-card drill"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div><div class="kpi-foot" data-slot="foot"></div></div></template>
+
+<!-- generic layout bits ----------------------------------------------------->
+<template data-tpl="section-label"><div class="section-label"></div></template>
+<template data-tpl="grid-auto"><div class="grid-auto"></div></template>
+<template data-tpl="card-body-card"><div class="card"><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="reg-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="head-btn-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span data-slot="action"></span></div><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="build-banner"><div class="build-banner mb-3"><i class="bi" data-slot="ico"></i><div data-slot="msg"></div></div></template>
+
+<!-- overview Action Center row (cursor + tone in logic; chevron static) ----->
+<template data-tpl="action-row"><div class="data-row tw-cursor-pointer"><span class="notif-ico" data-slot="ico"></span><div class="flex-1" data-slot="text"></div><span class="text-mute"><i class="bi bi-chevron-right"></i></span></div></template>
+
+<!-- chart card (relative box + canvas; height set in logic) ---------------->
+<template data-tpl="chart-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body"><div class="tw-relative" data-slot="box"><canvas data-slot="canvas"></canvas></div></div></div></template>
+
+<!-- General Ledger: the account picker card -------------------------------->
+<template data-tpl="select-card"><div class="card"><div class="card-body"><div class="section-label mt-0">Select account</div><select class="select tw-max-w-[360px]" data-slot="sel"></select></div></div></template>
+
+<!-- Party ledger empty state ----------------------------------------------->
+<template data-tpl="party-empty"><div class="empty-state"><i class="bi bi-people"></i><h3>No party movement yet</h3><p class="text-muted">Party postings (sales, payments) will appear here.</p></div></template>
+
+<!-- Balance-sheet Print row (right-aligned button) ------------------------->
+<template data-tpl="print-row"><div class="flex justify-end mb-2"><button class="btn btn-sm btn-primary" data-slot="btn"></button></div></template>
