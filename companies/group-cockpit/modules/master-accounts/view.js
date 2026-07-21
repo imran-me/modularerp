@@ -1192,7 +1192,10 @@
       onSave: function (vals) {
         var rec = Object.assign({}, b || { id: 'BNK-' + Date.now().toString().slice(-5), created: TODAY_STR }, vals);
         rec.type = vals.type || 'Bank';
-        if (rec.type === 'Cash Box' && !rec.account) rec.account = '0000';
+        // A Cash Box has no real account number, but account_number is UNIQUE in
+        // the DB — so give each one a distinct placeholder, never a shared '0000'
+        // (a second cash box would be rejected as a duplicate).
+        if (rec.type === 'Cash Box' && !rec.account) rec.account = 'CASH-' + Date.now().toString().slice(-9);
         if (!rec.accountName) rec.accountName = coName(rec.companyId || 'group');
         db.save('banks', rec);
         ui.toast('Bank saved', 'success'); EPAL.router.render();

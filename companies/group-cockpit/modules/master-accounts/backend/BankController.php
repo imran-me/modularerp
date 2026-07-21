@@ -131,10 +131,38 @@ class BankController
             'Cash Box' => 'cash', 'Card' => 'digital_wallet'];
         $type = $typeMap[$v['type'] ?? 'Bank'] ?? 'bank';
 
-        // account_number is NOT NULL + UNIQUE in the real table — a Cash Box
-        // (which has no real account number) needs a generated placeholder
-        // per row, not a fixed one, or a second cash box would collide.
-        $accountNumber = $v['account'] ?? ('CASH-' . substr(uniqid(), -8));
+        // account_number is NOT NULL + UNIQUE (globally, across every company).
+        // A Cash Box — or any row the form left blank or defaulted to the shared
+        // "0000" placeholder — needs a generated per-row value, or the SECOND one
+        // collides on that placeholder.
+        $accountNumber = trim((string) ($v['account'] ?? ''));
+        if ($accountNumber === '' || $accountNumber === '0000') {
+            $accountNumber = 'CASH-' . strtoupper(substr(uniqid(), -8));
+        }
+
+        // The UNIQUE index also counts SOFT-DELETED rows and rows in OTHER
+        // companies this user can't see — so a number freed only by a delete, or
+        // one already used elsewhere in the group, would make MySQL throw a raw
+        // 1062 "Duplicate entry". Resolve it here instead: revive a trashed row
+        // rather than failing, and return a CLEAR message for a genuine active
+        // clash instead of a database error.
+        $clash = DB::table('banks')->where('account_number', $accountNumber)
+            ->when($existingId, fn ($q) => $q->where('id', '!=', $existingId))
+            ->first();
+        $reviving = false;
+        if ($clash) {
+            if (! $existingId && $clash->deleted_at !== null) {
+                $existingId = (int) $clash->id;     // repurpose the soft-deleted row
+                $reviving = true;
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account number ' . $accountNumber . ' is already in use'
+                        . ($clash->deleted_at === null ? ' by "' . $clash->name . '".' : ' in the group.')
+                        . ' Please use a different account number.',
+                ], 422);
+            }
+        }
 
         $row = [
             'name'            => $v['name'],
@@ -169,7 +197,15 @@ class BankController
         preg_match('/(\d+)$/', $id, $m);
         $n = (int) ($m[1] ?? 0);
         if ($n > 0) {
-            DB::table('banks')->where('id', $n)->update(['deleted_at' => now()]);
+            // Soft-delete AND free the globally-unique account_number by tombstoning
+            // it ('x<id>-<old>'), so a bank with the same number can be created
+            // again later — the UNIQUE index counts soft-deleted rows, which would
+            // otherwise permanently reserve the number.
+            $acc = (string) DB::table('banks')->where('id', $n)->value('account_number');
+            DB::table('banks')->where('id', $n)->update([
+                'deleted_at'     => now(),
+                'account_number' => substr('x' . $n . '-' . $acc, 0, 50),
+            ]);
         }
 
         return response()->json(['success' => true]);
