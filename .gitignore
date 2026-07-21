@@ -5,6 +5,9 @@ node_modules/
 Thumbs.db
 .DS_Store
 
+# Claude Code local settings / session data (per-machine, never commit)
+.claude/
+
 # Claude verification harness temp files (never commit)
 __*.html
 
