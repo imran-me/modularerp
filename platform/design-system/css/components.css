@@ -224,6 +224,12 @@
 .stat { background: var(--surface); padding: 14px 16px; }
 .stat-label { font-size: var(--fs-tiny); color: var(--text-mute); font-weight: 600; }
 .stat-value { font-size: var(--fs-h3); font-weight: 700; margin-top: 4px; }
+/* .stat-compact — refined, smaller stat values for dense detail views (e.g. the
+   bank-account statement header): a premium, restrained fintech feel instead of
+   the big --fs-h3 headline number. Scoped, so other stat rows are unaffected. */
+.stat-row.stat-compact .stat { padding: 12px 15px; }
+.stat-row.stat-compact .stat-value { font-size: var(--fs-lead); font-weight: 600; margin-top: 3px; letter-spacing: .2px; }
+.stat-row.stat-compact .stat-label { font-size: var(--fs-micro); letter-spacing: .4px; text-transform: uppercase; }
 
 /* Flag glyph — the real country flag, rendered via the bundled Twemoji Country
    Flags web font (tokens.css @font-face) so it shows as a proper flag image on

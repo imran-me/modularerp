@@ -38,6 +38,15 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
 ## ✅ DONE (this session, 2026-07-21)
 - **T1** inner tab-band one-line auto-fit (4436e7a).
 - **T2** Group sidebar dividers (Sister Concerns / Group CRM / Document Center).
+- **Bank add fix VERIFIED** end-to-end (local PHP+MySQL, 16/16) + follow-up c3484c6.
+- **T3** bank-account statement header — smaller, premium `.stat-compact` values.
+- **Local backend now runnable/testable** (PHP 8.3 + Laragon MySQL 5.7 + composer install).
+
+## 🔧 PARTIAL (leftover)
+- **Laragon polish:** `php` works in a NEW terminal (winget PHP 8.3 on User PATH) and
+  the backend boots/tests. Making `php` resolve in Laragon's own cmder + adding to the
+  Machine PATH needs an ADMIN prompt; Laragon Apache failed on port 80 (separate). Not
+  blocking — backend runs fine via `php artisan serve` / direct boot. Revisit if wanted.
 - Bank add duplicate-account_number failure — fixed backend + frontend + delete-tombstone,
   pushed (6fd8054). Needs a live test after deploy.
 - Sidebar (Travels): reference text size + item spacing + dividers at My Task /

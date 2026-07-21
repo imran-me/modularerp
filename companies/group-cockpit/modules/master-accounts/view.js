@@ -1382,7 +1382,7 @@
 
       // ---- account info row ----
       host.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null, [
-        el('div.stat-row', null, [
+        el('div.stat-row.stat-compact', null, [
           stat('Account Name', esc(bank.accountName || coName(bank.companyId || 'group'))),
           stat('Account Number', esc(bank.account || '—')),
           stat('Type', esc((bank.type || 'Bank') + ' · ' + (bank.accType || 'Current'))),
@@ -1392,7 +1392,7 @@
       ]) ]));
 
       // ---- opening / debit / credit / closing ----
-      host.appendChild(el('div.stat-row.mb-2', null, [
+      host.appendChild(el('div.stat-row.stat-compact.mb-2', null, [
         bstat('Opening Balance', drcr(opening), 'flag-fill', 'info'),
         bstat('Total Debit (In)', ui.money(tin), 'arrow-down-left-circle-fill', 'good', '.text-good'),
         bstat('Total Credit (Out)', ui.money(tout), 'arrow-up-right-circle-fill', 'error', '.text-bad'),
