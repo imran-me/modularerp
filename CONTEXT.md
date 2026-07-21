@@ -66,8 +66,14 @@ session: Travels **Marketing & Messaging** → `frontend/{template.html,marketin
 + built `view.js` (cddc157). Parity **8/8 pixel-identical** across all 4 tabs
 (campaigns/templates/bot/send-log) both themes (4 light byte-perfect, 4 dark ≤1px AA
 jitter); sweep 222/222. Method proof: marketing honours `ctx.subId`, so parity.mjs
-shoots each tab via `#/travels/marketing/<tab>`. **Remaining legacy (6):**
-contract-flight, hrm, visa-processing, accounts, vendor-agent, air-ticketing.
+shoots each tab via `#/travels/marketing/<tab>`.
+
+**DONE 2026-07-21 — contract-flight converted (13/18, cd8b223).** Parity **8/8
+BYTE-IDENTICAL** across schedule/day-board/category/manage-sales both themes
+(charts included); sweep 222/222. (Caught + fixed a self-inflicted bug: a `->`
+instead of `-->` in template.html silently commented-out the KPI fragments — the
+parity harness flagged the full-content diff.) **Remaining legacy (5):** hrm,
+visa-processing, accounts, vendor-agent, air-ticketing.
 
 **Continuing the FRONTEND REBUILD** (owner: "code the frontend my way, 10× loop").
 Converting the remaining legacy modules one at a time — copy/baseline the current
@@ -75,6 +81,48 @@ view.js (parity `before`) → author `frontend/{template.html,<id>.js}` (HTML5 +
 `tw-` + raw JS) → build → parity `diff` byte-identical → 10× checks → commit. NOTE:
 this is a STRUCTURE-ONLY, pixel+behaviour-identical rebuild — NO feature changes (the
 earlier Air-Ticketing "Travel-Profile" idea was a feature, so it's OUT of this track).
+
+---
+
+## 🎯 INITIATIVE (owner, 2026-07-21) — ACCOUNTS DEEP-ENHANCE vs the reference ERP
+
+Owner directive: bring **Master Accounts** (group) and **Travels Accounts** to a
+best-in-class standard by mining the other developer's mature Laravel ERP
+`epal_erp_soft` for anything more advanced, then applying it (UI + frontend +
+backend). Method: section → subsection, **screenshot → analyze → solve → re-check
+until 100%**. Owner also wants me to occasionally REMIND what's missing + offer
+suggestions.
+
+**Reference build:** `H:\ERP\Live\epal_erp_soft-main.zip` (Laravel monolith; our
+DONOR / old erp.epal.com.bd). Extract → scratchpad `ref-erp/`. Models: Account,
+JournalEntry+JournalItem, Voucher+VoucherDetail, Transaction, EmployeeLedger.
+Controllers incl. a huge **ReportController (~1338 lines)**. See AI memory
+[[reference-erp-comparison]].
+
+**Reference's edge (verify per section as we go):** a deep REPORTING suite with
+V1+V2 of each — general_ledger, trial_balance, profit_loss, balance_sheet,
+account_ledger, account_statement, account_balances, journal_entries — plus
+printable vouchers (journal / party / payment-schedule).
+
+**Current status of the two targets:** BOTH are still **legacy monolithic view.js**
+(no `frontend/` sources) — Master Accounts (`group-cockpit/modules/master-accounts`)
+and Travels Accounts (`travels/modules/accounts`). Travels Ledgers IS converted.
+
+**PLAN (owner approved — do in order):**
+1. **[IN PROGRESS] Convert BOTH Accounts modules to the frontend structure**
+   (`frontend/{template.html,<id>.js}` → built `view.js`), parity-first / pixel-
+   identical, like hrm & contract-flight. Master Accounts first, then Travels
+   Accounts. "Make this perfectly done first."
+2. Then, **section by section** (Manage Journals → Manage Accounts → Reports →
+   Vouchers → …): screenshot ours, read the reference's blade+controller for that
+   section, LIST what's more advanced, apply it, re-check to 100%.
+3. Maintain a running **"reference-advantage list"** in `docs/TASK-QUEUE.md` as
+   gaps are found (owner can ask for the list anytime).
+
+**Session progress toward this (2026-07-21):** bank cards world-class + CMYK-muted
+hues + company-wise chip badges + accountant net-change/activity content;
+searchable account combobox; bank duplicate fix (verified 16/16 local); frontend
+rebuild now 14/18 (added marketing, contract-flight, hrm — all parity 8/8).
 
 ---
 
