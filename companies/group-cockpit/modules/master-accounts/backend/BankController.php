@@ -180,6 +180,9 @@ class BankController
         ];
 
         if ($existingId) {
+            if ($reviving) {
+                $row['deleted_at'] = null;   // un-delete the repurposed soft-deleted row
+            }
             DB::table('banks')->where('id', $existingId)->update($row);
             $id = $existingId;
         } else {
