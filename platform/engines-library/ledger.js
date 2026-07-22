@@ -196,7 +196,15 @@
     };
 
     S.upsert(GL_KEY, entry);
-    bus.emit('data:changed', { store: GL_KEY, action: 'upsert', record: entry });
+    // spec.local => a DERIVED entry (bank-opening / historical mirror) that is
+    // recomputed from a store which ALREADY persists (banks, acc_entries). It
+    // belongs in the in-memory ledger for display/reconciliation, but must NOT
+    // be pushed to the DB: on the shared host those auto-writes are rejected and
+    // re-fire every page load (the "Operation not permitted" toast flood). We
+    // still emit data:changed (so live counters/listeners update) but tag it
+    // local:true so api.js wireWrites skips the DB round-trip. Real user actions
+    // (deposits, expenses, manual journals) are NOT local and DO persist.
+    bus.emit('data:changed', { store: GL_KEY, action: 'upsert', record: entry, local: !!spec.local });
     bus.emit('ledger:posted', entry);
     if (EPAL.audit && EPAL.audit.record) {
       try {

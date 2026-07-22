@@ -100,7 +100,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           try {
             EPAL.ledger.post({ id: gid, date: e.date, companyId: e.companyId || 'group', ref: e.ref || e.id,
               memo: (e.category || 'Expense') + (e.subCategory ? ' · ' + e.subCategory : '') + (e.desc ? ' — ' + e.desc : ''),
-              source: 'manual', party: e.party || '', override: true,
+              source: 'manual', party: e.party || '', override: true, local: true,
               // historical repair credits the BANK control (1010) uniformly —
               // crediting 1000 for old "Cash" rows drove petty cash ৳21L
               // negative, since the GL never held that cash. New entries from
@@ -138,7 +138,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
               ? EPAL.ledger.incomeAccountFor({ category: e.category, desc: e.desc }) : '4000';
             EPAL.ledger.post({ id: gid, date: e.date, companyId: e.companyId || 'group', ref: e.ref || e.id,
               memo: (e.category || 'Income') + (e.desc && e.desc !== '—' ? ' — ' + e.desc : ''),
-              source: 'manual', party: e.party || '', override: true,
+              source: 'manual', party: e.party || '', override: true, local: true,
               lines: [{ account: '1010', dr: +e.amount, cr: 0 }, { account: incAcct, dr: 0, cr: +e.amount }] });
             ibN++; ibAmt += +e.amount;
           } catch (x) {}
@@ -165,7 +165,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           var abs = Math.abs(amt);
           try {
             EPAL.ledger.post({ id: gid, date: b.created || '2026-07-01', companyId: b.companyId || 'group',
-              ref: 'OPENING', memo: 'Bank opening balance · ' + b.name, source: 'opening', party: b.name, override: true,
+              ref: 'OPENING', memo: 'Bank opening balance · ' + b.name, source: 'opening', party: b.name, override: true, local: true,
               lines: amt > 0 ? [{ account: cashAcct, dr: abs, cr: 0 }, { account: '3100', dr: 0, cr: abs }]
                              : [{ account: '3100', dr: abs, cr: 0 }, { account: cashAcct, dr: 0, cr: abs }] });
             opN++; opAmt += amt;
@@ -319,13 +319,19 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         var abs = Math.abs(bal), date = b.created || TODAY_STR, co = b.companyId || 'group';
         if (!haveGl[glId] && EPAL.ledger && EPAL.ledger.post) {
           try {
-            EPAL.ledger.post({ id: glId, date: date, companyId: co, ref: 'OPENING', memo: 'Bank opening balance · ' + b.name, source: 'opening', party: b.name, override: true,
+            EPAL.ledger.post({ id: glId, date: date, companyId: co, ref: 'OPENING', memo: 'Bank opening balance · ' + b.name, source: 'opening', party: b.name, override: true, local: true,
               lines: bal > 0 ? [{ account: cashAcct, dr: abs, cr: 0 }, { account: '3100', dr: 0, cr: abs }]
                              : [{ account: '3100', dr: abs, cr: 0 }, { account: cashAcct, dr: 0, cr: abs }] });
           } catch (e) {}
         }
         if (!haveOpenTxn[b.id]) {
-          db.save('bank_txns', { id: 'BTX-OPEN-' + b.id, bankId: b.id, bankName: b.name, type: 'opening',
+          // Local write (S.upsert, no data:changed) — this opening row is DERIVED
+          // from the persisted banks table and recomputed each load, so it must
+          // NEVER reach the DB. Using db.save here (with a stale-cached api.js that
+          // still had bank_txns writable) is what re-triggered the CREATE TABLE
+          // "Operation not permitted" flood every page load. Recent Transactions
+          // reads it from the local store; real movements persist via the GL.
+          S.upsert('bank_txns', { id: 'BTX-OPEN-' + b.id, bankId: b.id, bankName: b.name, type: 'opening',
             amount: abs, date: date, desc: 'Opening balance', ref: 'OPENING', glId: glId });
         }
       });

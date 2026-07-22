@@ -195,6 +195,9 @@
       EPAL.bus.on('data:changed', function (e) {
         var path = WRITABLE[e.store];
         if (!path) return;                 // not a writable store — read-only for now
+        if (e.local) return;               // DERIVED entry (bank-opening / historical
+                                           // mirror), recomputed each load from a store
+                                           // that already persists — never a DB write.
         if (e.action === 'upsert') {
           var before = e.record.id;
           call(path, { method: 'POST', body: e.record }).then(function (j) {
