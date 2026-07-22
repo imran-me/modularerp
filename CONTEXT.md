@@ -109,10 +109,14 @@ printable vouchers (journal / party / payment-schedule).
 and Travels Accounts (`travels/modules/accounts`). Travels Ledgers IS converted.
 
 **PLAN (owner approved — do in order):**
-1. **[IN PROGRESS] Convert BOTH Accounts modules to the frontend structure**
+1. **[✅ DONE 2026-07-22] Convert BOTH Accounts modules to the frontend structure**
    (`frontend/{template.html,<id>.js}` → built `view.js`), parity-first / pixel-
-   identical, like hrm & contract-flight. Master Accounts first, then Travels
-   Accounts. "Make this perfectly done first."
+   identical, like hrm & contract-flight. "Make this perfectly done first."
+   → **Travels Accounts** c38fad1 (14/14 parity byte-identical) + **Master
+   Accounts** b9ad7ae (18/18 parity byte-identical). No feature lost: reverse-on-
+   delete, out-of-balance journal guard, company switcher, VAT/AIT return,
+   opening-balance posters and GL backfill migrations all preserved. Sweep 222/222,
+   0 errors, both themes. Next up: step 2 (section-by-section deep-enhance).
 2. Then, **section by section** (Manage Journals → Manage Accounts → Reports →
    Vouchers → …): screenshot ours, read the reference's blade+controller for that
    section, LIST what's more advanced, apply it, re-check to 100%.
@@ -123,6 +127,12 @@ and Travels Accounts (`travels/modules/accounts`). Travels Ledgers IS converted.
 hues + company-wise chip badges + accountant net-change/activity content;
 searchable account combobox; bank duplicate fix (verified 16/16 local); frontend
 rebuild now 14/18 (added marketing, contract-flight, hrm — all parity 8/8).
+
+**Session progress (2026-07-22):** step 1 COMPLETE — both Accounts modules on the
+modular frontend (Travels c38fad1, Master b9ad7ae), byte-identical parity, pushed.
+Travels rebuild now 15/18 (accounts done; remaining legacy: visa-processing,
+vendor-agent, air-ticketing). New-machine toolchain paths + headless git-push
+recipe saved to AI memory. Ready to begin step 2 (Manage Journals section first).
 
 ---
 
