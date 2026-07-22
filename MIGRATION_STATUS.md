@@ -64,7 +64,7 @@
   - [x] **PILOT: passport-mgmt** (3 routes) — PROVEN pixel-identical (parity
         6/6: light byte-perfect, dark ≤2px AA jitter) + sweep 222/222 both
         themes, 0 errors. Establishes the pattern + build chain. Commit 7498ec0.
-  - [~] **Scaling across Travels — 15 of 18 modules converted** (each has
+  - [x] **Scaling across Travels — 18 of 18 modules converted (COMPLETE 2026-07-22)** (each has
         `frontend/{template.html,<id>.js}` + built `view.js`, committed as
         `feat(rebuild): …`): settings, file-management, contract-file, dashboard,
         analytics, reports, automation, crm, ledgers, payroll, passport-mgmt,
@@ -72,15 +72,18 @@
         8/8 BYTE-IDENTICAL), **hrm** (2026-07-21, f94b2e7), **accounts**
         (2026-07-22, c38fad1 — 14/14 parity byte-identical; reverse-on-delete +
         out-of-balance journal guard preserved).
-        **Remaining legacy (3):** visa-processing, vendor-agent, air-ticketing
-        (smallest → largest).
+        Final three converted 2026-07-22: **visa-processing** (10991eb),
+        **vendor-agent** (e4f8bb9), **air-ticketing** (a9ffa28 — incl. momentum
+        delta chip + drill cards). ALL Travels modules now on the modular
+        frontend; parity byte-identical, sweep 222/222 both themes.
   - [x] **Master Accounts** (group-cockpit) converted 2026-07-22 (b9ad7ae —
         18/18 parity byte-identical; company switcher, VAT/AIT return, opening
         posters, GL backfill migrations all preserved). Both Accounts modules
         (Travels + Master) now on the modular frontend — owner initiative #1 UI+
         Frontend convert step COMPLETE; deep-enhance vs reference ERP is next.
-  - [ ] Convert the remaining 3 Travels legacy modules, simplest-first, same
-        parity-verified pattern.
+  - [x] Remaining 3 Travels legacy modules converted 2026-07-22 (see above).
+        NEXT COMPANY when the owner directs: apply the same parity-verified
+        pattern to woodart / it / shop / construction modules.
 
 
 ## ⏸ PAUSED at Phase 4 (2026-07-09) — feature-update window
