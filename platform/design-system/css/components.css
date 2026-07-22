@@ -430,19 +430,27 @@
  * One same-height row of cards: Main KPI · Cash Flow · Reconciliation · a right
  * column stacking the company balance + Hard Cash. Wraps on narrow screens.
  * Every card / number is clickable to its origin (accounts list / ledger). */
-.bank-cards-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: stretch; margin-bottom: 14px; }
-.bank-cards-row .bank-summary { flex: 1 1 460px; max-width: 620px; margin-bottom: 0; }
-.bank-cards-row .bank-flow { flex: 1 1 260px; }
-.bank-cards-row .bank-recon { flex: 1 1 290px; min-width: 260px; }
+/* All four cards ride ONE line at ~80–100% zoom (owner 2026-07-22): they shrink
+   to fit (min-width:0, browser zoom scales the text); only past ~100% zoom, when
+   the viewport is narrower, do they wrap to another row. */
+.bank-cards-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; margin-bottom: 14px; }
+@media (min-width: 1180px) { .bank-cards-row { flex-wrap: nowrap; } }
+.bank-cards-row .bank-summary { flex: 3 1 340px; min-width: 0; max-width: none; margin-bottom: 0; }
+.bank-cards-row .bank-flow { flex: 1 1 190px; min-width: 0; }
+.bank-cards-row .bank-recon { flex: 1.2 1 220px; min-width: 0; }
+.bank-cards-row .bank-ministack { flex: .8 1 160px; }
 .bank-summary-hero.clik { cursor: pointer; border-radius: 9px; transition: color .15s; }
 .bank-summary-hero.clik:hover .bank-summary-bal { color: color-mix(in srgb, var(--bank-ink) 74%, var(--text)); }
 .bank-recon-clik { cursor: pointer; transition: transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s; }
 .bank-recon-clik:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); box-shadow: 0 14px 30px -18px rgba(7, 12, 30, .34); }
 /* compact reconciliation inside the row: the 3 stats stack vertically (label
    above, value full-width so big numbers never clip); the long note hides. */
-.bank-recon .stat-row { flex-direction: column; gap: 11px; align-items: stretch; }
+.bank-recon .card-head { flex-wrap: wrap; gap: 4px; }
+.bank-recon .card-head h3 { font-size: 12.5px; line-height: 1.25; }
+.bank-recon .card-head .badge { display: none; }   /* float already shown in the stat below — avoid overlap */
+.bank-recon .stat-row { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
 .bank-recon .stat { min-width: 0; }
-.bank-recon .stat-label { font-size: 10px; }
+.bank-recon .stat-label { font-size: 9.5px; white-space: normal; }
 .bank-recon .stat-value { font-size: 15px; }
 .bank-recon .card-body > p { display: none; }
 .bank-ministack { display: flex; flex-direction: column; gap: 14px; flex: 1 1 180px; min-width: 168px; }
