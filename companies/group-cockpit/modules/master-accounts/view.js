@@ -1664,7 +1664,10 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         ]),
         ph ? el('div.bank-summary-last-ref', { text: 'No transactions yet' })
            : el('div.bank-summary-last-ref', { html: '<span class="txn-id-chip">' + esc(lastInfo.id) + '</span>' + (lastInfo.memo ? ' ' + esc(lastInfo.memo) : '') }),
-        el('div.bank-summary-last-oc', { html: 'Opening <b>' + esc(ui.money(ph ? 0 : lastInfo.opening)) + '</b> &nbsp;→&nbsp; Closing <b>' + esc(ui.money(ph ? 0 : lastInfo.closing)) + '</b>' })
+        el('div.bank-summary-last-oc', null, [
+          el('div.oc-open', { html: 'Opening <b>' + esc(ui.money(ph ? 0 : lastInfo.opening)) + '</b>' }),
+          el('div.oc-close.' + (isIn ? 'up' : 'down'), { html: 'Closing <b>' + esc(ui.money(ph ? 0 : lastInfo.closing)) + '</b>' })
+        ])
       ]);
 
       var sumCard = el('div.bank-summary', null, [

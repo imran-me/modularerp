@@ -400,8 +400,17 @@
   background: color-mix(in srgb, var(--bank-ink, var(--accent)) 11%, transparent); border: 1px solid color-mix(in srgb, var(--bank-ink, var(--accent)) 22%, transparent);
   padding: 1px 6px; border-radius: 6px; margin-right: 3px; }
 .bank-summary-last:hover .txn-id-chip { background: color-mix(in srgb, var(--bank-ink, var(--accent)) 18%, transparent); }
-.bank-summary-last-oc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--text-mute); margin-top: 5px; }
-.bank-summary-last-oc b { color: var(--text-dim); font-weight: 700; }
+/* Opening / Closing on their OWN lines (owner 2026-07-22); Opening in a CMYK-
+   muted blue, Closing muted-green when the balance went up / muted-red when down
+   (never neon — mixed toward a neutral ink). */
+.bank-summary-last-oc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; margin-top: 5px; line-height: 1.55; }
+.bank-summary-last-oc .oc-open, .bank-summary-last-oc .oc-close { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc-open { color: color-mix(in srgb, var(--accent) 55%, #737b88); }
+.oc-open b { color: color-mix(in srgb, var(--accent) 66%, #565f6c); font-weight: 700; }
+.oc-close.up { color: color-mix(in srgb, var(--good) 56%, #737b88); }
+.oc-close.up b { color: color-mix(in srgb, var(--good) 70%, #46515b); font-weight: 700; }
+.oc-close.down { color: color-mix(in srgb, var(--bad, #e0356e) 56%, #737b88); }
+.oc-close.down b { color: color-mix(in srgb, var(--bad, #e0356e) 70%, #46515b); font-weight: 700; }
 .bank-summary-empty { margin-top: 14px; padding-top: 13px; font-size: 11.5px; color: var(--text-mute);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent); }
 @media (prefers-reduced-motion: reduce) { .bank-summary, .bank-summary::after { transition: none; } .bank-summary:hover { transform: none; } .bank-summary:hover::after { left: -75%; } }
@@ -449,20 +458,22 @@
    content tightly and read as one equal-height set; the KPI row pins to the
    bottom so the main card fills its height with no dead space. Browser zoom
    scales it all, so the ratio holds at 80/90/100%. */
-.bank-cards-row .bank-summary-in { display: flex; flex-direction: column; justify-content: space-between; padding: 15px 16px 14px 18px; }
-.bank-cards-row .bank-summary-head { gap: 10px; }
-.bank-cards-row .bank-summary-ico { width: 38px; height: 38px; font-size: 16px; border-radius: 11px; }
-.bank-cards-row .bank-summary-co { font-size: 14.5px; }
-.bank-cards-row .bank-summary-sub { font-size: 9.5px; }
-.bank-cards-row .bank-summary-hero { margin: 9px 0 0; }
-.bank-cards-row .bank-summary-bal { font-size: 25px; }
-.bank-cards-row .bank-summary-ballabel { font-size: 8.5px; margin-top: 3px; }
-.bank-cards-row .bank-summary-last { padding-left: 14px; }
-.bank-cards-row .bank-summary-last-amt { font-size: 15px; }
+.bank-cards-row .bank-summary-in { display: flex; flex-direction: column; justify-content: space-between; padding: 11px 15px 10px 17px; }
+.bank-cards-row .bank-summary-head { gap: 9px; }
+.bank-cards-row .bank-summary-ico { width: 34px; height: 34px; font-size: 15px; border-radius: 10px; }
+.bank-cards-row .bank-summary-co { font-size: 14px; }
+.bank-cards-row .bank-summary-sub { font-size: 9px; }
+.bank-cards-row .bank-summary-hero { margin: 6px 0 0; }
+.bank-cards-row .bank-summary-bal { font-size: 21px; }
+.bank-cards-row .bank-summary-ballabel { font-size: 8px; margin-top: 2px; }
+.bank-cards-row .bank-summary-last { padding-left: 13px; }
+.bank-cards-row .bank-summary-last-amt { font-size: 14px; }
+.bank-cards-row .bank-summary-last-row { margin-top: 4px; }
 .bank-cards-row .bank-summary-last-ref, .bank-cards-row .bank-summary-last-oc { font-size: 9.5px; }
-.bank-cards-row .bank-summary-last-oc { margin-top: 4px; }
-.bank-cards-row .bank-summary-facts { margin-top: 11px; padding-top: 10px; }
-.bank-cards-row .bank-summary-fact .v { font-size: 16px; }
+.bank-cards-row .bank-summary-last-ref { margin-top: 2px; }
+.bank-cards-row .bank-summary-last-oc { margin-top: 3px; line-height: 1.45; }
+.bank-cards-row .bank-summary-facts { margin-top: 8px; padding-top: 7px; }
+.bank-cards-row .bank-summary-fact .v { font-size: 15px; }
 .bank-cards-row .bank-summary-fact .k { font-size: 8px; }
 .bank-cards-row .bank-flow { padding: 15px 15px 13px; }
 .bank-cards-row .bank-flow-head { flex-wrap: wrap; gap: 4px 6px; }
