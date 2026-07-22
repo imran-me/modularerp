@@ -439,6 +439,39 @@
 .bank-cards-row .bank-flow { flex: 1 1 190px; min-width: 0; }
 .bank-cards-row .bank-recon { flex: 1.2 1 220px; min-width: 0; }
 .bank-cards-row .bank-ministack { flex: .8 1 160px; }
+
+/* PIXEL-FIT (owner 2026-07-22): compact every element so the 4 cards fit their
+   content tightly and read as one equal-height set; the KPI row pins to the
+   bottom so the main card fills its height with no dead space. Browser zoom
+   scales it all, so the ratio holds at 80/90/100%. */
+.bank-cards-row .bank-summary-in { display: flex; flex-direction: column; justify-content: space-between; padding: 15px 16px 14px 18px; }
+.bank-cards-row .bank-summary-head { gap: 10px; }
+.bank-cards-row .bank-summary-ico { width: 38px; height: 38px; font-size: 16px; border-radius: 11px; }
+.bank-cards-row .bank-summary-co { font-size: 14.5px; }
+.bank-cards-row .bank-summary-sub { font-size: 9.5px; }
+.bank-cards-row .bank-summary-hero { margin: 9px 0 0; }
+.bank-cards-row .bank-summary-bal { font-size: 25px; }
+.bank-cards-row .bank-summary-ballabel { font-size: 8.5px; margin-top: 3px; }
+.bank-cards-row .bank-summary-last { padding-left: 14px; }
+.bank-cards-row .bank-summary-last-amt { font-size: 15px; }
+.bank-cards-row .bank-summary-last-ref, .bank-cards-row .bank-summary-last-oc { font-size: 9.5px; }
+.bank-cards-row .bank-summary-last-oc { margin-top: 4px; }
+.bank-cards-row .bank-summary-facts { margin-top: 11px; padding-top: 10px; }
+.bank-cards-row .bank-summary-fact .v { font-size: 16px; }
+.bank-cards-row .bank-summary-fact .k { font-size: 8px; }
+.bank-cards-row .bank-flow { padding: 15px 15px 13px; }
+.bank-cards-row .bank-flow-title { font-size: 13px; }
+.bank-cards-row .bank-flow-sub { font-size: 9px; }
+.bank-cards-row .bank-flow-net { font-size: 11px; padding: 2px 7px; }
+.bank-cards-row .bank-flow-spark { margin: 9px 0 8px; }
+.bank-cards-row .bank-flow-foot { font-size: 10px; gap: 12px; }
+.bank-cards-row .bank-recon .card-head { padding: 13px 14px 0; }
+.bank-cards-row .bank-recon .card-head h3 { font-size: 11.5px; }
+.bank-cards-row .bank-recon .card-body { padding: 11px 14px 13px; }
+.bank-cards-row .bank-recon .stat-row { gap: 8px; }
+.bank-cards-row .bank-recon .stat-value { font-size: 13.5px; }
+.bank-cards-row .bank-recon .stat-label { font-size: 8.5px; }
+.bank-cards-row .bank-mini { padding: 10px 13px; }
 .bank-summary-hero.clik { cursor: pointer; border-radius: 9px; transition: color .15s; }
 .bank-summary-hero.clik:hover .bank-summary-bal { color: color-mix(in srgb, var(--bank-ink) 74%, var(--text)); }
 .bank-recon-clik { cursor: pointer; transition: transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s; }
