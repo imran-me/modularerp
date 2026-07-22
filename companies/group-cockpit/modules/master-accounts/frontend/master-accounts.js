@@ -1794,8 +1794,13 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     // Premium account CARDS (identical to the Overview), scoped to this company —
     // the visual layer; the detailed register with per-row actions + export is the
     // "All Banks" table below. Click a card to drill into its ledger inline.
-    page.appendChild(el('div.section-label', { id: 'bank-accounts-anchor', text: 'Accounts' }));
-    renderBankCardGrid(banks, page, { autoOpen: false });
+    // ACCOUNTS as a VERTICAL label to the LEFT of the grid (owner 2026-07-22),
+    // and only a hair of gap above the cards so they sit right under the actions.
+    var acctWrap = el('div.bank-accts-wrap', { id: 'bank-accounts-anchor' }, [el('div.bank-accts-vlabel', { text: 'Accounts' })]);
+    var gridHost = el('div.bank-accts-host');
+    renderBankCardGrid(banks, gridHost, { autoOpen: false });
+    acctWrap.appendChild(gridHost);
+    page.appendChild(acctWrap);
 
     // ---- 2) ALL BANKS (production columns + filters) -------------------------
     var cols = [

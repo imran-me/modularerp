@@ -526,6 +526,12 @@
    at 90–100% zoom, 5 at 80% (lower zoom = wider CSS viewport = one more column).
    auto-fit + a ~250px track makes the column count fall out of the width, so it
    holds the same ratio as the browser zooms. */
+/* ACCOUNTS as a vertical side-label; only a sliver of gap above the cards */
+.bank-accts-wrap { display: flex; align-items: stretch; gap: 8px; margin-top: 2px; }
+.bank-accts-vlabel { flex: none; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center;
+  font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-mute);
+  padding: 2px 1px; align-self: center; }
+.bank-accts-host { flex: 1; min-width: 0; }
 .bank-acct-grid { grid-template-columns: repeat(auto-fill, minmax(218px, 1fr)); gap: 16px; }
 .bank-acct-grid .bank-card { max-width: 340px; }   /* a lone card must not balloon to full width (would blow up the cqw scale) */
 /* PROPORTIONAL SCALING (owner 2026-07-22): each account card is a query
@@ -536,23 +542,26 @@
 .bank-acct-grid .bank-card { container-type: inline-size; min-width: 0; overflow: hidden; }
 /* text reduced ~35% (owner 2026-07-22) — all in cqw so it stays proportional as
    the card scales; padding/icon trimmed to keep the card balanced, not sparse. */
-.bank-acct-grid .bank-card-top { padding: 6cqw 6.4cqw 0 7.4cqw; gap: 4cqw; }
-.bank-acct-grid .bank-card-ico { width: 13cqw; height: 13cqw; font-size: 5.4cqw; border-radius: 4cqw; }
-.bank-acct-grid .bank-card-ico::after { width: 3.8cqw; height: 3.8cqw; right: -1cqw; bottom: -1cqw; border-width: .8cqw; }
-.bank-acct-grid .bank-card-coico { width: 6cqw; height: 6cqw; font-size: 3cqw; left: -1.6cqw; top: -1.6cqw; }
-.bank-acct-grid .bank-card-name { font-size: 3.9cqw; }
-.bank-acct-grid .bank-card-sub { font-size: 2.6cqw; margin-top: .6cqw; }
-.bank-acct-grid .bank-card-status { font-size: 2.6cqw; padding: 1.2cqw 2.8cqw 1.2cqw 2.4cqw; gap: 1.6cqw; }
-.bank-acct-grid .bank-card-status::before { width: 1.8cqw; height: 1.8cqw; }
-.bank-acct-grid .bank-card-hero { padding: 5cqw 7.4cqw; }
-.bank-acct-grid .bank-card-caplabel { font-size: 2.5cqw; }
-.bank-acct-grid .bank-card-delta { font-size: 2.9cqw; padding: .6cqw 2.4cqw .6cqw 1.6cqw; }
-.bank-acct-grid .bank-card-bal { font-size: 7cqw; margin-top: 1.6cqw; }
-.bank-acct-grid .bank-card-acct { font-size: 2.6cqw; margin-top: 2.4cqw; }
-.bank-acct-grid .bank-card-foot { padding: 4cqw 7.4cqw 4.4cqw; gap: 4cqw; }
-.bank-acct-grid .bank-card-metric { gap: 1cqw; }
-.bank-acct-grid .bank-card-metric .k { font-size: 2.4cqw; letter-spacing: .1cqw; }
-.bank-acct-grid .bank-card-metric .v { font-size: 3.3cqw; }
+/* text ~1.8× larger (owner 2026-07-22 — the 35% cut was too small to read);
+   card WIDTH is grid-set and unchanged, padding trimmed a little so it doesn't
+   balloon. Still cqw, so it stays proportional as the card scales. */
+.bank-acct-grid .bank-card-top { padding: 5.2cqw 5.6cqw 0 6.4cqw; gap: 3.4cqw; }
+.bank-acct-grid .bank-card-ico { width: 14cqw; height: 14cqw; font-size: 6.4cqw; border-radius: 4.2cqw; }
+.bank-acct-grid .bank-card-ico::after { width: 4cqw; height: 4cqw; right: -1cqw; bottom: -1cqw; border-width: .9cqw; }
+.bank-acct-grid .bank-card-coico { width: 6.4cqw; height: 6.4cqw; font-size: 4cqw; left: -1.7cqw; top: -1.7cqw; }
+.bank-acct-grid .bank-card-name { font-size: 7cqw; }
+.bank-acct-grid .bank-card-sub { font-size: 4.7cqw; margin-top: .6cqw; }
+.bank-acct-grid .bank-card-status { font-size: 4.4cqw; padding: 1.2cqw 2.6cqw 1.2cqw 2.2cqw; gap: 1.4cqw; }
+.bank-acct-grid .bank-card-status::before { width: 2.6cqw; height: 2.6cqw; }
+.bank-acct-grid .bank-card-hero { padding: 4.4cqw 6.4cqw; }
+.bank-acct-grid .bank-card-caplabel { font-size: 4.5cqw; }
+.bank-acct-grid .bank-card-delta { font-size: 5.2cqw; padding: .6cqw 2.2cqw .6cqw 1.4cqw; }
+.bank-acct-grid .bank-card-bal { font-size: 12.6cqw; margin-top: 1.4cqw; }
+.bank-acct-grid .bank-card-acct { font-size: 4.7cqw; margin-top: 2.2cqw; }
+.bank-acct-grid .bank-card-foot { padding: 3.6cqw 6.4cqw 4cqw; gap: 3.4cqw; }
+.bank-acct-grid .bank-card-metric { gap: .8cqw; }
+.bank-acct-grid .bank-card-metric .k { font-size: 4.3cqw; letter-spacing: .1cqw; }
+.bank-acct-grid .bank-card-metric .v { font-size: 5.9cqw; }
 
 /* ---------------------------- SEARCHABLE COMBOBOX ------------------------
  * The type-to-filter select (forms.js makeCombobox). Reads as a normal input; a
