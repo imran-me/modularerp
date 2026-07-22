@@ -1506,24 +1506,29 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         });
       }
       var scopedTxns = S.list('bank_txns').filter(function (t) { return scopeIds[t.bankId]; });
-      var moveCount = ledgerN || scopedTxns.length;
+      var bt = null; scopedTxns.forEach(function (t) { if (t.date && (!bt || t.date >= bt.date)) bt = t; });
+      var moveCount = Math.max(ledgerN, scopedTxns.length);   // count deposits even if the ledger tag differs
       var lastInfo = null;
-      if (lastE) {
+      // Pick the genuinely MOST RECENT of the ledger cash entry vs the bank
+      // register's newest movement — so a just-made deposit (a bank txn) is
+      // never hidden behind an older ledger entry.
+      var useLedger = lastE && (!bt || lastE.date >= bt.date);
+      if (useLedger) {
         var dr = 0, cr = 0;
         (lastE.lines || []).forEach(function (l) { if (l.account === '1000' || l.account === '1010') { dr += +l.dr || 0; cr += +l.cr || 0; } });
         var net = dr - cr;
         lastInfo = { entry: lastE, id: lastE.ref || lastE.id, memo: lastE.memo || '', date: lastE.date, net: net, closing: gl, opening: gl - net };
+      } else if (bt) {
+        var sg = (bt.type === 'deposit' || bt.type === 'transfer-in') ? (+bt.amount || 0) : -(+bt.amount || 0);
+        // link back to the bank txn's ledger posting so a click opens the journal
+        var glE = null;
+        if (bt.glId && EPAL.ledger && EPAL.ledger.entries) EPAL.ledger.entries({}).forEach(function (e) { if (e.id === bt.glId) glE = e; });
+        lastInfo = { entry: glE, id: bt.ref || bt.id, memo: bt.desc || bt.type || '', date: bt.date, net: sg, closing: total, opening: total - sg };
       } else {
-        var bt = null; scopedTxns.forEach(function (t) { if (t.date && (!bt || t.date >= bt.date)) bt = t; });
-        if (bt) {
-          var sg = (bt.type === 'deposit' || bt.type === 'transfer-in') ? (+bt.amount || 0) : -(+bt.amount || 0);
-          lastInfo = { entry: null, id: bt.ref || bt.id, memo: bt.desc || bt.type || '', date: bt.date, net: sg, closing: total, opening: total - sg };
-        } else {
-          var lb = null; banks.forEach(function (b) { if (b.lastTxnDate && (!lb || b.lastTxnDate >= lb.lastTxnDate)) lb = b; });
-          if (lb) {
-            var s2 = (lb.lastTxnType === 'credit') ? (+lb.lastTxnAmount || 0) : -(+lb.lastTxnAmount || 0);
-            lastInfo = { entry: null, id: lb.name, memo: 'Last movement', date: lb.lastTxnDate, net: s2, closing: total, opening: total - s2 };
-          }
+        var lb = null; banks.forEach(function (b) { if (b.lastTxnDate && (!lb || b.lastTxnDate >= lb.lastTxnDate)) lb = b; });
+        if (lb) {
+          var s2 = (lb.lastTxnType === 'credit') ? (+lb.lastTxnAmount || 0) : -(+lb.lastTxnAmount || 0);
+          lastInfo = { entry: null, id: lb.name, memo: 'Last movement', date: lb.lastTxnDate, net: s2, closing: total, opening: total - s2 };
         }
       }
 
@@ -1613,7 +1618,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       // still show 0 there so I can have an idea of the look") — with no data
       // it's a flat baseline and ৳0 / ৳0, so the card's design still reads.
       var netStr = (netFlow > 0 ? '+' : netFlow < 0 ? '−' : '') + ui.money(Math.abs(netFlow));
-      var compCard = el('div.bank-flow', null, [
+      var compCard = el('div.bank-flow', { title: 'View the cash movements', onclick: function () { EPAL.router.navigate('group/master-accounts/journals'); } }, [
         el('div.bank-flow-head', null, [
           el('div', null, [el('div.bank-flow-title', { text: 'Cash Flow' }), el('div.bank-flow-sub', { text: 'last 30 days · money in vs out' + (hasFlow ? '' : ' · no activity yet') })]),
           el('span.bank-flow-net.' + (netFlow >= 0 ? 'is-up' : 'is-down'), { text: netStr })
