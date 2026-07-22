@@ -296,12 +296,44 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     } catch (x) {}
   }
 
+  /* A bank added with a starting balance holds money the books never SAW as a
+   * movement — so it shows "no activity", the ledger doesn't know the cash
+   * (float), and Recent Transactions is empty. This records that opening as a
+   * real event (owner 2026-07-22): an opening LEDGER journal (so the float
+   * reconciles) + an opening BANK-TXN (so it appears in Recent Transactions and
+   * persists). Idempotent by existence check — runs each render, only fills gaps
+   * (incl. banks added later), never duplicates. */
+  function backfillBankOpenings() {
+    try {
+      var haveGl = {};
+      if (EPAL.ledger && EPAL.ledger.entries) EPAL.ledger.entries({}).forEach(function (e) { haveGl[e.id] = 1; });
+      var haveOpenTxn = {}; S.list('bank_txns').forEach(function (t) { if (t.ref === 'OPENING' || t.type === 'opening') haveOpenTxn[t.bankId] = 1; });
+      db.col('banks').forEach(function (b) {
+        var bal = +b.balance || 0; if (!bal) return;
+        var glId = 'GL-OPBK-' + b.id, cashAcct = b.type === 'Cash Box' ? '1000' : '1010';
+        var abs = Math.abs(bal), date = b.created || TODAY_STR, co = b.companyId || 'group';
+        if (!haveGl[glId] && EPAL.ledger && EPAL.ledger.post) {
+          try {
+            EPAL.ledger.post({ id: glId, date: date, companyId: co, ref: 'OPENING', memo: 'Bank opening balance · ' + b.name, source: 'opening', party: b.name, override: true,
+              lines: bal > 0 ? [{ account: cashAcct, dr: abs, cr: 0 }, { account: '3100', dr: 0, cr: abs }]
+                             : [{ account: '3100', dr: abs, cr: 0 }, { account: cashAcct, dr: 0, cr: abs }] });
+          } catch (e) {}
+        }
+        if (!haveOpenTxn[b.id]) {
+          db.save('bank_txns', { id: 'BTX-OPEN-' + b.id, bankId: b.id, bankName: b.name, type: 'opening',
+            amount: abs, date: date, desc: 'Opening balance', ref: 'OPENING', glId: glId });
+        }
+      });
+    } catch (x) {}
+  }
+
   /* ==========================================================================
    * VIEW
    * ========================================================================*/
   EPAL.view('group/master-accounts', {
     render: function (ctx) {
       retagBankMovements();                            // one-time repair of mis-tagged deposits
+      backfillBankOpenings();                          // opening balances become real, visible, reconciled events
       var sub = ctx.subId || 'banks';
       // legacy deep-links from the pre-consolidation layout land on the right tab
       if (sub === 'categories' || sub === 'budget' || sub === 'report') { expTab = sub; sub = 'expenses'; }
@@ -1344,7 +1376,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     var grid = el('div.grid-auto.stagger.bank-acct-grid');
     // in/out sense for a txn — walks a bank's opening back from its closing
     // balance, and labels the last movement on the card.
-    var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in'; };
+    var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in' || t.type === 'opening'; };
     banks.forEach(function (b) {
       var mine = txns.filter(function (t) { return t.bankId === b.id; });
       var last = mine.slice().sort(function (x, y) { return (x.date < y.date ? 1 : -1); })[0];
@@ -1408,7 +1440,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
    * view = all · a single day · a custom range · only-in · only-out) plus a
    * per-row print for a single transaction. Mirrors the production ERP. */
   function bankAccountDetail(bank, host) {
-    var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in'; };
+    var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in' || t.type === 'opening'; };
     var all = S.list('bank_txns').filter(function (t) { return t.bankId === bank.id; });
     all.forEach(function (t, i) { t._seq = i; });
     function newestFirst(a, b) { return (a.date === b.date) ? b._seq - a._seq : (a.date < b.date ? 1 : -1); }
@@ -1595,7 +1627,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         var net = dr - cr;
         lastInfo = { entry: lastE, id: lastE.ref || lastE.id, memo: lastE.memo || '', date: lastE.date, net: net, closing: gl, opening: gl - net };
       } else if (bt) {
-        var sg = (bt.type === 'deposit' || bt.type === 'transfer-in') ? (+bt.amount || 0) : -(+bt.amount || 0);
+        var sg = (bt.type === 'deposit' || bt.type === 'transfer-in' || bt.type === 'opening') ? (+bt.amount || 0) : -(+bt.amount || 0);
         // link back to the bank txn's ledger posting so a click opens the journal
         var glE = null;
         if (bt.glId && EPAL.ledger && EPAL.ledger.entries) EPAL.ledger.entries({}).forEach(function (e) { if (e.id === bt.glId) glE = e; });
@@ -1844,7 +1876,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
 
       // Money direction. One helper so every column, sort and running total
       // agrees on what "in" means — this is the only place that decides it.
-      function isIn(t) { return t.type === 'deposit' || t.type === 'transfer-in'; }
+      function isIn(t) { return t.type === 'deposit' || t.type === 'transfer-in' || t.type === 'opening'; }
       function delta(t) { return isIn(t) ? (+t.amount || 0) : -(+t.amount || 0); }
 
       // Newest-first ordering (ties broken by insertion order, newest first).
