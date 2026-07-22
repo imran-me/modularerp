@@ -541,7 +541,11 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           ? [{ account: '1010', dr: amt, cr: 0 }, { account: v.account, dr: 0, cr: amt - vat }].concat(vat ? [{ account: '2130', dr: 0, cr: vat }] : [])
           : [{ account: v.account, dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: bankMove }].concat(tds ? [{ account: '2140', dr: 0, cr: tds }] : []);
         try {
-          EPAL.ledger.post({ id: glId, date: v.date, companyId: v.companyId,
+          // Book the movement to the BANK's own company, not the form's default
+          // (which is 'group' from the All-Companies view). Money moving through
+          // an IT bank is IT's transaction — so it shows on IT's tab, ledger,
+          // sparkline and movements, never silently on Group's books.
+          EPAL.ledger.post({ id: glId, date: v.date, companyId: bank.companyId || v.companyId,
             ref: v.ref || ('BANK-' + (isCr ? 'DEP' : 'WDR')), memo: memo, source: 'bank', lines: lines });
         } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); return false; }
         bankTxnApply(bank, isCr ? 'deposit' : 'withdraw', bankMove, v.date, memo, v.ref || '', glId);
