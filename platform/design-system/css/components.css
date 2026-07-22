@@ -322,6 +322,49 @@
   .bank-card, .bank-card::before, .bank-card::after, .bank-card-ico { transition: none; }
   .bank-card:hover { transform: none; } .bank-card:hover::after { left: -75%; } }
 
+/* --------------------------- BANK SUMMARY (identity panel) -----------------
+ * Replaces the row of four KPI tiles on Manage Banks with ONE company-branded
+ * banking-summary panel (owner 2026-07-22): company identity + hero balance +
+ * accounts / active / last-transaction facts. Same premium vocabulary as
+ * .bank-card (company-hue rail, gradient icon chip, a soft glaze that sweeps on
+ * hover) so the desk reads expensive and consistent. Deliberately sits at the
+ * LEFT (max-width) — the right gutter is reserved for planned future content.
+ * --bank-hue is set per-render in JS via style.setProperty (custom props can't
+ * be set through el()'s style object). */
+.bank-summary { --bank-hue: var(--accent); --bank-ink: color-mix(in srgb, var(--bank-hue) 64%, #7c828c);
+  position: relative; overflow: hidden; border-radius: 16px; max-width: 468px; margin-bottom: 14px; border: 1px solid var(--border);
+  background: radial-gradient(130% 100% at 100% 0%, color-mix(in srgb, var(--bank-ink) 10%, transparent), transparent 58%), var(--surface);
+  box-shadow: 0 1px 2px rgba(7, 12, 30, .06), 0 6px 18px -9px rgba(7, 12, 30, .12);
+  transition: transform .28s cubic-bezier(.2, .7, .2, 1), box-shadow .28s cubic-bezier(.2, .7, .2, 1), border-color .2s; }
+.bank-summary:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--bank-ink) 40%, var(--border));
+  box-shadow: 0 22px 42px -22px color-mix(in srgb, var(--bank-ink) 44%, rgba(7, 12, 30, .55)), 0 8px 18px -10px rgba(7, 12, 30, .18); }
+.bank-summary::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; z-index: 2;
+  background: linear-gradient(180deg, var(--bank-ink), color-mix(in srgb, var(--bank-ink) 45%, transparent)); }
+.bank-summary::after { content: ''; position: absolute; top: 0; left: -75%; width: 60%; height: 100%; z-index: 3; pointer-events: none;
+  background: linear-gradient(105deg, transparent 12%, color-mix(in srgb, #fff 26%, transparent) 42%,
+    color-mix(in srgb, #fff 50%, transparent) 50%, color-mix(in srgb, #fff 26%, transparent) 58%, transparent 88%);
+  transform: skewX(-18deg); transition: left .7s ease; }
+.bank-summary:hover::after { left: 150%; }
+.bank-summary-in { position: relative; z-index: 1; padding: 18px 22px 17px 24px; }
+.bank-summary-head { display: flex; align-items: center; gap: 13px; }
+.bank-summary-ico { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; flex: none; color: #fff; font-size: 19px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--bank-ink) 84%, #fff), var(--bank-ink));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34), 0 7px 15px -5px color-mix(in srgb, var(--bank-ink) 55%, transparent); }
+.bank-summary-id { flex: 1; min-width: 0; }
+.bank-summary-co { font-family: var(--font-display); font-weight: 700; font-size: 17px; letter-spacing: -.3px; line-height: 1.2; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bank-summary-sub { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 2px; font-weight: 500; }
+.bank-summary-hero { margin: 15px 0 2px; }
+.bank-summary-bal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 700; line-height: 1.05; letter-spacing: -1px; color: var(--text); }
+.bank-summary-bal.text-bad { color: var(--bad, #e0356e); }
+.bank-summary-ballabel { font-size: 9.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--text-mute); margin-top: 5px; }
+.bank-summary-facts { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-top: 15px; padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent); }
+.bank-summary-fact { display: flex; flex-direction: column; gap: 3px; }
+.bank-summary-fact .k { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-mute); font-weight: 700; }
+.bank-summary-fact .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 700; color: var(--text-dim); }
+@media (prefers-reduced-motion: reduce) { .bank-summary, .bank-summary::after { transition: none; } .bank-summary:hover { transform: none; } .bank-summary:hover::after { left: -75%; } }
+
 /* ---------------------------- SEARCHABLE COMBOBOX ------------------------
  * The type-to-filter select (forms.js makeCombobox). Reads as a normal input; a
  * floating panel lists options and floats matches to the TOP as you type. */

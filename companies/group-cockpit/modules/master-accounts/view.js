@@ -1493,13 +1493,56 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     var banks = allBanks.filter(function (b) { return selCo === 'all' ? true : (b.companyId || 'group') === selCo; });
     var total = banks.reduce(function (a, b) { return a + (+b.balance || 0); }, 0);
 
-    // ---- 1) BANK ACCOUNTS DASHBOARD -----------------------------------------
-    page.appendChild(kgrid([
-      kpi('Total Balance', ui.money(total, { compact: true }), 'safe2'),
-      kpi('Accounts', String(banks.length), 'bank'),
-      kpi('Active', String(banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length), 'check-circle'),
-      kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
-    ]));
+    // ---- 1) BANKING SUMMARY PANEL -------------------------------------------
+    // ONE company-branded identity panel in place of the old four KPI tiles
+    // (owner 2026-07-22): company · hero balance · accounts / active / last
+    // transaction. Deliberately left-aligned (max-width) — the right gutter is
+    // reserved for planned future content. Same data as the old tiles; "Scope"
+    // becomes the panel's own heading, and Last transaction is new.
+    (function () {
+      var activeN = banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length;
+      var coObj = EPAL.config.company(selCo);
+      var accent = (coObj && coObj.accent) ? coObj.accent : 'var(--accent)';
+      var icon = (coObj && coObj.icon) ? coObj.icon : (selCo === 'all' ? 'diagram-3' : 'bank2');
+      var heading = selCo === 'all' ? 'All Companies' : coName(selCo);
+      // Last transaction = newest money movement in scope — a bank-register txn
+      // OR any ledger posting that touches cash/bank (1000/1010), so openings,
+      // deposits, withdrawals and expenses all count (a bank with a balance but
+      // no bank_txns still shows a real date, not a perpetual dash).
+      var scopeIds = {}; banks.forEach(function (b) { scopeIds[b.id] = 1; });
+      var lastTxn = '';
+      S.list('bank_txns').forEach(function (t) { if (scopeIds[t.bankId] && t.date && t.date > lastTxn) lastTxn = t.date; });
+      try {
+        if (EPAL.ledger && EPAL.ledger.entries) {
+          EPAL.ledger.entries(selCo === 'all' ? {} : { companyId: selCo }).forEach(function (e) {
+            if (!e.date || e.date <= lastTxn) return;
+            if ((e.lines || []).some(function (l) { return l.account === '1000' || l.account === '1010'; })) lastTxn = e.date;
+          });
+        }
+      } catch (x) {}
+      var sumCard = el('div.bank-summary', null, [
+        el('div.bank-summary-in', null, [
+          el('div.bank-summary-head', null, [
+            el('div.bank-summary-ico', { html: ui.icon(icon) }),
+            el('div.bank-summary-id', null, [
+              el('div.bank-summary-co', { text: heading }),
+              el('div.bank-summary-sub', { text: selCo === 'all' ? 'Group-wide banking summary' : 'Banking summary' })
+            ])
+          ]),
+          el('div.bank-summary-hero', null, [
+            el('div.bank-summary-bal' + (total < 0 ? '.text-bad' : ''), { text: ui.money(total) }),
+            el('div.bank-summary-ballabel', { text: 'Total balance' })
+          ]),
+          el('div.bank-summary-facts', null, [
+            el('div.bank-summary-fact', null, [el('div.k', { text: 'Accounts' }), el('div.v', { text: String(banks.length) })]),
+            el('div.bank-summary-fact', null, [el('div.k', { text: 'Active' }), el('div.v', { text: String(activeN) })]),
+            el('div.bank-summary-fact', null, [el('div.k', { text: 'Last transaction' }), el('div.v', { text: lastTxn ? ui.date(lastTxn) : '—' })])
+          ])
+        ])
+      ]);
+      sumCard.style.setProperty('--bank-hue', accent);   // custom prop — must go via setProperty
+      page.appendChild(sumCard);
+    })();
     // per-company cards, like the production dashboard header. Respects the
     // selected company: on a specific company only THAT company's card shows,
     // not every sister concern (owner 2026-07-19).
