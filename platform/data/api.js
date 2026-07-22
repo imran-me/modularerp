@@ -61,6 +61,10 @@
    * corrected posting logic is built). Rolled out module by module. */
   var WRITABLE = {
     coa:       'group/master-accounts/accounts',   // ADD a chart-of-accounts head only (definition, not a posting) — via db.save('coa', rec)
+    // Journal entries (deposits, withdrawals, manual journals, mirrors) now
+    // persist to the DB (JournalController::store) — idempotent by client id,
+    // so transactions survive a reload instead of living only in the browser.
+    gl_entries: 'group/master-accounts/journals',
     customers: 'group/master-accounts/customers',
     suppliers: 'group/master-accounts/suppliers',
     banks:     'group/master-accounts/banks',
