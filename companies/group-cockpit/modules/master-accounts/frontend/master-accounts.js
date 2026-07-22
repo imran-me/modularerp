@@ -1529,6 +1529,12 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         if (lb) {
           var s2 = (lb.lastTxnType === 'credit') ? (+lb.lastTxnAmount || 0) : -(+lb.lastTxnAmount || 0);
           lastInfo = { entry: null, id: lb.name, memo: 'Last movement', date: lb.lastTxnDate, net: s2, closing: total, opening: total - s2 };
+        } else if (total !== 0) {
+          // the account holds money but has NO recorded movement — its balance is
+          // an opening balance (a bank added with a starting amount), so surface
+          // THAT as the transaction (Opening 0 → balance) instead of a blank/zero.
+          var created = null; banks.forEach(function (b) { if (b.created && (!created || b.created < created)) created = b.created; });
+          lastInfo = { entry: null, id: 'OPENING', memo: 'Opening balance', date: created, net: total, opening: 0, closing: total };
         }
       }
 
