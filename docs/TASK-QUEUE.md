@@ -7,17 +7,20 @@
 
 ## ⏳ OPEN
 
-### T-BANKS — condense the Manage Banks overview/summary block (space utilization)
+### T-BANKS — condense the Manage Banks summary block (space utilization)
 **Reported:** 2026-07-22, screenshot of Master Accounts › Manage Banks › Group HQ.
-Owner: the KPI cards + breakdown chips + Bank↔Ledger Reconciliation card "take too
-much space for their little info." Asked for SUGGESTIONS first, then will decide.
-**Suggested (awaiting owner pick):** (1) slim KPI cards → existing `kpi-slim kpi-onerow`
-variant; (2) drop the "Scope: Group HQ" card → move to subtitle; (3) merge "Active 4"
-into "Accounts 4 (4 active)"; (4) side-by-side chips + reconciliation instead of
-stacked; (5) collapse reconciliation to one green line when clean (ledger=bank,
-float=0), expandable on discrepancy; (6) compact empty-state prompt when a company
-has no banks. Recommended: 1+2+3+5. Open question: Manage Banks only, or roll the
-condensing across all Master Accounts sections. **STATUS: awaiting owner decision.**
+Owner: the four KPI tiles "take too much space for their little info."
+**DONE 2026-07-22 (3e4ce52):** the 4 tiles (Total Balance/Accounts/Active/Scope) in
+`banksView` became ONE company-branded **banking-summary panel** — company-hue rail +
+gradient icon + soft glaze; company heading, hero balance, and Accounts/Active/**Last
+transaction** facts (Last transaction is new = newest bank_txn or ledger 1000/1010
+movement). Left-aligned by design — owner is reserving the right gutter for planned
+content. New `.bank-summary` CSS in components.css. Verified: banksView driven +
+screenshotted both themes (0 console errors), sweep 222/222.
+**Deferred (owner's call, not yet requested):** reconciliation-card collapse-when-clean;
+compact empty-state prompt; rolling the same panel to the Overview all-companies view
+and/or the other Master Accounts sections (Cash/Payroll/Schedules/etc. still use the
+old KPI tiles). Owner said "first do what I said" + keep dead-space ideas in mind.
 
 ---
 
