@@ -459,6 +459,12 @@
   transition: transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s; }
 .bank-mini:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); box-shadow: 0 12px 26px -16px rgba(7, 12, 30, .32); }
 
+/* Accounts grid (the individual bank cards) — owner 2026-07-22: 4 cards per row
+   at 90–100% zoom, 5 at 80% (lower zoom = wider CSS viewport = one more column).
+   auto-fit + a ~250px track makes the column count fall out of the width, so it
+   holds the same ratio as the browser zooms. */
+.bank-acct-grid { grid-template-columns: repeat(auto-fit, minmax(218px, 1fr)); gap: 16px; }
+
 /* ---------------------------- SEARCHABLE COMBOBOX ------------------------
  * The type-to-filter select (forms.js makeCombobox). Reads as a normal input; a
  * floating panel lists options and floats matches to the TOP as you type. */

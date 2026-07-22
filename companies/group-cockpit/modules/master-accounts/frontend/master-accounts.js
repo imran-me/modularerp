@@ -1301,7 +1301,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     if (!banks.length) { page.appendChild(el('div.card', null, [ el('div.card-pad.text-mute', { text: 'No bank accounts in this scope.' }) ])); return; }
     var txns = S.list('bank_txns');
     var detailHost = el('div.mt-3');        // the clicked account's ledger renders INLINE here (not a modal)
-    var grid = el('div.grid-auto.stagger', { style: { gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' } });
+    var grid = el('div.grid-auto.stagger.bank-acct-grid');
     // in/out sense for a txn — walks a bank's opening back from its closing
     // balance, and labels the last movement on the card.
     var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in'; };
@@ -1703,9 +1703,9 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
             el('span.badge' + (ok ? '.badge-good' : '.badge-warn'), { style: { marginLeft: 'auto' }, text: ok ? 'RECONCILED' : 'FLOAT ' + ui.money(Math.abs(delta)) })]),
           el('div.card-body', null, [
             el('div.stat-row', null, [
-              el('div.stat', null, [el('div.stat-label', { text: 'Ledger cash + bank (1000 + 1010)' }), el('div.stat-value.num', { text: ui.money(gl) })]),
-              el('div.stat', null, [el('div.stat-label', { text: 'Bank register total' }), el('div.stat-value.num', { text: ui.money(total) })]),
-              el('div.stat', null, [el('div.stat-label', { text: 'Unassigned cash float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) })])
+              el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Ledger cash + bank (1000 + 1010)' : 'Ledger (cash + bank)' }), el('div.stat-value.num', { text: ui.money(gl) })]),
+              el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Bank register total' : 'Bank register' }), el('div.stat-value.num', { text: ui.money(total) })]),
+              el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Unassigned cash float' : 'Unassigned float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) })])
             ]),
             el('p.text-mute.xs.mt-2', { text: 'Float = business cash in the books not yet held on any bank record (e.g. undeposited collections). Bank openings and the expense backfill are explicit journals (GL-OPBK-* · GL-MX-*)' + (op ? ' — ' + op.banks + ' bank openings ' + ui.money(op.amount) : '') + (bf ? ' · backfilled ' + bf.entries + ' expenses ' + ui.money(bf.amount) : '') + '.' })
           ])
