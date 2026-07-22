@@ -266,16 +266,44 @@ because it ADDS posting/reporting, never changes existing screens' look.
 
 ---
 
-## 10. Open decisions for the owner
+## 10. Decisions (owner, 2026-07-22) — LOCKED
 
-1. **Per-product costing method** — tag lines (A, recommended) vs product COGS
-   accounts (B)?
-2. **Shared-cost split rule** — equal, by headcount, by revenue, or per-cost
-   custom? (Rent equal? AI by headcount?)
-3. **Opex → product apportionment** — do you want *fully-loaded* per-product P&L
-   (opex spread onto products), or just **direct** margin (revenue − COGS) per
-   product with opex shown company-wide?
-4. **Who holds the shared contracts** — Group HQ pays rent/AI then recharges, or
-   one concern pays and recharges?
-5. **Cash vs accrual** — book expenses when paid (cash) or when incurred
-   (accrual, via AP)? The engine supports both; pick the default.
+1. **Per-product costing** — **Direct cost (COGS) is captured at the SELL entry**
+   (per sale → naturally product-tagged); operating expenses are captured in the
+   **Expense section**. Both post to the ledger and flow everywhere. → revenue on
+   the product revenue account + COGS **tagged with `product`** on the same sale.
+2. **Where P&L lives** — **on the Travels Dashboard**: cost-per-sale, margins,
+   per-product P&L all shown there. Entry points: **sale entry** (COGS) +
+   **Travels Accounts → Expenses** (opex, already built).
+3. **P&L depth (owner said "do the standard/perfect one" — my call)** —
+   **per-product CONTRIBUTION / GROSS margin** (Revenue − direct COGS) as the
+   product view, then a **company NET P&L** after all operating expenses (the
+   standard management P&L). Fully-loaded opex-apportionment to products stays an
+   optional advanced view (Phase 7).
+4. **Shared costs held by GROUP** — entered ONCE at **Group HQ's expense entry**
+   for the full amount (e.g. rent ৳1,00,000), then **split EQUALLY across the
+   concerns**. In the ledger each concern carries its share and Group keeps its
+   share, via inter-company legs (Group DR Inter-co Rcv 1300 / each concern DR its
+   expense head + CR Inter-co Payable 2400). Shared = rent + subscriptions (AI).
+5. **Funding source rule** — the expense is booked against **wherever the money
+   came from**:
+   - Paid from **Travels' own bank/cash** → DR expense / CR 1010|1000 (normal).
+   - Paid from **another company's funds** (Group's cash box pays a Travels
+     expense) → **inter-company loan**: Group DR Inter-co Rcv (Travels owes) / CR
+     Group cash; Travels DR expense / CR Inter-co Payable (owes Group). Travels
+     later **settles** by paying Group from its own cash/bank. Every expense
+     reduces the RIGHT purse; every inter-company debt is tracked and repayable.
+
+### Build order that follows
+1. **COGS at sale** — sale entry (Air/Visa/Contract-Flight/File) captures the
+   direct cost + posts revenue + COGS tagged `product`.
+2. **Group shared-expense entry + EQUAL split** — post each concern's share via
+   inter-company legs from Group HQ's expense entry.
+3. **Inter-company funding** — expense "paid from" can be another company → loan
+   legs + a payable to settle.
+4. **Travels Dashboard P&L** — revenue, COGS, gross margin, opex, net; per-product
+   contribution margin; cost-per-sale & margin-per-sale; monthly / yearly.
+5. Statement suite (TB/GL/BS/P&L V2) + Group consolidated P&L.
+
+**Expense entry — DONE** (Travels Accounts → Expenses → "New Expense": guided
+Category→Sub→Details + live journal preview; posts DR head / CR cash|bank).
