@@ -53,9 +53,14 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     ['journals', 'Manage Journals'], ['expenses', 'Operational Expenses'], ['accounts', 'Manage Accounts'],
     ['party-types', 'Party Types'], ['loans', 'Manage Loan']];
   var EXP_TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Category & Sub-category']];
-  var expTab = 'all';                                 // active button inside Operational Expenses
-  var selCo = 'all';                                  // the company switcher state
-  var banksDash = true;                               // Manage Banks: Overview (card dashboard) vs per-company table
+  // UI state is REMEMBERED across reloads (owner 2026-07-22: "if I reload it
+  // should open the same page where I reloaded") — restored from localStorage
+  // and re-saved on every render, so a hard refresh keeps the same company +
+  // sub-tab instead of dropping back to the Overview.
+  function uiGet(k, d) { try { var v = S.get('ma_ui_' + k, undefined); return v === undefined ? d : v; } catch (e) { return d; } }
+  var expTab = uiGet('expTab', 'all');                // active button inside Operational Expenses
+  var selCo = uiGet('selCo', 'all');                  // the company switcher state
+  var banksDash = uiGet('banksDash', true) !== false; // Manage Banks: Overview (card dashboard) vs per-company table
   // (the expense-report period state moved WITH the report into
   //  platform/kit/expenses.js — see the dispatch below)
   var taxYm = TODAY_STR.slice(0, 7);                  // VAT/AIT return period (P3)
@@ -302,6 +307,8 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         ({ accounts: accountsView, journals: journalsView, schedules: schedulesView, 'party-types': partyTypesView,
            payroll: payrollView, banks: (banksDash ? overviewView : banksView), loans: loansSection, cash: cashSection }[sub])(page);
       }
+      // remember the current company + tab so a reload lands back here
+      try { S.set('ma_ui_selCo', selCo); S.set('ma_ui_banksDash', banksDash); S.set('ma_ui_expTab', expTab); } catch (e) {}
       ctx.mount.appendChild(page);
     }
   });
