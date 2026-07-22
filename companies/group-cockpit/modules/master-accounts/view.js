@@ -1265,7 +1265,9 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     bank.balance = (+bank.balance || 0) + (isIn ? amt : -amt);
     bank.lastTxnDate = date; bank.lastTxnAmount = amt; bank.lastTxnType = isIn ? 'credit' : 'debit';
     db.save('banks', bank);
-    S.upsert('bank_txns', Object.assign({ id: 'BTX-' + ui.uid('').slice(-7).toUpperCase(), bankId: bank.id, bankName: bank.name,
+    // db.save (NOT S.upsert) so the write emits data:changed → in API mode it
+    // POSTs to the bank-transactions endpoint and the log persists to the DB.
+    db.save('bank_txns', Object.assign({ id: 'BTX-' + ui.uid('').slice(-7).toUpperCase(), bankId: bank.id, bankName: bank.name,
       type: type, amount: amt, date: date, desc: desc || '', ref: ref || '', glId: glId || '' }, extra || {}));
   }
   // shared so other desks (Manage Loan) move bank money the SAME way — one
@@ -1983,7 +1985,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
             }
           }
           bankTxnApply(bank, isDep ? 'withdraw' : 'deposit', +t.amount || 0, TODAY_STR, 'Reversal of: ' + (t.desc || t.type), 'REV-' + (t.ref || t.id), '', { reversal: true });
-          t.reversed = true; S.upsert('bank_txns', t);
+          t.reversed = true; db.save('bank_txns', t);   // emit → persist the reversal flag
           ui.toast('Transaction reversed', 'success'); EPAL.router.render();
         });
     }

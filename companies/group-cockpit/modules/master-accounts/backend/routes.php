@@ -12,6 +12,7 @@
 
 use Epal\Modules\GroupCockpit\MasterAccounts\AccountController;
 use Epal\Modules\GroupCockpit\MasterAccounts\BankController;
+use Epal\Modules\GroupCockpit\MasterAccounts\BankTxnController;
 use Epal\Modules\GroupCockpit\MasterAccounts\JournalController;
 use Epal\Modules\GroupCockpit\MasterAccounts\CustomerController;
 use Epal\Modules\GroupCockpit\MasterAccounts\SupplierController;
@@ -33,6 +34,11 @@ Route::delete('group/master-accounts/banks/{id}', [BankController::class, 'destr
 Route::get('group/master-accounts/journals', [JournalController::class, 'index']);
 Route::post('group/master-accounts/journals', [JournalController::class, 'store']);
 Route::delete('group/master-accounts/journals/{id}', [JournalController::class, 'destroy']);
+// Bank transaction log (deposits/withdrawals/transfers) — the "Recent Bank
+// Transactions" list; persisted so it survives reload and shows on every device.
+Route::get('group/master-accounts/bank-transactions', [BankTxnController::class, 'index']);
+Route::post('group/master-accounts/bank-transactions', [BankTxnController::class, 'store']);
+Route::delete('group/master-accounts/bank-transactions/{id}', [BankTxnController::class, 'destroy']);
 
 // Customers (real `customers` table) — frontend `customers` store.
 Route::get('group/master-accounts/customers', [CustomerController::class, 'index']);

@@ -44,6 +44,7 @@
     coa:           'group/master-accounts/accounts',
     banks:         'group/master-accounts/banks',
     gl_entries:    'group/master-accounts/journals',
+    bank_txns:     'group/master-accounts/bank-transactions',
     customers:     'group/master-accounts/customers',
     suppliers:     'group/master-accounts/suppliers',
     acc_schedules: 'group/master-accounts/schedules',
@@ -65,6 +66,10 @@
     // persist to the DB (JournalController::store) — idempotent by client id,
     // so transactions survive a reload instead of living only in the browser.
     gl_entries: 'group/master-accounts/journals',
+    // The bank movement log behind "Recent Bank Transactions" — persisted so the
+    // deposit shows there too, on reload and on every device (self-contained
+    // table via BankTxnController). Written through db.save('bank_txns', …).
+    bank_txns: 'group/master-accounts/bank-transactions',
     customers: 'group/master-accounts/customers',
     suppliers: 'group/master-accounts/suppliers',
     banks:     'group/master-accounts/banks',
