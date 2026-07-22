@@ -338,6 +338,50 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     } catch (x) {}
   }
 
+  /* Recent Bank Transactions, DURABLY (owner 2026-07-22: "all should store in
+   * db. must"). The bank_txns log lives only in the browser — its own table
+   * can't be created on the shared host (DDL denied). But every bank movement
+   * ALSO posts a GL journal (source 'bank' | 'opening') that DOES persist to
+   * journal_entries, and its memo names the bank ("Deposit to <name>",
+   * "Withdrawal from <name>", "Bank opening balance · <name>"). So we MERGE:
+   *   • live local rows (this session — full fidelity), plus
+   *   • any persisted GL bank movement with no matching local row (a prior
+   *     session's deposit that survived reload in the DB) — reconstructed into a
+   *     txn row from the GL memo + its cash/bank (1000/1010) line.
+   * Result: a deposit made yesterday reappears after a reload, sourced from the
+   * DB, even though the bank_txns table itself was never provisioned. */
+  function resolveBankTxns(scopeIds) {
+    var local = S.list('bank_txns').filter(function (t) { return !!scopeIds[t.bankId]; });
+    var seenGl = {}; local.forEach(function (t) { if (t.glId) seenGl[t.glId] = 1; });
+    var byName = {}; Object.keys(scopeIds).forEach(function (id) {
+      var b = scopeIds[id]; if (b && b.name) byName[String(b.name).toLowerCase()] = b;
+    });
+    function bankFromMemo(memo) {
+      var m = String(memo || ''), mt = null, name = null;
+      if ((mt = m.match(/^Deposit to (.+?)(?: — | · |$)/))) name = mt[1];
+      else if ((mt = m.match(/^Withdrawal from (.+?)(?: — | · |$)/))) name = mt[1];
+      else if ((mt = m.match(/^Bank opening balance · (.+?)(?: — | · |$)/))) name = mt[1];
+      return name ? byName[name.toLowerCase()] : null;
+    }
+    var synth = [];
+    if (EPAL.ledger && EPAL.ledger.entries) EPAL.ledger.entries({}).forEach(function (e) {
+      if (seenGl[e.id]) return;                                   // live row already has it
+      if (e.source !== 'bank' && e.source !== 'opening') return;  // only bank movements
+      var b = bankFromMemo(e.memo); if (!b) return;               // can't attribute → skip
+      var din = 0, dout = 0;
+      (e.lines || []).forEach(function (l) {
+        if (l.account === '1000' || l.account === '1010') { din += +l.dr || 0; dout += +l.cr || 0; }
+      });
+      if (!din && !dout) return;
+      var isIn = din >= dout, amt = isIn ? din : dout;
+      synth.push({ id: 'GLX-' + e.id, bankId: b.id, bankName: b.name,
+        type: e.source === 'opening' ? 'opening' : (isIn ? 'deposit' : 'withdraw'),
+        amount: amt, date: e.date, desc: e.memo || '',
+        ref: (e.ref && e.ref !== e.id) ? e.ref : '', glId: e.id, _synth: true });
+    });
+    return local.concat(synth);
+  }
+
   /* ==========================================================================
    * VIEW
    * ========================================================================*/
@@ -1885,7 +1929,9 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     // ---- 3) RECENT BANK TRANSACTIONS — shown FIRST (owner order) -------------
     (function () {
       var scopeIds = {}; banks.forEach(function (b) { scopeIds[b.id] = b; });
-      var txns = S.list('bank_txns').filter(function (t) { return !!scopeIds[t.bankId]; });
+      // MERGE live local rows with prior-session movements reconstructed from the
+      // persisted GL (see resolveBankTxns) — so the log survives a reload.
+      var txns = resolveBankTxns(scopeIds);
 
       // Money direction. One helper so every column, sort and running total
       // agrees on what "in" means — this is the only place that decides it.
