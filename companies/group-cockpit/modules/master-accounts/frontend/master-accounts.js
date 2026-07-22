@@ -1539,40 +1539,46 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         fact('Movements', moveCount, function () { EPAL.router.navigate('group/master-accounts/journals'); })
       ]);
 
-      var lastBlock;
-      if (lastInfo) {
-        var isIn = lastInfo.net >= 0;
-        lastBlock = el('div.bank-summary-last', { title: 'Open this transaction', onclick: function () { if (lastInfo.entry && typeof journalDetail === 'function') journalDetail(lastInfo.entry); else EPAL.router.navigate('group/master-accounts/journals'); } }, [
-          el('div.bank-summary-last-top', null, [
-            el('span.bank-summary-last-lbl', { text: 'Last transaction' }),
-            el('span.bank-summary-dir.' + (isIn ? 'in' : 'out'), { text: isIn ? 'IN' : 'OUT' })
-          ]),
-          el('div.bank-summary-last-row', null, [
-            el('span.bank-summary-last-amt.' + (isIn ? 'in' : 'out'), { text: (isIn ? '+' : '−') + ui.money(Math.abs(lastInfo.net)) }),
-            el('span.bank-summary-last-date', { text: ui.date(lastInfo.date) })
-          ]),
-          el('div.bank-summary-last-ref', { text: lastInfo.id + (lastInfo.memo ? ' · ' + lastInfo.memo : '') }),
-          el('div.bank-summary-last-oc', { html: 'Opening <b>' + esc(ui.money(lastInfo.opening)) + '</b> &nbsp;→&nbsp; Closing <b>' + esc(ui.money(lastInfo.closing)) + '</b>' })
-        ]);
-      } else {
-        lastBlock = el('div.bank-summary-empty', { text: 'No bank transactions yet in this scope.' });
-      }
+      // LAST TRANSACTION — the RIGHT COLUMN of the card. When there's no data
+      // yet we still render every field with zeros (owner 2026-07-22: "put zero
+      // there so I can understand the view after a transaction"), never a blank.
+      var ph = !lastInfo;                                // placeholder / zero-state
+      var net = ph ? 0 : lastInfo.net, isIn = net >= 0;
+      var lastCol = el('div.bank-summary-last' + (ph ? '.is-empty' : ''), {
+        title: ph ? 'No transactions yet' : 'Open this transaction',
+        onclick: function () { if (lastInfo && lastInfo.entry && typeof journalDetail === 'function') journalDetail(lastInfo.entry); else if (!ph) EPAL.router.navigate('group/master-accounts/journals'); }
+      }, [
+        el('div.bank-summary-last-top', null, [
+          el('span.bank-summary-last-lbl', { text: 'Last transaction' }),
+          el('span.bank-summary-dir.' + (ph ? 'none' : (isIn ? 'in' : 'out')), { text: ph ? '—' : (isIn ? 'IN' : 'OUT') })
+        ]),
+        el('div.bank-summary-last-row', null, [
+          el('span.bank-summary-last-amt' + (ph ? '' : (isIn ? '.in' : '.out')), { text: (ph ? '' : (isIn ? '+' : '−')) + ui.money(ph ? 0 : Math.abs(net)) }),
+          el('span.bank-summary-last-date', { text: (lastInfo && lastInfo.date) ? ui.date(lastInfo.date) : '—' })
+        ]),
+        el('div.bank-summary-last-ref', { text: ph ? 'No transactions yet' : (lastInfo.id + (lastInfo.memo ? ' · ' + lastInfo.memo : '')) }),
+        el('div.bank-summary-last-oc', { html: 'Opening <b>' + esc(ui.money(ph ? 0 : lastInfo.opening)) + '</b> &nbsp;→&nbsp; Closing <b>' + esc(ui.money(ph ? 0 : lastInfo.closing)) + '</b>' })
+      ]);
 
       var sumCard = el('div.bank-summary', null, [
         el('div.bank-summary-in', null, [
-          el('div.bank-summary-head', null, [
-            el('div.bank-summary-ico', { html: ui.icon(icon) }),
-            el('div.bank-summary-id', null, [
-              el('div.bank-summary-co', { text: heading }),
-              el('div.bank-summary-sub', { text: selCo === 'all' ? 'Group-wide banking summary' : 'Banking summary' })
-            ])
+          el('div.bank-summary-body', null, [
+            el('div.bank-summary-left', null, [
+              el('div.bank-summary-head', null, [
+                el('div.bank-summary-ico', { html: ui.icon(icon) }),
+                el('div.bank-summary-id', null, [
+                  el('div.bank-summary-co', { text: heading }),
+                  el('div.bank-summary-sub', { text: selCo === 'all' ? 'Group-wide banking summary' : 'Banking summary' })
+                ])
+              ]),
+              el('div.bank-summary-hero', null, [
+                el('div.bank-summary-bal' + (total < 0 ? '.text-bad' : ''), { text: ui.money(total) }),
+                el('div.bank-summary-ballabel', { text: 'Total balance' })
+              ])
+            ]),
+            lastCol
           ]),
-          el('div.bank-summary-hero', null, [
-            el('div.bank-summary-bal' + (total < 0 ? '.text-bad' : ''), { text: ui.money(total) }),
-            el('div.bank-summary-ballabel', { text: 'Total balance' })
-          ]),
-          facts,
-          lastBlock
+          facts
         ])
       ]);
       sumCard.style.setProperty('--bank-hue', accent);   // custom prop — must go via setProperty
