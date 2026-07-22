@@ -1759,14 +1759,26 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         reconCard = el('div.card.bank-recon-clik' + (isGroupWide ? '.mb-2' : '.bank-recon'), { title: 'Open the ledger', onclick: function () { EPAL.router.navigate('group/master-accounts/journals'); } }, [
           el('div.card-head', null, [el('h3', { html: ui.icon('shield-check') + ' Bank ↔ Ledger Reconciliation' }),
             el('span.badge' + (ok ? '.badge-good' : '.badge-warn'), { style: { marginLeft: 'auto' }, text: ok ? 'RECONCILED' : 'FLOAT ' + ui.money(Math.abs(delta)) })]),
-          el('div.card-body', null, [
+          el('div.card-body', null, isGroupWide ? [
             el('div.stat-row', null, [
-              el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Ledger cash + bank (1000 + 1010)' : 'Ledger (cash + bank)' }), el('div.stat-value.num', { text: ui.money(gl) })]),
-              el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Bank register total' : 'Bank register' }), el('div.stat-value.num', { text: ui.money(total) })]),
-              el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Unassigned cash float' : 'Unassigned float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) }),
+              el('div.stat', null, [el('div.stat-label', { text: 'Ledger cash + bank (1000 + 1010)' }), el('div.stat-value.num', { text: ui.money(gl) })]),
+              el('div.stat', null, [el('div.stat-label', { text: 'Bank register total' }), el('div.stat-value.num', { text: ui.money(total) })]),
+              el('div.stat', null, [el('div.stat-label', { text: 'Unassigned cash float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) }),
                 (!ok ? el('button.float-why', { type: 'button', html: ui.icon('question-circle') + ' why?', onclick: function (ev) { ev.stopPropagation(); floatExplainer(scope, gl, total, delta); } }) : null)])
             ]),
             el('p.text-mute.xs.mt-2', { text: 'Float = business cash in the books not yet held on any bank record (e.g. undeposited collections). Bank openings and the expense backfill are explicit journals (GL-OPBK-* · GL-MX-*)' + (op ? ' — ' + op.banks + ' bank openings ' + ui.money(op.amount) : '') + (bf ? ' · backfilled ' + bf.entries + ' expenses ' + ui.money(bf.amount) : '') + '.' })
+          ] : [
+            // compact (in-row): a 2×2 grid of numbers split by a CROSS shadow
+            // divider (owner 2026-07-22) — ledger cash / ledger bank / register /
+            // float. Cross = a vertical hairline between columns + a horizontal
+            // one between rows, meeting in the centre.
+            el('div.bank-recon-2x2', null, [
+              el('div.stat', null, [el('div.stat-label', { text: 'Ledger cash (1000)' }), el('div.stat-value.num', { text: ui.money(EPAL.ledger.balance('1000', scope)) })]),
+              el('div.stat', null, [el('div.stat-label', { text: 'Ledger bank (1010)' }), el('div.stat-value.num', { text: ui.money(EPAL.ledger.balance('1010', scope)) })]),
+              el('div.stat', null, [el('div.stat-label', { text: 'Bank register' }), el('div.stat-value.num', { text: ui.money(total) })]),
+              el('div.stat', null, [el('div.stat-label', { text: 'Unassigned float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) }),
+                (!ok ? el('button.float-why', { type: 'button', html: ui.icon('question-circle') + ' why?', onclick: function (ev) { ev.stopPropagation(); floatExplainer(scope, gl, total, delta); } }) : null)])
+            ])
           ])
         ]);
       }

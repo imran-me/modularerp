@@ -486,11 +486,20 @@
 .bank-recon .card-head { flex-wrap: wrap; gap: 4px; }
 .bank-recon .card-head h3 { font-size: 12.5px; line-height: 1.25; }
 .bank-recon .card-head .badge { display: none; }   /* float already shown in the stat below — avoid overlap */
-.bank-recon .stat-row { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
-.bank-recon .stat { min-width: 0; }
-.bank-recon .stat-label { font-size: 9.5px; white-space: normal; }
-.bank-recon .stat-value { font-size: 15px; }
+/* compact reconciliation = 2×2 grid of numbers split by a CROSS shadow divider
+   (a vertical hairline between the columns + a horizontal one between the rows,
+   meeting at the centre) — owner 2026-07-22. */
+.bank-recon-2x2 { display: grid; grid-template-columns: 1fr 1fr; }
+.bank-recon-2x2 .stat { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 9px 12px; }
+.bank-recon-2x2 .stat:nth-child(odd) { padding-left: 2px; }
+.bank-recon-2x2 .stat:nth-child(even)::before { content: ''; position: absolute; left: 0; top: 12%; bottom: 12%; width: 1px;
+  background: color-mix(in srgb, var(--text) 10%, transparent); box-shadow: 1px 0 0 color-mix(in srgb, #fff 55%, transparent); }
+.bank-recon-2x2 .stat:nth-child(n+3)::after { content: ''; position: absolute; top: 0; left: 5%; right: 5%; height: 1px;
+  background: color-mix(in srgb, var(--text) 10%, transparent); box-shadow: 0 1px 0 color-mix(in srgb, #fff 55%, transparent); }
+.bank-recon-2x2 .stat-label { font-size: 8.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bank-recon-2x2 .stat-value { font-size: 14px; }
 .bank-recon .card-body > p { display: none; }
+.bank-recon .card-body { padding-top: 6px; }
 /* a subtle 'why?' link on the float — opens the exact float-causing entries */
 .float-why { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; padding: 0; background: none; border: none; cursor: pointer;
   font-size: 10px; font-weight: 700; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
