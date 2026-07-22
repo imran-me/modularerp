@@ -358,12 +358,63 @@
 .bank-summary-bal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 700; line-height: 1.05; letter-spacing: -1px; color: var(--text); }
 .bank-summary-bal.text-bad { color: var(--bad, #e0356e); }
 .bank-summary-ballabel { font-size: 9.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--text-mute); margin-top: 5px; }
-.bank-summary-facts { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-top: 15px; padding-top: 14px;
-  border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent); }
-.bank-summary-fact { display: flex; flex-direction: column; gap: 3px; }
-.bank-summary-fact .k { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-mute); font-weight: 700; }
-.bank-summary-fact .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 700; color: var(--text-dim); }
+/* 3-KPI row — the dividers are soft black "shadow-like" hairlines (owner
+   2026-07-22: the red guide lines become black shadows), not flat borders. */
+.bank-summary-facts { display: flex; margin-top: 15px; padding-top: 14px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), inset 0 3px 4px -3px color-mix(in srgb, var(--text) 14%, transparent); }
+.bank-summary-fact { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 3px 14px; position: relative; border-radius: 9px; transition: background .15s; }
+.bank-summary-fact:first-child { padding-left: 0; }
+.bank-summary-fact + .bank-summary-fact::before { content: ''; position: absolute; left: 0; top: 14%; bottom: 14%; width: 1px;
+  background: color-mix(in srgb, var(--text) 10%, transparent); box-shadow: 1px 0 0 color-mix(in srgb, #fff 55%, transparent); }
+.bank-summary-fact .k { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-mute); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ~30% larger count than before (was 14px) — owner ask */
+.bank-summary-fact .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18.5px; font-weight: 700; line-height: 1; color: var(--text); }
+.bank-summary-fact.clik { cursor: pointer; }
+.bank-summary-fact.clik:hover { background: color-mix(in srgb, var(--bank-ink) 9%, transparent); }
+.bank-summary-fact.clik:hover .v { color: color-mix(in srgb, var(--bank-ink) 72%, var(--text)); }
+
+/* LAST TRANSACTION mini-statement — id · amount+date · opening → closing.
+   Clickable (opens the transaction). Same soft-shadow divider above it. */
+.bank-summary-last { margin-top: 14px; padding-top: 13px; cursor: pointer; border-radius: 10px; padding-left: 2px; padding-right: 6px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), inset 0 3px 4px -3px color-mix(in srgb, var(--text) 14%, transparent); transition: background .15s; }
+.bank-summary-last:hover { background: color-mix(in srgb, var(--bank-ink) 8%, transparent); }
+.bank-summary-last-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bank-summary-last-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-mute); font-weight: 700; }
+.bank-summary-dir { font-size: 9.5px; font-weight: 800; letter-spacing: .4px; padding: 2px 8px; border-radius: 999px; }
+.bank-summary-dir.in { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.bank-summary-dir.out { color: var(--bad, #e0356e); background: color-mix(in srgb, var(--bad, #e0356e) 14%, transparent); }
+.bank-summary-last-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 7px; }
+.bank-summary-last-amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 700; color: var(--text); }
+.bank-summary-last-amt.in { color: var(--good); } .bank-summary-last-amt.out { color: var(--bad, #e0356e); }
+.bank-summary-last-date { font-size: 11px; color: var(--text-mute); font-weight: 600; white-space: nowrap; }
+.bank-summary-last-ref { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bank-summary-last-oc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--text-mute); margin-top: 7px; }
+.bank-summary-last-oc b { color: var(--text-dim); font-weight: 700; }
+.bank-summary-empty { margin-top: 14px; padding-top: 13px; font-size: 11.5px; color: var(--text-mute);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent); }
 @media (prefers-reduced-motion: reduce) { .bank-summary, .bank-summary::after { transition: none; } .bank-summary:hover { transform: none; } .bank-summary:hover::after { left: -75%; } }
+
+/* --------------------- BANK SUMMARY ROW + CASH-FLOW COMPANION --------------
+ * The summary panel + a companion cash-flow card sit in one flexing row; the
+ * panel keeps its fixed left width, the companion fills the rest and matches
+ * height. A 30-day mirrored in/out sparkline (green up = money in, red down =
+ * money out) with In/Out totals + a net chip. */
+.bank-summary-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: stretch; margin-bottom: 14px; }
+.bank-summary-row .bank-summary { margin-bottom: 0; }
+.bank-flow { flex: 1; min-width: 300px; position: relative; overflow: hidden; border-radius: 16px; border: 1px solid var(--border); background: var(--surface);
+  box-shadow: 0 1px 2px rgba(7, 12, 30, .06), 0 6px 18px -9px rgba(7, 12, 30, .12); padding: 18px 20px; display: flex; flex-direction: column; }
+.bank-flow-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.bank-flow-title { font-family: var(--font-display); font-weight: 700; font-size: 14px; color: var(--text); letter-spacing: -.2px; }
+.bank-flow-sub { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 2px; }
+.bank-flow-net { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.bank-flow-net.is-up { color: var(--good); background: color-mix(in srgb, var(--good) 13%, transparent); }
+.bank-flow-net.is-down { color: var(--bad, #e0356e); background: color-mix(in srgb, var(--bad, #e0356e) 13%, transparent); }
+.bank-flow-spark { flex: 1; display: flex; align-items: center; margin: 16px 0 12px; min-height: 52px; color: var(--text); }
+.bank-flow-spark svg { width: 100%; height: 52px; display: block; }
+.bank-flow-foot { display: flex; gap: 20px; font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.bank-flow-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.bank-flow-dot.in { background: #23c17e; } .bank-flow-dot.out { background: #f0506e; }
+.bank-flow-empty { flex: 1; display: grid; place-items: center; color: var(--text-mute); font-size: 12px; text-align: center; }
 
 /* ---------------------------- SEARCHABLE COMBOBOX ------------------------
  * The type-to-filter select (forms.js makeCombobox). Reads as a normal input; a

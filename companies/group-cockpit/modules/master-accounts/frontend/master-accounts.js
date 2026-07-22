@@ -1474,33 +1474,75 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     var banks = allBanks.filter(function (b) { return selCo === 'all' ? true : (b.companyId || 'group') === selCo; });
     var total = banks.reduce(function (a, b) { return a + (+b.balance || 0); }, 0);
 
-    // ---- 1) BANKING SUMMARY PANEL -------------------------------------------
+    // ---- 1) BANKING SUMMARY PANEL + CASH-FLOW COMPANION ---------------------
     // ONE company-branded identity panel in place of the old four KPI tiles
-    // (owner 2026-07-22): company · hero balance · accounts / active / last
-    // transaction. Deliberately left-aligned (max-width) — the right gutter is
-    // reserved for planned future content. Same data as the old tiles; "Scope"
-    // becomes the panel's own heading, and Last transaction is new.
+    // (owner 2026-07-22): company · hero balance · THREE clickable KPIs
+    // (Accounts · Active · Movements, each drilling to its origin) · a
+    // Last-Transaction mini-statement (id · amount+date · opening → closing,
+    // click opens it). A companion cash-flow card (30-day in/out sparkline)
+    // rides to the RIGHT. Dividers are soft black shadow hairlines.
     (function () {
+      var scope = selCo === 'all' ? {} : { companyId: selCo };
       var activeN = banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length;
       var coObj = EPAL.config.company(selCo);
       var accent = (coObj && coObj.accent) ? coObj.accent : 'var(--accent)';
       var icon = (coObj && coObj.icon) ? coObj.icon : (selCo === 'all' ? 'diagram-3' : 'bank2');
       var heading = selCo === 'all' ? 'All Companies' : coName(selCo);
-      // Last transaction = newest money movement in scope — a bank-register txn
-      // OR any ledger posting that touches cash/bank (1000/1010), so openings,
-      // deposits, withdrawals and expenses all count (a bank with a balance but
-      // no bank_txns still shows a real date, not a perpetual dash).
-      var scopeIds = {}; banks.forEach(function (b) { scopeIds[b.id] = 1; });
-      var lastTxn = '';
-      S.list('bank_txns').forEach(function (t) { if (scopeIds[t.bankId] && t.date && t.date > lastTxn) lastTxn = t.date; });
-      try {
-        if (EPAL.ledger && EPAL.ledger.entries) {
-          EPAL.ledger.entries(selCo === 'all' ? {} : { companyId: selCo }).forEach(function (e) {
-            if (!e.date || e.date <= lastTxn) return;
-            if ((e.lines || []).some(function (l) { return l.account === '1000' || l.account === '1010'; })) lastTxn = e.date;
-          });
-        }
-      } catch (x) {}
+      var gl = EPAL.ledger ? (EPAL.ledger.balance('1000', scope) + EPAL.ledger.balance('1010', scope)) : total;
+
+      // LAST TRANSACTION + MOVEMENTS count — both read the ledger (the
+      // authoritative cash record), so Movements matches what Last Transaction
+      // and the sparkline show (openings are ledger entries, not bank_txns).
+      // closing = current ledger cash+bank (matches the reconciliation card
+      // below); opening = closing − this entry's net.
+      var lastE = null, moveCount = 0;
+      if (EPAL.ledger && EPAL.ledger.entries) {
+        EPAL.ledger.entries(scope).forEach(function (e) {
+          if (!e.date) return;
+          if (!(e.lines || []).some(function (l) { return l.account === '1000' || l.account === '1010'; })) return;
+          moveCount++;
+          if (!lastE || e.date >= lastE.date) lastE = e;   // array is chronological → later wins on date ties
+        });
+      }
+      var lastInfo = null;
+      if (lastE) {
+        var dr = 0, cr = 0;
+        (lastE.lines || []).forEach(function (l) { if (l.account === '1000' || l.account === '1010') { dr += +l.dr || 0; cr += +l.cr || 0; } });
+        var net = dr - cr;
+        lastInfo = { entry: lastE, id: lastE.ref || lastE.id, memo: lastE.memo || '', date: lastE.date, net: net, closing: gl, opening: gl - net };
+      }
+
+      function scrollAccts() { var a = document.getElementById('bank-accounts-anchor'); if (a) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      function fact(k, v, onClick) {
+        return el('div.bank-summary-fact' + (onClick ? '.clik' : ''), onClick ? { onclick: onClick } : null,
+          [el('div.k', { text: k }), el('div.v', { text: String(v) })]);
+      }
+
+      var facts = el('div.bank-summary-facts', null, [
+        fact('Accounts', banks.length, scrollAccts),
+        fact('Active', activeN, scrollAccts),
+        fact('Movements', moveCount, function () { EPAL.router.navigate('group/master-accounts/journals'); })
+      ]);
+
+      var lastBlock;
+      if (lastInfo) {
+        var isIn = lastInfo.net >= 0;
+        lastBlock = el('div.bank-summary-last', { title: 'Open this transaction', onclick: function () { if (typeof journalDetail === 'function') journalDetail(lastInfo.entry); else EPAL.router.navigate('group/master-accounts/journals'); } }, [
+          el('div.bank-summary-last-top', null, [
+            el('span.bank-summary-last-lbl', { text: 'Last transaction' }),
+            el('span.bank-summary-dir.' + (isIn ? 'in' : 'out'), { text: isIn ? 'IN' : 'OUT' })
+          ]),
+          el('div.bank-summary-last-row', null, [
+            el('span.bank-summary-last-amt.' + (isIn ? 'in' : 'out'), { text: (isIn ? '+' : '−') + ui.money(Math.abs(lastInfo.net)) }),
+            el('span.bank-summary-last-date', { text: ui.date(lastInfo.date) })
+          ]),
+          el('div.bank-summary-last-ref', { text: lastInfo.id + (lastInfo.memo ? ' · ' + lastInfo.memo : '') }),
+          el('div.bank-summary-last-oc', { html: 'Opening <b>' + esc(ui.money(lastInfo.opening)) + '</b> &nbsp;→&nbsp; Closing <b>' + esc(ui.money(lastInfo.closing)) + '</b>' })
+        ]);
+      } else {
+        lastBlock = el('div.bank-summary-empty', { text: 'No bank transactions yet in this scope.' });
+      }
+
       var sumCard = el('div.bank-summary', null, [
         el('div.bank-summary-in', null, [
           el('div.bank-summary-head', null, [
@@ -1514,15 +1556,51 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
             el('div.bank-summary-bal' + (total < 0 ? '.text-bad' : ''), { text: ui.money(total) }),
             el('div.bank-summary-ballabel', { text: 'Total balance' })
           ]),
-          el('div.bank-summary-facts', null, [
-            el('div.bank-summary-fact', null, [el('div.k', { text: 'Accounts' }), el('div.v', { text: String(banks.length) })]),
-            el('div.bank-summary-fact', null, [el('div.k', { text: 'Active' }), el('div.v', { text: String(activeN) })]),
-            el('div.bank-summary-fact', null, [el('div.k', { text: 'Last transaction' }), el('div.v', { text: lastTxn ? ui.date(lastTxn) : '—' })])
-          ])
+          facts,
+          lastBlock
         ])
       ]);
       sumCard.style.setProperty('--bank-hue', accent);   // custom prop — must go via setProperty
-      page.appendChild(sumCard);
+
+      // ---- companion: 30-day cash-flow sparkline ------------------------------
+      var days = [], inD = {}, outD = {}, totIn = 0, totOut = 0;
+      var end = new Date(TODAY_STR + 'T00:00:00');
+      for (var i = 29; i >= 0; i--) { var d = new Date(end); d.setDate(d.getDate() - i);
+        var key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        days.push(key); inD[key] = 0; outD[key] = 0; }
+      var startK = days[0], endK = days[29];
+      if (EPAL.ledger && EPAL.ledger.entries) EPAL.ledger.entries(scope).forEach(function (e) {
+        if (!e.date || e.date < startK || e.date > endK) return;
+        var din = 0, dout = 0;
+        (e.lines || []).forEach(function (l) { if (l.account === '1000' || l.account === '1010') { din += +l.dr || 0; dout += +l.cr || 0; } });
+        if (inD[e.date] === undefined) return;
+        inD[e.date] += din; outD[e.date] += dout; totIn += din; totOut += dout;
+      });
+      var maxV = 1; days.forEach(function (k) { maxV = Math.max(maxV, inD[k], outD[k]); });
+      var W = 300, H = 52, mid = H / 2, slot = W / 30, bw = Math.max(2, slot - 3);
+      var bars = days.map(function (k, idx) {
+        var x = idx * slot + (slot - bw) / 2, s = '';
+        var hi = inD[k] / maxV * (mid - 3), ho = outD[k] / maxV * (mid - 3);
+        if (inD[k] > 0) s += '<rect x="' + x.toFixed(1) + '" y="' + (mid - hi).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, hi).toFixed(1) + '" rx="1" fill="#23c17e"/>';
+        if (outD[k] > 0) s += '<rect x="' + x.toFixed(1) + '" y="' + mid.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, ho).toFixed(1) + '" rx="1" fill="#f0506e"/>';
+        return s;
+      }).join('');
+      var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<line x1="0" y1="' + mid + '" x2="' + W + '" y2="' + mid + '" stroke="currentColor" stroke-opacity="0.13" stroke-width="1"/>' + bars + '</svg>';
+      var netFlow = totIn - totOut, hasFlow = totIn > 0 || totOut > 0;
+      var compCard = el('div.bank-flow', null, [
+        el('div.bank-flow-head', null, [
+          el('div', null, [el('div.bank-flow-title', { text: 'Cash Flow' }), el('div.bank-flow-sub', { text: 'last 30 days · money in vs out' })]),
+          hasFlow ? el('span.bank-flow-net.' + (netFlow >= 0 ? 'is-up' : 'is-down'), { text: (netFlow >= 0 ? '+' : '−') + ui.money(Math.abs(netFlow)) }) : null
+        ]),
+        hasFlow ? el('div.bank-flow-spark', { html: svg }) : el('div.bank-flow-empty', { text: 'No cash movement in the last 30 days.' }),
+        hasFlow ? el('div.bank-flow-foot', null, [
+          el('span', { html: '<span class="bank-flow-dot in"></span> In ' + esc(ui.money(totIn)) }),
+          el('span', { html: '<span class="bank-flow-dot out"></span> Out ' + esc(ui.money(totOut)) })
+        ]) : null
+      ]);
+
+      page.appendChild(el('div.bank-summary-row', null, [sumCard, compCard]));
     })();
     // per-company cards, like the production dashboard header. Respects the
     // selected company: on a specific company only THAT company's card shows,
@@ -1585,7 +1663,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     // Premium account CARDS (identical to the Overview), scoped to this company —
     // the visual layer; the detailed register with per-row actions + export is the
     // "All Banks" table below. Click a card to drill into its ledger inline.
-    page.appendChild(el('div.section-label', { text: 'Accounts' }));
+    page.appendChild(el('div.section-label', { id: 'bank-accounts-anchor', text: 'Accounts' }));
     renderBankCardGrid(banks, page, { autoOpen: false });
 
     // ---- 2) ALL BANKS (production columns + filters) -------------------------
