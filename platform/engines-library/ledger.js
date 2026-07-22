@@ -165,11 +165,15 @@
       if (mo <= lockedThrough) throw new Error('Accounting period ' + mo + ' is closed (locked through ' + lockedThrough + '). Reopen it to post.');
     }
 
-    // normalise lines to {account,dr,cr}
+    // normalise lines to {account,dr,cr}; carry an optional `product` tag when
+    // present (owner decision 2026-07-22: tag journal lines with the product so
+    // per-product P&L — cost & margin per Air/Visa/Contract sale — is exact).
     var clean = [];
     for (var i = 0; i < lines.length; i++) {
       var ln = lines[i] || {};
-      clean.push({ account: String(ln.account), dr: +ln.dr || 0, cr: +ln.cr || 0 });
+      var out = { account: String(ln.account), dr: +ln.dr || 0, cr: +ln.cr || 0 };
+      if (ln.product) out.product = ln.product;
+      clean.push(out);
     }
     var dr = sumSide(clean, 'dr'), cr = sumSide(clean, 'cr');
     if (Math.abs(dr - cr) > TOL) {
@@ -495,6 +499,68 @@
       net: gross - expenses, lines: lines };
   }
 
+  /* Product label for a revenue account — the sale's income head IS its product
+   * (owner decision 2026-07-22: revenue is categorised per product, direct cost
+   * captured at sale). Used to attribute both revenue and its matched COGS. */
+  function productForAccount(code) {
+    var m = { '4010': 'Air Ticket', '4020': 'Visa', '4030': 'Package',
+      '4040': 'Hotel', '4050': 'Contract', '4000': 'Other Sales' };
+    if (m[code]) return m[code];
+    var a = account(code);
+    return (a && a.name) || 'Other Sales';
+  }
+
+  /* PER-PRODUCT P&L (owner 2026-07-22: "cost per sell, margins … per product,
+   * shown on the Travels Dashboard"). Contribution / gross view = Revenue − direct
+   * COGS per product (the standard management P&L; company opex stays a separate
+   * block, see pnl()). Reads the ONE ledger's `source:'sale'` journals:
+   *   • revenue  — each income line, keyed to its product (line `product` tag if
+   *     present, else its income account).
+   *   • COGS     — each 5000 line, attributed to the product of its own sale via
+   *     the shared `ref` (so it works on HISTORICAL sales too, tag or no tag).
+   * Returns rows {product, revenue, cogs, gross, margin, count, perSaleCost,
+   * perSaleMargin}, biggest revenue first. */
+  function pnlByProduct(companyId, opts) {
+    opts = opts || {};
+    var list = entries({ companyId: companyId, source: 'sale', from: opts.from, to: opts.to });
+    // ref -> product, learned from the revenue (income) leg
+    var prodByRef = {};
+    list.forEach(function (e) {
+      (e.lines || []).forEach(function (l) {
+        if (l.product) { prodByRef[e.ref || e.id] = l.product; return; }
+        var a = account(l.account);
+        if (a && a.type === 'income') prodByRef[e.ref || e.id] = productForAccount(l.account);
+      });
+    });
+    var by = {};
+    function bucket(p) { return by[p] || (by[p] = { product: p, revenue: 0, cogs: 0, count: 0 }); }
+    list.forEach(function (e) {
+      var ref = e.ref || e.id;
+      (e.lines || []).forEach(function (l) {
+        var a = account(l.account);
+        if (a && a.type === 'income') {
+          var p = l.product || productForAccount(l.account);
+          var r = (+l.cr || 0) - (+l.dr || 0);           // income is normal-credit
+          bucket(p).revenue += r;
+          if (r > 0) bucket(p).count++;                  // one counted sale per revenue leg
+        } else if (l.account === '5000') {
+          var pc = l.product || prodByRef[ref] || 'Other Sales';
+          bucket(pc).cogs += (+l.dr || 0) - (+l.cr || 0); // COGS is normal-debit
+        }
+      });
+    });
+    var out = Object.keys(by).map(function (p) {
+      var x = by[p];
+      x.gross = x.revenue - x.cogs;
+      x.margin = x.revenue ? (x.gross / x.revenue * 100) : 0;
+      x.perSaleCost = x.count ? (x.cogs / x.count) : 0;
+      x.perSaleMargin = x.count ? (x.gross / x.count) : 0;
+      return x;
+    });
+    out.sort(function (a, b) { return b.revenue - a.revenue; });
+    return out;
+  }
+
   function valueOnNormal(acc, q) {
     var t = accountTotals(acc.code, q);
     return acc.normal === 'debit' ? (t.dr - t.cr) : (t.cr - t.dr);
@@ -548,6 +614,8 @@
     partyLedger: partyLedger,
     aging: aging,
     pnl: pnl,
+    pnlByProduct: pnlByProduct,
+    productForAccount: productForAccount,
     balanceSheet: balanceSheet,
     consolidatedTrialBalance: consolidatedTrialBalance,
     postIntercompany: postIntercompany,
@@ -852,6 +920,7 @@
 
       var amount = +rec.amount || 0, cost = +rec.cost || 0, vat = +rec.vat || 0;
       var incAcct = incomeAccountFor(rec);
+      var prod = productForAccount(incAcct);   // product label for per-product P&L
       var paid = rec.paid === true || rec.payStatus === 'Paid';
       // cash if paid; else the RIGHT receivable for the party class (audit fix:
       // sub-agent sales go to 1150 Agent Receivable, not customer AR)
@@ -866,8 +935,8 @@
         post({ id: 'GL-S' + (rec.id || key), date: rec.date, companyId: rec.companyId,
           ref: rec.ref, memo: rec.desc || 'Sale', source: 'sale', party: rec.customer || '',
           lines: splitVat
-            ? [ { account: debit, dr: amount, cr: 0 }, { account: incAcct, dr: 0, cr: amount - vat }, { account: '2130', dr: 0, cr: vat } ]
-            : [ { account: debit, dr: amount, cr: 0 }, { account: incAcct, dr: 0, cr: amount } ] });
+            ? [ { account: debit, dr: amount, cr: 0, product: prod }, { account: incAcct, dr: 0, cr: amount - vat, product: prod }, { account: '2130', dr: 0, cr: vat } ]
+            : [ { account: debit, dr: amount, cr: 0, product: prod }, { account: incAcct, dr: 0, cr: amount, product: prod } ] });
         // cost leg — a SEPARATE entry so the vendor's payable sub-ledger is correct;
         // cash-out if the vendor is already paid (costPaid), otherwise a payable.
         // `!== 0` NOT `> 0`: a void/refund reverses a sale with a NEGATIVE cost, and
@@ -879,7 +948,7 @@
           var creditCost = rec.costPaid === true ? '1010' : '2000';
           post({ id: 'GL-SC' + (rec.id || key), date: rec.date, companyId: rec.companyId,
             ref: rec.ref, memo: (rec.desc || 'Sale') + ' — cost', source: 'sale', party: rec.vendor || rec.customer || '',
-            lines: [ { account: '5000', dr: cost, cr: 0 }, { account: creditCost, dr: 0, cr: cost } ] });
+            lines: [ { account: '5000', dr: cost, cr: 0, product: prod }, { account: creditCost, dr: 0, cr: cost } ] });
         }
       } catch (e) { console.error('[ledger] auto-post failed', e); }
     });

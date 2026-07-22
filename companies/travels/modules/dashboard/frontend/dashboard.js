@@ -197,6 +197,63 @@ EPAL.view('travels/dashboard', {
       page.appendChild(card);
     })();
 
+    // --- PRODUCT P&L (owner 2026-07-22): "cost per sell, margins … per product,
+    // shown on the Travels Dashboard". Contribution view straight from the ONE
+    // ledger — Revenue − direct COGS per product (Air / Visa / Contract), with
+    // the count-driven cost-per-sale; the company opex + net close the block.
+    // Reads EPAL.ledger.pnlByProduct + pnl, so it can't drift from the books. ---
+    (function () {
+      var prods = [], P = { revenue: 0, cogs: 0, gross: 0, expenses: 0, net: 0 };
+      try { prods = EPAL.ledger.pnlByProduct('travels') || []; P = EPAL.ledger.pnl('travels') || P; } catch (e) {}
+      function st(label, val, cls) {
+        return el('div.stat', null, [ el('div.stat-label', { text: label }),
+          el('div.stat-value.num' + (cls ? '.' + cls : ''), { text: val }) ]);
+      }
+      var body = el('div.card-body');
+      if (!prods.length) {
+        body.appendChild(el('p.text-mute.sm', { html: ui.icon('inbox') + ' No product sales posted to the books yet — issue a ticket, visa or contract sale and its revenue, cost and margin appear here.' }));
+      } else {
+        var routeOf = { 'Air Ticket': 'travels/air-ticketing/manage-sales', 'Visa': 'travels/visa-processing/manage-sales', 'Contract': 'travels/contract-flight', 'EMD/Ancillary': 'travels/air-ticketing/manage-sales' };
+        var tb = el('tbody');
+        prods.forEach(function (p) {
+          var route = routeOf[p.product];
+          var tr = el('tr' + (route ? '.drill' : ''), null, [
+            el('td', { html: '<span class="strong">' + ui.escapeHtml(p.product) + '</span>' }),
+            el('td.num', { text: String(p.count) }),
+            el('td.num', { text: ui.money(p.revenue) }),
+            el('td.num.text-mute', { text: ui.money(p.cogs) }),
+            el('td.num.' + (p.gross >= 0 ? 'text-good' : 'text-bad'), { text: ui.money(p.gross) }),
+            el('td.num', { html: '<span class="badge badge-' + (p.margin >= 0 ? 'good' : 'bad') + '">' + ui.pct(p.margin) + '</span>' }),
+            el('td.num.text-mute', { text: ui.money(p.perSaleCost) })
+          ]);
+          if (route) { tr.setAttribute('title', 'Open ' + p.product + ' sales'); tr.addEventListener('click', function () { EPAL.router.navigate(route); }); }
+          tb.appendChild(tr);
+        });
+        var tbl = el('table.tbl', null, [
+          el('thead', null, [ el('tr', null, [
+            el('th', { text: 'Product' }), el('th.num', { text: 'Sales' }), el('th.num', { text: 'Revenue' }),
+            el('th.num', { text: 'Direct Cost' }), el('th.num', { text: 'Gross Margin' }),
+            el('th.num', { text: 'Margin %' }), el('th.num', { text: 'Cost / Sale' }) ]) ]),
+          tb
+        ]);
+        body.appendChild(tbl);
+        body.appendChild(el('div.stat-row.mt-3', null, [
+          st('Revenue', ui.money(P.revenue)),
+          st('COGS', ui.money(P.cogs)),
+          st('Gross Margin', ui.money(P.gross), P.gross >= 0 ? 'text-good' : 'text-bad'),
+          st('Operating Exp', ui.money(P.expenses)),
+          st(P.net >= 0 ? 'Net Profit' : 'Net Loss', ui.money(Math.abs(P.net)), P.net >= 0 ? 'text-good' : 'text-bad')
+        ]));
+      }
+      page.appendChild(el('div.card.mb-3', null, [
+        el('div.card-head', null, [
+          el('h3', { html: ui.icon('graph-up-arrow') + ' Product P&L — cost &amp; margin per sale' }),
+          el('span.card-sub', { text: 'straight from the books · all products' })
+        ]),
+        body
+      ]));
+    })();
+
     // trend + visa stage funnel
     var row = frag('two-col');
     row.appendChild(frag('trend-card'));
