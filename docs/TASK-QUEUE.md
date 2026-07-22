@@ -7,7 +7,55 @@
 
 ## ⏳ OPEN
 
-_(nothing open)_
+### T-BANKS — condense the Manage Banks overview/summary block (space utilization)
+**Reported:** 2026-07-22, screenshot of Master Accounts › Manage Banks › Group HQ.
+Owner: the KPI cards + breakdown chips + Bank↔Ledger Reconciliation card "take too
+much space for their little info." Asked for SUGGESTIONS first, then will decide.
+**Suggested (awaiting owner pick):** (1) slim KPI cards → existing `kpi-slim kpi-onerow`
+variant; (2) drop the "Scope: Group HQ" card → move to subtitle; (3) merge "Active 4"
+into "Accounts 4 (4 active)"; (4) side-by-side chips + reconciliation instead of
+stacked; (5) collapse reconciliation to one green line when clean (ledger=bank,
+float=0), expandable on discrepancy; (6) compact empty-state prompt when a company
+has no banks. Recommended: 1+2+3+5. Open question: Manage Banks only, or roll the
+condensing across all Master Accounts sections. **STATUS: awaiting owner decision.**
+
+---
+
+## 📊 REFERENCE-ADVANTAGE LIST (deep-enhance initiative — gaps vs epal_erp_soft)
+
+> Running list of where the reference ERP does MORE than ours, per section. Built by
+> screenshot→analyze→reference-compare. Apply additively (never delete our leads).
+> Section 1 of N: **Manage Journals** (analysed 2026-07-22).
+
+### Manage Journals — verified gaps (ranked)
+1. **[high·L] Per-line PARTY attribution** linked to real customer/supplier/agent/vendor
+   records. Ref: `journal_items.party_type/party_id` + morph relations. Ours: lines are
+   `{account,dr,cr}` only; entry-level party is a free-text string. Adopt: optional
+   `party {type,id,name}` per ledger line (additive) + searchable party select in the
+   opening/journal posters. Unlocks #2.
+2. **[high·M] Party Voucher** — per-party printable (party contact block, that party's
+   net, party signature line), distinct from the company JV. Depends on #1. Ours has only
+   the generic `journalVoucherPrint`.
+3. **[med-high·M] Edit/Delete manual journals from the desk**, strictly guarded to
+   `source==='manual'` (system/sale/opening/payroll/reversal stay immutable). Ours desk is
+   view+print only. Delete should post a reversal (reuse `EPAL.ledger.reverse`).
+4. **[low-med·S] "Created By" as a list column** — we already store `by`; just add the
+   column to the master `journalsView` table.
+5. **[med·L] Chart-of-Accounts hierarchy** (parent/child, system-account protection).
+   Ours COA is flat with a free-text `group`. Lower urgency (group already buckets TB).
+6. **[low-med·S] Reversal back-pointer + explicit "Reverse" button.** We stamp
+   `orig.reversedBy` but not `reversalOf` on the REV- entry, and there's no Reverse action
+   in the journals UI (only implicit on quick-entry delete).
+
+**OUR LEADS over the reference (do NOT regress/duplicate):** BD VAT/AIT tax cycle in
+journals + NBR deposit; group multi-company journals + consolidated TB with inter-company
+elimination; CSV/PDF export + live source-filtered totals; reversal-on-delete immutability;
+engine-enforced period locks; full N-line manual poster with live Dr=Cr guard.
+
+**Recommended apply order:** 1 → 2 → 3 → (4 & 6 quick polish) → 5. All additive; none touch
+the `ledger.post` balancing invariant. **STATUS: analysed, awaiting owner go-ahead to build.**
+
+---
 
 <details><summary>T5 — searchable account select ✅ DONE</summary>
 
