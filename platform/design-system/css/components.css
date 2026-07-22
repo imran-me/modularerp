@@ -548,20 +548,20 @@
 .bank-acct-grid .bank-card-top { padding: 5.2cqw 5.6cqw 0 6.4cqw; gap: 3.4cqw; }
 .bank-acct-grid .bank-card-ico { width: 14cqw; height: 14cqw; font-size: 6.4cqw; border-radius: 4.2cqw; }
 .bank-acct-grid .bank-card-ico::after { width: 4cqw; height: 4cqw; right: -1cqw; bottom: -1cqw; border-width: .9cqw; }
-.bank-acct-grid .bank-card-coico { width: 6.4cqw; height: 6.4cqw; font-size: 4cqw; left: -1.7cqw; top: -1.7cqw; }
-.bank-acct-grid .bank-card-name { font-size: 7cqw; }
-.bank-acct-grid .bank-card-sub { font-size: 4.7cqw; margin-top: .6cqw; }
-.bank-acct-grid .bank-card-status { font-size: 4.4cqw; padding: 1.2cqw 2.6cqw 1.2cqw 2.2cqw; gap: 1.4cqw; }
-.bank-acct-grid .bank-card-status::before { width: 2.6cqw; height: 2.6cqw; }
+.bank-acct-grid .bank-card-coico { width: 6.4cqw; height: 6.4cqw; font-size: 3.2cqw; left: -1.7cqw; top: -1.7cqw; }
+.bank-acct-grid .bank-card-name { font-size: 5.6cqw; }
+.bank-acct-grid .bank-card-sub { font-size: 3.8cqw; margin-top: .6cqw; }
+.bank-acct-grid .bank-card-status { font-size: 3.5cqw; padding: 1.2cqw 2.6cqw 1.2cqw 2.2cqw; gap: 1.4cqw; }
+.bank-acct-grid .bank-card-status::before { width: 2.4cqw; height: 2.4cqw; }
 .bank-acct-grid .bank-card-hero { padding: 4.4cqw 6.4cqw; }
-.bank-acct-grid .bank-card-caplabel { font-size: 4.5cqw; }
-.bank-acct-grid .bank-card-delta { font-size: 5.2cqw; padding: .6cqw 2.2cqw .6cqw 1.4cqw; }
-.bank-acct-grid .bank-card-bal { font-size: 12.6cqw; margin-top: 1.4cqw; }
-.bank-acct-grid .bank-card-acct { font-size: 4.7cqw; margin-top: 2.2cqw; }
+.bank-acct-grid .bank-card-caplabel { font-size: 3.6cqw; }
+.bank-acct-grid .bank-card-delta { font-size: 4.2cqw; padding: .6cqw 2.2cqw .6cqw 1.4cqw; }
+.bank-acct-grid .bank-card-bal { font-size: 10cqw; margin-top: 1.4cqw; }
+.bank-acct-grid .bank-card-acct { font-size: 3.8cqw; margin-top: 2.2cqw; }
 .bank-acct-grid .bank-card-foot { padding: 3.6cqw 6.4cqw 4cqw; gap: 3.4cqw; }
 .bank-acct-grid .bank-card-metric { gap: .8cqw; }
-.bank-acct-grid .bank-card-metric .k { font-size: 4.3cqw; letter-spacing: .1cqw; }
-.bank-acct-grid .bank-card-metric .v { font-size: 5.9cqw; }
+.bank-acct-grid .bank-card-metric .k { font-size: 3.4cqw; letter-spacing: .1cqw; }
+.bank-acct-grid .bank-card-metric .v { font-size: 4.7cqw; }
 
 /* --------------------- CATEGORISED EXPENSE ENTRY (Travels) ----------------
  * The guided expense capture: category cards (each pins a CoA head) → dependent
