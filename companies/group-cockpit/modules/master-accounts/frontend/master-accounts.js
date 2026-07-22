@@ -236,11 +236,36 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
   }
   function coCell(cid) { var c = EPAL.config.company(cid); return '<span class="badge"' + (c ? ' style="color:' + c.accent + '"' : '') + '>' + esc(coName(cid)) + '</span>'; }
 
+  /* MIGRATION (guarded, one-time): re-tag existing bank deposits / withdrawals
+   * to their BANK's company. Movements posted from the All-Companies view were
+   * booked to 'group' (the form default), so a deposit into an IT bank never
+   * showed on the IT tab's ledger / sparkline / reconciliation. Runs at render
+   * (NOT in the seed engine — seeds don't re-run on reload, and never run in
+   * API mode) so it repairs an already-populated store on the next page open.
+   * New deposits are booked correctly at the source; this fixes the old ones. */
+  function retagBankMovements() {
+    if (S.get('bank_txn_company_fix_v1', null)) return;
+    try {
+      var bankById = {}; db.col('banks').forEach(function (b) { bankById[b.id] = b; });
+      var txnByGl = {}; S.list('bank_txns').forEach(function (t) { if (t.glId) txnByGl[t.glId] = t; });
+      var reTag = 0;
+      S.list('gl_entries').forEach(function (e) {
+        if (e.source !== 'bank') return;
+        var t = txnByGl[e.id]; if (!t) return;
+        var bank = bankById[t.bankId]; if (!bank) return;
+        var want = bank.companyId || 'group';
+        if (e.companyId !== want) { e.companyId = want; S.upsert('gl_entries', e); reTag++; }
+      });
+      S.set('bank_txn_company_fix_v1', { reTagged: reTag });
+    } catch (x) {}
+  }
+
   /* ==========================================================================
    * VIEW
    * ========================================================================*/
   EPAL.view('group/master-accounts', {
     render: function (ctx) {
+      retagBankMovements();                            // one-time repair of mis-tagged deposits
       var sub = ctx.subId || 'banks';
       // legacy deep-links from the pre-consolidation layout land on the right tab
       if (sub === 'categories' || sub === 'budget' || sub === 'report') { expTab = sub; sub = 'expenses'; }
