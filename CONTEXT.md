@@ -130,9 +130,12 @@ rebuild now 14/18 (added marketing, contract-flight, hrm — all parity 8/8).
 
 **Session progress (2026-07-22):** step 1 COMPLETE — both Accounts modules on the
 modular frontend (Travels c38fad1, Master b9ad7ae), byte-identical parity, pushed.
-Travels rebuild now 15/18 (accounts done; remaining legacy: visa-processing,
-vendor-agent, air-ticketing). New-machine toolchain paths + headless git-push
-recipe saved to AI memory. Ready to begin step 2 (Manage Journals section first).
+Then **Travels rebuild finished 18/18** — visa-processing (10991eb), vendor-agent
+(e4f8bb9), air-ticketing (a9ffa28) all converted parity-verified & pushed. Whole
+Travels company now on the modular frontend. New-machine toolchain paths +
+headless git-push recipe saved to AI memory. **Step 2 (deep-enhance) UNDERWAY:**
+Manage Journals gap-analysis vs the reference ERP kicked off; findings land in
+`docs/TASK-QUEUE.md` as the running reference-advantage list.
 
 ---
 
