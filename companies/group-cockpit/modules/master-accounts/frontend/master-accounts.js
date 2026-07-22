@@ -1586,7 +1586,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
                   el('div.bank-summary-sub', { text: selCo === 'all' ? 'Group-wide banking summary' : 'Banking summary' })
                 ])
               ]),
-              el('div.bank-summary-hero', null, [
+              el('div.bank-summary-hero.clik', { title: 'View accounts', onclick: scrollAccts }, [
                 el('div.bank-summary-bal' + (total < 0 ? '.text-bad' : ''), { text: ui.money(total) }),
                 el('div.bank-summary-ballabel', { text: 'Total balance' })
               ])
@@ -1640,55 +1640,57 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         ])
       ]);
 
-      page.appendChild(el('div.bank-summary-row', null, [sumCard, compCard]));
-    })();
-    // per-company cards, like the production dashboard header. Respects the
-    // selected company: on a specific company only THAT company's card shows,
-    // not every sister concern (owner 2026-07-19).
-    (function () {
+      // ---- ASSEMBLE THE CARD ROW ---------------------------------------------
+      // Individual company (owner 2026-07-22) → ONE dashboard row of same-height
+      // cards: Main KPI · Cash Flow · Reconciliation · a right column of the
+      // company balance + Hard Cash. All Companies / Group HQ keep the classic
+      // layout (full per-company strip + full-width reconciliation) untouched.
+      var isGroupWide = (selCo === 'all' || selCo === 'group');
       var byCo = {};
       banks.forEach(function (b) { var k = b.companyId || 'group'; byCo[k] = byCo[k] || { total: 0, n: 0 }; byCo[k].total += +b.balance || 0; byCo[k].n++; });
-      var strip = el('div.flex.gap-2.flex-wrap.mb-2');
-      Object.keys(byCo).forEach(function (k) {
-        strip.appendChild(el('div.card', { style: { padding: '10px 14px', cursor: 'pointer', minWidth: '170px' }, onclick: function () { selCo = k; EPAL.router.render(); } }, [
+      function coCard(k) {
+        return el('div.card.bank-mini', { onclick: function () { selCo = k; EPAL.router.render(); } }, [
           el('div.fw-600.sm', { text: coName(k) }),
           el('div.strong.num' + (byCo[k].total < 0 ? '.text-bad' : ''), { text: ui.money(byCo[k].total) }),
           el('div.text-mute.xs', { text: byCo[k].n + ' account' + (byCo[k].n === 1 ? '' : 's') + ' · filter' })
-        ]));
-      });
-      // HARD CASH & CHEQUES doorway (owner mark 2026-07-15): cash lives with
-      // the banks, so its card rides in this same strip — click → Manage Cash.
-      if (EPAL.cashDesk) {
-        var cashBal = EPAL.ledger ? EPAL.ledger.balance('1000', selCo === 'all' ? {} : { companyId: selCo }) : 0;
-        strip.appendChild(el('div.card', { style: { padding: '10px 14px', cursor: 'pointer', minWidth: '170px' },
-          onclick: function () { EPAL.router.navigate('group/master-accounts/cash'); } }, [
-          el('div.fw-600.sm', { html: ui.icon('cash-stack') + ' Hard Cash · Cheques' }),
-          el('div.strong.num' + (cashBal < 0 ? '.text-bad' : ''), { text: ui.money(cashBal) }),
-          el('div.text-mute.xs', { text: 'drawer · petty · cheques → manage cash' })
-        ]));
+        ]);
       }
-      page.appendChild(strip);
-    })();
-    // ---- BANK ↔ LEDGER RECONCILIATION (permanent audit card, P1-②) ----------
-    (function () {
-      if (!EPAL.ledger) return;
-      var scope = selCo === 'all' ? {} : { companyId: selCo };
-      var gl = EPAL.ledger.balance('1000', scope) + EPAL.ledger.balance('1010', scope);
-      var delta = gl - total;
-      var ok = Math.abs(delta) < 1;
-      var bf = S.get('exp_gl_backfill_v1', null), op = S.get('bank_gl_open_v1', null);
-      page.appendChild(el('div.card.mb-2', null, [
-        el('div.card-head', null, [el('h3', { html: ui.icon('shield-check') + ' Bank ↔ Ledger Reconciliation' }),
-          el('span.badge' + (ok ? '.badge-good' : '.badge-warn'), { style: { marginLeft: 'auto' }, text: ok ? 'RECONCILED' : 'FLOAT ' + ui.money(Math.abs(delta)) })]),
-        el('div.card-body', null, [
-          el('div.stat-row', null, [
-            el('div.stat', null, [el('div.stat-label', { text: 'Ledger cash + bank (1000 + 1010)' }), el('div.stat-value.num', { text: ui.money(gl) })]),
-            el('div.stat', null, [el('div.stat-label', { text: 'Bank register total' }), el('div.stat-value.num', { text: ui.money(total) })]),
-            el('div.stat', null, [el('div.stat-label', { text: 'Unassigned cash float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) })])
-          ]),
-          el('p.text-mute.xs.mt-2', { text: 'Float = business cash in the books not yet held on any bank record (e.g. undeposited collections). Bank openings and the expense backfill are explicit journals (GL-OPBK-* · GL-MX-*)' + (op ? ' — ' + op.banks + ' bank openings ' + ui.money(op.amount) : '') + (bf ? ' · backfilled ' + bf.entries + ' expenses ' + ui.money(bf.amount) : '') + '.' })
-        ])
-      ]));
+      var cashBal = EPAL.ledger ? EPAL.ledger.balance('1000', scope) : 0;
+      var hardCashCard = EPAL.cashDesk ? el('div.card.bank-mini', { onclick: function () { EPAL.router.navigate('group/master-accounts/cash'); } }, [
+        el('div.fw-600.sm', { html: ui.icon('cash-stack') + ' Hard Cash · Cheques' }),
+        el('div.strong.num' + (cashBal < 0 ? '.text-bad' : ''), { text: ui.money(cashBal) }),
+        el('div.text-mute.xs', { text: 'drawer · petty · cheques → manage cash' })
+      ]) : null;
+
+      var reconCard = null;
+      if (EPAL.ledger) {
+        var delta = gl - total, ok = Math.abs(delta) < 1;
+        var bf = S.get('exp_gl_backfill_v1', null), op = S.get('bank_gl_open_v1', null);
+        reconCard = el('div.card.bank-recon-clik' + (isGroupWide ? '.mb-2' : '.bank-recon'), { title: 'Open the ledger', onclick: function () { EPAL.router.navigate('group/master-accounts/journals'); } }, [
+          el('div.card-head', null, [el('h3', { html: ui.icon('shield-check') + ' Bank ↔ Ledger Reconciliation' }),
+            el('span.badge' + (ok ? '.badge-good' : '.badge-warn'), { style: { marginLeft: 'auto' }, text: ok ? 'RECONCILED' : 'FLOAT ' + ui.money(Math.abs(delta)) })]),
+          el('div.card-body', null, [
+            el('div.stat-row', null, [
+              el('div.stat', null, [el('div.stat-label', { text: 'Ledger cash + bank (1000 + 1010)' }), el('div.stat-value.num', { text: ui.money(gl) })]),
+              el('div.stat', null, [el('div.stat-label', { text: 'Bank register total' }), el('div.stat-value.num', { text: ui.money(total) })]),
+              el('div.stat', null, [el('div.stat-label', { text: 'Unassigned cash float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) })])
+            ]),
+            el('p.text-mute.xs.mt-2', { text: 'Float = business cash in the books not yet held on any bank record (e.g. undeposited collections). Bank openings and the expense backfill are explicit journals (GL-OPBK-* · GL-MX-*)' + (op ? ' — ' + op.banks + ' bank openings ' + ui.money(op.amount) : '') + (bf ? ' · backfilled ' + bf.entries + ' expenses ' + ui.money(bf.amount) : '') + '.' })
+          ])
+        ]);
+      }
+
+      if (isGroupWide) {
+        page.appendChild(el('div.bank-summary-row', null, [sumCard, compCard]));
+        var strip = el('div.flex.gap-2.flex-wrap.mb-2');
+        Object.keys(byCo).forEach(function (k) { strip.appendChild(coCard(k)); });
+        if (hardCashCard) strip.appendChild(hardCashCard);
+        page.appendChild(strip);
+        if (reconCard) page.appendChild(reconCard);
+      } else {
+        var rightStack = el('div.bank-ministack', null, [coCard(selCo)].concat(hardCashCard ? [hardCashCard] : []));
+        page.appendChild(el('div.bank-cards-row', null, [sumCard, compCard, reconCard, rightStack].filter(Boolean)));
+      }
     })();
     if (canCreate()) {
       page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
