@@ -395,6 +395,11 @@
 .bank-summary-last-amt.in { color: var(--good); } .bank-summary-last-amt.out { color: var(--bad, #e0356e); }
 .bank-summary-last-date { font-size: 11px; color: var(--text-mute); font-weight: 600; white-space: nowrap; }
 .bank-summary-last-ref { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the transaction id reads as a clickable mono chip (owner 2026-07-22) */
+.txn-id-chip { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; letter-spacing: .2px; color: var(--bank-ink, var(--accent));
+  background: color-mix(in srgb, var(--bank-ink, var(--accent)) 11%, transparent); border: 1px solid color-mix(in srgb, var(--bank-ink, var(--accent)) 22%, transparent);
+  padding: 1px 6px; border-radius: 6px; margin-right: 3px; }
+.bank-summary-last:hover .txn-id-chip { background: color-mix(in srgb, var(--bank-ink, var(--accent)) 18%, transparent); }
 .bank-summary-last-oc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--text-mute); margin-top: 5px; }
 .bank-summary-last-oc b { color: var(--text-dim); font-weight: 700; }
 .bank-summary-empty { margin-top: 14px; padding-top: 13px; font-size: 11.5px; color: var(--text-mute);
@@ -496,7 +501,31 @@
    at 90–100% zoom, 5 at 80% (lower zoom = wider CSS viewport = one more column).
    auto-fit + a ~250px track makes the column count fall out of the width, so it
    holds the same ratio as the browser zooms. */
-.bank-acct-grid { grid-template-columns: repeat(auto-fit, minmax(218px, 1fr)); gap: 16px; }
+.bank-acct-grid { grid-template-columns: repeat(auto-fill, minmax(218px, 1fr)); gap: 16px; }
+.bank-acct-grid .bank-card { max-width: 340px; }   /* a lone card must not balloon to full width (would blow up the cqw scale) */
+/* PROPORTIONAL SCALING (owner 2026-07-22): each account card is a query
+   container and every dimension is expressed in cqw (% of the card's OWN
+   width), so width, height, spacing AND text all scale in one ratio. A narrower
+   card (5-per-row) is a smaller copy of a wider one (4-per-row) — same look,
+   just demoted/promoted in size. Calibrated to a ~250px base. */
+.bank-acct-grid .bank-card { container-type: inline-size; min-width: 0; overflow: hidden; }
+.bank-acct-grid .bank-card-top { padding: 6.8cqw 7.2cqw 0 8.4cqw; gap: 4.8cqw; }
+.bank-acct-grid .bank-card-ico { width: 16.8cqw; height: 16.8cqw; font-size: 7.2cqw; border-radius: 5.2cqw; }
+.bank-acct-grid .bank-card-ico::after { width: 4.8cqw; height: 4.8cqw; right: -1.2cqw; bottom: -1.2cqw; border-width: 1cqw; }
+.bank-acct-grid .bank-card-coico { width: 7.2cqw; height: 7.2cqw; font-size: 3.8cqw; left: -2cqw; top: -2cqw; }
+.bank-acct-grid .bank-card-name { font-size: 6cqw; }
+.bank-acct-grid .bank-card-sub { font-size: 4cqw; margin-top: .8cqw; }
+.bank-acct-grid .bank-card-status { font-size: 4cqw; padding: 1.6cqw 3.6cqw 1.6cqw 3.2cqw; gap: 2cqw; }
+.bank-acct-grid .bank-card-status::before { width: 2.4cqw; height: 2.4cqw; }
+.bank-acct-grid .bank-card-hero { padding: 6cqw 8.4cqw; }
+.bank-acct-grid .bank-card-caplabel { font-size: 3.8cqw; }
+.bank-acct-grid .bank-card-delta { font-size: 4.4cqw; padding: .8cqw 3.2cqw .8cqw 2cqw; }
+.bank-acct-grid .bank-card-bal { font-size: 10.8cqw; margin-top: 2cqw; }
+.bank-acct-grid .bank-card-acct { font-size: 4cqw; margin-top: 3.2cqw; }
+.bank-acct-grid .bank-card-foot { padding: 4.4cqw 8.4cqw 4.8cqw; gap: 4.8cqw; }
+.bank-acct-grid .bank-card-metric { gap: 1.2cqw; }
+.bank-acct-grid .bank-card-metric .k { font-size: 3.6cqw; letter-spacing: .2cqw; }
+.bank-acct-grid .bank-card-metric .v { font-size: 5cqw; }
 
 /* ---------------------------- SEARCHABLE COMBOBOX ------------------------
  * The type-to-filter select (forms.js makeCombobox). Reads as a normal input; a

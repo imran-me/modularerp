@@ -563,9 +563,11 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       title: isCr ? 'Credit Journal — Money In' : 'Debit Journal — Money Out', icon: isCr ? 'arrow-down-circle' : 'arrow-up-circle', size: 'md',
       record: { date: TODAY_STR, companyId: selCo === 'all' ? 'group' : selCo, bankId: presetBankId || banks[0].id },
       fields: [
-        { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
+        // Company field dropped (owner 2026-07-22): a bank movement always books
+        // to the BANK's own company, so it's redundant + a mis-tag risk. The
+        // bank picker now shows the company so it's clear where the money lands.
         { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
-        { key: 'bankId', label: 'Bank', type: 'select', required: true, options: banks.map(function (b) { return [b.id, b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; }) },
+        { key: 'bankId', label: (isCr ? 'Deposit into' : 'Withdraw from'), type: 'select', required: true, searchable: banks.length >= 8, options: banks.map(function (b) { return [b.id, coName(b.companyId || 'group') + ' — ' + b.name + ' (' + ui.money(b.balance, { compact: true }) + ')']; }) },
         { key: 'account', label: isCr ? 'Credit account' : 'Debit account', type: 'select', searchable: true, required: true, options: accts.map(function (a) { return [a.code, a.code + ' · ' + a.name]; }) },
         { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
         // AUDIT P3 (BD tax cycle): optional split — collected VAT rides to
@@ -1622,7 +1624,8 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           el('span.bank-summary-last-amt' + (ph ? '' : (isIn ? '.in' : '.out')), { text: (ph ? '' : (isIn ? '+' : '−')) + ui.money(ph ? 0 : Math.abs(net)) }),
           el('span.bank-summary-last-date', { text: (lastInfo && lastInfo.date) ? ui.date(lastInfo.date) : '—' })
         ]),
-        el('div.bank-summary-last-ref', { text: ph ? 'No transactions yet' : (lastInfo.id + (lastInfo.memo ? ' · ' + lastInfo.memo : '')) }),
+        ph ? el('div.bank-summary-last-ref', { text: 'No transactions yet' })
+           : el('div.bank-summary-last-ref', { html: '<span class="txn-id-chip">' + esc(lastInfo.id) + '</span>' + (lastInfo.memo ? ' ' + esc(lastInfo.memo) : '') }),
         el('div.bank-summary-last-oc', { html: 'Opening <b>' + esc(ui.money(ph ? 0 : lastInfo.opening)) + '</b> &nbsp;→&nbsp; Closing <b>' + esc(ui.money(ph ? 0 : lastInfo.closing)) + '</b>' })
       ]);
 
