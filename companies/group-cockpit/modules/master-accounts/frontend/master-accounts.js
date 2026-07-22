@@ -236,6 +236,42 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
   }
   function coCell(cid) { var c = EPAL.config.company(cid); return '<span class="badge"' + (c ? ' style="color:' + c.accent + '"' : '') + '>' + esc(coName(cid)) + '</span>'; }
 
+  // Reconciliation float explainer (owner 2026-07-22): opens the EXACT entries
+  // that make up the ledger cash+bank figure, so the float is self-explanatory.
+  function floatExplainer(scope, gl, total, delta) {
+    var rows = [];
+    if (EPAL.ledger && EPAL.ledger.entries) EPAL.ledger.entries(scope).forEach(function (e) {
+      var d = 0, c = 0;
+      (e.lines || []).forEach(function (l) { if (l.account === '1000' || l.account === '1010') { d += +l.dr || 0; c += +l.cr || 0; } });
+      if (d === 0 && c === 0) return;
+      rows.push({ id: e.id, date: e.date, memo: e.memo || '', source: e.source || '', net: d - c });
+    });
+    rows.sort(function (a, b) { return (a.date < b.date) ? 1 : -1; });
+    var tbl = EPAL.table({
+      columns: [
+        { key: 'date', label: 'Date', date: true },
+        { key: 'id', label: 'Entry', render: function (r) { return '<span class="mono xs text-mute">' + esc(r.id) + '</span>'; } },
+        { key: 'source', label: 'Source', badge: {} },
+        { key: 'memo', label: 'Description', render: function (r) { return esc(r.memo || '—'); } },
+        { key: 'net', label: 'Cash effect', num: true, sortVal: function (r) { return r.net; }, render: function (r) { return '<span class="num ' + (r.net >= 0 ? 'text-good' : 'text-bad') + '">' + (r.net >= 0 ? '+' : '−') + ui.money(Math.abs(r.net)) + '</span>'; } }
+      ],
+      rows: rows, pageSize: 12, searchKeys: ['id', 'memo', 'source'], dateKey: 'date', exportName: 'ledger-cash-movements.csv',
+      empty: { icon: 'journal', title: 'No cash/bank ledger movements' }
+    });
+    ui.modal({ title: 'Why is there a float?', icon: 'shield-check', size: 'lg', body: el('div', null, [
+      el('div.card.mb-2', null, [el('div.card-body', null, [
+        el('div.stat-row', null, [
+          el('div.stat', null, [el('div.stat-label', { text: 'Ledger cash + bank' }), el('div.stat-value.num', { text: ui.money(gl) })]),
+          el('div.stat', null, [el('div.stat-label', { text: 'Bank register total' }), el('div.stat-value.num', { text: ui.money(total) })]),
+          el('div.stat', null, [el('div.stat-label', { text: 'Float (difference)' }), el('div.stat-value.num.text-warn', { text: ui.money(delta) })])
+        ]),
+        el('p.text-mute.sm.mt-2', { text: 'The float is the ledger cash + bank position minus what the bank records actually hold — business cash in the books not yet sitting on a bank account (undeposited collections, or bank openings / expense backfills posted as journals). The entries below are every ledger movement that touches cash (1000) or bank (1010); together they make up the ledger figure above.' })
+      ])]),
+      el('div.section-label', { text: 'Ledger cash & bank movements (accounts 1000 + 1010)' }),
+      tbl.el
+    ]), actions: [{ label: 'Close', variant: 'ghost' }] });
+  }
+
   /* MIGRATION (guarded, one-time): re-tag existing bank deposits / withdrawals
    * to their BANK's company. Movements posted from the All-Companies view were
    * booked to 'group' (the form default), so a deposit into an IT bank never
@@ -1708,7 +1744,8 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
             el('div.stat-row', null, [
               el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Ledger cash + bank (1000 + 1010)' : 'Ledger (cash + bank)' }), el('div.stat-value.num', { text: ui.money(gl) })]),
               el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Bank register total' : 'Bank register' }), el('div.stat-value.num', { text: ui.money(total) })]),
-              el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Unassigned cash float' : 'Unassigned float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) })])
+              el('div.stat', null, [el('div.stat-label', { text: isGroupWide ? 'Unassigned cash float' : 'Unassigned float' }), el('div.stat-value.num' + (ok ? '' : '.text-warn'), { text: ui.money(delta) }),
+                (!ok ? el('button.float-why', { type: 'button', html: ui.icon('question-circle') + ' why?', onclick: function (ev) { ev.stopPropagation(); floatExplainer(scope, gl, total, delta); } }) : null)])
             ]),
             el('p.text-mute.xs.mt-2', { text: 'Float = business cash in the books not yet held on any bank record (e.g. undeposited collections). Bank openings and the expense backfill are explicit journals (GL-OPBK-* · GL-MX-*)' + (op ? ' — ' + op.banks + ' bank openings ' + ui.money(op.amount) : '') + (bf ? ' · backfilled ' + bf.entries + ' expenses ' + ui.money(bf.amount) : '') + '.' })
           ])
