@@ -1489,27 +1489,42 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       var icon = (coObj && coObj.icon) ? coObj.icon : (selCo === 'all' ? 'diagram-3' : 'bank2');
       var heading = selCo === 'all' ? 'All Companies' : coName(selCo);
       var gl = EPAL.ledger ? (EPAL.ledger.balance('1000', scope) + EPAL.ledger.balance('1010', scope)) : total;
+      var scopeIds = {}; banks.forEach(function (b) { scopeIds[b.id] = 1; });
 
-      // LAST TRANSACTION + MOVEMENTS count — both read the ledger (the
-      // authoritative cash record), so Movements matches what Last Transaction
-      // and the sparkline show (openings are ledger entries, not bank_txns).
-      // closing = current ledger cash+bank (matches the reconciliation card
-      // below); opening = closing − this entry's net.
-      var lastE = null, moveCount = 0;
+      // LAST TRANSACTION + MOVEMENTS — prefer the ledger (it carries a true
+      // running balance, so opening/closing are exact). But a bank added after
+      // the GL-opening backfill isn't mirrored to the ledger, so fall back to
+      // the bank register's own movements (then the bank's lastTxn stamp) — the
+      // card must show a real last movement whenever the account has money.
+      var lastE = null, ledgerN = 0;
       if (EPAL.ledger && EPAL.ledger.entries) {
         EPAL.ledger.entries(scope).forEach(function (e) {
           if (!e.date) return;
           if (!(e.lines || []).some(function (l) { return l.account === '1000' || l.account === '1010'; })) return;
-          moveCount++;
+          ledgerN++;
           if (!lastE || e.date >= lastE.date) lastE = e;   // array is chronological → later wins on date ties
         });
       }
+      var scopedTxns = S.list('bank_txns').filter(function (t) { return scopeIds[t.bankId]; });
+      var moveCount = ledgerN || scopedTxns.length;
       var lastInfo = null;
       if (lastE) {
         var dr = 0, cr = 0;
         (lastE.lines || []).forEach(function (l) { if (l.account === '1000' || l.account === '1010') { dr += +l.dr || 0; cr += +l.cr || 0; } });
         var net = dr - cr;
         lastInfo = { entry: lastE, id: lastE.ref || lastE.id, memo: lastE.memo || '', date: lastE.date, net: net, closing: gl, opening: gl - net };
+      } else {
+        var bt = null; scopedTxns.forEach(function (t) { if (t.date && (!bt || t.date >= bt.date)) bt = t; });
+        if (bt) {
+          var sg = (bt.type === 'deposit' || bt.type === 'transfer-in') ? (+bt.amount || 0) : -(+bt.amount || 0);
+          lastInfo = { entry: null, id: bt.ref || bt.id, memo: bt.desc || bt.type || '', date: bt.date, net: sg, closing: total, opening: total - sg };
+        } else {
+          var lb = null; banks.forEach(function (b) { if (b.lastTxnDate && (!lb || b.lastTxnDate >= lb.lastTxnDate)) lb = b; });
+          if (lb) {
+            var s2 = (lb.lastTxnType === 'credit') ? (+lb.lastTxnAmount || 0) : -(+lb.lastTxnAmount || 0);
+            lastInfo = { entry: null, id: lb.name, memo: 'Last movement', date: lb.lastTxnDate, net: s2, closing: total, opening: total - s2 };
+          }
+        }
       }
 
       function scrollAccts() { var a = document.getElementById('bank-accounts-anchor'); if (a) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
@@ -1527,7 +1542,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       var lastBlock;
       if (lastInfo) {
         var isIn = lastInfo.net >= 0;
-        lastBlock = el('div.bank-summary-last', { title: 'Open this transaction', onclick: function () { if (typeof journalDetail === 'function') journalDetail(lastInfo.entry); else EPAL.router.navigate('group/master-accounts/journals'); } }, [
+        lastBlock = el('div.bank-summary-last', { title: 'Open this transaction', onclick: function () { if (lastInfo.entry && typeof journalDetail === 'function') journalDetail(lastInfo.entry); else EPAL.router.navigate('group/master-accounts/journals'); } }, [
           el('div.bank-summary-last-top', null, [
             el('span.bank-summary-last-lbl', { text: 'Last transaction' }),
             el('span.bank-summary-dir.' + (isIn ? 'in' : 'out'), { text: isIn ? 'IN' : 'OUT' })
@@ -1588,16 +1603,20 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
         '<line x1="0" y1="' + mid + '" x2="' + W + '" y2="' + mid + '" stroke="currentColor" stroke-opacity="0.13" stroke-width="1"/>' + bars + '</svg>';
       var netFlow = totIn - totOut, hasFlow = totIn > 0 || totOut > 0;
+      // Always render the sparkline + In/Out totals (owner 2026-07-22: "you can
+      // still show 0 there so I can have an idea of the look") — with no data
+      // it's a flat baseline and ৳0 / ৳0, so the card's design still reads.
+      var netStr = (netFlow > 0 ? '+' : netFlow < 0 ? '−' : '') + ui.money(Math.abs(netFlow));
       var compCard = el('div.bank-flow', null, [
         el('div.bank-flow-head', null, [
-          el('div', null, [el('div.bank-flow-title', { text: 'Cash Flow' }), el('div.bank-flow-sub', { text: 'last 30 days · money in vs out' })]),
-          hasFlow ? el('span.bank-flow-net.' + (netFlow >= 0 ? 'is-up' : 'is-down'), { text: (netFlow >= 0 ? '+' : '−') + ui.money(Math.abs(netFlow)) }) : null
+          el('div', null, [el('div.bank-flow-title', { text: 'Cash Flow' }), el('div.bank-flow-sub', { text: 'last 30 days · money in vs out' + (hasFlow ? '' : ' · no activity yet') })]),
+          el('span.bank-flow-net.' + (netFlow >= 0 ? 'is-up' : 'is-down'), { text: netStr })
         ]),
-        hasFlow ? el('div.bank-flow-spark', { html: svg }) : el('div.bank-flow-empty', { text: 'No cash movement in the last 30 days.' }),
-        hasFlow ? el('div.bank-flow-foot', null, [
+        el('div.bank-flow-spark', { html: svg }),
+        el('div.bank-flow-foot', null, [
           el('span', { html: '<span class="bank-flow-dot in"></span> In ' + esc(ui.money(totIn)) }),
           el('span', { html: '<span class="bank-flow-dot out"></span> Out ' + esc(ui.money(totOut)) })
-        ]) : null
+        ])
       ]);
 
       page.appendChild(el('div.bank-summary-row', null, [sumCard, compCard]));

@@ -332,7 +332,7 @@
  * --bank-hue is set per-render in JS via style.setProperty (custom props can't
  * be set through el()'s style object). */
 .bank-summary { --bank-hue: var(--accent); --bank-ink: color-mix(in srgb, var(--bank-hue) 64%, #7c828c);
-  position: relative; overflow: hidden; border-radius: 16px; max-width: 468px; margin-bottom: 14px; border: 1px solid var(--border);
+  position: relative; overflow: hidden; border-radius: 16px; max-width: 500px; margin-bottom: 14px; border: 1px solid var(--border);
   background: radial-gradient(130% 100% at 100% 0%, color-mix(in srgb, var(--bank-ink) 10%, transparent), transparent 58%), var(--surface);
   box-shadow: 0 1px 2px rgba(7, 12, 30, .06), 0 6px 18px -9px rgba(7, 12, 30, .12);
   transition: transform .28s cubic-bezier(.2, .7, .2, 1), box-shadow .28s cubic-bezier(.2, .7, .2, 1), border-color .2s; }
@@ -360,13 +360,13 @@
 .bank-summary-ballabel { font-size: 9.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--text-mute); margin-top: 5px; }
 /* 3-KPI row — the dividers are soft black "shadow-like" hairlines (owner
    2026-07-22: the red guide lines become black shadows), not flat borders. */
-.bank-summary-facts { display: flex; margin-top: 15px; padding-top: 14px;
+.bank-summary-facts { display: flex; margin-top: 13px; padding-top: 12px;
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), inset 0 3px 4px -3px color-mix(in srgb, var(--text) 14%, transparent); }
-.bank-summary-fact { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 3px 14px; position: relative; border-radius: 9px; transition: background .15s; }
-.bank-summary-fact:first-child { padding-left: 0; }
+.bank-summary-fact { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 3px 10px; position: relative; border-radius: 9px; transition: background .15s; }
+.bank-summary-fact:first-child { padding-left: 2px; }
 .bank-summary-fact + .bank-summary-fact::before { content: ''; position: absolute; left: 0; top: 14%; bottom: 14%; width: 1px;
   background: color-mix(in srgb, var(--text) 10%, transparent); box-shadow: 1px 0 0 color-mix(in srgb, #fff 55%, transparent); }
-.bank-summary-fact .k { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-mute); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bank-summary-fact .k { font-size: 8.5px; text-transform: uppercase; letter-spacing: .2px; color: var(--text-mute); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* ~30% larger count than before (was 14px) — owner ask */
 .bank-summary-fact .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18.5px; font-weight: 700; line-height: 1; color: var(--text); }
 .bank-summary-fact.clik { cursor: pointer; }
@@ -375,7 +375,7 @@
 
 /* LAST TRANSACTION mini-statement — id · amount+date · opening → closing.
    Clickable (opens the transaction). Same soft-shadow divider above it. */
-.bank-summary-last { margin-top: 14px; padding-top: 13px; cursor: pointer; border-radius: 10px; padding-left: 2px; padding-right: 6px;
+.bank-summary-last { margin-top: 12px; padding-top: 11px; cursor: pointer; border-radius: 10px; padding-left: 2px; padding-right: 6px;
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent), inset 0 3px 4px -3px color-mix(in srgb, var(--text) 14%, transparent); transition: background .15s; }
 .bank-summary-last:hover { background: color-mix(in srgb, var(--bank-ink) 8%, transparent); }
 .bank-summary-last-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -383,12 +383,12 @@
 .bank-summary-dir { font-size: 9.5px; font-weight: 800; letter-spacing: .4px; padding: 2px 8px; border-radius: 999px; }
 .bank-summary-dir.in { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
 .bank-summary-dir.out { color: var(--bad, #e0356e); background: color-mix(in srgb, var(--bad, #e0356e) 14%, transparent); }
-.bank-summary-last-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 7px; }
+.bank-summary-last-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 5px; }
 .bank-summary-last-amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 700; color: var(--text); }
 .bank-summary-last-amt.in { color: var(--good); } .bank-summary-last-amt.out { color: var(--bad, #e0356e); }
 .bank-summary-last-date { font-size: 11px; color: var(--text-mute); font-weight: 600; white-space: nowrap; }
-.bank-summary-last-ref { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bank-summary-last-oc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--text-mute); margin-top: 7px; }
+.bank-summary-last-ref { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bank-summary-last-oc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--text-mute); margin-top: 5px; }
 .bank-summary-last-oc b { color: var(--text-dim); font-weight: 700; }
 .bank-summary-empty { margin-top: 14px; padding-top: 13px; font-size: 11.5px; color: var(--text-mute);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 7%, transparent); }
@@ -400,7 +400,7 @@
  * height. A 30-day mirrored in/out sparkline (green up = money in, red down =
  * money out) with In/Out totals + a net chip. */
 .bank-summary-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: stretch; margin-bottom: 14px; }
-.bank-summary-row .bank-summary { margin-bottom: 0; }
+.bank-summary-row .bank-summary { margin-bottom: 0; flex: 0 0 auto; width: 100%; max-width: 500px; }
 .bank-flow { flex: 1; min-width: 300px; position: relative; overflow: hidden; border-radius: 16px; border: 1px solid var(--border); background: var(--surface);
   box-shadow: 0 1px 2px rgba(7, 12, 30, .06), 0 6px 18px -9px rgba(7, 12, 30, .12); padding: 18px 20px; display: flex; flex-direction: column; }
 .bank-flow-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
