@@ -27,25 +27,34 @@ class BankTxnController
 {
     use ScopesToCompany;
 
-    private function ensureTable(): void
+    /** True if the log table is available. NEVER throws — shared hosting denies
+     *  DDL ("Operation not permitted"), and a raised QueryException here caused a
+     *  save-fail → re-render loop on the client. If the table can't be created,
+     *  we report unavailable and the caller returns an empty/soft result. */
+    private function ensureTable(): bool
     {
-        if (Schema::hasTable('bank_transactions')) {
-            return;
+        try {
+            if (Schema::hasTable('bank_transactions')) {
+                return true;
+            }
+            Schema::create('bank_transactions', function ($t) {
+                $t->id();
+                $t->string('client_id', 40)->nullable()->index();
+                $t->string('bank_ref', 64)->nullable()->index();   // the frontend bank id
+                $t->string('bank_name', 255)->nullable();
+                $t->string('type', 30);
+                $t->decimal('amount', 15, 2)->default(0);
+                $t->date('date')->nullable();
+                $t->string('reference', 255)->nullable();
+                $t->text('description')->nullable();
+                $t->string('gl_id', 64)->nullable();
+                $t->softDeletes();
+                $t->timestamps();
+            });
+            return true;
+        } catch (\Throwable $e) {
+            return false;   // DDL denied on this host — log stays browser-side until provisioned
         }
-        Schema::create('bank_transactions', function ($t) {
-            $t->id();
-            $t->string('client_id', 40)->nullable()->index();
-            $t->string('bank_ref', 64)->nullable()->index();   // the frontend bank id
-            $t->string('bank_name', 255)->nullable();
-            $t->string('type', 30);
-            $t->decimal('amount', 15, 2)->default(0);
-            $t->date('date')->nullable();
-            $t->string('reference', 255)->nullable();
-            $t->text('description')->nullable();
-            $t->string('gl_id', 64)->nullable();
-            $t->softDeletes();
-            $t->timestamps();
-        });
     }
 
     private function shape($r): array
@@ -65,7 +74,9 @@ class BankTxnController
 
     public function index(Request $request): JsonResponse
     {
-        $this->ensureTable();
+        if (! $this->ensureTable()) {
+            return response()->json(['success' => true, 'count' => 0, 'data' => []]);
+        }
         $rows = DB::table('bank_transactions')->whereNull('deleted_at')
             ->orderBy('date')->orderBy('id')->get();
         $data = $rows->map(fn ($r) => $this->shape($r))->values();
@@ -75,7 +86,11 @@ class BankTxnController
 
     public function store(Request $request): JsonResponse
     {
-        $this->ensureTable();
+        if (! $this->ensureTable()) {
+            // table not provisioned on this host — accept softly (no data => the
+            // client keeps its optimistic row, no rollback, no error toast/loop)
+            return response()->json(['success' => true]);
+        }
         $v = $request->all();
         $clientId = trim((string) ($v['id'] ?? ''));
         $now = now();

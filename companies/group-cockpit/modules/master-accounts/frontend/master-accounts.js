@@ -279,6 +279,11 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
    * (NOT in the seed engine — seeds don't re-run on reload, and never run in
    * API mode) so it repairs an already-populated store on the next page open.
    * New deposits are booked correctly at the source; this fixes the old ones. */
+  // Run the render-time repairs ONCE per page load, never on every render — a
+  // write they emit can fail (API rejects), and wireWrites re-renders on failure,
+  // which would re-run the repair → re-post → infinite re-render loop (the
+  // "blinking" + toast flood). This latch breaks that feedback cycle.
+  var bankRepairsRan = false;
   function retagBankMovements() {
     if (S.get('bank_txn_company_fix_v1', null)) return;
     try {
@@ -332,8 +337,10 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
    * ========================================================================*/
   EPAL.view('group/master-accounts', {
     render: function (ctx) {
-      retagBankMovements();                            // one-time repair of mis-tagged deposits
-      backfillBankOpenings();                          // opening balances become real, visible, reconciled events
+      if (!bankRepairsRan) {                           // ONCE per page load — never on a re-render (avoids the write-fail → re-render loop)
+        bankRepairsRan = true;
+        try { retagBankMovements(); backfillBankOpenings(); } catch (e) {}
+      }
       var sub = ctx.subId || 'banks';
       // legacy deep-links from the pre-consolidation layout land on the right tab
       if (sub === 'categories' || sub === 'budget' || sub === 'report') { expTab = sub; sub = 'expenses'; }

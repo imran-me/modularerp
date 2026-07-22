@@ -44,7 +44,9 @@
     coa:           'group/master-accounts/accounts',
     banks:         'group/master-accounts/banks',
     gl_entries:    'group/master-accounts/journals',
-    bank_txns:     'group/master-accounts/bank-transactions',
+    // bank_txns is NOT hydrated: its endpoint CREATEs its table on first use, and
+    // the live (shared) DB denies DDL ("Operation not permitted"). Kept out until
+    // the table is provisioned server-side (see BankTxnController).
     customers:     'group/master-accounts/customers',
     suppliers:     'group/master-accounts/suppliers',
     acc_schedules: 'group/master-accounts/schedules',
@@ -66,10 +68,10 @@
     // persist to the DB (JournalController::store) — idempotent by client id,
     // so transactions survive a reload instead of living only in the browser.
     gl_entries: 'group/master-accounts/journals',
-    // The bank movement log behind "Recent Bank Transactions" — persisted so the
-    // deposit shows there too, on reload and on every device (self-contained
-    // table via BankTxnController). Written through db.save('bank_txns', …).
-    bank_txns: 'group/master-accounts/bank-transactions',
+    // bank_txns intentionally NOT writable yet — its endpoint needs to CREATE its
+    // table, which the shared live DB rejects (DDL denied → "Operation not
+    // permitted"), and the failed write + wireWrites re-render caused a reload
+    // loop. Re-enable once bank_transactions is provisioned server-side.
     customers: 'group/master-accounts/customers',
     suppliers: 'group/master-accounts/suppliers',
     banks:     'group/master-accounts/banks',
