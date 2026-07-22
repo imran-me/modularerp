@@ -61,6 +61,24 @@ var INCOME_HEADS = ['Air Ticket', 'Visa Service', 'Package Tour', 'Umrah / Hajj'
   'Insurance', 'Service Charge', 'Commission', 'Other Income'];
 var EXPENSE_HEADS = ['Office Rent', 'Staff Salary', 'Utilities', 'Marketing', 'Airline / GSA Payment',
   'Bank Charge', 'ADM / Penalty', 'Travel & Conveyance', 'Printing & Stationery', 'Software / GDS', 'Other Expense'];
+
+// Standard operating-expense taxonomy for the categorised expense entry
+// (owner 2026-07-22, see docs/ACCOUNTING-PLAN-TRAVELS.md §5). Each category
+// pins the CoA head the journal debits, so posting is always correct regardless
+// of wording; `shared` flags a cost that is normally split across concerns
+// (rent, subscriptions) → Group Finance › Allocate Costs.
+var TV_EXPENSE_CATS = [
+  { key: 'staff-pay',   name: 'Staff · Salary & Wages', icon: 'people-fill',        head: '5100', tone: '#1A43BF', subs: ['Salary', 'Wages', 'Overtime', 'Bonus', 'Festival Bonus'] },
+  { key: 'staff-welf',  name: 'Staff · Welfare',        icon: 'cup-hot-fill',       head: '5550', tone: '#0A9396', subs: ['Staff Lunch', 'Snacks', 'Tea & Coffee'] },
+  { key: 'rent',        name: 'Office Rent',            icon: 'building-fill',       head: '5200', tone: '#8338EC', subs: ['Office Rent'], shared: true },
+  { key: 'utilities',   name: 'Utilities & Internet',   icon: 'lightning-charge-fill', head: '5300', tone: '#F4A261', subs: ['Electricity', 'Water', 'Gas', 'Internet', 'Phone'] },
+  { key: 'office',      name: 'Office & Admin',         icon: 'printer-fill',        head: '5500', tone: '#3A5A96', subs: ['Office Supplies', 'Stationery', 'Printing', 'Cleaning', 'Housekeeping', 'Security', 'Repair & Maintenance', 'Software / Dev'] },
+  { key: 'marketing',   name: 'Marketing',              icon: 'megaphone-fill',      head: '5400', tone: '#E76F51', subs: ['Facebook / Google Ads', 'Boosting', 'Design', 'Print / SMS', 'Subscriptions (AI / SaaS)'], sharedSubs: ['Subscriptions (AI / SaaS)'] },
+  { key: 'guest',       name: 'Guest & Entertainment',  icon: 'gift-fill',           head: '5550', tone: '#D62828', subs: ['Guest Nasta', 'Client Entertainment', 'Tea / Coffee (Guest)', 'Events', 'Occasions', 'Refreshments'] },
+  { key: 'conveyance',  name: 'Conveyance & Travel',    icon: 'truck',               head: '5600', tone: '#457B9D', subs: ['Local Transport', 'Fuel', 'TA / DA', 'Courier'] },
+  { key: 'fees',        name: 'Fees & Charges',         icon: 'receipt',             head: '6000', tone: '#6C757D', subs: ['Bank Charge', 'Trade License', 'IATA / GDS Fee', 'Software License'] },
+  { key: 'cogs',        name: 'Direct Cost (COGS)',     icon: 'cart-dash-fill',      head: '5000', tone: '#2A9D8F', subs: ['Air Ticket Cost', 'Visa Cost', 'Contract Flight Cost', 'Contract File Cost'] }
+];
 var SCHEDULE_KINDS = ['Payable', 'Receivable'];
 var SCHEDULE_STATUS = ['Pending', 'Partial', 'Paid'];
 
@@ -158,7 +176,9 @@ EPAL.view('travels/accounts', {
       eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
       icon: 'cash-stack', title: titles[sub], sub: subs[sub],
       actions: [
-        canCreate() && ['overview', 'income', 'expenses'].indexOf(sub) >= 0
+        canCreate() && sub === 'expenses'
+          ? el('button.btn.btn-primary', { html: ui.icon('wallet2') + ' New Expense', onclick: function () { expenseEntry(); } }) : null,
+        canCreate() && ['overview', 'income'].indexOf(sub) >= 0
           ? el('button.btn.btn-ghost', { html: ui.icon('journal-plus') + ' New Entry', onclick: function () { entryForm(null); } }) : null,
         canCreate() && sub === 'schedules'
           ? el('button.btn.btn-ghost', { html: ui.icon('calendar2-plus') + ' New Schedule', onclick: function () { scheduleForm(null); } }) : null,
@@ -509,6 +529,102 @@ function glFor(e) {
 }
 
 /* ---- rich add / edit entry form ---------------------------------------*/
+/* ---- CATEGORISED EXPENSE ENTRY (owner 2026-07-22) ------------------------
+ * A guided, standard operating-expense capture: pick a Category (which pins the
+ * CoA head the journal debits), pick or type a Sub-category, enter the amount +
+ * how it was paid — and it posts a balanced double-entry (DR the head / CR
+ * cash|bank) to the ledger, so it shows in the register, journals, P&L and the
+ * Group books at once. A live journal preview shows the posting before you save.
+ * ==> LARAVEL: an ExpenseController@store that writes the same acc_entries + GL. */
+function expenseEntry() {
+  var sel = { cat: null, sub: '' };
+  var body = el('div.tv-exp-entry');
+  var m = ui.modal({ title: 'Record Expense · Epal Travels', icon: 'wallet2', size: 'lg', body: body, footer: false });
+
+  body.appendChild(el('div.section-label.mt-0', { text: '1 · Category' }));
+  var grid = el('div.tv-exp-cats');
+  var subHost = el('div.tv-exp-subhost');
+  var catBtns = {};
+  TV_EXPENSE_CATS.forEach(function (c) {
+    var b = el('button.tv-exp-cat', { type: 'button', title: 'Posts to account ' + c.head, onclick: function () { pickCat(c); } }, [
+      el('span.tv-exp-cat-ico', { html: ui.icon(c.icon) }),
+      el('span.tv-exp-cat-name', { text: c.name }),
+      el('span.tv-exp-cat-head', { text: c.head })
+    ]);
+    b.style.setProperty('--exp-tone', c.tone);
+    catBtns[c.key] = b; grid.appendChild(b);
+  });
+  body.appendChild(grid);
+  body.appendChild(subHost);
+
+  var details = EPAL.form([
+    { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
+    { key: 'method', label: 'Paid from / method', type: 'select', options: METHODS, default: 'Bank', required: true },
+    { key: 'party', label: 'Paid to (vendor / staff)', type: 'text', placeholder: 'e.g. Landlord, ISP, staff name' },
+    { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
+    { key: 'ref', label: 'Bill / voucher no', type: 'text', placeholder: 'e.g. BR-118' },
+    { key: 'desc', label: 'Notes', type: 'textarea', col2: true, placeholder: 'What is this expense for?' }
+  ], { date: TODAY_STR, method: 'Bank' });
+
+  var live = el('div.tv-exp-live');
+  var save = el('button.btn.btn-primary', { html: ui.icon('check2-circle') + ' Record Expense', onclick: doSave });
+
+  function pickCat(c) {
+    sel.cat = c; sel.sub = '';
+    Object.keys(catBtns).forEach(function (k) { catBtns[k].classList.toggle('sel', k === c.key); });
+    subHost.innerHTML = '';
+    subHost.appendChild(el('div.section-label', { text: '2 · Sub-category' }));
+    var chips = el('div.tv-exp-subs');
+    var subInput;
+    c.subs.forEach(function (s) {
+      var chip = el('button.tv-exp-sub', { type: 'button', onclick: function () {
+        sel.sub = s; Array.prototype.forEach.call(chips.children, function (x) { x.classList.remove('sel'); }); chip.classList.add('sel');
+        if (subInput) subInput.value = ''; refreshLive();
+      } }, [ el('span', { text: s }), (c.sharedSubs && c.sharedSubs.indexOf(s) >= 0) ? el('span.tv-exp-shared', { text: 'shared' }) : null ]);
+      chips.appendChild(chip);
+    });
+    subHost.appendChild(chips);
+    subInput = el('input.input.mt-2', { type: 'text', placeholder: '…or type a custom sub-category',
+      oninput: function () { sel.sub = this.value; Array.prototype.forEach.call(chips.children, function (x) { x.classList.remove('sel'); }); refreshLive(); } });
+    subHost.appendChild(subInput);
+    if (c.shared) subHost.appendChild(el('div.tv-exp-note', { html: ui.icon('diagram-3') + ' <b>Shared cost.</b> Record it here, then split it across concerns in <a class="text-accent" href="#/group/finance">Group Finance › Allocate Costs</a>.' }));
+    refreshLive();
+  }
+
+  function refreshLive() {
+    if (!sel.cat) { live.innerHTML = ''; return; }
+    var v = details.values(); var amt = +v.amount || 0;
+    var pay = (v.method === 'Cash') ? '1000 Cash' : '1010 Bank';
+    live.innerHTML = '';
+    live.appendChild(el('div.tv-exp-live-t', { html: ui.icon('journal-text') + ' Journal preview' }));
+    live.appendChild(el('div.tv-exp-live-l', { html: '<span>DR ' + sel.cat.head + ' · ' + esc(sel.cat.name) + (sel.sub ? ' <span class="text-mute">(' + esc(sel.sub) + ')</span>' : '') + '</span><span class="num">' + ui.money(amt) + '</span>' }));
+    live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR ' + pay + '</span><span class="num">' + ui.money(amt) + '</span>' }));
+  }
+
+  body.appendChild(el('div.section-label', { text: '3 · Details' }));
+  body.appendChild(details.el);
+  details.el.addEventListener('input', refreshLive);
+  details.el.addEventListener('change', refreshLive);
+  body.appendChild(live);
+  body.appendChild(el('div.flex.justify-end.gap-2.mt-3', null, [
+    el('button.btn.btn-ghost', { text: 'Cancel', onclick: function () { m.close(); } }), save
+  ]));
+
+  function doSave() {
+    if (!sel.cat) { ui.toast('Pick a category first', 'error'); return; }
+    if (!details.validate()) { ui.toast('Enter the amount', 'error'); return; }
+    var v = details.values(); var amt = +v.amount || 0;
+    if (amt <= 0) { ui.toast('Enter a valid amount', 'error'); return; }
+    var r = { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: CID, created: TODAY_STR, kind: 'Expense',
+      amount: amt, category: sel.cat.name, subCategory: sel.sub || '', head: sel.cat.head, method: v.method,
+      date: v.date || TODAY_STR, party: v.party || '', ref: v.ref || '', desc: v.desc || '' };
+    db.save('acc_entries', r);
+    mirrorToLedger(r);
+    ui.toast('Expense recorded & posted to ' + sel.cat.head + ' · ' + sel.cat.name, 'success');
+    m.close(); EPAL.router.render();
+  }
+}
+
 function entryForm(rec) {
   var isNew = !rec;
   var kind = (rec && rec.kind) || 'Expense';
@@ -574,9 +690,12 @@ function printEntry(e) {
 function mirrorToLedger(rec) {
   if (!EPAL.ledger || !EPAL.ledger.post) return;
   var amt = +rec.amount || 0; if (amt <= 0) return;
+  // the categorised entry pins the CoA head (rec.head); otherwise fall back to
+  // the keyword mapper. Cash method credits 1000, everything else the 1010 bank.
+  var payAcct = rec.method === 'Cash' ? '1000' : '1010';
   var lines = rec.kind === 'Income'
-    ? [ { account: '1010', dr: amt, cr: 0 }, { account: '4000', dr: 0, cr: amt } ]
-    : [ { account: expenseAccountFor(rec.category), dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt } ];
+    ? [ { account: payAcct, dr: amt, cr: 0 }, { account: '4000', dr: 0, cr: amt } ]
+    : [ { account: rec.head || expenseAccountFor(rec.category), dr: amt, cr: 0 }, { account: payAcct, dr: 0, cr: amt } ];
   try {
     EPAL.ledger.post({ id: 'GL-ACC-' + rec.id, date: rec.date, companyId: CID, ref: rec.id,
       memo: rec.desc || rec.category || (rec.kind + ' entry'), source: 'manual', party: rec.party || '', lines: lines });
