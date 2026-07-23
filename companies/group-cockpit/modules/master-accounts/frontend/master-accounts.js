@@ -94,8 +94,8 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         var glIds = {};
         (EPAL.ledger.entries({}) || []).forEach(function (g) { glIds[g.id] = 1; });
         var bfN = 0, bfAmt = 0;
-        db.col('acc_entries').filter(function (e) { return e.kind === 'Expense'; }).forEach(function (e) {
-          var gid = 'GL-MX-' + e.id;
+        db.col('acc_entries').filter(function (e) { return e.kind === 'Expense' && !e.alloc; }).forEach(function (e) {
+          var gid = 'GL-MX-' + e.id;   // `alloc` rows are shared-cost shares already posted as inter-company legs — never mirror them (would double the expense)
           if (glIds[gid] || !(+e.amount > 0)) return;
           try {
             EPAL.ledger.post({ id: gid, date: e.date, companyId: e.companyId || 'group', ref: e.ref || e.id,
@@ -474,7 +474,10 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       kpi('Entries', String(list.length), 'card-list'),
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
-    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Expense', onclick: function () { expenseForm(null); } })]));
+    if (canCreate()) page.appendChild(el('div.flex.gap-2.mb-2', null, [
+      el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Expense', onclick: function () { expenseForm(null); } }),
+      el('button.btn.btn-outline', { html: ui.icon('diagram-3') + ' Shared Cost', title: 'Enter a shared cost (rent, subscriptions) once and split it equally across concerns', onclick: function () { sharedExpenseForm(); } })
+    ]));
     var cols = [
       { key: 'date', label: 'Date', date: true },
       { key: 'category', label: 'Category', badge: {} },
@@ -532,6 +535,123 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         ui.toast('Expense recorded', 'success'); EPAL.router.render(); return true;
       }
     });
+  }
+
+  /* SHARED COST — enter a shared cost ONCE at Group HQ and split it EQUALLY
+   * across the concerns (owner decision 2026-07-22: rent / AI subscriptions are
+   * shared; "rent 1 lac paid by group, but in the ledger group gets its partial,
+   * travel gets its partial"). ONE-STEP double-entry via the inter-company
+   * control accounts (1300 Rcv / 2400 Payable) so it eliminates on consolidation
+   * and each concern's P&L carries only its share:
+   *   Payer  (pays full):  DR <head> payerShare · DR 1300 (Σ other shares) · CR 1000|1010 full
+   *   Concern (per other): DR <head> share · CR 2400 share
+   * Also writes a per-concern acc_entries row (flagged `alloc` so the exp→GL
+   * mirror skips it) so each concern's expense register shows its share. */
+  function sharedExpenseForm() {
+    var parts = [{ id: 'group', name: 'Group HQ', on: true }].concat(comps().map(function (c) { return { id: c.id, name: c.short, on: true }; }));
+    var catOpts = cats().filter(function (c) { return c.active !== false; }).map(function (c) { return c.name; });
+    var body = el('div.ma-shr');
+    var m = ui.modal({ title: 'Shared Cost · split equally across concerns', icon: 'diagram-3', size: 'lg', body: body, footer: false });
+
+    var details = EPAL.form([
+      { key: 'category', label: 'Expense head', type: 'select', required: true, options: catOpts },
+      { key: 'amount', label: 'Total amount (৳)', type: 'money', required: true, min: 1 },
+      { key: 'paidBy', label: 'Paid by', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })), default: 'group' },
+      { key: 'method', label: 'Paid from / method', type: 'select', options: METHODS, default: 'Bank', required: true },
+      { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
+      { key: 'ref', label: 'Bill / voucher no', type: 'text', placeholder: 'e.g. RENT-07' },
+      { key: 'desc', label: 'Notes', type: 'textarea', col2: true, placeholder: 'e.g. July office rent · AI subscriptions' }
+    ], { date: TODAY_STR, method: 'Bank', paidBy: 'group' });
+
+    body.appendChild(el('div.section-label.mt-0', { text: '1 · Cost details' }));
+    body.appendChild(details.el);
+    body.appendChild(el('div.section-label', { text: '2 · Concerns sharing this cost' }));
+    var chips = el('div.flex.gap-1.flex-wrap.mb-2');
+    parts.forEach(function (p) {
+      var b = el('button.btn.btn-sm.btn-primary', { type: 'button', text: p.name, onclick: function () {
+        p.on = !p.on; b.className = 'btn btn-sm ' + (p.on ? 'btn-primary' : 'btn-outline'); refreshLive();
+      } });
+      chips.appendChild(b);
+    });
+    body.appendChild(chips);
+    body.appendChild(el('div.section-label', { text: '3 · Split preview' }));
+    var live = el('div.ma-shr-live');
+    body.appendChild(live);
+    var save = el('button.btn.btn-primary', { html: ui.icon('check2-circle') + ' Post shared cost', onclick: doSave });
+    body.appendChild(el('div.flex.justify-end.gap-2.mt-3', null, [
+      el('button.btn.btn-ghost', { text: 'Cancel', onclick: function () { m.close(); } }), save
+    ]));
+    details.el.addEventListener('input', refreshLive);
+    details.el.addEventListener('change', refreshLive);
+
+    function selected() { return parts.filter(function (p) { return p.on; }); }
+    function splitOf(amt, n) { var base = Math.floor(amt / n), a = [], i; for (i = 0; i < n; i++) a.push(base); a[0] += amt - base * n; return a; }
+    function refreshLive() {
+      var v = details.values(), amt = Math.round(+v.amount || 0), sel = selected();
+      live.innerHTML = '';
+      if (amt <= 0 || sel.length < 2) {
+        live.appendChild(el('p.text-mute.sm', { text: 'Enter an amount and keep at least two concerns selected to see the equal split.' }));
+        return;
+      }
+      var shares = splitOf(amt, sel.length), payer = v.paidBy, head = expenseAccountFor(v.category || '');
+      var rows = sel.map(function (p, i) {
+        return el('div.ma-shr-row.sm', null, [
+          el('span', { html: esc(p.name) + (p.id === payer ? ' <span class="badge badge-accent">payer</span>' : '') }),
+          el('span.num', { text: ui.money(shares[i]) })
+        ]);
+      });
+      live.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null,
+        [ el('div.text-mute.xs.mb-1', { html: ui.icon('diagram-3') + ' ' + sel.length + ' concerns × ' + ui.money(Math.floor(amt / sel.length)) + ' — head ' + head + ' · ' + esc(v.category || '') }) ].concat(rows)) ]));
+      var payerShare = shares[sel.map(function (p) { return p.id; }).indexOf(payer)] || 0, recv = amt - payerShare;
+      var pay = v.method === 'Cash' ? '1000 Cash' : '1010 Bank';
+      var jl = el('div.ma-shr-jl');
+      jl.appendChild(el('div.text-mute.xs.mb-1', { html: ui.icon('journal-text') + ' Journal — ' + coName(payer) + ' pays the full ' + ui.money(amt) }));
+      if (payerShare > 0) jl.appendChild(el('div.ma-shr-row.sm', null, [el('span', { text: 'DR ' + head + ' · ' + coName(payer) + ' share' }), el('span.num', { text: ui.money(payerShare) })]));
+      if (recv > 0) jl.appendChild(el('div.ma-shr-row.sm', null, [el('span', { text: 'DR 1300 Inter-company Receivable' }), el('span.num', { text: ui.money(recv) })]));
+      jl.appendChild(el('div.ma-shr-row.sm', null, [el('span', { text: 'CR ' + pay }), el('span.num', { text: ui.money(amt) })]));
+      jl.appendChild(el('div.text-mute.xs.mt-1', { text: 'Each other concern books: DR ' + head + ' share / CR 2400 Inter-company Payable — it owes ' + coName(payer) + ' until settled.' }));
+      live.appendChild(jl);
+    }
+    refreshLive();
+
+    function doSave() {
+      if (!details.validate()) { ui.toast('Fill in the required fields', 'error'); return; }
+      var v = details.values(), amt = Math.round(+v.amount || 0);
+      if (amt <= 0) { ui.toast('Enter a valid amount', 'error'); return; }
+      var sel = selected();
+      if (sel.length < 2) { ui.toast('Select at least two concerns to share the cost', 'error'); return; }
+      var payer = v.paidBy, head = expenseAccountFor(v.category || ''), cashAcct = v.method === 'Cash' ? '1000' : '1010';
+      var ref = 'SHR-' + ui.uid('').slice(-6).toUpperCase();
+      var shares = splitOf(amt, sel.length), shareOf = {};
+      sel.forEach(function (p, i) { shareOf[p.id] = shares[i]; });
+      try {
+        if (EPAL.ledger.ensureAccount) {
+          EPAL.ledger.ensureAccount('1300', 'Inter-company Receivable', 'asset');
+          EPAL.ledger.ensureAccount('2400', 'Inter-company Payable', 'liability');
+        }
+        var payerShare = shareOf[payer] || 0, recv = amt - payerShare, payerLines = [];
+        if (payerShare > 0) payerLines.push({ account: head, dr: payerShare, cr: 0 });
+        if (recv > 0) payerLines.push({ account: '1300', dr: recv, cr: 0 });
+        payerLines.push({ account: cashAcct, dr: 0, cr: amt });
+        EPAL.ledger.post({ id: 'GL-' + ref + '-' + payer, date: v.date, companyId: payer, ref: ref,
+          memo: (v.category || 'Shared cost') + ' (shared) — paid by ' + coName(payer) + ', split across ' + sel.length,
+          source: 'intercompany', party: 'shared', lines: payerLines });
+        sel.forEach(function (p) {
+          if (p.id === payer) return;
+          EPAL.ledger.post({ id: 'GL-' + ref + '-' + p.id, date: v.date, companyId: p.id, ref: ref,
+            memo: (v.category || 'Shared cost') + ' share (from ' + coName(payer) + ')', source: 'intercompany', party: payer,
+            lines: [{ account: head, dr: shareOf[p.id], cr: 0 }, { account: '2400', dr: 0, cr: shareOf[p.id] }] });
+        });
+        sel.forEach(function (p) {
+          db.save('acc_entries', { id: 'JV-' + ref + '-' + p.id, companyId: p.id, kind: 'Expense',
+            category: v.category, subCategory: 'Shared', amount: shareOf[p.id], date: v.date,
+            method: p.id === payer ? v.method : 'Inter-co', party: 'Shared · ' + coName(payer),
+            ref: ref, desc: v.desc || '', alloc: true, created: TODAY_STR });
+        });
+        ui.toast('Shared ' + ui.money(amt) + ' across ' + sel.length + ' concerns (' + ui.money(Math.floor(amt / sel.length)) + ' each)', 'success');
+        m.close(); EPAL.router.render();
+      } catch (e) { ui.toast(e.message || 'Posting failed', 'error'); }
+    }
   }
 
   /* ======================================================= CATEGORY & SUB-CATEGORY

@@ -594,6 +594,11 @@
 .tv-exp-live-t { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-mute); margin-bottom: 7px; }
 .tv-exp-live-l { display: flex; justify-content: space-between; gap: 12px; font-family: var(--font-mono); font-size: 12.5px; color: var(--text-dim); padding: 2px 0; }
 .tv-exp-live-l .num { font-weight: 700; color: var(--text); }
+/* Shared-cost split modal (Master Accounts → Operational Expenses → Shared Cost) */
+.ma-shr-live { display: flex; flex-direction: column; gap: 8px; }
+.ma-shr-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.ma-shr-jl { border-top: 1px solid var(--border); padding-top: 9px; margin-top: 2px; }
+.ma-shr-jl .num { font-weight: 700; color: var(--text); }
 
 /* ---------------------------- SEARCHABLE COMBOBOX ------------------------
  * The type-to-filter select (forms.js makeCombobox). Reads as a normal input; a
