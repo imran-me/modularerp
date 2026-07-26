@@ -881,20 +881,17 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     ]));
     page.appendChild(pills('cashflow'));
 
-    page.appendChild(el('div.kpi-grid', null, [
-      kpi('Cash In (12M)', ui.money(inflow, { compact: true }), 'arrow-down-left-circle'),
-      kpi('Cash Out (12M)', ui.money(outflow, { compact: true }), 'arrow-up-right-circle'),
-      kpi('Net Movement', ui.money(inflow - outflow, { compact: true }), 'cash-coin'),
-      kpi('Positive Months', positive + ' / 12', 'calendar2-check', null, 'months with net inflow')
-    ]));
+    var scr = screen('cashflow');
+    var kpis = scr.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Cash In (12M)', ui.money(inflow, { compact: true }), 'arrow-down-left-circle'));
+    kpis.appendChild(kpi('Cash Out (12M)', ui.money(outflow, { compact: true }), 'arrow-up-right-circle'));
+    kpis.appendChild(kpi('Net Movement', ui.money(inflow - outflow, { compact: true }), 'cash-coin'));
+    kpis.appendChild(kpi('Positive Months', positive + ' / 12', 'calendar2-check', null, 'months with net inflow'));
 
     var barId = ui.uid('cfBar'), cumId = ui.uid('cfCum');
-    var row = el('div.two-col');
-    row.appendChild(chartCard('Net Cash Movement', 'bar-chart-steps', barId, 'green = inflow month · red = outflow month', 270));
-    row.appendChild(chartCard('Cumulative Cash Curve', 'graph-up', cumId, 'running total of net movement', 270));
-    page.appendChild(row);
+    scr.querySelector('[data-fill="chart-bar"]').replaceWith(chartCard('Net Cash Movement', 'bar-chart-steps', barId, 'green = inflow month · red = outflow month', 270));
+    scr.querySelector('[data-fill="chart-cum"]').replaceWith(chartCard('Cumulative Cash Curve', 'graph-up', cumId, 'running total of net movement', 270));
 
-    page.appendChild(el('div.section-label', { text: 'Monthly Cash Ledger' }));
     var t = EPAL.table({
       columns: [
         { key: 'month', label: 'Month', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.month) + '</span>'; } },
@@ -909,7 +906,8 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       exportName: 'group-cash-ledger.csv',
       empty: { icon: 'cash-coin', title: 'No cash rows yet' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ t.el ]) ]));
+    scr.querySelector('[data-fill="table"]').appendChild(t.el);
+    mountScreen(page, scr);
 
     requestAnimationFrame(function () {
       var c1 = document.getElementById(barId);
