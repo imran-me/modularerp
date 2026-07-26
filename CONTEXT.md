@@ -74,8 +74,17 @@ tab/route STRUCTURAL shells are templated (kpi-grid/head-row/two-col via frag); 
 remaining el() is documented DYNAMIC content (chat bubbles, phone panel, funnel bars,
 template-editor preview) — same bar as MA detail views, left as el() by design.
 
-**▶ NEXT (resume here):** the rest of the **Travels modules**, same loop each (FE route
-markup + parity + backend where the module owns data): automation · reports ·
+**➡️ ALL TRAVELS MODULE BACKENDS DONE (2026-07-26).** Document-style Laravel slices
+(ext_id/company_id/status columns + data JSON, upsert-by-frontend-id, {store}-keyed),
+each migrated + CRUD-tested vs MySQL + api.js wired: accounts (7c7156f), marketing
+(cc9d09d), automation+contract-file+crm (7d70db3), contract-flight+hrm (3220b7a),
+vendor-agent 5 stores (b011c26). Plus passport-mgmt/settings/file-management earlier.
+reports/analytics/dashboard/ledgers are read-only views (no owned stores → no backend).
+
+**▶ NEXT (resume here):** FRONTEND pass for the remaining Travels modules — most were
+"converted" in prior sessions (structural shells templated, dynamic content el(), like
+marketing), so per-module: shoot baseline → convert any UN-templated route cards (like
+Travels Accounts had) → parity byte-identical. Modules to check: automation · reports ·
 analytics · crm · dashboard · ledgers · contract-file · contract-flight · vendor-agent ·
 hrm · visa-processing · air-ticketing (payroll backend already built via master-accounts).
 Then Group-cockpit modules, then woodart/it/shop/construction. Autonomous, push each.
