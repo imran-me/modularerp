@@ -19,6 +19,107 @@
 
 ---
 
+## 🆕 SESSION — 2026-07-22 → 07-23 · BANK PERSISTENCE FIX + TRAVELS ACCOUNTING BUILDOUT
+
+**Git is working now** (the 2026-07-21 "not a repo" blocker is resolved) — this
+session committed and pushed ~10 small commits to `origin/main`. Headless push:
+`git -c credential.helper= -c credential.helper=manager -c credential.interactive=false push origin main`.
+
+### A. Bank card polish (Master Accounts → Manage Banks · Overview)
+- Account-card text scaled down 20% (cqw × 0.8) per owner; cards stay proportional
+  (`container-type: inline-size`, `min-width:0`, `max-width:340px`). CSS only.
+
+### B. 🩹 CRITICAL — the "Operation not permitted" save-fail flood / blinking
+**Symptom:** on Manage Banks, a flood of red "Not saved · Database rejected the
+write: Operation not permitted" toasts on every load; earlier it also blinked.
+**Root cause:** DERIVED/auto ledger backfills (bank openings `GL-OPBK-*` + the
+historical expense/income mirrors) posted to the DB on EVERY page load. The
+opening bank-txn used `db.save`, which — with a stale-cached `api.js` where
+`bank_txns` was still writable — re-triggered the `bank_transactions` **CREATE
+TABLE**, which the shared host denies (DDL EPERM → driver message "Operation not
+permitted", surfaced by `bootstrap/app.php`'s QueryException→422 handler). It
+never persists, so it re-fires each load. (The blink itself was the earlier
+`bankRepairsRan` once-per-load latch — already in place.)
+**Fix (committed `bca99b1`):**
+- `ledger.post()` tags its `data:changed` event with `local: !!spec.local`.
+- `api.js` `wireWrites` **skips `e.local`** — a derived entry never hits the DB.
+- The 4 backfills (exp + inc mirrors, both bank-opening posts) pass `local:true`;
+  the opening bank-txn uses `S.upsert` (local), not `db.save`.
+- Rationale: openings/mirrors are RECOMPUTED each load from stores that already
+  persist (`banks`, `acc_entries`) — they must never round-trip to the DB.
+- Real user actions (deposits/withdrawals/expenses/manual journals) are NOT local
+  → still persist via `journal_entries` (DML, allowed on the shared host).
+
+### C. Recent Bank Transactions survive reload — WITHOUT the extra table
+`bank_transactions` cannot be created on the shared host (DDL denied), so the log
+lived only in the browser. NEW `resolveBankTxns(scopeIds)` in master-accounts:
+MERGES live local `bank_txns` with any **persisted GL** bank/opening movement that
+has no local row, reconstructing a txn row from the GL memo ("Deposit to <name>",
+"Bank opening balance · <name>") + its 1000/1010 line. A prior-session deposit
+reappears after reload, sourced from the DB. Committed `2a92b47`.
+**Persistence status now:** deposit → balance (`banks`) ✔ + GL journal
+(`journal_entries`) ✔ both persist; the log is reconstructed from the GL. See the
+memory `api-mode-persistence-gap` for the full map.
+
+### D. ⚠️ BUILD-STEP TRAP (important, recurring risk)
+Module screens are COMPILED: `frontend/<id>.js` (+ `template.html`) →
+`tools/build/build-module.mjs` → committed **`view.js`**, and **`index.html`
+loads `view.js`, not the frontend source.** This session I found master-accounts'
+`view.js` was STALE — B & C above were committed as frontend source but never
+compiled, so they weren't actually live until the rebuild in commit `7334754`.
+**Rule:** after editing any `frontend/<id>.js`, run
+`node tools/build/build-module.mjs companies/<co>/modules/<id>` and commit the
+regenerated `view.js` too. Directly-loaded (edit-and-go, no build): `ledger.js`,
+`api.js`, `database.js`, `platform/kit/*`, `platform/core/*`, CSS.
+
+### E. 📚 Accounting buildout for Travels — plan LOCKED + 3 features shipped
+Full plan in **`docs/ACCOUNTING-PLAN-TRAVELS.md`** (§10 = the owner's 5 LOCKED
+decisions). Summary of the decisions:
+1. **COGS captured at the SELL entry** (per sale → product-tagged); opex in the
+   Expense section. 2. **P&L lives on the Travels Dashboard** (cost-per-sale,
+   margins, per-product). 3. P&L depth = **per-product contribution/gross margin
+   + company net** (the standard). 4. **Shared costs entered at GROUP HQ, split
+   EQUALLY** across concerns via inter-company legs (1300 Rcv / 2400 Payable).
+   5. **Funding-source rule**: book the expense against whoever's money paid; if
+   another company pays (Group cash → Travels bill) → inter-company **loan**
+   (Travels owes Group, settle later).
+
+Shipped this session:
+- **Travels categorized expense entry** (`travels/accounts` → Expenses → "New
+  Expense") — guided Category→Sub→Details modal with live journal preview,
+  `TV_EXPENSE_CATS` taxonomy, `.tv-exp-*` CSS. (commit `03ea21c`)
+- **COGS-at-sale already existed** via `db.postSale('travels',{amount,cost,
+  category,…})` → emits `sale:recorded` → ledger auto-posts revenue (product
+  income acct 4010 Air / 4020 Visa / 4050 Contract via `incomeAccountFor`) + COGS
+  (5000). Added a **`product` line-tag** (`post()` preserves `line.product`; the
+  sale auto-post stamps it) + **`ledger.pnlByProduct(companyId,{from,to})`** →
+  per-product {revenue,cogs,gross,margin,count,perSaleCost} (keyed by income
+  account + ref-matched COGS, so it works on historical sales too). contract-file
+  does NOT post (it's a contract master — correct). (commit `0229310`)
+- **Travels Dashboard "Product P&L" card** — per-product table (Revenue · Direct
+  Cost · Gross Margin · Margin% · Cost/Sale) + company Revenue/COGS/Gross/Opex/Net
+  footer, straight from the ledger. (`travels/dashboard`, rebuilt view.js)
+- **Group Shared-Cost equal split** (`group/master-accounts` → Operational
+  Expenses → **"Shared Cost"**) — `sharedExpenseForm()`: guided modal, concern
+  chips, live split/journal preview. One-step inter-company posting: payer DR
+  head own-share + DR 1300 (Σ others) + CR 1000|1010 full; each other concern DR
+  head share / CR 2400. Per-concern `acc_entries` flagged `alloc` (the exp→GL
+  mirror skips them, no double-post). Verified: ৳120k across 6 concerns → 6
+  balanced legs, group keeps ৳20k expense + ৳100k receivable, each concern ৳20k
+  expense + ৳20k payable; eliminates on consolidation. (commit `7334754`)
+
+**▶ NEXT (resume here):** build-order **step 3 — inter-company FUNDING legs**
+(expense "paid from" another company → loan/transfer + a payable the borrower must
+settle), then (4b) Dashboard P&L monthly/yearly filter, then (5) statement suite
+(TB/GL/BS/P&L V2). All decisions locked — no re-asking. See the memory
+`accounting-buildout-travels`.
+
+### Verify each commit
+`node tools/verify/sweep.mjs both` → 222 routes, 0 console errors, both themes.
+Every commit this session passed 222/222.
+
+---
+
 ## 🆕 SESSION — 2026-07-21 · NEW MACHINE BRING-UP + SIDEBAR TEXT FIX
 
 **Machine move.** Owner is on a new Windows 11 box with nothing dev-related
