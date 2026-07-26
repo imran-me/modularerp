@@ -72,7 +72,12 @@
     pay_txns:      'group/master-accounts/payroll/txns',
     tv_recurring:  'travels/accounts/books/recurring',
     tv_cheques:    'travels/accounts/books/cheques',
-    tv_petty:      'travels/accounts/books/petty'
+    tv_petty:      'travels/accounts/books/petty',
+    tv_campaigns:  'travels/marketing/books/campaigns',
+    tv_templates:  'travels/marketing/books/templates',
+    tv_messages:   'travels/marketing/books/messages',
+    tv_bot_bookings: 'travels/marketing/books/bookings',
+    tv_bot_chat:   'travels/marketing/books/chat'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -112,6 +117,11 @@
     tv_recurring: 'travels/accounts/books/recurring',
     tv_cheques:  'travels/accounts/books/cheques',
     tv_petty:    'travels/accounts/books/petty',
+    tv_campaigns: 'travels/marketing/books/campaigns',
+    tv_templates: 'travels/marketing/books/templates',
+    tv_messages: 'travels/marketing/books/messages',
+    tv_bot_bookings: 'travels/marketing/books/bookings',
+    tv_bot_chat: 'travels/marketing/books/chat',
     perf_reviews: 'group/employees/reviews'
   };
 
