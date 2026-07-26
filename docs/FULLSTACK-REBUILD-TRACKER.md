@@ -34,16 +34,28 @@
 7. **Context + push** — update CONTEXT.md + this tracker; commit small; push; verify
    `git ls-remote` == HEAD.
 
-## Order (simplest → hardest; Travels first — deepest & already frontend-converted)
+## ⭐ PRIORITY ORDER (owner override, 2026-07-26) — do these FIRST, full-stack, in order:
+1. **group-cockpit / master-accounts** (the Group's money hub) — FE completion + finish/verify BE
+2. **travels / accounts** (Travels money desk) — FE completion + build BE (currently 0 php)
+3. **the rest of the Travels modules** (dashboard, ledgers, air-ticketing, visa-processing,
+   vendor-agent, hrm, crm, contract-flight, contract-file, marketing, automation, reports,
+   analytics, settings✓, file-management✓, passport-mgmt✓, payroll-last)
+4. **then the rest** — remaining Group-cockpit modules + woodart / it / shop / construction.
+
+Then re-sweep ALL for a final full pass. (The simplest→hardest list below still holds
+WITHIN each priority band; money modules jump the queue per this override.)
+
+## Order (within-band: simplest → hardest; Travels already frontend-converted)
 
 Legend: ⬜ not started · ◑ in progress · ✅ done (all 7 gates)
 
-> NOTE on the Travels frontends: all 18 were converted to HTML+Tailwind `template.html`
-> + logic-only JS in PRIOR sessions (MIGRATION_STATUS "18/18"), so the per-module
-> frontend work here is a COMPLETION pass — convert any residual `el()` DOM to template
-> markup + polish + prove pixel-perfect — not a ground-up rebuild. The GROUND-UP frontend
-> rebuilds are the Group-cockpit modules + the 4 other companies (still legacy view.js /
-> shared wildcard views).
+> ⚠️ CORRECTED NOTE (2026-07-26): the prior "18/18 converted" was a STRUCTURAL split only
+> (view.js → template.html + logic + parity) — it did NOT convert the DOM to markup. The
+> screens are still largely built with `el()` script-DOM (e.g. master-accounts = 2,234
+> lines, 279 `el()` calls, 6 template fragments). So the owner's "all HTML+Tailwind, not
+> script tags" rebuild IS owed for these modules too — convert the `el()` DOM into
+> `template.html` markup, pixel-perfect via the before/after loop. This is real per-module
+> frontend work, not a rubber-stamp.
 
 ### Travels
 | # | Module | FE rebuilt | Parity | Backend | Tested | Status |
@@ -88,4 +100,6 @@ woodart/projects · it/projects · shop/pos · construction/projects.
 | 2026-07-26 | — | full backup + tracker + method locked | 9442 files backed up | 702dcaf |
 | 2026-07-26 | passport-mgmt | backend 100% (8-file Laravel slice, migrated+seeded+CRUD-tested vs MySQL); FE already HTML/template + read-only so pixel-identical | tinker CRUD test + raw SQL row check + sweep 222/222 | 99e5af4 |
 | 2026-07-26 | settings | backend 100% (company_settings JSON table + Model/Service/Request/Controller; migrated+tested vs MySQL, shallow-merge no-clobber proven); FE already HTML/template, untouched | tinker merge test vs MySQL | 34b7d27 |
-| 2026-07-26 | file-management | backend 100% (tv_files 8-file slice; migrated+seeded+CRUD-tested vs MySQL, total=embassy+service derived); FE already HTML, untouched; api.js HYDRATE wired; sweep 222/222 | tinker CRUD + raw SQL + sweep | (this) |
+| 2026-07-26 | file-management | backend 100% (tv_files 8-file slice; migrated+seeded+CRUD-tested vs MySQL, total=embassy+service derived); FE completion owed; api.js HYDRATE wired; sweep 222/222 | tinker CRUD + raw SQL + sweep | 2a3ec78 |
+| 2026-07-26 | passport-mgmt | FULL-STACK done — FE detail modal el()→template markup, parity before/after 8/8 pixel-identical; backend tested | parity diff + sweep | ab3bb11 |
+| 2026-07-26 | (priority reorder) | owner: Master Accounts → Travels Accounts → rest of Travels → rest; loop mandatory each | master-accounts before-baseline shot (20) | (this) |

@@ -19,6 +19,21 @@
 
 ---
 
+## ⭐ PRIORITY ORDER (owner, 2026-07-26) + LOOP DISCIPLINE
+
+Owner set the order: **(1) Group Master Accounts → (2) Travels Accounts → (3) rest of
+Travels → (4) everything else**, all full-stack (FE+BE), and re-do ALL to this standard.
+Owner (caps) reinforced: **follow the loop — before/after screenshots, cross-check,
+pixel-perfect match — for EVERY module.** Recorded in `docs/FULLSTACK-REBUILD-TRACKER.md`.
+
+**◑ IN PROGRESS — module = group-cockpit/master-accounts (priority #1).** Before-baseline
+shot: `.parity/master-accounts-before` (20 shots = 10 routes × 2 themes: overview · banks ·
+cash · payroll · schedules · journals · expenses · accounts · party-types · loans).
+Backend today: 7 controllers (accounts, banks, bank-txns, journals, customers, suppliers,
+schedules) — **missing: expenses, loans, party-types, payroll**. Plan: FE completion pass
+(residual `el()`→markup) → after-shot + pixel-diff → build the 4 missing backends
+(migrations+models+services+controllers) → test vs MySQL → sweep → push.
+
 ## 🚨 CORRECTION — 2026-07-26 (owner reminded me) · FULL-STACK MEANS FRONTEND **AND** BACKEND
 
 I broke the command on modules #1–#3: I built + tested their Laravel backends but
