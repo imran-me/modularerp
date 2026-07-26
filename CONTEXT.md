@@ -1,5 +1,29 @@
 # CONTEXT.md — Epal Group ERP
 
+> 🟥🟥🟥 **FRONTEND BUILD LAW — OWNER COMMAND (2026-07-26), RESTATED FORCEFULLY. NEVER
+> EVER FORGET OR WATER THIS DOWN.** 🟥🟥🟥
+>
+> **Every screen's ENTIRE UI is authored as REAL, PLAIN HTML** — every container, card,
+> KPI, button, bar, tab band, page-head, company switcher, form, and table STRUCTURE is
+> written out as readable HTML markup that IS the screen. **NOT built by JavaScript.**
+> Both of these are REJECTED: (1) `el()` / hyperscript JS-DOM assembly, and (2)
+> `<template data-tpl="…">` fragment-cloning with `frag()`/`slot()`. Opening the HTML
+> file must show the whole screen as HTML — head bar to footer.
+>
+> - **HTML** = the foundation/structure of EVERYTHING on the screen.
+> - **CSS + Tailwind + a custom `style.css` + Bootstrap** = colors, styling, layout.
+> - **JS = ONLY where truly needed:** hover effects, animations, filling LIVE DATA into
+>   the HTML placeholders, and feature behavior (a data grid's sort/search/pagination).
+> - **PIXEL-PERFECT, PROVEN:** for each screen run the before/after screenshot loop and
+>   iterate until it is **100% byte-identical to the CURRENT view**, THEN move to the next.
+> - **ORDER:** Master Accounts + Travels FIRST, then every other module, one at a time.
+> - Earlier claims that screens were "converted to markup" were WRONG — they were still
+>   JS-built (`el()`) or `<template>`-cloned. This law supersedes all of that. Redo them.
+>
+> (Proven pattern started: master-accounts `<section data-screen="party-types">` in
+> template.html is real HTML; party-types route verified byte-identical. Extend this to
+> EVERY element of EVERY screen — including the page-head bar, tab bar, switcher.)
+
 > **This file is the project's long-term memory.** It exists so that any developer
 > (human or AI) can resume work months later without losing the vision, the
 > architecture, or the conventions. Read this first, always.
