@@ -29,6 +29,27 @@
 > template.html is real HTML; party-types route verified byte-identical. Extend this to
 > EVERY element of EVERY screen — including the page-head bar, tab bar, switcher.)
 
+> 🎨 **STYLING METHOD — decided 2026-07-26 (owner: "custom effects/concepts in custom
+> CSS, rest universal CSS in Tailwind").** Owner wants generic utilities as Tailwind, but
+> a PILOT proved it's **currently unsafe**: adding any `tw-` class needs a regenerate of
+> the shared `platform/design-system/css/tailwind.built.css`, and `npm run tw:build` on
+> this repo does NOT losslessly reproduce it — it dropped arbitrary-value classes
+> (`tw-max-w-[320px]`…) that OTHER screens build **dynamically in JS**, silently breaking
+> untouched screens (cash/loans/payroll). So Tailwind conversion is **DEFERRED** behind a
+> prerequisite: harden the build (pin `tailwindcss@3.4.17`, add a `safelist` for the
+> dynamically-built classes, prove regeneration == committed byte-for-byte). Until then,
+> styling stays the **house design-system CSS** (`platform/design-system/css/*` — component
+> classes + utility classes), which already satisfies "HTML + CSS, JS only for data" and is
+> pixel-perfect. Tailwind config is `tw-` prefixed + seeded from tokens.css and READY when
+> the build is hardened. Do NOT run `tw:build` + commit its output without proving losslessness.
+
+> 📖 **DEVELOPER-READABILITY pass done (2026-07-26):** master-accounts + finance
+> `template.html` now open with a full conventions LEGEND (every `data-*` hook explained)
+> and the shells/KPI cards are laid out multi-line — EXCEPT inline leaf runs (the `<h1>`
+> eyebrow·icon·title, `<template data-tpl>` fragments) which stay one-line so cloned
+> whitespace can't shift pixels. Both re-proven pixel-identical via the back-to-back loop.
+> Backups at `_frontend-originals/_readability-backup/<module>/`.
+
 > **This file is the project's long-term memory.** It exists so that any developer
 > (human or AI) can resume work months later without losing the vision, the
 > architecture, or the conventions. Read this first, always.
@@ -260,6 +281,81 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 > shipped & working as frontend features; their Laravel backends are now folded into
 > this full-stack program (accounts=#15, ledgers=#14, dashboard=#13). The Group
 > consolidated P&L (step-5 part 2) is deferred until those modules' full-stack pass.
+
+---
+
+## 🆕 SESSION — 2026-07-26 (cont'd) · RECORD EXPENSE: REAL ACCOUNTS, WHOLE-CHART SEARCH, FULL PROPAGATION + REAL LARAVEL
+
+Owner screenshot of `#/travels/accounts/expenses` with the **Record Expense** modal
+open and **"Payment method" circled in red** (it only offered `Bank`). Four asks —
+see `docs/TASK-QUEUE.md` T-EXP-SOURCE for the verbatim log. All four shipped.
+
+**1 · "Paid from (bank / cash account)" replaces "Payment method".** The field now
+lists the REAL accounts from Manage Banks — bank accounts, cash boxes (hard cash /
+petty cash), wallets, cards — in the owner's order (**bank → cash → wallet**), and it
+**follows "Funded by"**: another concern's money offers THAT concern's accounts,
+because that is whose account the cash leaves. The 7 generic methods stay at the END
+of the list, labelled "no registered account", so a cheque or card swipe with no
+registered account is still recordable (nothing removed — R3).
+
+**2 · "Or search the whole account list"** sits beside the ten cards. Every chart
+code, **expense heads first**, then each head's items, then the rest of the chart.
+Typing "tea" surfaces *Tea / Coffee (Guest)* and *Tea & Coffee*; picking an item
+lights its **card AND its chip**, and clicking a card fills the field back — both
+ways in, always in sync. Non-expense codes are pickable too (the owner asked for the
+whole list) with a note that the posting lands on the balance sheet, not the P&L.
+
+**3 · Propagation — one spend, every book.** register (`acc_entries`, now carrying
+`bankId`/`bankName`/`payAcct`) → GL (`GL-ACC-…`, and `GL-ACF-…` on the funder's books
+for an inter-company spend) → **the paying account's balance + a withdrawal row in
+its own transaction history** (through the SHARED `EPAL.bankTxnApply`, so Travels ›
+Banks and Master Accounts › Manage Banks both show it and stay reconciled) → the
+group bridge `expense.recorded` event. An **edit** posts an adjustment row and a
+**delete** posts a reversal row + flags the original: a balance never moves without a
+row explaining why (AUDIT P2).
+
+**4 · Real Laravel, not a sketch.** Posting rules in the KERNEL (a company module
+must never reach into another company's code), HTTP surface in the module:
+- `platform/backend/app/Services/ExpensePostingService.php` — `record()` / `void()`:
+  all three books in ONE `DB::transaction`, idempotent by voucher id, reversible.
+- `platform/backend/app/Services/LedgerService.php` — now **THE** ledger poster
+  (`post`/`reverse`/`expenseAccountFor`). `JournalController@store` delegates to it,
+  same HTTP contract as before; the duplicated posting code is gone.
+- `platform/backend/app/Services/BankRegisterService.php` — the server twin of
+  `bankTxnApply` (atomic increment/decrement + the `bank_transactions` row).
+- `platform/backend/app/Support/CompanySlugs.php` — the ONE slug ↔ `companies.id` map
+  (was privately duplicated in Bank/Journal controllers).
+- `companies/travels/modules/accounts/backend/ExpenseController.php` +
+  `Http/Requests/StoreExpenseRequest.php` — `GET|POST /api/travels/accounts/expenses`,
+  `GET …/expenses/form` (heads + accounts pre-ordered for the form),
+  `DELETE …/expenses/{voucher}`. Documented with a worked example in the file header
+  and in the module's `LARAVEL-BLUEPRINT.md`.
+- Migrations: `…master-accounts/…/2026_07_26_002000_add_payment_source_to_acc_entries`
+  (`bank_id`, `bank_name`, `pay_acct`) and
+  `platform/backend/…/2026_07_26_003000_add_entry_trail_to_bank_transactions`
+  (`entry_ref`, `reversed`). **Run `php artisan migrate`.**
+- **9 feature tests** — `platform/backend/tests/Feature/ExpensePostingTest.php`:
+  all three books, cash box → 1000, the inter-company legs on both companies,
+  wrong-owner account refused, unknown head refused, re-post never duplicates, void
+  reverses everything. Suite **11/11 green** (needs `pdo_sqlite`; if php.ini has it
+  off, run `php -d extension=pdo_sqlite vendor/bin/phpunit`).
+
+**Platform kit:** `EPAL.form(...)` gained `setOptions(key, options, prefer)` —
+repopulate a select after build (dependent dropdowns) and the searchable combobox is
+rebuilt around the SAME `<select>`, so `values()`/`validate()`/`showIf` never notice.
+
+**Verified:** rebuilt `view.js` (compiled module — build step, see the trap below);
+**sweep 222/222 routes × both themes, 0 console errors**; a headless CDP drive of the
+modal, **18/18 assertions** — the account ordering, the "tea" search, both-ways card↔
+list sync, the funder re-filter, `DR 5550 / CR 1010`, the balance ৳900,000 → ৳898,750,
+the withdrawal row, and the inter-company pair (`DR 5500/CR 2400` on Travels,
+`DR 1300/CR 1010` on Group, Group HQ's balance the one that dropped).
+
+**Known-open (deliberate, owner's call):** in API mode the `bank_txns` LOG is still
+browser-only until `bank_transactions` is provisioned on the host — the **balance
+does** persist (`banks` is writable); the generic **New Journal Entry** form still has
+the plain Method select, not the account picker; Master Accounts' own expense recorder
+was not touched.
 
 ---
 
