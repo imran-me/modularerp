@@ -21,3 +21,18 @@
 <!-- KPI grid (compact, one row) + one KPI card -->
 <template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
 <template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+
+<!-- reusable shells (markup, filled by the logic) --------------------------- -->
+<!-- a titled card: head (title + optional sub) over a body slot -->
+<template data-tpl="titled-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
+<!-- a primary action button on its own row (fill data-slot="btn") -->
+<template data-tpl="add-row"><div class="mb-2"><button class="btn btn-sm btn-primary" data-slot="btn"></button></div></template>
+<!-- a bare button (class + html + onclick set by the logic) -->
+<template data-tpl="btn"><button class="btn"></button></template>
+<!-- a wrapping flex row for a button strip -->
+<template data-tpl="btn-strip"><div class="flex gap-1 flex-wrap mb-2"></div></template>
+<!-- a scrollable simple ledger table (modal) + one row -->
+<template data-tpl="ledger-table"><div class="table-wrap"><table class="tbl"><thead><tr><th>Date</th><th>Ref</th><th>Memo</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead><tbody data-slot="rows"></tbody></table></div></template>
+<template data-tpl="ledger-row"><tr><td data-slot="date"></td><td data-slot="ref"></td><td data-slot="memo"></td><td class="num" data-slot="debit"></td><td class="num" data-slot="credit"></td><td class="num" data-slot="balance"></td></tr></template>
+<!-- schedule section card: head has a right-aligned running total (tone set by logic) -->
+<template data-tpl="sched-card"><div class="card mb-2"><div class="card-head"><h3 data-slot="title"></h3><span class="strong num" style="margin-left:auto" data-slot="total"></span></div><div class="card-body" data-slot="body"></div></div></template>

@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  MASTER ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/master-accounts.js) and\n  cloned + filled via [data-tpl] / [data-slot]. The group accounting desk is\n  highly dynamic — the company switcher, the expense/journal/schedule/payroll/\n  bank desks, VAT & AIT return, opening-balance posters and every table/modal/\n  form keep their legacy el()-built DOM (with inline styles) in the logic file,\n  exactly as before. Only the reusable page / section-nav / KPI shells live here,\n  in house design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band, 9 sections) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  MASTER ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/master-accounts.js) and\n  cloned + filled via [data-tpl] / [data-slot]. The group accounting desk is\n  highly dynamic — the company switcher, the expense/journal/schedule/payroll/\n  bank desks, VAT & AIT return, opening-balance posters and every table/modal/\n  form keep their legacy el()-built DOM (with inline styles) in the logic file,\n  exactly as before. Only the reusable page / section-nav / KPI shells live here,\n  in house design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band, 9 sections) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n\n<!-- reusable shells (markup, filled by the logic) --------------------------- -->\n<!-- a titled card: head (title + optional sub) over a body slot -->\n<template data-tpl=\"titled-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- a primary action button on its own row (fill data-slot=\"btn\") -->\n<template data-tpl=\"add-row\"><div class=\"mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\n<!-- a bare button (class + html + onclick set by the logic) -->\n<template data-tpl=\"btn\"><button class=\"btn\"></button></template>\n<!-- a wrapping flex row for a button strip -->\n<template data-tpl=\"btn-strip\"><div class=\"flex gap-1 flex-wrap mb-2\"></div></template>\n<!-- a scrollable simple ledger table (modal) + one row -->\n<template data-tpl=\"ledger-table\"><div class=\"table-wrap\"><table class=\"tbl\"><thead><tr><th>Date</th><th>Ref</th><th>Memo</th><th class=\"num\">Debit</th><th class=\"num\">Credit</th><th class=\"num\">Balance</th></tr></thead><tbody data-slot=\"rows\"></tbody></table></div></template>\n<template data-tpl=\"ledger-row\"><tr><td data-slot=\"date\"></td><td data-slot=\"ref\"></td><td data-slot=\"memo\"></td><td class=\"num\" data-slot=\"debit\"></td><td class=\"num\" data-slot=\"credit\"></td><td class=\"num\" data-slot=\"balance\"></td></tr></template>\n<!-- schedule section card: head has a right-aligned running total (tone set by logic) -->\n<template data-tpl=\"sched-card\"><div class=\"card mb-2\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"strong num\" style=\"margin-left:auto\" data-slot=\"total\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="group-cockpit/master-accounts"]')) {
     var st = document.createElement('style');
@@ -59,6 +59,21 @@ function frag(name) {
 function slot(root, name) { return root.querySelector('[data-slot="' + name + '"]'); }
 function kgrid(children) { var g = frag('kpi-grid'); (children || []).forEach(function (c) { if (c) g.appendChild(c); }); return g; }
 function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b.classList.add('active'); b.textContent = label; b.addEventListener('click', onClick); return b; }
+// reusable markup shells (template.html) — a primary-action button row, and a
+// titled card (head title + optional sub, over a body). Byte-identical to the
+// el('div.card',…) shells they replace; the sub span is dropped when empty.
+function addRow(html, onClick) { var r = frag('add-row'); var b = slot(r, 'btn'); b.innerHTML = html; b.addEventListener('click', onClick); return r; }
+function btn(cls, html, onClick) { var b = frag('btn'); b.className = cls; b.innerHTML = html; if (onClick) b.addEventListener('click', onClick); return b; }
+function btnStrip(children) { var s = frag('btn-strip'); (children || []).forEach(function (c) { if (c) s.appendChild(c); }); return s; }
+function titledCard(titleHtml, subText, bodyEl, extraClass) {
+  var c = frag('titled-card');
+  if (extraClass) c.className += ' ' + extraClass;
+  slot(c, 'title').innerHTML = titleHtml;
+  var sub = slot(c, 'sub');
+  if (subText == null || subText === '') sub.parentNode.removeChild(sub); else sub.textContent = subText;
+  if (bodyEl) slot(c, 'body').appendChild(bodyEl);
+  return c;
+}
   // real local today (was a hardcoded seed date — broke TODAY chips + report
   // anchors). Local parts, NOT toISOString(): UTC lands on yesterday in +06.
   var TODAY_STR = (function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
@@ -985,7 +1000,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       kpi('Overdue', ui.money(overdue.reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0), { compact: true }), 'exclamation-octagon', overdue.length ? 'text-bad' : null),
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
-    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-sm.btn-primary', { html: ui.icon('calendar2-plus') + ' Add Schedule', onclick: function () { masterScheduleForm(null); } })]));
+    if (canCreate()) page.appendChild(addRow(ui.icon('calendar2-plus') + ' Add Schedule', function () { masterScheduleForm(null); }));
 
     function section(kind, icon, sub) {
       var rows = list.filter(function (s) { return (s.kind || 'Payable') === kind; });
@@ -1034,13 +1049,13 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         ] : [{ icon: 'file-earmark-text', title: 'Details', onClick: function (s) { masterScheduleDetail(s); } }],
         empty: { icon: 'calendar2-week', title: 'No ' + kind.toLowerCase() + ' schedules' }
       });
-      page.appendChild(el('div.card.mb-2', null, [
-        el('div.card-head', null, [
-          el('h3', { html: ui.icon(icon) + ' ' + (kind === 'Receivable' ? 'Receivable — amounts to collect' : 'Payable — amounts due to suppliers / vendors') }),
-          el('span.strong.num.' + (kind === 'Receivable' ? 'text-good' : 'text-warn'), { style: { marginLeft: 'auto' }, text: 'Open total ' + ui.money(openTotal) })
-        ]),
-        el('div.card-body', null, [tbl.el])
-      ]));
+      var card = frag('sched-card');
+      slot(card, 'title').innerHTML = ui.icon(icon) + ' ' + (kind === 'Receivable' ? 'Receivable — amounts to collect' : 'Payable — amounts due to suppliers / vendors');
+      var tot = slot(card, 'total');
+      tot.classList.add(kind === 'Receivable' ? 'text-good' : 'text-warn');
+      tot.textContent = 'Open total ' + ui.money(openTotal);
+      slot(card, 'body').appendChild(tbl.el);
+      page.appendChild(card);
     }
     section('Receivable', 'arrow-down-left-circle');
     section('Payable', 'arrow-up-right-circle');
@@ -1201,7 +1216,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       kpi('Free text', String(list.filter(function (p) { return !p.mapsTo; }).length), 'pencil'),
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
-    if (canCreate()) page.appendChild(el('div.mb-2', null, [el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-lg') + ' Add New', onclick: function () { partyTypeForm(null); } })]));
+    if (canCreate()) page.appendChild(addRow(ui.icon('plus-lg') + ' Add New', function () { partyTypeForm(null); }));
     var rows = list.filter(function (p) { return selCo === 'all' ? true : (p.companyId || 'group') === selCo; });
     var cols = [
       { key: 'companyId', label: 'Company', render: function (p) { return coCell(p.companyId || 'group'); }, exportVal: function (p) { return p.companyId || 'group'; } },
@@ -1223,7 +1238,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       }),
       empty: { icon: 'tags', title: 'No party types in scope' }
     });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('tags') + ' Party Types — ' + coName(selCo) }), el('span.card-sub', { text: 'used on schedules & party records' })]), el('div.card-body', null, [tbl.el])]));
+    page.appendChild(titledCard(ui.icon('tags') + ' Party Types — ' + coName(selCo), 'used on schedules & party records', tbl.el));
   }
   function partyTypeForm(p) {
     EPAL.formModal({
@@ -1296,10 +1311,10 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     if (canCreate()) {
       var in4000 = 0;
       try { in4000 = L.balance('4000', scope); } catch (e0) {}
-      page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
-        el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-square') + ' Add Account', onclick: addAccountForm }),
-        el('button.btn.btn-sm.btn-outline', { html: ui.icon('flag') + ' Opening Balance', onclick: openingBalanceForm }),
-        el('button.btn.btn-sm.btn-outline', { html: ui.icon('shuffle') + ' Reclass 4000 Catch-all' + (in4000 > 0.5 ? ' (' + ui.money(in4000, { compact: true }) + ')' : ''), onclick: reclass4000Tool })
+      page.appendChild(btnStrip([
+        btn('btn btn-sm btn-primary', ui.icon('plus-square') + ' Add Account', addAccountForm),
+        btn('btn btn-sm btn-outline', ui.icon('flag') + ' Opening Balance', openingBalanceForm),
+        btn('btn btn-sm btn-outline', ui.icon('shuffle') + ' Reclass 4000 Catch-all' + (in4000 > 0.5 ? ' (' + ui.money(in4000, { compact: true }) + ')' : ''), reclass4000Tool)
       ]));
     }
     TYPE_META.forEach(function (t) {
@@ -1330,24 +1345,27 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         } }] : [],
         empty: { icon: 'diagram-2', title: 'No accounts' }
       });
-      page.appendChild(el('div.card.mb-2', null, [
-        el('div.card-head', null, [el('h3', { html: ui.icon(t[2]) + ' ' + t[1] })]),
-        el('div.card-body', null, [tbl.el])
-      ]));
+      page.appendChild(titledCard(ui.icon(t[2]) + ' ' + t[1], '', tbl.el, 'mb-2'));
     });
     function openAccountLedger(code, name) {
       var rows = L.ledgerFor(code, scope) || [];
-      var t = el('table.tbl');
-      t.appendChild(el('thead', null, [el('tr', null, [el('th', { text: 'Date' }), el('th', { text: 'Ref' }), el('th', { text: 'Memo' }),
-        el('th.num', { text: 'Debit' }), el('th.num', { text: 'Credit' }), el('th.num', { text: 'Balance' })])]));
-      var tb = el('tbody');
-      rows.forEach(function (r) {
-        tb.appendChild(el('tr', null, [el('td', { text: ui.date(r.date) }), el('td', { text: r.ref || '—' }), el('td', { text: r.memo || '—' }),
-          el('td.num', { html: r.debit ? ui.money(r.debit) : '—' }), el('td.num', { html: r.credit ? ui.money(r.credit) : '—' }),
-          el('td.num', { html: '<span class="num">' + ui.money(r.balance) + '</span>' })]));
-      });
-      t.appendChild(tb);
-      var body = rows.length ? el('div.table-wrap', null, [t]) : el('div.text-mute', { text: 'No movement in this scope.' });
+      var body;
+      if (rows.length) {
+        var wrap = frag('ledger-table'), tb = slot(wrap, 'rows');
+        rows.forEach(function (r) {
+          var row = frag('ledger-row');
+          slot(row, 'date').textContent = ui.date(r.date);
+          slot(row, 'ref').textContent = r.ref || '—';
+          slot(row, 'memo').textContent = r.memo || '—';
+          slot(row, 'debit').innerHTML = r.debit ? ui.money(r.debit) : '—';
+          slot(row, 'credit').innerHTML = r.credit ? ui.money(r.credit) : '—';
+          slot(row, 'balance').innerHTML = '<span class="num">' + ui.money(r.balance) + '</span>';
+          tb.appendChild(row);
+        });
+        body = wrap;
+      } else {
+        body = el('div.text-mute', { text: 'No movement in this scope.' });
+      }
       ui.modal({ title: code + ' · ' + name + ' — ' + (selCo === 'all' ? 'Group' : coName(selCo)), icon: 'journal-text', size: 'xl', body: body, footer: false });
     }
     function addAccountForm() {
