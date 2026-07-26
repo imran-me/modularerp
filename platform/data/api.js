@@ -58,7 +58,8 @@
     visaCats:      'travels/visa-processing/categories',
     visaApps:      'travels/visa-processing/sales',
     tv_passports:  'travels/passport-mgmt/passports',
-    tv_files:      'travels/file-management/files'
+    tv_files:      'travels/file-management/files',
+    party_types:   'group/master-accounts/party-types'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -84,6 +85,7 @@
     visaCats:  'travels/visa-processing/categories',
     visaApps:  'travels/visa-processing/sales',
     acc_schedules: 'group/master-accounts/schedules',
+    party_types: 'group/master-accounts/party-types',
     perf_reviews: 'group/employees/reviews'
   };
 
