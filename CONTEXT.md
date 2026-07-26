@@ -75,8 +75,16 @@ template-structured, untouched (pixel-identical). Settings is a keyed config blo
 a collection), so it stays on the proven local-persist path with the API ready for
 server sync — no `api.js`/SPA change, sweep unaffected.
 
-**▶ NEXT (resume here):** module #3 = **Travels file-management** — same gates (per
-`docs/FULLSTACK-REBUILD-TRACKER.md` order). Cadence: autonomous, push each.
+**MODULE #3 — file-management — ✅ DONE (2026-07-26).** Backend: `tv_files` 8-file
+Laravel slice (VisaFile model + FileService with derived `total`=embassy+service +
+StoreFileRequest + FileResource + FileController + migration + seeder + routes),
+migrated+seeded+CRUD-tested vs MySQL (3 rows raw-SQL verified, shape exact, create/
+update-no-dup/soft-delete pass). `api.js` HYDRATE wired (`tv_files`); sweep 222/222.
+FE already HTML/template, untouched.
+
+**▶ NEXT (resume here):** module #4 = **Travels marketing** (owns tv_campaigns,
+tv_templates, tv_messages, tv_bot_bookings, tv_bot_chat — multi-store). Then automation,
+reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, push each.
 
 > Note: the accounting buildout (funding legs, Dashboard P&L, statement suite V2) is
 > shipped & working as frontend features; their Laravel backends are now folded into
