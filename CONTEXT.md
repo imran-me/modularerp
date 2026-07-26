@@ -365,11 +365,43 @@ list sync, the funder re-filter, `DR 5550 / CR 1010`, the balance ৳900,000 →
 the withdrawal row, and the inter-company pair (`DR 5500/CR 2400` on Travels,
 `DR 1300/CR 1010` on Group, Group HQ's balance the one that dropped).
 
-**Known-open (deliberate, owner's call):** in API mode the `bank_txns` LOG is still
-browser-only until `bank_transactions` is provisioned on the host — the **balance
-does** persist (`banks` is writable); the generic **New Journal Entry** form still has
-the plain Method select, not the account picker; Master Accounts' own expense recorder
-was not touched.
+**FOLLOW-UPS — same day, all three known-open items closed** (owner: "push, then
+solve, then again push"):
+
+1. **`bank_txns` persistence is SELF-HEALING now.** `BankTxnController@index` reports
+   `provisioned: true|false`; `platform/data/api.js` hydrates the log always and
+   promotes it into `WRITABLE` only when the server says the table exists (new
+   `CONDITIONAL` map + a `console.warn` naming the gap instead of hiding it). The log
+   starts persisting **by itself** the moment `php artisan migrate` runs on the host —
+   no redeploy — and there is no save-fail → re-render loop if it never does. That
+   loop is exactly why bank_txns was pulled out of HYDRATE/WRITABLE in July; this is
+   the safe way back in. Verified by loading the real api.js with stubs: **8/8** over
+   both branches (read always on · no POST when unprovisioned · POST when provisioned).
+2. **New Journal Entry** (Travels, income AND expense) uses the account picker too.
+   Income ADDS to the chosen account (deposit row), Expense takes it out, and moving
+   an entry to a DIFFERENT account refunds the old one in full and charges the new one
+   — two honest rows, never a silent balance swap between accounts.
+3. **Master Accounts › Operational Expenses + Shared Cost** got the same picker: the
+   list follows *Company* / *Paid by*, the spend moves that account's balance and
+   history, and for a shared cost the **payer's account loses the FULL bill** (one
+   register row) while the other concerns only owe their share (2400). Fixed on the
+   way: with the desk scoped to "All companies" the picker offered only generic
+   methods — an `'all'`/unset scope is not a company, it means Group HQ.
+
+**ONE implementation (important):** the payment-source + register-leg helpers now live
+in the platform cash kit as **`EPAL.pay`** (`platform/kit/cash.js`) —
+`accountsOf · options · valueOf · resolve · stamp · cashEffect · syncRegister ·
+reverseRegister`. Travels Accounts (expense + journal entry) and both Master Accounts
+desks call it, so a fix cannot land in one screen and drift in the other. The Travels
+module keeps four one-line locals purely for call-site readability.
+`EPAL.formModal` gained **`onReady(form)`** — the hook for dependent fields.
+
+**Verified (follow-ups):** rebuilt both modules' `view.js`; sweep **222/222 × both
+themes, 0 console errors**; trial balance balances; PHP suite **11/11**; a headless
+drive of all three screens **20/20** — including the move-to-another-account trail
+(`deposit:5000 | withdraw:5000 (rev) | deposit:8000`), the shared cost's single
+full-bill row on the payer's account, and **Dr − Cr = 0 for travels, group AND woodart**
+after every posting.
 
 ---
 

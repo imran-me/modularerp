@@ -44,9 +44,7 @@
     coa:           'group/master-accounts/accounts',
     banks:         'group/master-accounts/banks',
     gl_entries:    'group/master-accounts/journals',
-    // bank_txns is NOT hydrated: its endpoint CREATEs its table on first use, and
-    // the live (shared) DB denies DDL ("Operation not permitted"). Kept out until
-    // the table is provisioned server-side (see BankTxnController).
+    bank_txns:     'group/master-accounts/bank-transactions',   // read always; WRITES are conditional — see CONDITIONAL
     customers:     'group/master-accounts/customers',
     suppliers:     'group/master-accounts/suppliers',
     acc_schedules: 'group/master-accounts/schedules',
@@ -101,10 +99,7 @@
     // persist to the DB (JournalController::store) — idempotent by client id,
     // so transactions survive a reload instead of living only in the browser.
     gl_entries: 'group/master-accounts/journals',
-    // bank_txns intentionally NOT writable yet — its endpoint needs to CREATE its
-    // table, which the shared live DB rejects (DDL denied → "Operation not
-    // permitted"), and the failed write + wireWrites re-render caused a reload
-    // loop. Re-enable once bank_transactions is provisioned server-side.
+    // bank_txns is NOT here: it is CONDITIONALLY writable — see CONDITIONAL below.
     customers: 'group/master-accounts/customers',
     suppliers: 'group/master-accounts/suppliers',
     banks:     'group/master-accounts/banks',
@@ -148,6 +143,21 @@
     tv_portals:  'travels/vendor-agent/books/portals',
     perf_reviews: 'group/employees/reviews'
   };
+
+  /* Stores whose WRITE side depends on the server actually having their table.
+   * ------------------------------------------------------------------------
+   * `bank_txns` is the case (owner 2026-07-26). Its log table ships as a
+   * migration (platform/backend/database/migrations/2026_07_22_100000), but the
+   * shared live DB denies DDL at request time, so on a host that never ran
+   * `php artisan migrate` the table is simply absent — and blind POSTing into it
+   * is what caused the old save-fail → rollback → re-render LOOP. Hence:
+   *   · it hydrates like any other store (an unprovisioned host answers with an
+   *     empty list, which costs nothing and mixes in no demo data), and
+   *   · its endpoint reports `provisioned: true|false`, which is the ONLY thing
+   *     that promotes it into WRITABLE below.
+   * So the bank movement log starts persisting BY ITSELF the moment the table is
+   * provisioned — no code change, no redeploy, and no loop if it never is. */
+  var CONDITIONAL = { bank_txns: 'group/master-accounts/bank-transactions' };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()
 
@@ -228,17 +238,26 @@
       return Promise.all(keys.map(function (key) {
         return call(HYDRATE[key]).then(function (j) {
           S.set(key, j.data || []);
-          return { key: key, n: (j.data || []).length };
+          // a CONDITIONAL store is promoted to writable only if the server says
+          // its table is really there (see CONDITIONAL)
+          if (CONDITIONAL[key] && j.provisioned) WRITABLE[key] = CONDITIONAL[key];
+          return { key: key, n: (j.data || []).length, writable: !!WRITABLE[key] };
         }, function (err) {
           if (err.auth) throw err;                  // stale token — abort to login
           return { key: key, n: -1, err: String(err.message || err) };   // one endpoint down ≠ dead app
         });
       })).then(function (results) {
-        var report = { ms: Date.now() - t0, loaded: {}, failed: {} };
+        var report = { ms: Date.now() - t0, loaded: {}, failed: {}, readOnly: [] };
         results.forEach(function (r) {
           if (r.n >= 0) report.loaded[r.key] = r.n; else report.failed[r.key] = r.err;
+          if (r.n >= 0 && CONDITIONAL[r.key] && !r.writable) report.readOnly.push(r.key);
         });
-        try { console.info('[api] hydrated in ' + report.ms + 'ms', report.loaded, Object.keys(report.failed).length ? report.failed : ''); } catch (e) {}
+        try {
+          console.info('[api] hydrated in ' + report.ms + 'ms', report.loaded, Object.keys(report.failed).length ? report.failed : '');
+          // say it out loud: this store reads but cannot save until its table is
+          // migrated — silence here is what made the gap hard to spot before
+          if (report.readOnly.length) console.warn('[api] read-only until migrated (run: php artisan migrate): ' + report.readOnly.join(', '));
+        } catch (e) {}
         return report;
       });
     },

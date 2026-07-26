@@ -128,6 +128,13 @@ DELETE /api/travels/accounts/expenses/{voucher}  void: register row removed, led
 Refusals come back as `422 { success:false, message }` — unbalanced, unknown
 account code, an account belonging to another concern, a zero amount.
 
+**The bank movement LOG is self-healing.** `bank_transactions` is created by a
+migration, not at request time (shared hosting denies DDL). `BankTxnController@index`
+reports `provisioned: true|false` and `platform/data/api.js` only promotes `bank_txns`
+into its WRITABLE set when that is true — so the log persists **the moment you run
+`php artisan migrate`**, with no redeploy, and an un-migrated host degrades to
+read-only (with a `console.warn`) instead of looping on failed writes.
+
 **Migrations to run:** `php artisan migrate`
 (`…master-accounts/backend/migrations/2026_07_26_002000_add_payment_source_to_acc_entries.php`,
 `platform/backend/database/migrations/2026_07_26_003000_add_entry_trail_to_bank_transactions.php`.)

@@ -50,6 +50,11 @@
  *         companyId each record already carries.
  *
  * EXPOSES: EPAL.cashDesk(page, companyId, { rightEl }) — the whole section.
+ *          EPAL.pay — the shared PAYMENT-SOURCE helpers (see their block below):
+ *          which real accounts a concern can pay from, and the register leg a
+ *          money entry must move. Lives here because "which account did the
+ *          money leave" is this desk's question, and every entry screen
+ *          (Travels Accounts, Master Accounts expenses, shared costs) asks it.
  *
  * ==> LARAVEL HANDOFF: no new tables. CashController reads JournalLine
  *     where account_code = 1000 (window function for the running balance);
@@ -77,6 +82,145 @@
   // scope: 'all' means every company; anything else filters to that company.
   function scopeOf(cid) { return cid === 'all' ? {} : { companyId: cid }; }
   function inScope(cid, recCo) { return cid === 'all' ? true : (recCo || 'group') === cid; }
+
+  /* ==========================================================================
+   * EPAL.pay — PAYMENT SOURCES + THE REGISTER LEG  (owner 2026-07-26)
+   * --------------------------------------------------------------------------
+   * "I need here all listed bank including cash, petty cash etc. … ordering will
+   *  be travels bank, and cash first" — money never leaves "Bank" in the
+   * abstract, it leaves a NAMED account. So every money-entry form offers the
+   * REAL accounts opened in Master Accounts › Manage Banks (bank accounts,
+   * cash boxes = hard cash / petty cash, bKash/Nagad wallets, cards) belonging
+   * to whoever is paying, banks first then cash then the wallets.
+   *
+   * And picking a real account has to MEAN something: the entry then moves that
+   * account's own book too — balance, and a row in its transaction history —
+   * not just the GL. syncRegister() is that leg, and it works by DELTA, so one
+   * function serves posting, editing and deleting: an edited amount posts a
+   * visible adjustment row, a delete posts a visible reversal row, and a
+   * balance never changes without a row explaining why (AUDIT P2).
+   *
+   * ONE implementation, used by Travels › Accounts (expense + journal entry),
+   * Master Accounts › Operational Expenses and the Shared Cost desk — a second
+   * copy of this would drift the day someone fixes a bug in only one of them.
+   *
+   * ==> LARAVEL: App\Services\BankRegisterService (balance + bank_transactions)
+   *     and App\Services\ExpensePostingService, which do the same three books
+   *     inside one DB::transaction.
+   * ========================================================================*/
+  // Ordering the owner asked for: bank → cash (incl. petty cash) → wallets → card.
+  var SRC_ORDER = { 'Bank': 0, 'Cash Box': 1, 'bKash': 2, 'Nagad': 3, 'Card': 4 };
+  var GENERIC = ['Bank', 'Cash', 'bKash', 'Nagad', 'Debit Card', 'Credit Card', 'Cheque'];
+
+  function srcRank(b) { var r = SRC_ORDER[b.type || 'Bank']; return r == null ? 9 : r; }
+
+  var Pay = {
+    /** Every ACTIVE payment account one concern owns, in the owner's order. */
+    accountsOf: function (owner) {
+      return db().col('banks').filter(function (b) {
+        return (b.companyId || 'group') === owner && (b.status || 'Active') !== 'Inactive';
+      }).sort(function (a, b) { return (srcRank(a) - srcRank(b)) || String(a.name || '').localeCompare(String(b.name || '')); });
+    },
+
+    byId: function (id) { return db().col('banks').filter(function (b) { return b.id === id; })[0] || null; },
+
+    /** A cash box IS hard cash on the books (1000); everything else is bank (1010). */
+    glAcctOf: function (bank) { return (bank && bank.type === 'Cash Box') ? '1000' : '1010'; },
+
+    /** "Cash Box · Travels Petty Cash · Gulshan — ৳ 40K" */
+    label: function (b) {
+      var bits = [b.name];
+      if (b.branch && b.branch !== '—') bits.push(b.branch);
+      if (b.account && b.type !== 'Cash Box') bits.push('…' + String(b.account).slice(-4));
+      return (b.type && b.type !== 'Bank' ? b.type + ' · ' : '') + bits.join(' · ') + ' — ' + ui.money(b.balance || 0, { compact: true });
+    },
+
+    /** Options for a "Paid from" select: the owner's real accounts, then the
+     *  generic methods LAST — a cheque or a card swipe that no registered
+     *  account carries must still be recordable (nothing is ever removed). */
+    options: function (owner) {
+      return Pay.accountsOf(owner).map(function (b) { return ['bank:' + b.id, Pay.label(b)]; })
+        .concat(GENERIC.map(function (m) { return ['m:' + m, m + ' — no registered account']; }));
+    },
+
+    /** The select value for a record being edited — its account, else its method. */
+    valueOf: function (rec) {
+      if (rec && rec.bankId && Pay.byId(rec.bankId)) return 'bank:' + rec.bankId;
+      return 'm:' + ((rec && rec.method) || 'Bank');
+    },
+
+    /** 'bank:<id>' | 'm:<Method>' -> { bank, method, gl }. `method` stays one of
+     *  the short GENERIC values, so every Method badge, filter facet and
+     *  method-mix chart in the app keeps reading exactly as it does today. */
+    resolve: function (val) {
+      val = String(val || '');
+      if (val.indexOf('bank:') === 0) {
+        var b = Pay.byId(val.slice(5));
+        if (b) return { bank: b, method: b.type === 'Cash Box' ? 'Cash' : (b.type || 'Bank'), gl: Pay.glAcctOf(b) };
+      }
+      var m = val.indexOf('m:') === 0 ? val.slice(2) : 'Bank';
+      return { bank: null, method: m, gl: m === 'Cash' ? '1000' : '1010' };
+    },
+
+    /** Stamp the resolved source onto a record: what every save path writes. */
+    stamp: function (rec, val) {
+      var src = Pay.resolve(val);
+      rec.method = src.method;
+      rec.payAcct = src.gl;
+      rec.bankId = src.bank ? src.bank.id : '';
+      rec.bankName = src.bank ? src.bank.name : '';
+      return src;
+    },
+
+    /** Signed effect on cash: Income puts money IN, anything else takes it OUT. */
+    cashEffect: function (rec) {
+      var a = +(rec && rec.amount) || 0;
+      return (rec && rec.kind === 'Income') ? a : -a;
+    },
+
+    /**
+     * Move the paying account's own book by the DELTA between `prev` and `rec`.
+     *   post   → syncRegister(rec, null)                  … a withdrawal (or deposit for income)
+     *   edit   → syncRegister(rec, before, 'Adjustment ·') … only the difference
+     *   delete → reverseRegister(rec)                      … the whole thing back
+     * `amount` may be overridden for a partial leg (a shared cost's payer credits
+     * the FULL bill even though its own share is smaller).
+     */
+    syncRegister: function (rec, prev, note, amountOverride) {
+      if (!rec || !rec.bankId || !EPAL.bankTxnApply) return null;
+      var bank = Pay.byId(rec.bankId); if (!bank) return null;
+      var delta = amountOverride != null
+        ? (rec.kind === 'Income' ? +amountOverride : -amountOverride)
+        : Pay.cashEffect(rec) - Pay.cashEffect(prev);
+      if (Math.abs(delta) < 0.005) return null;
+      var isIn = delta > 0, amt = Math.abs(delta);
+      var what = (rec.category || rec.kind || 'Entry') + (rec.subCategory ? ' · ' + rec.subCategory : '') + (rec.party ? ' — ' + rec.party : '');
+      // The journal this movement belongs to: an explicit rec.glId when the
+      // caller knows it, else <prefix><voucher id>. An entry another concern
+      // FUNDED points at the funder's leg — that is whose account moved.
+      var glId = rec.glId ||
+        ((rec.fundedBy && rec.fundedBy !== rec.companyId ? 'GL-ACF-' : (rec.glPrefix || 'GL-ACC-')) + rec.id);
+      return EPAL.bankTxnApply(bank, isIn ? 'deposit' : 'withdraw', amt, rec.date || today(),
+        (note ? note + ' ' : '') + what, rec.ref || rec.id, glId,
+        { entryId: rec.id, reversal: note === 'Reversal of:' });
+    },
+
+    /** Give the account its money back for a deleted voucher, and flag the
+     *  original row so Manage Banks cannot reverse it a second time. `asOf`
+     *  dates the reversal row (callers on the demo clock pass their own today). */
+    reverseRegister: function (rec, asOf) {
+      if (!rec || !rec.bankId) return;
+      Pay.syncRegister({ id: rec.id, bankId: rec.bankId, kind: rec.kind, amount: 0, category: rec.category,
+        subCategory: rec.subCategory, party: rec.party, ref: rec.ref, date: asOf || today(),
+        companyId: rec.companyId, fundedBy: rec.fundedBy, glPrefix: rec.glPrefix }, rec, 'Reversal of:');
+      try {
+        S.list('bank_txns').forEach(function (t) {
+          if (t.entryId === rec.id && !t.reversal && !t.reversed) { t.reversed = true; db().save('bank_txns', t); }
+        });
+      } catch (e) {}
+    }
+  };
+  EPAL.pay = Pay;
 
   /* ==========================================================================
    * HARD CASH — the GL-1000 register, derived (never stored) from the journal

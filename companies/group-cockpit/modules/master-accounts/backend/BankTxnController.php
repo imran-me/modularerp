@@ -76,16 +76,23 @@ class BankTxnController
         ];
     }
 
+    /**
+     * The log. `provisioned` tells the CLIENT whether this table actually exists
+     * on this host — platform/data/api.js turns the bank_txns WRITE side on only
+     * when it is true, so the log starts persisting by itself the moment
+     * `php artisan migrate` runs, and never retries writes into a missing table
+     * (which is what caused the old save-fail → re-render loop).
+     */
     public function index(Request $request): JsonResponse
     {
         if (! $this->ensureTable()) {
-            return response()->json(['success' => true, 'count' => 0, 'data' => []]);
+            return response()->json(['success' => true, 'provisioned' => false, 'count' => 0, 'data' => []]);
         }
         $rows = DB::table('bank_transactions')->whereNull('deleted_at')
             ->orderBy('date')->orderBy('id')->get();
         $data = $rows->map(fn ($r) => $this->shape($r))->values();
 
-        return response()->json(['success' => true, 'count' => $data->count(), 'data' => $data]);
+        return response()->json(['success' => true, 'provisioned' => true, 'count' => $data->count(), 'data' => $data]);
     }
 
     public function store(Request $request): JsonResponse

@@ -418,9 +418,13 @@
     return { el: root, values: values, validate: validate, setErr: setErr, ctrls: ctrls, setOptions: setOptions };
   };
 
-  /* Convenience: a modal wrapping a form with Cancel/Save + validation. ----*/
+  /* Convenience: a modal wrapping a form with Cancel/Save + validation.
+   * onReady(form) fires once the form exists, before it is shown — the hook for
+   * wiring DEPENDENT fields (pick a company → setOptions() its accounts) without
+   * having to hand-build the modal. ----------------------------------------*/
   EPAL.formModal = function (opts) {
     var form = EPAL.form(opts.fields, opts.record);
+    if (opts.onReady) opts.onReady(form);
     return ui.modal({
       title: opts.title, icon: opts.icon || 'pencil-square', size: opts.size || 'lg',
       body: form.el,

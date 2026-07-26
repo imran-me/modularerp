@@ -52,11 +52,33 @@
   headless drive of the modal — 18/18 assertions — proved the ordering, the "tea"
   search, both-ways sync, the funder re-filter, the GL legs, the balance deduction
   and the inter-company legs on both books.
-- **Left open on purpose (owner's call):** in API mode the `bank_txns` LOG is still
-  browser-only (its table needs `php artisan migrate` on the host — the balance
-  itself does persist); the generic `entryForm` (New Journal Entry) still has the
-  plain Method select, not the account picker; Master Accounts' own expense
-  recorder was not touched.
+**FOLLOW-UPS ALSO DONE 2026-07-26** (owner: "push, then solve, then again push") —
+the three items left open above are closed:
+1. **`bank_txns` persistence is now self-healing.** `BankTxnController@index` reports
+   `provisioned: true|false`; `platform/data/api.js` hydrates the log ALWAYS and
+   promotes it into `WRITABLE` only when the server says its table is really there
+   (new `CONDITIONAL` map). So the log starts persisting BY ITSELF the moment
+   `php artisan migrate` runs — no redeploy — and there is no save-fail → re-render
+   loop if it never does. It also `console.warn`s the gap instead of hiding it.
+   Proved with a stubbed load of the real api.js: 8/8 across both branches.
+2. **New Journal Entry** (Travels, income AND expense) now uses the account picker
+   too: an Income entry ADDS to the chosen account (deposit row), an Expense takes
+   it out, and moving an entry to a different account refunds the old one in full and
+   charges the new one — two honest rows, never a silent balance swap.
+3. **Master Accounts › Operational Expenses** and the **Shared Cost** desk got the
+   same picker: the account list follows *Company* / *Paid by*, the spend moves that
+   account's balance + history, and for a shared cost the PAYER's account loses the
+   FULL bill (one register row) while the other concerns just owe their share.
+   Also fixed: with the desk scoped to "All companies" the picker was offering only
+   the generic methods (an `'all'`/unset scope is not a company — it means Group HQ).
+
+**One implementation:** the helpers moved into the platform cash kit as **`EPAL.pay`**
+(`platform/kit/cash.js`) — `options/resolve/stamp/syncRegister/reverseRegister` — used
+by Travels Accounts and both Master Accounts desks, so a fix can't land in one and
+drift in the other. `EPAL.formModal` gained `onReady(form)` for dependent fields.
+**Verified:** sweep 222/222 × both themes, 0 errors; trial balance balances; PHP 11/11;
+headless drive of all three screens **20/20** (including Dr−Cr = 0 for travels, group
+and woodart after every posting).
 
 ### T-BANKS — condense the Manage Banks summary block (space utilization)
 **Reported:** 2026-07-22, screenshot of Master Accounts › Manage Banks › Group HQ.

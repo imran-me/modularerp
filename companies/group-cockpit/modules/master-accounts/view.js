@@ -554,15 +554,33 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
     var catList = cats();
     var catOpts = catList.filter(function (c) { return c.active !== false; }).map(function (c) { return c.name; });
     function subsOf(name) { var c = catList.filter(function (x) { return x.name === name; })[0]; return (c && c.subs && c.subs.length) ? c.subs : []; }
+    // "Paid from" is a REAL account now (owner 2026-07-26, same as the Travels
+    // expense desk): the accounts of the company the expense belongs to, so the
+    // spend also moves that account's balance + history, not only the GL. The
+    // generic methods stay at the end of the list for a cheque or card swipe.
+    // whose expense (and therefore whose accounts we may pay from). The desk's
+    // scope may be 'all' — or unset — and neither is a company: both mean Group HQ.
+    var startCo = (rec && rec.companyId) || (selCo && selCo !== 'all' ? selCo : 'group');
+    var seed = Object.assign({ date: TODAY_STR }, rec || {},
+      { companyId: startCo, source: EPAL.pay.valueOf(rec) });
     EPAL.formModal({
       title: rec ? 'Edit Expense' : 'New Expense', icon: 'wallet2', size: 'md',
-      record: rec || { date: TODAY_STR, method: 'Bank', companyId: selCo === 'all' ? 'group' : selCo },
+      record: seed,
+      // switching Company re-filters the accounts — you can only pay from an
+      // account that company owns
+      onReady: function (f) {
+        f.ctrls.companyId.input.addEventListener('change', function () {
+          f.setOptions('source', EPAL.pay.options(this.value || 'group'));
+        });
+      },
       fields: [
         { key: 'companyId', label: 'Company', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })) },
         { key: 'category', label: 'Category', type: 'select', required: true, options: catOpts },
         { key: 'subCategory', label: 'Sub-category', type: 'text', placeholder: 'e.g. ' + (subsOf(catOpts[0]) || []).slice(0, 3).join(', '), hint: 'Pick from the category\'s sub-list or type your own.' },
         { key: 'date', label: 'Date', type: 'date', default: TODAY_STR },
-        { key: 'method', label: 'Paid from / method', type: 'select', options: METHODS, default: 'Bank' },
+        { key: 'source', label: 'Paid from (bank / cash account)', type: 'select', required: true, searchable: true,
+          options: EPAL.pay.options(startCo),
+          hint: 'The real account the money leaves — its balance drops and the spend lands in its transaction history.' },
         { key: 'party', label: 'Paid to', type: 'text' },
         { key: 'ref', label: 'Bill / voucher no', type: 'text' },
         // LINE ITEMS (ported from the production ERP's expense_items): several
@@ -579,13 +597,24 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         var items = (v.items || []).map(function (i) { return { description: (i.description || '').trim(), amount: +i.amount || 0 }; }).filter(function (i) { return i.amount > 0; });
         var total = items.reduce(function (a, i) { return a + i.amount; }, 0);
         if (total <= 0) { ui.toast('Add at least one item with an amount', 'error'); return false; }
+        var before = rec ? Object.assign({}, rec) : null;
         var r = rec || { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), kind: 'Expense', created: TODAY_STR };
         r.companyId = v.companyId; r.category = v.category; r.subCategory = (v.subCategory || '').trim();
-        r.items = items; r.amount = total; r.date = v.date; r.method = v.method; r.party = v.party || ''; r.ref = v.ref || ''; r.desc = v.desc || '';
+        r.items = items; r.amount = total; r.date = v.date; r.party = v.party || ''; r.ref = v.ref || ''; r.desc = v.desc || '';
+        EPAL.pay.stamp(r, v.source);          // method + payAcct + bankId/bankName
+        r.glPrefix = 'GL-MX-';                // this desk's mirror id, for the register row
         db.save('acc_entries', r);
-        // mirror into the GL — Cash pays from 1000, everything else from 1010
-        try { EPAL.ledger.post({ id: 'GL-MX-' + r.id, date: r.date, companyId: r.companyId, ref: r.ref || r.id, memo: r.category + (r.subCategory ? ' · ' + r.subCategory : '') + (r.desc ? ' — ' + r.desc : ''), source: 'manual', party: r.party, lines: [{ account: expenseAccountFor(r.category + ' ' + r.subCategory), dr: r.amount, cr: 0 }, { account: r.method === 'Cash' ? '1000' : '1010', dr: 0, cr: r.amount }] }); } catch (e) { ui.toast(e.message || 'Ledger mirror failed', 'error'); }
-        ui.toast('Expense recorded', 'success'); EPAL.router.render(); return true;
+        // mirror into the GL — the credited side is the account that actually
+        // paid (a cash box IS 1000; every other account 1010), pinned on the record
+        try { EPAL.ledger.post({ id: 'GL-MX-' + r.id, date: r.date, companyId: r.companyId, ref: r.ref || r.id, memo: r.category + (r.subCategory ? ' · ' + r.subCategory : '') + (r.desc ? ' — ' + r.desc : ''), source: 'manual', party: r.party, lines: [{ account: expenseAccountFor(r.category + ' ' + r.subCategory), dr: r.amount, cr: 0 }, { account: r.payAcct || (r.method === 'Cash' ? '1000' : '1010'), dr: 0, cr: r.amount }] }); } catch (e) { ui.toast(e.message || 'Ledger mirror failed', 'error'); }
+        // …and move the paying account's own book: balance + a row in its history
+        if (before && before.bankId && before.bankId !== r.bankId) {
+          EPAL.pay.reverseRegister(before, TODAY_STR);   // moved to another account
+          EPAL.pay.syncRegister(r, null);
+        } else {
+          EPAL.pay.syncRegister(r, before, before ? 'Adjustment ·' : '');
+        }
+        ui.toast('Expense recorded' + (r.bankName ? ' · paid from ' + r.bankName : ''), 'success'); EPAL.router.render(); return true;
       }
     });
   }
@@ -610,11 +639,18 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       { key: 'category', label: 'Expense head', type: 'select', required: true, options: catOpts },
       { key: 'amount', label: 'Total amount (৳)', type: 'money', required: true, min: 1 },
       { key: 'paidBy', label: 'Paid by', type: 'select', required: true, options: [['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; })), default: 'group' },
-      { key: 'method', label: 'Paid from / method', type: 'select', options: METHODS, default: 'Bank', required: true },
+      // the FULL bill leaves this one account, even though each concern carries
+      // only its share — so the list follows "Paid by" (owner 2026-07-26)
+      { key: 'source', label: 'Paid from (bank / cash account)', type: 'select', required: true, searchable: true,
+        options: EPAL.pay.options('group'),
+        hint: 'The payer\'s account: the FULL amount leaves it, and the other concerns owe their share back.' },
       { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
       { key: 'ref', label: 'Bill / voucher no', type: 'text', placeholder: 'e.g. RENT-07' },
       { key: 'desc', label: 'Notes', type: 'textarea', col2: true, placeholder: 'e.g. July office rent · AI subscriptions' }
-    ], { date: TODAY_STR, method: 'Bank', paidBy: 'group' });
+    ], { date: TODAY_STR, paidBy: 'group', source: 'm:Bank' });
+    details.ctrls.paidBy.input.addEventListener('change', function () {
+      details.setOptions('source', EPAL.pay.options(this.value || 'group'));
+    });
 
     body.appendChild(el('div.section-label.mt-0', { text: '1 · Cost details' }));
     body.appendChild(details.el);
@@ -656,13 +692,19 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       live.appendChild(el('div.card.mb-2', null, [ el('div.card-body', null,
         [ el('div.text-mute.xs.mb-1', { html: ui.icon('diagram-3') + ' ' + sel.length + ' concerns × ' + ui.money(Math.floor(amt / sel.length)) + ' — head ' + head + ' · ' + esc(v.category || '') }) ].concat(rows)) ]));
       var payerShare = shares[sel.map(function (p) { return p.id; }).indexOf(payer)] || 0, recv = amt - payerShare;
-      var pay = v.method === 'Cash' ? '1000 Cash' : '1010 Bank';
+      var src = EPAL.pay.resolve(v.source);
+      var pay = src.gl + (src.gl === '1000' ? ' Cash' : ' Bank') + (src.bank ? ' · ' + src.bank.name : '');
       var jl = el('div.ma-shr-jl');
       jl.appendChild(el('div.text-mute.xs.mb-1', { html: ui.icon('journal-text') + ' Journal — ' + coName(payer) + ' pays the full ' + ui.money(amt) }));
       if (payerShare > 0) jl.appendChild(el('div.ma-shr-row.sm', null, [el('span', { text: 'DR ' + head + ' · ' + coName(payer) + ' share' }), el('span.num', { text: ui.money(payerShare) })]));
       if (recv > 0) jl.appendChild(el('div.ma-shr-row.sm', null, [el('span', { text: 'DR 1300 Inter-company Receivable' }), el('span.num', { text: ui.money(recv) })]));
       jl.appendChild(el('div.ma-shr-row.sm', null, [el('span', { text: 'CR ' + pay }), el('span.num', { text: ui.money(amt) })]));
       jl.appendChild(el('div.text-mute.xs.mt-1', { text: 'Each other concern books: DR ' + head + ' share / CR 2400 Inter-company Payable — it owes ' + coName(payer) + ' until settled.' }));
+      if (src.bank) {
+        var b4 = +src.bank.balance || 0;
+        jl.appendChild(el('div.text-mute.xs.mt-1', { html: ui.icon('bank') + ' ' + esc(src.bank.name) + ' · ' +
+          ui.money(b4) + ' → <b>' + ui.money(b4 - amt) + '</b> — the full bill, logged in its transaction history.' }));
+      }
       live.appendChild(jl);
     }
     refreshLive();
@@ -673,7 +715,9 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       if (amt <= 0) { ui.toast('Enter a valid amount', 'error'); return; }
       var sel = selected();
       if (sel.length < 2) { ui.toast('Select at least two concerns to share the cost', 'error'); return; }
-      var payer = v.paidBy, head = expenseAccountFor(v.category || ''), cashAcct = v.method === 'Cash' ? '1000' : '1010';
+      var payer = v.paidBy, head = expenseAccountFor(v.category || '');
+      var src = EPAL.pay.resolve(v.source), cashAcct = src.gl;
+      if (src.bank && (src.bank.companyId || 'group') !== payer) { ui.toast('That account belongs to ' + coName(src.bank.companyId || 'group') + ', not the payer', 'error'); return; }
       var ref = 'SHR-' + ui.uid('').slice(-6).toUpperCase();
       var shares = splitOf(amt, sel.length), shareOf = {};
       sel.forEach(function (p, i) { shareOf[p.id] = shares[i]; });
@@ -696,11 +740,23 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
             lines: [{ account: head, dr: shareOf[p.id], cr: 0 }, { account: '2400', dr: 0, cr: shareOf[p.id] }] });
         });
         sel.forEach(function (p) {
+          var isPayer = p.id === payer;
           db.save('acc_entries', { id: 'JV-' + ref + '-' + p.id, companyId: p.id, kind: 'Expense',
             category: v.category, subCategory: 'Shared', amount: shareOf[p.id], date: v.date,
-            method: p.id === payer ? v.method : 'Inter-co', party: 'Shared · ' + coName(payer),
+            method: isPayer ? src.method : 'Inter-co', party: 'Shared · ' + coName(payer),
+            // only the payer's row names the account — the others never paid cash,
+            // they owe their share (2400). payAcct pins the payer's credited side.
+            bankId: isPayer && src.bank ? src.bank.id : '', bankName: isPayer && src.bank ? src.bank.name : '',
+            payAcct: isPayer ? cashAcct : '',
             ref: ref, desc: v.desc || '', alloc: true, created: TODAY_STR });
         });
+        // The payer's account loses the FULL bill (not just its share) — one row
+        // in its history for the whole payment, exactly as the journal credits it.
+        if (src.bank) {
+          EPAL.pay.syncRegister({ id: 'JV-' + ref + '-' + payer, bankId: src.bank.id, kind: 'Expense', amount: amt,
+            category: v.category, subCategory: 'Shared cost · ' + sel.length + ' concerns', party: coName(payer),
+            ref: ref, date: v.date, companyId: payer, glId: 'GL-' + ref + '-' + payer }, null, '', amt);
+        }
         ui.toast('Shared ' + ui.money(amt) + ' across ' + sel.length + ' concerns (' + ui.money(Math.floor(amt / sel.length)) + ' each)', 'success');
         m.close(); EPAL.router.render();
       } catch (e) { ui.toast(e.message || 'Posting failed', 'error'); }
