@@ -1161,17 +1161,16 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     ].filter(Boolean)));
     page.appendChild(pills('banks'));
 
-    page.appendChild(el('div.kpi-grid', null, [
-      kpi('Total Cash Position', ui.money(total, { compact: true }), 'safe2'),
-      kpi('Accounts', all.length, 'bank', null, 'across all concerns'),
-      kpi('Largest Balance', largest ? ui.money(largest.balance, { compact: true }) : '—', 'trophy',
-        null, largest ? largest.name + ' · ' + (largest.branch || '—') : ''),
-      kpi('Average Balance', all.length ? ui.money(total / all.length, { compact: true }) : '—', 'distribute-vertical')
-    ]));
+    var scr = screen('banks');
+    var kpis = scr.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Total Cash Position', ui.money(total, { compact: true }), 'safe2'));
+    kpis.appendChild(kpi('Accounts', all.length, 'bank', null, 'across all concerns'));
+    kpis.appendChild(kpi('Largest Balance', largest ? ui.money(largest.balance, { compact: true }) : '—', 'trophy',
+      null, largest ? largest.name + ' · ' + (largest.branch || '—') : ''));
+    kpis.appendChild(kpi('Average Balance', all.length ? ui.money(total / all.length, { compact: true }) : '—', 'distribute-vertical'));
 
     var mixId = ui.uid('bankMix');
-    var row = el('div.two-col');
-    row.appendChild(chartCard('Balance by Bank', 'pie-chart', mixId, 'share of the group cash position', 280));
+    scr.querySelector('[data-fill="chart"]').replaceWith(chartCard('Balance by Bank', 'pie-chart', mixId, 'share of the group cash position', 280));
 
     // cash held per concern — the CFO's "who is sitting on the cash" card
     var byCo = {};
@@ -1181,26 +1180,19 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       byCo[k].total += b.balance || 0; byCo[k].count++;
     });
     var coRows = Object.keys(byCo).sort(function (a, b) { return byCo[b].total - byCo[a].total; });
-    row.appendChild(el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('diagram-3') + ' Cash by Concern' }),
-        el('span.card-sub', { text: 'holding entity of each account' }) ]),
-      el('div.card-body', null, [
-        el('div.data-list', null, coRows.map(function (k) {
-          var co = EPAL.config.company(k);
-          var share = total ? byCo[k].total / total * 100 : 0;
-          return el('div.data-row', null, [
-            el('div.flex-1', null, [
-              el('div.fw-600', { text: co ? co.short : k, style: co ? { color: co.accent } : null }),
-              el('div.text-mute.xs', { text: byCo[k].count + ' account' + (byCo[k].count === 1 ? '' : 's') + ' · ' + ui.pct(share) + ' of position' }),
-              el('div.progress.mt-1', null, [ el('div.progress-bar', {
-                style: { width: Math.max(2, Math.round(share)) + '%', background: co ? co.accent : GOLD } }) ])
-            ]),
-            el('span.num.strong', { text: ui.money(byCo[k].total, { compact: true }) })
-          ]);
-        }))
-      ])
-    ]));
-    page.appendChild(row);
+    scr.querySelector('[data-fill="byco"]').appendChild(el('div.data-list', null, coRows.map(function (k) {
+      var co = EPAL.config.company(k);
+      var share = total ? byCo[k].total / total * 100 : 0;
+      return el('div.data-row', null, [
+        el('div.flex-1', null, [
+          el('div.fw-600', { text: co ? co.short : k, style: co ? { color: co.accent } : null }),
+          el('div.text-mute.xs', { text: byCo[k].count + ' account' + (byCo[k].count === 1 ? '' : 's') + ' · ' + ui.pct(share) + ' of position' }),
+          el('div.progress.mt-1', null, [ el('div.progress-bar', {
+            style: { width: Math.max(2, Math.round(share)) + '%', background: co ? co.accent : GOLD } }) ])
+        ]),
+        el('span.num.strong', { text: ui.money(byCo[k].total, { compact: true }) })
+      ]);
+    })));
 
     var TYPE_ICON = { 'Bank': 'bank', 'bKash': 'phone', 'Nagad': 'phone-fill', 'Cash Box': 'cash-stack', 'Card': 'credit-card' };
     var table = EPAL.table({
@@ -1233,8 +1225,8 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       ],
       empty: { icon: 'bank', title: 'No bank accounts yet', hint: 'Add the first account to build the cash position.' }
     });
-    page.appendChild(el('div.section-label', { text: 'All Accounts' }));
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ table.el ]) ]));
+    scr.querySelector('[data-fill="table"]').appendChild(table.el);
+    mountScreen(page, scr);
 
     requestAnimationFrame(function () {
       var c = document.getElementById(mixId);
