@@ -18,6 +18,7 @@ use Epal\Modules\GroupCockpit\MasterAccounts\CustomerController;
 use Epal\Modules\GroupCockpit\MasterAccounts\SupplierController;
 use Epal\Modules\GroupCockpit\MasterAccounts\AccEntryController;
 use Epal\Modules\GroupCockpit\MasterAccounts\ExpenseCategoryController;
+use Epal\Modules\GroupCockpit\MasterAccounts\LoanController;
 use Epal\Modules\GroupCockpit\MasterAccounts\PartyTypeController;
 use Epal\Modules\GroupCockpit\MasterAccounts\PaymentScheduleController;
 use Illuminate\Support\Facades\Route;
@@ -72,3 +73,9 @@ Route::delete('group/master-accounts/expense-categories/{id}', [ExpenseCategoryC
 Route::get('group/master-accounts/entries', [AccEntryController::class, 'index']);
 Route::post('group/master-accounts/entries', [AccEntryController::class, 'store']);
 Route::delete('group/master-accounts/entries/{id}', [AccEntryController::class, 'destroy']);
+
+// Loan books (module-owned) — {store} = products | ext | taken | txns.
+// Frontend stores: loan_products, loans_ext, loans_taken, loan_txns.
+Route::get('group/master-accounts/loans/{store}', [LoanController::class, 'index'])->where('store', 'products|ext|taken|txns');
+Route::post('group/master-accounts/loans/{store}', [LoanController::class, 'store'])->where('store', 'products|ext|taken|txns');
+Route::delete('group/master-accounts/loans/{store}/{id}', [LoanController::class, 'destroy'])->where('store', 'products|ext|taken|txns');

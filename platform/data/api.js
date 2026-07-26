@@ -61,7 +61,11 @@
     tv_files:      'travels/file-management/files',
     party_types:   'group/master-accounts/party-types',
     exp_categories: 'group/master-accounts/expense-categories',
-    acc_entries:   'group/master-accounts/entries'
+    acc_entries:   'group/master-accounts/entries',
+    loan_products: 'group/master-accounts/loans/products',
+    loans_ext:     'group/master-accounts/loans/ext',
+    loans_taken:   'group/master-accounts/loans/taken',
+    loan_txns:     'group/master-accounts/loans/txns'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -90,6 +94,10 @@
     party_types: 'group/master-accounts/party-types',
     exp_categories: 'group/master-accounts/expense-categories',
     acc_entries: 'group/master-accounts/entries',
+    loan_products: 'group/master-accounts/loans/products',
+    loans_ext:   'group/master-accounts/loans/ext',
+    loans_taken: 'group/master-accounts/loans/taken',
+    loan_txns:   'group/master-accounts/loans/txns',
     perf_reviews: 'group/employees/reviews'
   };
 
