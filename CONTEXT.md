@@ -67,8 +67,15 @@ pixel-perfect match — for EVERY module.** Recorded in `docs/FULLSTACK-REBUILD-
   seeded + CRUD-tested vs MySQL; api.js HYDRATE+WRITABLE wired. Commit 7c7156f. (acc_entries/
   schedules/banks come from the Master Accounts backend.)
 
+**➡️ MARKETING done (2026-07-26).** Backend: 5-store document-style Laravel slice
+(tv_campaigns/templates/messages/bot_bookings/bot_chat), migrated + CRUD-tested vs MySQL,
+api.js wired (cc9d09d). Frontend: already at standard from the prior conversion — the
+tab/route STRUCTURAL shells are templated (kpi-grid/head-row/two-col via frag); the
+remaining el() is documented DYNAMIC content (chat bubbles, phone panel, funnel bars,
+template-editor preview) — same bar as MA detail views, left as el() by design.
+
 **▶ NEXT (resume here):** the rest of the **Travels modules**, same loop each (FE route
-markup + parity + backend where the module owns data): marketing · automation · reports ·
+markup + parity + backend where the module owns data): automation · reports ·
 analytics · crm · dashboard · ledgers · contract-file · contract-flight · vendor-agent ·
 hrm · visa-processing · air-ticketing (payroll backend already built via master-accounts).
 Then Group-cockpit modules, then woodart/it/shop/construction. Autonomous, push each.
