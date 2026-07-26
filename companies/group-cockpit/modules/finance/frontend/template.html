@@ -4,3 +4,9 @@
   block; frontend/finance.js fills live data + draws charts into the <canvas>
   placeholders. Screens are converted one at a time, pixel-verified byte-identical.
 ============================================================================ -->
+
+<!-- Shared chrome — the page-head bar (mirrors EPAL.pageHead markup) and the
+     finance tab band. head() / pills() clone + fill these. -->
+<div data-shell="head" class="page-head"><div><h1 class="page-title" data-fill="title"><span class="eyebrow">Epal Group · Consolidated Finance</span><i class="bi" data-fill="icon"></i></h1><p class="page-sub" data-fill="sub"></p></div><div class="page-actions" data-fill="actions"></div></div>
+
+<div data-shell="pills"><div class="tab-underline tabs-dense mb-3" data-fill="tabs"><button data-tab="">Overview</button><button data-tab="pnl">P&amp;L</button><button data-tab="cashflow">Cash Flow</button><button data-tab="balance-sheet">Balance Sheet</button><button data-tab="receivables">Receivables</button><button data-tab="payables">Payables</button><button data-tab="banks">Banks</button><button data-tab="coa">Chart of Accounts</button><button data-tab="journal">Journal</button><button data-tab="trial-balance">Trial Balance</button><button data-tab="consolidation">Consolidation</button><button data-tab="concern-pnl">P&amp;L by Concern</button><button data-tab="expenses">Group Expenses</button></div></div>

@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  Group Consolidated Finance — real-HTML screens (FRONTEND BUILD LAW).\n  Each route screen is authored below as a plain-HTML <section data-screen=\"…\">\n  block; frontend/finance.js fills live data + draws charts into the <canvas>\n  placeholders. Screens are converted one at a time, pixel-verified byte-identical.\n============================================================================ -->\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  Group Consolidated Finance — real-HTML screens (FRONTEND BUILD LAW).\n  Each route screen is authored below as a plain-HTML <section data-screen=\"…\">\n  block; frontend/finance.js fills live data + draws charts into the <canvas>\n  placeholders. Screens are converted one at a time, pixel-verified byte-identical.\n============================================================================ -->\n\n<!-- Shared chrome — the page-head bar (mirrors EPAL.pageHead markup) and the\n     finance tab band. head() / pills() clone + fill these. -->\n<div data-shell=\"head\" class=\"page-head\"><div><h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\">Epal Group · Consolidated Finance</span><i class=\"bi\" data-fill=\"icon\"></i></h1><p class=\"page-sub\" data-fill=\"sub\"></p></div><div class=\"page-actions\" data-fill=\"actions\"></div></div>\n\n<div data-shell=\"pills\"><div class=\"tab-underline tabs-dense mb-3\" data-fill=\"tabs\"><button data-tab=\"\">Overview</button><button data-tab=\"pnl\">P&amp;L</button><button data-tab=\"cashflow\">Cash Flow</button><button data-tab=\"balance-sheet\">Balance Sheet</button><button data-tab=\"receivables\">Receivables</button><button data-tab=\"payables\">Payables</button><button data-tab=\"banks\">Banks</button><button data-tab=\"coa\">Chart of Accounts</button><button data-tab=\"journal\">Journal</button><button data-tab=\"trial-balance\">Trial Balance</button><button data-tab=\"consolidation\">Consolidation</button><button data-tab=\"concern-pnl\">P&amp;L by Concern</button><button data-tab=\"expenses\">Group Expenses</button></div></div>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="group-cockpit/finance"]')) {
     var st = document.createElement('style');
@@ -97,22 +97,34 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
   // SECTION NAV — the same calm full-bleed underline tabs as Master Accounts
   // (owner 2026-07-15). 13 sections, so the row is marked .tabs-dense: it
   // compresses harder and scrolls (hidden bar) only at the narrowest widths.
+  // tab band — authored as real HTML ([data-shell="pills"] in template.html);
+  // here we only mark the active tab + wire clicks (JS = behavior only).
   function pills(active) {
-    var host = el('div.tab-underline.tabs-dense.mb-3');
-    TABS.forEach(function (t) {
-      host.appendChild(el('button' + ((active || null) === t[0] ? '.active' : ''), {
-        text: t[1],
-        onclick: function () { EPAL.router.navigate('group/finance' + (t[0] ? '/' + t[0] : '')); }
-      }));
+    var wrap = shell('pills');
+    var host = wrap.querySelector('[data-fill="tabs"]');
+    Array.prototype.forEach.call(host.querySelectorAll('button'), function (b) {
+      var t = b.getAttribute('data-tab') || null;
+      if ((active || null) === t) b.classList.add('active');
+      b.addEventListener('click', function () { EPAL.router.navigate('group/finance' + (t ? '/' + t : '')); });
     });
     // the period lock is VISIBLE here too (P2) — this is where it is set
     var locked = (hasLedger() && LED().lockedThrough) ? LED().lockedThrough() : null;
-    return el('div', null, [host, locked ? el('div.mb-2', null, [
+    if (locked) wrap.appendChild(el('div.mb-2', null, [
       el('span.badge.badge-warn', { html: ui.icon('lock-fill') + ' Books locked through ' + ui.escapeHtml(locked) + ' — back-dated entries are blocked' })
-    ]) : null].filter(Boolean));
+    ]));
+    return wrap;
   }
+  // page-head bar — authored as real HTML ([data-shell="head"], mirrors the
+  // EPAL.pageHead markup); JS fills the per-screen icon / title / sub / actions.
   function head(title, icon, sub, actions) {
-    return EPAL.pageHead({ eyebrow: 'Epal Group · Consolidated Finance', icon: icon, title: title, sub: sub, actions: actions });
+    var h = shell('head');
+    h.querySelector('[data-fill="icon"]').className = 'bi bi-' + icon;
+    h.querySelector('[data-fill="title"]').appendChild(document.createTextNode(title || ''));
+    var subEl = h.querySelector('[data-fill="sub"]');
+    subEl.textContent = sub || ''; subEl.setAttribute('title', sub || '');
+    var acts = h.querySelector('[data-fill="actions"]');
+    (actions || []).forEach(function (a) { if (a) acts.appendChild(a); });
+    return h;
   }
   function dl(name, content, mime) {
     var blob = new Blob([content], { type: mime || 'text/csv' });
