@@ -22,7 +22,34 @@
 <template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
 <template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
 
-<!-- reusable shells (markup, filled by the logic) --------------------------- -->
+<!-- ============ THE MODULE SHELL, written as real HTML ========================
+     The top bars every screen shares: the page-head bar, and the tab band with all
+     9 tabs. The logic fills the live title, marks the active tab, and wires clicks. -->
+<div data-shell="head" class="page-head"><div><h1 class="page-title" data-fill="title"><span class="eyebrow">Epal Group · Master Accounts</span><i class="bi bi-safe2"></i></h1><p class="page-sub" title="Group-level accounting across every sister concern — switch company with the buttons below.">Group-level accounting across every sister concern — switch company with the buttons below.</p></div><div class="page-actions"></div></div>
+<div data-shell="tabs" class="tab-underline tabs-dense mb-3"><button data-tab="banks">Manage Banks</button><button data-tab="cash">Manage Cash</button><button data-tab="payroll">Master Payroll</button><button data-tab="schedules">Payment Schedules</button><button data-tab="journals">Manage Journals</button><button data-tab="expenses">Operational Expenses</button><button data-tab="accounts">Manage Accounts</button><button data-tab="party-types">Party Types</button><button data-tab="loans">Manage Loan</button></div>
+
+<!-- ============================================================================
+     REAL SCREEN HTML (the foundation). Each <section data-screen="…"> is the whole
+     screen written as plain HTML — containers, KPI cards, buttons, the card that
+     holds the data grid. The logic file only FILLS the live values ([data-k]),
+     drops the data table into [data-fill], and wires the buttons. No fragment
+     cloning of tiny pieces — you read the screen here as HTML.
+     ============================================================================ -->
+<section data-screen="party-types">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Party Types</span><span class="kpi-ico"><i class="bi bi-tags"></i></span></div><div class="kpi-value" data-k="total"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Mapped</span><span class="kpi-ico"><i class="bi bi-link-45deg"></i></span></div><div class="kpi-value" data-k="mapped"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Free text</span><span class="kpi-ico"><i class="bi bi-pencil"></i></span></div><div class="kpi-value" data-k="free"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Scope</span><span class="kpi-ico"><i class="bi bi-diagram-3"></i></span></div><div class="kpi-value" data-k="scope"></div></div>
+  </div>
+  <div class="mb-2" data-role="add"><button class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Add New</button></div>
+  <div class="card">
+    <div class="card-head"><h3 data-k="title"></h3><span class="card-sub">used on schedules &amp; party records</span></div>
+    <div class="card-body" data-fill="table"></div>
+  </div>
+</section>
+
+<!-- reusable shells (still used by the not-yet-rebuilt screens) --------------- -->
 <!-- a titled card: head (title + optional sub) over a body slot -->
 <template data-tpl="titled-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
 <!-- a primary action button on its own row (fill data-slot="btn") -->

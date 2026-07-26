@@ -38,6 +38,14 @@ function frag(name) {
   return t.content.firstElementChild.cloneNode(true);
 }
 function slot(root, name) { return root.querySelector('[data-slot="' + name + '"]'); }
+// clone a REAL SCREEN written as plain HTML in template.html (<section data-screen>).
+// The logic then fills [data-k]/[data-fill] + wires buttons — HTML is the foundation.
+function screen(name) { return TPL.querySelector('[data-screen="' + name + '"]').cloneNode(true); }
+function shell(name) { return TPL.querySelector('[data-shell="' + name + '"]').cloneNode(true); }
+function fillK(root, k, v) { var n = root.querySelector('[data-k="' + k + '"]'); if (n) n.textContent = String(v); }
+// move a screen's element children onto `page` (no wrapper, no whitespace nodes) so
+// the final DOM is exactly what the old code produced.
+function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(function (c) { page.appendChild(c); }); }
 function kgrid(children) { var g = frag('kpi-grid'); (children || []).forEach(function (c) { if (c) g.appendChild(c); }); return g; }
 function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b.classList.add('active'); b.textContent = label; b.addEventListener('click', onClick); return b; }
 // reusable markup shells (template.html) — a primary-action button row, and a
@@ -415,13 +423,18 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       if (sub === 'loans' && selCo === 'all') { /* the loan desk reads 'all' fine */ }
       var titles = {}; SECTIONS.forEach(function (s) { titles[s[0]] = s[1]; });
       if (sub === 'payroll' && (selCo === 'all')) selCo = 'travels';
-      page.appendChild(EPAL.pageHead({
-        eyebrow: 'Epal Group · Master Accounts', icon: 'safe2', title: titles[sub],
-        sub: 'Group-level accounting across every sister concern — switch company with the buttons below.'
-      }));
-      // section nav — calm underline tabs (primary), per the owner's mock
-      var pills = frag('nav');   // 9 sections — dense
-      SECTIONS.forEach(function (s) { pills.appendChild(navBtn(s[1], sub === s[0], function () { EPAL.router.navigate('group/master-accounts/' + s[0]); })); });
+      // page-head bar — real HTML (template.html · [data-shell="head"]); fill the
+      // live route title (a text node, exactly like the old pageHead produced).
+      var head = shell('head');
+      head.querySelector('[data-fill="title"]').appendChild(document.createTextNode(titles[sub] || ''));
+      page.appendChild(head);
+      // tab band — real HTML ([data-shell="tabs"]); mark the active tab + wire clicks.
+      var pills = shell('tabs');
+      Array.prototype.forEach.call(pills.querySelectorAll('button'), function (b) {
+        var t = b.getAttribute('data-tab');
+        if (t === sub) b.classList.add('active');
+        b.addEventListener('click', function () { EPAL.router.navigate('group/master-accounts/' + t); });
+      });
       page.appendChild(pills);
       // AUDIT P2: the period lock is VISIBLE wherever money is handled
       var lockYm = (EPAL.ledger && EPAL.ledger.lockedThrough) ? EPAL.ledger.lockedThrough() : null;
@@ -1198,13 +1211,17 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
   function ptSlug(name) { return String(name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); }
   function partyTypesView(page) {
     var list = S.list('party_types');
-    page.appendChild(kgrid([
-      kpi('Party Types', String(list.length), 'tags'),
-      kpi('Mapped', String(list.filter(function (p) { return p.mapsTo; }).length), 'link-45deg'),
-      kpi('Free text', String(list.filter(function (p) { return !p.mapsTo; }).length), 'pencil'),
-      kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
-    ]));
-    if (canCreate()) page.appendChild(addRow(ui.icon('plus-lg') + ' Add New', function () { partyTypeForm(null); }));
+    // the whole screen is real HTML (template.html · <section data-screen="party-types">).
+    // here we only fill the live values, wire the button, and drop in the data grid.
+    var s = screen('party-types');
+    fillK(s, 'total', list.length);
+    fillK(s, 'mapped', list.filter(function (p) { return p.mapsTo; }).length);
+    fillK(s, 'free', list.filter(function (p) { return !p.mapsTo; }).length);
+    fillK(s, 'scope', selCo === 'all' ? 'All companies' : coName(selCo));
+    s.querySelector('[data-k="title"]').innerHTML = ui.icon('tags') + ' Party Types — ' + coName(selCo);
+    var addWrap = s.querySelector('[data-role="add"]');
+    if (canCreate()) addWrap.querySelector('button').addEventListener('click', function () { partyTypeForm(null); });
+    else addWrap.parentNode.removeChild(addWrap);
     var rows = list.filter(function (p) { return selCo === 'all' ? true : (p.companyId || 'group') === selCo; });
     var cols = [
       { key: 'companyId', label: 'Company', render: function (p) { return coCell(p.companyId || 'group'); }, exportVal: function (p) { return p.companyId || 'group'; } },
@@ -1226,7 +1243,8 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       }),
       empty: { icon: 'tags', title: 'No party types in scope' }
     });
-    page.appendChild(titledCard(ui.icon('tags') + ' Party Types — ' + coName(selCo), 'used on schedules & party records', tbl.el));
+    s.querySelector('[data-fill="table"]').appendChild(tbl.el);
+    mountScreen(page, s);
   }
   function partyTypeForm(p) {
     EPAL.formModal({
