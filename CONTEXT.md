@@ -19,6 +19,11 @@
 > - **ORDER:** Master Accounts + Travels FIRST, then every other module, one at a time.
 > - Earlier claims that screens were "converted to markup" were WRONG — they were still
 >   JS-built (`el()`) or `<template>`-cloned. This law supersedes all of that. Redo them.
+> - **BACKUP RULE (owner):** BEFORE converting a module, COPY its current frontend files
+>   to `_frontend-originals/<company>/<module>/` and KEEP them there even after changing.
+>   Use that backup + the `.parity/<module>-before` screenshots to **cross-check** the new
+>   HTML build against the old, running the loop until it matches **100% (byte-identical)**,
+>   THEN move to the next. Never delete the backup.
 >
 > (Proven pattern started: master-accounts `<section data-screen="party-types">` in
 > template.html is real HTML; party-types route verified byte-identical. Extend this to
