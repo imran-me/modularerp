@@ -2027,13 +2027,13 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     ]));
     page.appendChild(pills('balance-sheet'));
 
-    page.appendChild(el('div.kpi-grid', null, [
-      kpi('Total Assets', ui.money(totA, { compact: true }), 'safe2', null, bs.assets.length + ' accounts'),
-      kpi('Total Liabilities', ui.money(totL, { compact: true }), 'file-earmark-minus', 'group/finance/payables', bs.liabilities.length + ' accounts'),
-      kpi('Total Equity', ui.money(totE, { compact: true }), 'gem', null, bs.equity.length + ' accounts'),
-      kpi('Balance Check', balanced ? 'Balanced' : 'Off by ' + ui.money(Math.abs(totA - (totL + totE)), { compact: true }),
-        balanced ? 'check-circle' : 'exclamation-triangle', null, 'Assets = Liabilities + Equity')
-    ]));
+    var scr = screen('balance-sheet');
+    var kpis = scr.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Total Assets', ui.money(totA, { compact: true }), 'safe2', null, bs.assets.length + ' accounts'));
+    kpis.appendChild(kpi('Total Liabilities', ui.money(totL, { compact: true }), 'file-earmark-minus', 'group/finance/payables', bs.liabilities.length + ' accounts'));
+    kpis.appendChild(kpi('Total Equity', ui.money(totE, { compact: true }), 'gem', null, bs.equity.length + ' accounts'));
+    kpis.appendChild(kpi('Balance Check', balanced ? 'Balanced' : 'Off by ' + ui.money(Math.abs(totA - (totL + totE)), { compact: true }),
+      balanced ? 'check-circle' : 'exclamation-triangle', null, 'Assets = Liabilities + Equity'));
 
     function lineRow(a) {
       return el('div.flex.justify-between.items-center', {
@@ -2052,26 +2052,21 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       ]);
     }
 
-    var left = el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('safe2') + ' Assets' }),
-        el('span.card-sub', { text: 'what the group owns' }) ]),
-      el('div.card-body', null, (bs.assets.length ? bs.assets.map(lineRow) : [ el('div.text-mute', { text: 'No asset balances.' }) ])
-        .concat([ totalRow('TOTAL ASSETS', totA, GREEN) ]))
-    ]);
-    var right = el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('file-earmark-minus') + ' Liabilities & Equity' }),
-        el('span.card-sub', { text: 'what it owes + owner value' }) ]),
-      el('div.card-body', null, [ el('div.section-label', { style: { marginTop: '0' }, text: 'Liabilities' }) ]
-        .concat(bs.liabilities.length ? bs.liabilities.map(lineRow) : [ el('div.text-mute', { text: 'No liabilities.' }) ])
-        .concat([ totalRow('Subtotal — Liabilities', totL, RED), el('div.section-label', { text: 'Equity' }) ])
-        .concat(bs.equity.length ? bs.equity.map(lineRow) : [ el('div.text-mute', { text: 'No equity balances.' }) ])
-        .concat([ totalRow('Subtotal — Equity', totE), totalRow('TOTAL LIABILITIES + EQUITY', totL + totE, GOLD) ]))
-    ]);
-    var cols = el('div.two-col'); cols.appendChild(left); cols.appendChild(right);
-    page.appendChild(cols);
+    var assetsBody = scr.querySelector('[data-fill="assets"]');
+    (bs.assets.length ? bs.assets.map(lineRow) : [ el('div.text-mute', { text: 'No asset balances.' }) ])
+      .concat([ totalRow('TOTAL ASSETS', totA, GREEN) ])
+      .forEach(function (n) { assetsBody.appendChild(n); });
+    var leBody = scr.querySelector('[data-fill="liabeq"]');
+    [ el('div.section-label', { style: { marginTop: '0' }, text: 'Liabilities' }) ]
+      .concat(bs.liabilities.length ? bs.liabilities.map(lineRow) : [ el('div.text-mute', { text: 'No liabilities.' }) ])
+      .concat([ totalRow('Subtotal — Liabilities', totL, RED), el('div.section-label', { text: 'Equity' }) ])
+      .concat(bs.equity.length ? bs.equity.map(lineRow) : [ el('div.text-mute', { text: 'No equity balances.' }) ])
+      .concat([ totalRow('Subtotal — Equity', totE), totalRow('TOTAL LIABILITIES + EQUITY', totL + totE, GOLD) ])
+      .forEach(function (n) { leBody.appendChild(n); });
 
     var mixId = ui.uid('bsLedMix');
-    page.appendChild(chartCard('Asset Composition', 'pie-chart', mixId, 'by ledger account', 280));
+    scr.querySelector('[data-fill="chart"]').replaceWith(chartCard('Asset Composition', 'pie-chart', mixId, 'by ledger account', 280));
+    mountScreen(page, scr);
     requestAnimationFrame(function () {
       var c = document.getElementById(mixId);
       if (c && bs.assets.length) EPAL.charts.doughnut(c, {
