@@ -2127,19 +2127,21 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     ]));
     page.appendChild(pills(subKey));
 
-    page.appendChild(el('div.kpi-grid', null, BUCKETS.map(function (b, i) {
+    var s = screen('aging');
+    var kpis = s.querySelector('[data-fill="kpis"]');
+    BUCKETS.forEach(function (b, i) {
       var host = kpi(b[1] === 'Current' ? 'Current (not due)' : b[1] + ' overdue',
         ui.money(bucketSum(b[0]), { compact: true }),
         ['check2-circle', 'hourglass-split', 'exclamation-triangle', 'exclamation-octagon'][i]);
       host.style.borderTop = '3px solid ' + BUCKET_COLORS[i];
-      return host;
-    })));
+      kpis.appendChild(host);
+    });
 
     var agingId = ui.uid('ledAging');
-    page.appendChild(chartCard('Aging Distribution', 'bar-chart', agingId,
+    s.querySelector('[data-fill="chart"]').replaceWith(chartCard('Aging Distribution', 'bar-chart', agingId,
       'outstanding ' + (isAR ? 'receivable' : 'payable') + ' value per bucket', 240));
 
-    page.appendChild(el('div.section-label', { text: 'By Party — total outstanding ' + ui.money(total, { compact: true }) + ' · click a party for its statement' }));
+    s.querySelector('[data-fill="section-label"]').textContent = 'By Party — total outstanding ' + ui.money(total, { compact: true }) + ' · click a party for its statement';
     var table = EPAL.table({
       columns: [
         { key: 'party', label: 'Party', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.party) + '</span>'; } },
@@ -2156,7 +2158,8 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       onRow: function (r) { openPartyLedger(r.party); },
       empty: { icon: 'calendar2-week', title: 'No open ' + subKey, hint: 'Nothing outstanding in the ledger subledger.' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ table.el ]) ]));
+    s.querySelector('[data-fill="table"]').appendChild(table.el);
+    mountScreen(page, s);
 
     requestAnimationFrame(function () {
       var c = document.getElementById(agingId);
