@@ -1532,12 +1532,12 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     var totalVal = 0, srcSet = {};
     entries.forEach(function (e) { totalVal += entryDebit(e); srcSet[e.source] = 1; });
 
-    page.appendChild(el('div.kpi-grid', null, [
-      kpi('Posted Entries', entries.length, 'journals', null, 'across the group'),
-      kpi('Posted Value', ui.money(totalVal, { compact: true }), 'cash-stack', null, 'sum of debits'),
-      kpi('Sources', Object.keys(srcSet).length, 'tags', null, 'entry origins'),
-      kpi('Chart Accounts', LED().accounts().length, 'diagram-2', 'group/finance/coa', 'open CoA')
-    ]));
+    var s = screen('journal');
+    var kpis = s.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Posted Entries', entries.length, 'journals', null, 'across the group'));
+    kpis.appendChild(kpi('Posted Value', ui.money(totalVal, { compact: true }), 'cash-stack', null, 'sum of debits'));
+    kpis.appendChild(kpi('Sources', Object.keys(srcSet).length, 'tags', null, 'entry origins'));
+    kpis.appendChild(kpi('Chart Accounts', LED().accounts().length, 'diagram-2', 'group/finance/coa', 'open CoA'));
 
     var rows = entries.map(function (e) {
       return { id: e.id, date: e.date, companyId: e.companyId, source: e.source,
@@ -1545,7 +1545,6 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
         amount: entryDebit(e), count: e.lines.length, _e: e };
     }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
 
-    page.appendChild(el('div.section-label', { text: 'Journal Entries — newest first · click a row for its lines' }));
     var table = EPAL.table({
       columns: [
         { key: 'date', label: 'Date', date: true },
@@ -1565,7 +1564,8 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       onRow: function (r) { openEntry(r._e); },
       empty: { icon: 'journal-x', title: 'No journal entries', hint: 'Post the first entry with New Journal.' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ table.el ]) ]));
+    s.querySelector('[data-fill="table"]').appendChild(table.el);
+    mountScreen(page, s);
   }
   function openEntry(e) {
     var dr = 0, cr = 0;
