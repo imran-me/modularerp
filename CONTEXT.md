@@ -19,6 +19,43 @@
 
 ---
 
+## 🚨 DIRECTIVE PIVOT — 2026-07-26 · FULL-STACK, MODULE-BY-MODULE, 100% EACH
+
+**Owner correction (important):** the accounting work above (steps 3–5) was
+**frontend-only** — JS in each module's `frontend/<id>.js` using the `el()` DOM
+builder + design-system CSS classes, persisting through the ONE pre-existing generic
+`JournalController`. **No new Laravel backend, no HTML+Tailwind rebuild.** The owner
+had strongly instructed: build each module **100% full-stack, then move to the next**.
+
+**The binding method from here on** (see `docs/FULLSTACK-REBUILD-TRACKER.md`):
+- **Frontend:** properly-structured **HTML5 + Tailwind** (real containers/cards/markup
+  in `template.html`, logic-only JS) — **pixel-perfect** vs current, proven by
+  `tools/verify/parity.mjs` (shoot before → rebuild → diff byte-identical; screenshot,
+  find issue, fix, repeat until 100%).
+- **Backend:** a real **Laravel** slice per module — routes · Controller · Service ·
+  Model(s) · migrations · Form Requests · Resource — auto-discovered by
+  `platform/backend`'s ModuleServiceProvider; reference = the master-accounts
+  controllers. **Build all → cross-check → test vs local Laragon MySQL → fix → re-check → push.**
+- **One module fully done + verified before the next.** Order = simplest→hardest,
+  Travels first; **payroll is the most complex (shared desk ×5 companies + embedded in
+  Master Accounts) and is deliberately LAST in Travels**, after the pattern is proven.
+- **STRICT CONTEXT (owner 2026-07-26):** update THIS file + the tracker for EVERY edit.
+
+**Full code backup taken FIRST** (owner instruction): `../modularerp-FULLSTACK-BACKUP-2026-07-26`
+(9,442 files / 119.9 MB incl. `.git`) in the mother folder.
+
+**▶ NEXT (resume here):** start module #1 = **Travels passport-mgmt** (the original
+parity pilot — simplest, self-contained) full-stack: parity-baseline → HTML+Tailwind
+frontend → Laravel backend (Passport model + migration + controller + service) → test
+vs Laragon → sweep → push. Then work down the tracker order.
+
+> Note: the accounting buildout (funding legs, Dashboard P&L, statement suite V2) is
+> shipped & working as frontend features; their Laravel backends are now folded into
+> this full-stack program (accounts=#15, ledgers=#14, dashboard=#13). The Group
+> consolidated P&L (step-5 part 2) is deferred until those modules' full-stack pass.
+
+---
+
 ## 🆕 SESSION — 2026-07-26 (cont'd) · STATEMENT SUITE V2 — PERIOD-AWARE (build-order step 5, part 1)
 
 Made the Travels **Ledgers** statement suite period-aware (the "V2" upgrade). The
