@@ -1714,23 +1714,26 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     renderSubledgerRecon(page);
     if (!hasLedger()) { page.appendChild(ledgerMissing()); return; }
 
-    page.appendChild(el('div.kpi-grid', null, [
-      kpi('Total Debits', ui.money(totDr, { compact: true }), 'arrow-down-circle'),
-      kpi('Total Credits', ui.money(totCr, { compact: true }), 'arrow-up-circle'),
-      kpi('Difference', ui.money(Math.abs(totDr - totCr), { compact: true }),
-        balanced ? 'check-circle' : 'exclamation-triangle', null, balanced ? 'in balance' : 'OUT OF BALANCE'),
-      kpi('Accounts', tb.length, 'diagram-2', 'group/finance/coa', 'with movement')
-    ]));
+    var s = screen('trial-balance');
+    fillK(s, 'dr', ui.money(totDr, { compact: true }));
+    fillK(s, 'cr', ui.money(totCr, { compact: true }));
+    fillK(s, 'diff', ui.money(Math.abs(totDr - totCr), { compact: true }));
+    s.querySelector('[data-fill="diff-ico"]').className = 'bi bi-' + (balanced ? 'check-circle' : 'exclamation-triangle');
+    s.querySelector('[data-fill="diff-foot"]').textContent = balanced ? 'in balance' : 'OUT OF BALANCE';
+    fillK(s, 'accounts', tb.length);
+    var acctCard = s.querySelector('[data-drill="group/finance/coa"]');
+    acctCard.title = 'Open Accounts';
+    acctCard.addEventListener('click', function () { EPAL.router.navigate('group/finance/coa'); });
 
-    page.appendChild(el('div.card', null, [ el('div', {
+    // status banner — computed border colour + message (per-state inline style)
+    s.querySelector('[data-role="status"]').appendChild(el('div', {
       style: { padding: '12px 16px', display: 'flex', gap: '10px', alignItems: 'center',
         borderLeft: '4px solid ' + (balanced ? GREEN : RED) },
       html: ui.icon(balanced ? 'check-circle-fill' : 'exclamation-octagon-fill') +
         ' <span class="strong">' + (balanced ? 'The consolidated ledger is in balance' : 'The ledger does NOT balance') +
         '</span> <span class="text-mute">· Debits ' + ui.money(totDr) + ' vs Credits ' + ui.money(totCr) + '</span>'
-    }) ]));
+    }));
 
-    page.appendChild(el('div.section-label', { text: 'Trial Balance — all accounts with movement' }));
     var mainT = EPAL.table({
       columns: [
         { key: 'code', label: 'Code', render: function (r) { return '<span class="num strong">' + ui.escapeHtml(r.code) + '</span>'; } },
@@ -1747,7 +1750,7 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       onRow: function (r) { openAccountLedger(r.code, r.name); },
       empty: { icon: 'list-columns', title: 'No ledger movement yet' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ mainT.el ]) ]));
+    s.querySelector('[data-fill="main-table"]').appendChild(mainT.el);
 
     // per-company net-balance comparison
     var comps = activeCompanies();
@@ -1785,14 +1788,17 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       cmpCols.push({ key: 'grp', label: 'Group', num: true, render: function (r) {
         return '<span class="num strong">' + ui.money(r.grp, { compact: true }) + '</span>'; },
         exportVal: function (r) { return r.grp; } });
-      page.appendChild(el('div.section-label', { text: 'Per-Company Comparison — net balance (debit positive · credit negative)' }));
       var cmpT = EPAL.table({
         columns: cmpCols, rows: cmpRows, pageSize: 30, searchKeys: ['code', 'name'],
         exportName: 'trial-balance-by-company.csv',
         empty: { icon: 'grid-3x3', title: 'No comparison data' }
       });
-      page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ cmpT.el ]) ]));
+      s.querySelector('[data-fill="cmp-table"]').appendChild(cmpT.el);
+    } else {
+      s.querySelector('[data-role="cmp-label"]').remove();
+      s.querySelector('[data-role="cmp-card"]').remove();
     }
+    mountScreen(page, s);
   }
   function exportTrialBalance(tb) {
     var lines = [['Code', 'Account', 'Class', 'Debit', 'Credit']];

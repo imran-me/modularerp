@@ -10,3 +10,17 @@
 <div data-shell="head" class="page-head"><div><h1 class="page-title" data-fill="title"><span class="eyebrow">Epal Group · Consolidated Finance</span><i class="bi" data-fill="icon"></i></h1><p class="page-sub" data-fill="sub"></p></div><div class="page-actions" data-fill="actions"></div></div>
 
 <div data-shell="pills"><div class="tab-underline tabs-dense mb-3" data-fill="tabs"><button data-tab="">Overview</button><button data-tab="pnl">P&amp;L</button><button data-tab="cashflow">Cash Flow</button><button data-tab="balance-sheet">Balance Sheet</button><button data-tab="receivables">Receivables</button><button data-tab="payables">Payables</button><button data-tab="banks">Banks</button><button data-tab="coa">Chart of Accounts</button><button data-tab="journal">Journal</button><button data-tab="trial-balance">Trial Balance</button><button data-tab="consolidation">Consolidation</button><button data-tab="concern-pnl">P&amp;L by Concern</button><button data-tab="expenses">Group Expenses</button></div></div>
+
+<section data-screen="trial-balance">
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Total Debits</span><span class="kpi-ico"><i class="bi bi-arrow-down-circle"></i></span></div><div class="kpi-value" data-k="dr"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Total Credits</span><span class="kpi-ico"><i class="bi bi-arrow-up-circle"></i></span></div><div class="kpi-value" data-k="cr"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Difference</span><span class="kpi-ico"><i class="bi" data-fill="diff-ico"></i></span></div><div class="kpi-value" data-k="diff"></div><div class="kpi-foot"><span class="text-muted" data-fill="diff-foot"></span></div></div>
+    <div class="kpi-card drill" data-drill="group/finance/coa"><div class="kpi-top"><span class="kpi-label">Accounts</span><span class="kpi-ico"><i class="bi bi-diagram-2"></i></span></div><div class="kpi-value" data-k="accounts"></div><div class="kpi-foot"><span class="text-muted">with movement</span></div></div>
+  </div>
+  <div class="card" data-role="status"></div>
+  <div class="section-label">Trial Balance — all accounts with movement</div>
+  <div class="card"><div class="card-pad" data-fill="main-table"></div></div>
+  <div class="section-label" data-role="cmp-label">Per-Company Comparison — net balance (debit positive · credit negative)</div>
+  <div class="card" data-role="cmp-card"><div class="card-pad" data-fill="cmp-table"></div></div>
+</section>
