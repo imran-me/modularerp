@@ -77,7 +77,12 @@
     tv_templates:  'travels/marketing/books/templates',
     tv_messages:   'travels/marketing/books/messages',
     tv_bot_bookings: 'travels/marketing/books/bookings',
-    tv_bot_chat:   'travels/marketing/books/chat'
+    tv_bot_chat:   'travels/marketing/books/chat',
+    tv_automation: 'travels/automation/books/rules',
+    tv_markup:     'travels/automation/books/markup',
+    tv_contracts:  'travels/contract-file/contracts',
+    leads:         'travels/crm/books/leads',
+    crm_activities: 'travels/crm/books/activities'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -122,6 +127,11 @@
     tv_messages: 'travels/marketing/books/messages',
     tv_bot_bookings: 'travels/marketing/books/bookings',
     tv_bot_chat: 'travels/marketing/books/chat',
+    tv_automation: 'travels/automation/books/rules',
+    tv_markup:   'travels/automation/books/markup',
+    tv_contracts: 'travels/contract-file/contracts',
+    leads:       'travels/crm/books/leads',
+    crm_activities: 'travels/crm/books/activities',
     perf_reviews: 'group/employees/reviews'
   };
 
