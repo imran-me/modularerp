@@ -1306,28 +1306,30 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
    * Group Finance tab uses, so both screens always agree). Balances respect
    * the company switcher — pick a concern to see ITS balance on each head. */
   function accountsView(page) {
-    if (!EPAL.ledger) { page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Ledger engine unavailable.' })])); return; }
+    if (!EPAL.ledger) { var g = frag('body-card'); slot(g, 'body').textContent = 'Ledger engine unavailable.'; page.appendChild(g); return; }
     var L = EPAL.ledger;
     var scope = selCo === 'all' ? {} : { companyId: selCo };
     var accts = L.accounts();
     var TYPE_META = [['asset', 'Assets', 'safe2'], ['liability', 'Liabilities', 'file-earmark-minus'],
       ['equity', 'Equity', 'gem'], ['income', 'Income', 'graph-up-arrow'], ['expense', 'Expenses', 'wallet2']];
     var counts = {}; accts.forEach(function (a) { counts[a.type] = (counts[a.type] || 0) + 1; });
-    page.appendChild(kgrid(TYPE_META.map(function (t) {
-      return kpi(t[1], String(counts[t[0]] || 0), t[2]);
-    })));
+    // whole screen is real HTML (template.html · <section data-screen="accounts">).
+    var s = screen('accounts');
+    TYPE_META.forEach(function (t) { fillK(s, t[0], counts[t[0]] || 0); });
+    var actions = s.querySelector('[data-role="actions"]');
     if (canCreate()) {
       var in4000 = 0;
       try { in4000 = L.balance('4000', scope); } catch (e0) {}
-      page.appendChild(btnStrip([
-        btn('btn btn-sm btn-primary', ui.icon('plus-square') + ' Add Account', addAccountForm),
-        btn('btn btn-sm btn-outline', ui.icon('flag') + ' Opening Balance', openingBalanceForm),
-        btn('btn btn-sm btn-outline', ui.icon('shuffle') + ' Reclass 4000 Catch-all' + (in4000 > 0.5 ? ' (' + ui.money(in4000, { compact: true }) + ')' : ''), reclass4000Tool)
-      ]));
-    }
+      s.querySelector('[data-act="add"]').addEventListener('click', addAccountForm);
+      s.querySelector('[data-act="opening"]').addEventListener('click', openingBalanceForm);
+      var rc = s.querySelector('[data-act="reclass"]');
+      rc.innerHTML = ui.icon('shuffle') + ' Reclass 4000 Catch-all' + (in4000 > 0.5 ? ' (' + ui.money(in4000, { compact: true }) + ')' : '');
+      rc.addEventListener('click', reclass4000Tool);
+    } else { actions.parentNode.removeChild(actions); }
     TYPE_META.forEach(function (t) {
+      var card = s.querySelector('[data-type="' + t[0] + '"]');
       var list = accts.filter(function (a) { return a.type === t[0]; });
-      if (!list.length) return;
+      if (!list.length) { card.parentNode.removeChild(card); return; }
       var rows = list.map(function (a) {
         return { code: a.code, name: a.name, group: a.group || '—', normal: a.normal, active: a.active !== false, balance: L.balance(a.code, scope) };
       });
@@ -1353,8 +1355,9 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         } }] : [],
         empty: { icon: 'diagram-2', title: 'No accounts' }
       });
-      page.appendChild(titledCard(ui.icon(t[2]) + ' ' + t[1], '', tbl.el, 'mb-2'));
+      card.querySelector('[data-fill="' + t[0] + '"]').appendChild(tbl.el);
     });
+    mountScreen(page, s);
     function openAccountLedger(code, name) {
       var rows = L.ledgerFor(code, scope) || [];
       var body;

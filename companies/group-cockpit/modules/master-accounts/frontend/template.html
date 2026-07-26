@@ -50,6 +50,26 @@
   </div>
 </section>
 
+<section data-screen="accounts">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Assets</span><span class="kpi-ico"><i class="bi bi-safe2"></i></span></div><div class="kpi-value" data-k="asset"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Liabilities</span><span class="kpi-ico"><i class="bi bi-file-earmark-minus"></i></span></div><div class="kpi-value" data-k="liability"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Equity</span><span class="kpi-ico"><i class="bi bi-gem"></i></span></div><div class="kpi-value" data-k="equity"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Income</span><span class="kpi-ico"><i class="bi bi-graph-up-arrow"></i></span></div><div class="kpi-value" data-k="income"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Expenses</span><span class="kpi-ico"><i class="bi bi-wallet2"></i></span></div><div class="kpi-value" data-k="expense"></div></div>
+  </div>
+  <div class="flex gap-1 flex-wrap mb-2" data-role="actions">
+    <button class="btn btn-sm btn-primary" data-act="add"><i class="bi bi-plus-square"></i> Add Account</button>
+    <button class="btn btn-sm btn-outline" data-act="opening"><i class="bi bi-flag"></i> Opening Balance</button>
+    <button class="btn btn-sm btn-outline" data-act="reclass" data-fill="reclass"></button>
+  </div>
+  <div class="card mb-2" data-type="asset"><div class="card-head"><h3><i class="bi bi-safe2"></i> Assets</h3></div><div class="card-body" data-fill="asset"></div></div>
+  <div class="card mb-2" data-type="liability"><div class="card-head"><h3><i class="bi bi-file-earmark-minus"></i> Liabilities</h3></div><div class="card-body" data-fill="liability"></div></div>
+  <div class="card mb-2" data-type="equity"><div class="card-head"><h3><i class="bi bi-gem"></i> Equity</h3></div><div class="card-body" data-fill="equity"></div></div>
+  <div class="card mb-2" data-type="income"><div class="card-head"><h3><i class="bi bi-graph-up-arrow"></i> Income</h3></div><div class="card-body" data-fill="income"></div></div>
+  <div class="card mb-2" data-type="expense"><div class="card-head"><h3><i class="bi bi-wallet2"></i> Expenses</h3></div><div class="card-body" data-fill="expense"></div></div>
+</section>
+
 <!-- reusable shells (still used by the not-yet-rebuilt screens) --------------- -->
 <!-- a titled card: head (title + optional sub) over a body slot -->
 <template data-tpl="titled-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
