@@ -487,12 +487,13 @@ function kindRegister(page, kind, heads, color) {
   // compare. Nothing is lost: the head chips immediately below are ordered
   // biggest-first, so the top head is the first chip — shown with its actual
   // amount, and clickable to filter the register, which the tile never was.
-  var kg = frag('kpi-grid');
+  var s = screen('kind-register');
+  var kg = s.querySelector('[data-fill="kpis"]');
   kg.appendChild(kpi('Total ' + kind, ui.money(total, { compact: true }), kind === 'Income' ? 'arrow-down-left-circle' : 'arrow-up-right-circle', kind === 'Income' ? 'text-good' : 'text-bad'));
   kg.appendChild(kpi('This Month', ui.money(thisMonth, { compact: true }), 'calendar3'));
   kg.appendChild(kpi('Entries', String(list.length), 'card-list'));
   kg.appendChild(kpi('Average', ui.money(avg, { compact: true }), 'graph-up'));
-  page.appendChild(kg);
+  mountScreen(page, s);
 
   // clickable head chips — biggest posting heads, tap to filter the register
   if (heads2.length) {

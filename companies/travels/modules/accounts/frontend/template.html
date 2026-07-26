@@ -38,6 +38,13 @@
      values ([data-k]) + drops data tables into [data-fill], then mountScreen()
      moves the block onto the page. Converted one screen at a time, pixel-verified.
      ============================================================================ -->
+<!-- income & expense register share this shell — the KPI strip is real HTML; the
+     clickable head chips (an interactive filter) + the entries data-grid are
+     appended by the logic below it (dynamic/interactive → JS). -->
+<section data-screen="kind-register">
+  <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
+</section>
+
 <section data-screen="banks">
   <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
   <div class="text-mute sm mb-2" data-fill="note"></div>
