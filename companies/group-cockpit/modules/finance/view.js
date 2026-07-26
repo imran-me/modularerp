@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  Group Consolidated Finance — real-HTML screens (FRONTEND BUILD LAW).\n  Each route screen is authored below as a plain-HTML <section data-screen=\"…\">\n  block; frontend/finance.js fills live data + draws charts into the <canvas>\n  placeholders. Screens are converted one at a time, pixel-verified byte-identical.\n============================================================================ -->\n\n<!-- Shared chrome — the page-head bar (mirrors EPAL.pageHead markup) and the\n     finance tab band. head() / pills() clone + fill these. -->\n<div data-shell=\"head\" class=\"page-head\"><div><h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\">Epal Group · Consolidated Finance</span><i class=\"bi\" data-fill=\"icon\"></i></h1><p class=\"page-sub\" data-fill=\"sub\"></p></div><div class=\"page-actions\" data-fill=\"actions\"></div></div>\n\n<div data-shell=\"pills\"><div class=\"tab-underline tabs-dense mb-3\" data-fill=\"tabs\"><button data-tab=\"\">Overview</button><button data-tab=\"pnl\">P&amp;L</button><button data-tab=\"cashflow\">Cash Flow</button><button data-tab=\"balance-sheet\">Balance Sheet</button><button data-tab=\"receivables\">Receivables</button><button data-tab=\"payables\">Payables</button><button data-tab=\"banks\">Banks</button><button data-tab=\"coa\">Chart of Accounts</button><button data-tab=\"journal\">Journal</button><button data-tab=\"trial-balance\">Trial Balance</button><button data-tab=\"consolidation\">Consolidation</button><button data-tab=\"concern-pnl\">P&amp;L by Concern</button><button data-tab=\"expenses\">Group Expenses</button></div></div>\n\n<section data-screen=\"trial-balance\">\n  <div class=\"kpi-grid\">\n    <div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\">Total Debits</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-down-circle\"></i></span></div><div class=\"kpi-value\" data-k=\"dr\"></div></div>\n    <div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\">Total Credits</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-up-circle\"></i></span></div><div class=\"kpi-value\" data-k=\"cr\"></div></div>\n    <div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\">Difference</span><span class=\"kpi-ico\"><i class=\"bi\" data-fill=\"diff-ico\"></i></span></div><div class=\"kpi-value\" data-k=\"diff\"></div><div class=\"kpi-foot\"><span class=\"text-muted\" data-fill=\"diff-foot\"></span></div></div>\n    <div class=\"kpi-card drill\" data-drill=\"group/finance/coa\"><div class=\"kpi-top\"><span class=\"kpi-label\">Accounts</span><span class=\"kpi-ico\"><i class=\"bi bi-diagram-2\"></i></span></div><div class=\"kpi-value\" data-k=\"accounts\"></div><div class=\"kpi-foot\"><span class=\"text-muted\">with movement</span></div></div>\n  </div>\n  <div class=\"card\" data-role=\"status\"></div>\n  <div class=\"section-label\">Trial Balance — all accounts with movement</div>\n  <div class=\"card\"><div class=\"card-pad\" data-fill=\"main-table\"></div></div>\n  <div class=\"section-label\" data-role=\"cmp-label\">Per-Company Comparison — net balance (debit positive · credit negative)</div>\n  <div class=\"card\" data-role=\"cmp-card\"><div class=\"card-pad\" data-fill=\"cmp-table\"></div></div>\n</section>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  Group Consolidated Finance — real-HTML screens (FRONTEND BUILD LAW).\n  Each route screen is authored below as a plain-HTML <section data-screen=\"…\">\n  block; frontend/finance.js fills live data + draws charts into the <canvas>\n  placeholders. Screens are converted one at a time, pixel-verified byte-identical.\n============================================================================ -->\n\n<!-- Shared building blocks — a KPI tile and a chart card, authored as real HTML.\n     kpi() / chartCard() clone these and fill label / value / icon / canvas. -->\n<div data-shell=\"kpi\" class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-fill=\"label\"></span><span class=\"kpi-ico\" data-fill=\"ico\"></span></div><div class=\"kpi-value\" data-fill=\"value\"></div></div>\n\n<div data-shell=\"chart-card\" class=\"card\"><div class=\"card-head\"><h3 data-fill=\"title\"></h3><span class=\"card-sub\" data-fill=\"sub\"></span></div><div class=\"card-body\"><div data-fill=\"canvas-box\" style=\"position: relative;\"><canvas data-fill=\"canvas\"></canvas></div></div></div>\n\n<!-- Shared chrome — the page-head bar (mirrors EPAL.pageHead markup) and the\n     finance tab band. head() / pills() clone + fill these. -->\n<div data-shell=\"head\" class=\"page-head\"><div><h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\">Epal Group · Consolidated Finance</span><i class=\"bi\" data-fill=\"icon\"></i></h1><p class=\"page-sub\" data-fill=\"sub\"></p></div><div class=\"page-actions\" data-fill=\"actions\"></div></div>\n\n<div data-shell=\"pills\"><div class=\"tab-underline tabs-dense mb-3\" data-fill=\"tabs\"><button data-tab=\"\">Overview</button><button data-tab=\"pnl\">P&amp;L</button><button data-tab=\"cashflow\">Cash Flow</button><button data-tab=\"balance-sheet\">Balance Sheet</button><button data-tab=\"receivables\">Receivables</button><button data-tab=\"payables\">Payables</button><button data-tab=\"banks\">Banks</button><button data-tab=\"coa\">Chart of Accounts</button><button data-tab=\"journal\">Journal</button><button data-tab=\"trial-balance\">Trial Balance</button><button data-tab=\"consolidation\">Consolidation</button><button data-tab=\"concern-pnl\">P&amp;L by Concern</button><button data-tab=\"expenses\">Group Expenses</button></div></div>\n\n<section data-screen=\"trial-balance\">\n  <div class=\"kpi-grid\">\n    <div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\">Total Debits</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-down-circle\"></i></span></div><div class=\"kpi-value\" data-k=\"dr\"></div></div>\n    <div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\">Total Credits</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-up-circle\"></i></span></div><div class=\"kpi-value\" data-k=\"cr\"></div></div>\n    <div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\">Difference</span><span class=\"kpi-ico\"><i class=\"bi\" data-fill=\"diff-ico\"></i></span></div><div class=\"kpi-value\" data-k=\"diff\"></div><div class=\"kpi-foot\"><span class=\"text-muted\" data-fill=\"diff-foot\"></span></div></div>\n    <div class=\"kpi-card drill\" data-drill=\"group/finance/coa\"><div class=\"kpi-top\"><span class=\"kpi-label\">Accounts</span><span class=\"kpi-ico\"><i class=\"bi bi-diagram-2\"></i></span></div><div class=\"kpi-value\" data-k=\"accounts\"></div><div class=\"kpi-foot\"><span class=\"text-muted\">with movement</span></div></div>\n  </div>\n  <div class=\"card\" data-role=\"status\"></div>\n  <div class=\"section-label\">Trial Balance — all accounts with movement</div>\n  <div class=\"card\"><div class=\"card-pad\" data-fill=\"main-table\"></div></div>\n  <div class=\"section-label\" data-role=\"cmp-label\">Per-Company Comparison — net balance (debit positive · credit negative)</div>\n  <div class=\"card\" data-role=\"cmp-card\"><div class=\"card-pad\" data-fill=\"cmp-table\"></div></div>\n</section>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="group-cockpit/finance"]')) {
     var st = document.createElement('style');
@@ -76,23 +76,31 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
   function activeCompanies() {
     return EPAL.config.companies.filter(function (c) { return c.type === 'company' && c.enabled; });
   }
+  // KPI tile — real HTML ([data-shell="kpi"]); JS fills label / value / icon and
+  // (optionally) the drill-through + a foot caption. Behaviour only.
   function kpi(label, value, icon, drill, foot) {
-    return el('div.kpi-card' + (drill ? '.drill' : ''),
-      drill ? { onclick: function () { EPAL.router.navigate(drill); }, title: 'Open ' + label } : null, [
-      el('div.kpi-top', null, [ el('span.kpi-label', { text: label }),
-        el('span.kpi-ico', { html: '<i class="bi bi-' + icon + '"></i>' }) ]),
-      el('div.kpi-value', { text: String(value) }),
-      foot ? el('div.kpi-foot', null, [ el('span.text-muted', { text: foot }) ]) : null
-    ]);
+    var c = shell('kpi');
+    c.querySelector('[data-fill="label"]').textContent = label;
+    c.querySelector('[data-fill="ico"]').innerHTML = '<i class="bi bi-' + icon + '"></i>';
+    c.querySelector('[data-fill="value"]').textContent = String(value);
+    if (drill) {
+      c.classList.add('drill');
+      c.title = 'Open ' + label;
+      c.addEventListener('click', function () { EPAL.router.navigate(drill); });
+    }
+    if (foot) c.appendChild(el('div.kpi-foot', null, [ el('span.text-muted', { text: foot }) ]));
+    return c;
   }
+  // chart card — real HTML ([data-shell="chart-card"]); JS fills the heading and
+  // wires the canvas id + box height the charting engine draws into.
   function chartCard(title, icon, canvasId, subLabel, height) {
-    return el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon(icon) + ' ' + title }),
-        subLabel ? el('span.card-sub', { text: subLabel }) : null ]),
-      el('div.card-body', null, [
-        el('div', { style: { height: (height || 260) + 'px', position: 'relative' } }, [ el('canvas', { id: canvasId }) ])
-      ])
-    ]);
+    var c = shell('chart-card');
+    c.querySelector('[data-fill="title"]').innerHTML = ui.icon(icon) + ' ' + title;
+    var sub = c.querySelector('[data-fill="sub"]');
+    if (subLabel) sub.textContent = subLabel; else sub.parentNode.removeChild(sub);
+    c.querySelector('[data-fill="canvas-box"]').style.height = (height || 260) + 'px';
+    c.querySelector('[data-fill="canvas"]').id = canvasId;
+    return c;
   }
   // SECTION NAV — the same calm full-bleed underline tabs as Master Accounts
   // (owner 2026-07-15). 13 sections, so the row is marked .tabs-dense: it

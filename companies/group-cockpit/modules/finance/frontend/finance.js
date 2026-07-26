@@ -57,23 +57,31 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
   function activeCompanies() {
     return EPAL.config.companies.filter(function (c) { return c.type === 'company' && c.enabled; });
   }
+  // KPI tile — real HTML ([data-shell="kpi"]); JS fills label / value / icon and
+  // (optionally) the drill-through + a foot caption. Behaviour only.
   function kpi(label, value, icon, drill, foot) {
-    return el('div.kpi-card' + (drill ? '.drill' : ''),
-      drill ? { onclick: function () { EPAL.router.navigate(drill); }, title: 'Open ' + label } : null, [
-      el('div.kpi-top', null, [ el('span.kpi-label', { text: label }),
-        el('span.kpi-ico', { html: '<i class="bi bi-' + icon + '"></i>' }) ]),
-      el('div.kpi-value', { text: String(value) }),
-      foot ? el('div.kpi-foot', null, [ el('span.text-muted', { text: foot }) ]) : null
-    ]);
+    var c = shell('kpi');
+    c.querySelector('[data-fill="label"]').textContent = label;
+    c.querySelector('[data-fill="ico"]').innerHTML = '<i class="bi bi-' + icon + '"></i>';
+    c.querySelector('[data-fill="value"]').textContent = String(value);
+    if (drill) {
+      c.classList.add('drill');
+      c.title = 'Open ' + label;
+      c.addEventListener('click', function () { EPAL.router.navigate(drill); });
+    }
+    if (foot) c.appendChild(el('div.kpi-foot', null, [ el('span.text-muted', { text: foot }) ]));
+    return c;
   }
+  // chart card — real HTML ([data-shell="chart-card"]); JS fills the heading and
+  // wires the canvas id + box height the charting engine draws into.
   function chartCard(title, icon, canvasId, subLabel, height) {
-    return el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon(icon) + ' ' + title }),
-        subLabel ? el('span.card-sub', { text: subLabel }) : null ]),
-      el('div.card-body', null, [
-        el('div', { style: { height: (height || 260) + 'px', position: 'relative' } }, [ el('canvas', { id: canvasId }) ])
-      ])
-    ]);
+    var c = shell('chart-card');
+    c.querySelector('[data-fill="title"]').innerHTML = ui.icon(icon) + ' ' + title;
+    var sub = c.querySelector('[data-fill="sub"]');
+    if (subLabel) sub.textContent = subLabel; else sub.parentNode.removeChild(sub);
+    c.querySelector('[data-fill="canvas-box"]').style.height = (height || 260) + 'px';
+    c.querySelector('[data-fill="canvas"]').id = canvasId;
+    return c;
   }
   // SECTION NAV — the same calm full-bleed underline tabs as Master Accounts
   // (owner 2026-07-15). 13 sections, so the row is marked .tabs-dense: it
