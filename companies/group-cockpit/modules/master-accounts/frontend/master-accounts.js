@@ -499,20 +499,16 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
     var list = entriesFor('Expense').slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
     var total = list.reduce(function (a, e) { return a + (+e.amount || 0); }, 0);
     var mtd = list.filter(function (e) { return String(e.date).slice(0, 7) === TODAY_STR.slice(0, 7); }).reduce(function (a, e) { return a + (+e.amount || 0); }, 0);
-    page.appendChild(kgrid([
-      kpi('Expenses (Σ)', ui.money(total, { compact: true }), 'wallet2'),
-      kpi('This Month', ui.money(mtd, { compact: true }), 'calendar-event'),
-      kpi('Entries', String(list.length), 'card-list'),
-      kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
-    ]));
+    var s = screen('expenses');
+    fillK(s, 'total', ui.money(total, { compact: true }));
+    fillK(s, 'mtd', ui.money(mtd, { compact: true }));
+    fillK(s, 'entries', String(list.length));
+    fillK(s, 'scope', selCo === 'all' ? 'All companies' : coName(selCo));
+    var actions = s.querySelector('[data-role="actions"]');
     if (canCreate()) {
-      var scBtn = btn('btn btn-outline', ui.icon('diagram-3') + ' Shared Cost', function () { sharedExpenseForm(); });
-      scBtn.title = 'Enter a shared cost (rent, subscriptions) once and split it equally across concerns';
-      page.appendChild(btnStrip([
-        btn('btn btn-primary', ui.icon('plus-lg') + ' New Expense', function () { expenseForm(null); }),
-        scBtn
-      ], 'flex gap-2 mb-2'));
-    }
+      actions.querySelector('[data-act="new"]').addEventListener('click', function () { expenseForm(null); });
+      actions.querySelector('[data-act="shared"]').addEventListener('click', function () { sharedExpenseForm(); });
+    } else { actions.parentNode.removeChild(actions); }
     var cols = [
       { key: 'date', label: 'Date', date: true },
       { key: 'category', label: 'Category', badge: {} },
@@ -530,7 +526,10 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       actions: ui.actions({ edit: canCreate() ? function (e) { expenseForm(e); } : null }),
       empty: { icon: 'wallet2', title: 'No expenses in this scope', hint: 'Record one with New Expense.' }
     });
-    page.appendChild(titledCard(ui.icon('wallet2') + ' All Expenses — ' + coName(selCo), '', tbl.el));
+    var card = s.querySelector('[data-role="all"]');
+    card.querySelector('[data-fill="title"]').innerHTML = ui.icon('wallet2') + ' All Expenses — ' + coName(selCo);
+    card.querySelector('[data-fill="body"]').appendChild(tbl.el);
+    mountScreen(page, s);
   }
   function expenseForm(rec) {
     var catList = cats();
@@ -1578,19 +1577,16 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
     var total = banks.reduce(function (a, b) { return a + (+b.balance || 0); }, 0);
     var active = banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length;
 
-    page.appendChild(kgrid([
-      kpi('Total Balance', ui.money(total, { compact: true }), 'safe2'),
-      kpi('Accounts', String(banks.length), 'bank'),
-      kpi('Active', String(active), 'check-circle'),
-      kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
-    ]));
-
-    if (canCreate()) page.appendChild(btnStrip([
-      btn('btn btn-sm btn-primary', ui.icon('plus-lg') + ' Add New Bank', function () { editBank(null); }),
-      aBtn('btn btn-sm btn-outline', '#/group/master-accounts/cash', ui.icon('cash-stack') + ' Manage cash')
-    ]));
-
-    var sl = frag('section-label'); sl.textContent = 'Bank Accounts — ' + (selCo === 'all' ? 'all sister concerns' : coName(selCo)); page.appendChild(sl);
+    var s = screen('overview');
+    fillK(s, 'total', ui.money(total, { compact: true }));
+    fillK(s, 'accounts', String(banks.length));
+    fillK(s, 'active', String(active));
+    fillK(s, 'scope', selCo === 'all' ? 'All companies' : coName(selCo));
+    var actions = s.querySelector('[data-role="actions"]');
+    if (canCreate()) actions.querySelector('[data-act="add"]').addEventListener('click', function () { editBank(null); });
+    else actions.parentNode.removeChild(actions);
+    s.querySelector('[data-fill="section-label"]').textContent = 'Bank Accounts — ' + (selCo === 'all' ? 'all sister concerns' : coName(selCo));
+    mountScreen(page, s);
     renderBankCardGrid(banks, page);
   }
 

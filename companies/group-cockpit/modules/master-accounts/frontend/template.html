@@ -107,6 +107,34 @@
   <div class="card" data-role="entries"><div class="card-head"><h3 data-fill="entries-title"></h3><span class="card-sub">filter by Source to see its total</span></div><div class="card-body" data-fill="entries-body"></div></div>
 </section>
 
+<section data-screen="expenses">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Expenses (Σ)</span><span class="kpi-ico"><i class="bi bi-wallet2"></i></span></div><div class="kpi-value" data-k="total"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">This Month</span><span class="kpi-ico"><i class="bi bi-calendar-event"></i></span></div><div class="kpi-value" data-k="mtd"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Entries</span><span class="kpi-ico"><i class="bi bi-card-list"></i></span></div><div class="kpi-value" data-k="entries"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Scope</span><span class="kpi-ico"><i class="bi bi-diagram-3"></i></span></div><div class="kpi-value" data-k="scope"></div></div>
+  </div>
+  <div class="flex gap-2 mb-2" data-role="actions">
+    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> New Expense</button>
+    <button class="btn btn-outline" data-act="shared" title="Enter a shared cost (rent, subscriptions) once and split it equally across concerns"><i class="bi bi-diagram-3"></i> Shared Cost</button>
+  </div>
+  <div class="card" data-role="all"><div class="card-head"><h3 data-fill="title"></h3></div><div class="card-body" data-fill="body"></div></div>
+</section>
+
+<section data-screen="overview">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Total Balance</span><span class="kpi-ico"><i class="bi bi-safe2"></i></span></div><div class="kpi-value" data-k="total"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Accounts</span><span class="kpi-ico"><i class="bi bi-bank"></i></span></div><div class="kpi-value" data-k="accounts"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Active</span><span class="kpi-ico"><i class="bi bi-check-circle"></i></span></div><div class="kpi-value" data-k="active"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Scope</span><span class="kpi-ico"><i class="bi bi-diagram-3"></i></span></div><div class="kpi-value" data-k="scope"></div></div>
+  </div>
+  <div class="flex gap-1 flex-wrap mb-2" data-role="actions">
+    <button class="btn btn-sm btn-primary" data-act="add"><i class="bi bi-plus-lg"></i> Add New Bank</button>
+    <a class="btn btn-sm btn-outline" href="#/group/master-accounts/cash"><i class="bi bi-cash-stack"></i> Manage cash</a>
+  </div>
+  <div class="section-label" data-fill="section-label"></div>
+</section>
+
 <!-- reusable shells (still used by the not-yet-rebuilt screens) --------------- -->
 <!-- a titled card: head (title + optional sub) over a body slot -->
 <template data-tpl="titled-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
