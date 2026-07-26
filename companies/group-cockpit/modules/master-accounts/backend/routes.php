@@ -20,6 +20,7 @@ use Epal\Modules\GroupCockpit\MasterAccounts\AccEntryController;
 use Epal\Modules\GroupCockpit\MasterAccounts\ExpenseCategoryController;
 use Epal\Modules\GroupCockpit\MasterAccounts\LoanController;
 use Epal\Modules\GroupCockpit\MasterAccounts\PartyTypeController;
+use Epal\Modules\GroupCockpit\MasterAccounts\PayrollBookController;
 use Epal\Modules\GroupCockpit\MasterAccounts\PaymentScheduleController;
 use Illuminate\Support\Facades\Route;
 
@@ -79,3 +80,9 @@ Route::delete('group/master-accounts/entries/{id}', [AccEntryController::class, 
 Route::get('group/master-accounts/loans/{store}', [LoanController::class, 'index'])->where('store', 'products|ext|taken|txns');
 Route::post('group/master-accounts/loans/{store}', [LoanController::class, 'store'])->where('store', 'products|ext|taken|txns');
 Route::delete('group/master-accounts/loans/{store}/{id}', [LoanController::class, 'destroy'])->where('store', 'products|ext|taken|txns');
+
+// Payroll books (shared engine, hosted here) — {store} = templates | runs | slips | txns.
+// Frontend stores: pay_templates, pay_runs, pay_slips, pay_txns.
+Route::get('group/master-accounts/payroll/{store}', [PayrollBookController::class, 'index'])->where('store', 'templates|runs|slips|txns');
+Route::post('group/master-accounts/payroll/{store}', [PayrollBookController::class, 'store'])->where('store', 'templates|runs|slips|txns');
+Route::delete('group/master-accounts/payroll/{store}/{id}', [PayrollBookController::class, 'destroy'])->where('store', 'templates|runs|slips|txns');

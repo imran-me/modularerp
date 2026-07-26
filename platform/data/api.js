@@ -65,7 +65,11 @@
     loan_products: 'group/master-accounts/loans/products',
     loans_ext:     'group/master-accounts/loans/ext',
     loans_taken:   'group/master-accounts/loans/taken',
-    loan_txns:     'group/master-accounts/loans/txns'
+    loan_txns:     'group/master-accounts/loans/txns',
+    pay_templates: 'group/master-accounts/payroll/templates',
+    pay_runs:      'group/master-accounts/payroll/runs',
+    pay_slips:     'group/master-accounts/payroll/slips',
+    pay_txns:      'group/master-accounts/payroll/txns'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -98,6 +102,10 @@
     loans_ext:   'group/master-accounts/loans/ext',
     loans_taken: 'group/master-accounts/loans/taken',
     loan_txns:   'group/master-accounts/loans/txns',
+    pay_templates: 'group/master-accounts/payroll/templates',
+    pay_runs:    'group/master-accounts/payroll/runs',
+    pay_slips:   'group/master-accounts/payroll/slips',
+    pay_txns:    'group/master-accounts/payroll/txns',
     perf_reviews: 'group/employees/reviews'
   };
 
