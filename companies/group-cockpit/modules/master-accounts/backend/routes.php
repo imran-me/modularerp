@@ -16,6 +16,7 @@ use Epal\Modules\GroupCockpit\MasterAccounts\BankTxnController;
 use Epal\Modules\GroupCockpit\MasterAccounts\JournalController;
 use Epal\Modules\GroupCockpit\MasterAccounts\CustomerController;
 use Epal\Modules\GroupCockpit\MasterAccounts\SupplierController;
+use Epal\Modules\GroupCockpit\MasterAccounts\AccEntryController;
 use Epal\Modules\GroupCockpit\MasterAccounts\ExpenseCategoryController;
 use Epal\Modules\GroupCockpit\MasterAccounts\PartyTypeController;
 use Epal\Modules\GroupCockpit\MasterAccounts\PaymentScheduleController;
@@ -66,3 +67,8 @@ Route::delete('group/master-accounts/party-types/{id}', [PartyTypeController::cl
 Route::get('group/master-accounts/expense-categories', [ExpenseCategoryController::class, 'index']);
 Route::post('group/master-accounts/expense-categories', [ExpenseCategoryController::class, 'store']);
 Route::delete('group/master-accounts/expense-categories/{id}', [ExpenseCategoryController::class, 'destroy']);
+
+// Account entries — the income/expense register (module-owned `acc_entries`).
+Route::get('group/master-accounts/entries', [AccEntryController::class, 'index']);
+Route::post('group/master-accounts/entries', [AccEntryController::class, 'store']);
+Route::delete('group/master-accounts/entries/{id}', [AccEntryController::class, 'destroy']);

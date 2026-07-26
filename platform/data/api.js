@@ -60,7 +60,8 @@
     tv_passports:  'travels/passport-mgmt/passports',
     tv_files:      'travels/file-management/files',
     party_types:   'group/master-accounts/party-types',
-    exp_categories: 'group/master-accounts/expense-categories'
+    exp_categories: 'group/master-accounts/expense-categories',
+    acc_entries:   'group/master-accounts/entries'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -88,6 +89,7 @@
     acc_schedules: 'group/master-accounts/schedules',
     party_types: 'group/master-accounts/party-types',
     exp_categories: 'group/master-accounts/expense-categories',
+    acc_entries: 'group/master-accounts/entries',
     perf_reviews: 'group/employees/reviews'
   };
 
