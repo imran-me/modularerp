@@ -273,11 +273,14 @@
     return normal === 'debit' ? (t.dr - t.cr) : (t.cr - t.dr);
   }
 
-  function trialBalance(companyId) {
+  // opts (all optional): { asOf, from, to } — a period-aware / as-of trial balance
+  // (V2, 2026-07-26). Omitted → the all-time TB, byte-identical to before.
+  function trialBalance(companyId, opts) {
+    opts = opts || {};
     var coa = accounts(), out = [];
     for (var i = 0; i < coa.length; i++) {
       var acc = coa[i];
-      var t = accountTotals(acc.code, { companyId: companyId });
+      var t = accountTotals(acc.code, { companyId: companyId, asOf: opts.asOf, from: opts.from, to: opts.to });
       var net = t.dr - t.cr;                 // + => net debit, - => net credit
       if (Math.abs(net) < 0.5 && t.dr === 0 && t.cr === 0) continue; // untouched
       out.push({ code: acc.code, name: acc.name, type: acc.type,
@@ -566,14 +569,17 @@
     return acc.normal === 'debit' ? (t.dr - t.cr) : (t.cr - t.dr);
   }
 
-  function balanceSheet(companyId) {
+  // opts (optional): { asOf } — the balance sheet AS OF a date (V2, 2026-07-26);
+  // omitted → the latest position, byte-identical to before.
+  function balanceSheet(companyId, opts) {
+    opts = opts || {};
     var coa = accounts();
     var assets = [], liabilities = [], equity = [];
     var totAssets = 0, totLiab = 0, totEquity = 0;
     var income = 0, expense = 0;
     for (var i = 0; i < coa.length; i++) {
       var a = coa[i];
-      var v = valueOnNormal(a, { companyId: companyId });
+      var v = valueOnNormal(a, { companyId: companyId, asOf: opts.asOf });
       if (a.type === 'asset') {
         if (Math.abs(v) > 0.5) assets.push({ code: a.code, name: a.name, amount: v });
         totAssets += v;

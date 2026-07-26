@@ -19,6 +19,34 @@
 
 ---
 
+## 🆕 SESSION — 2026-07-26 (cont'd) · STATEMENT SUITE V2 — PERIOD-AWARE (build-order step 5, part 1)
+
+Made the Travels **Ledgers** statement suite period-aware (the "V2" upgrade). The
+per-company suite already existed (Overview · General Ledger · Trial Balance · Party
+Ledger · AR/AP Ageing · Balance Sheet · P&L, with print + CSV) — step 5 is enhancement.
+
+- **Engine (`platform/engines-library/ledger.js`, directly-loaded, no build)** — made
+  period-aware ADDITIVELY: `trialBalance(companyId, {asOf, from, to})` and
+  `balanceSheet(companyId, {asOf})`. Both default to the all-time/latest result
+  (byte-identical when no opts) — `pnl` already took `{from,to}`.
+- **Ledgers UI (`ledgers.js` → rebuilt `view.js`)** — new shared `periodControl`
+  (range pills: All · This/Last month · This/Last year · Custom From/To) on the **P&L**
+  tab, and `asOfControl` (As-of date + Latest) on **Trial Balance** + **Balance Sheet**.
+  Each repaints its host in place. Print docs (`printPnl/printTrial/printBalanceSheet`)
+  now carry the period/as-of label.
+- **Verified:** rebuilt view.js; **sweep 222/222 both themes, 0 errors**; a CDP probe
+  proved every range scopes AND stays balanced — TB dr=cr ৳11.84Cr all-time, balanced
+  as-of 2026-12, empty as-of 2025-01; BS A=L+E at every as-of; P&L all ৳6.47Cr → 2026
+  ৳6.29Cr → empty year ৳0.
+
+**▶ NEXT (resume here):** the REMAINING half of step 5 — **Group consolidated P&L**
+(sum every concern's `pnl()` with inter-company revenue/expense elimination + the
+Group's own income line). Its own focused pass: the engine has `consolidatedTrialBalance`
+(eliminates 1300/2400) but no consolidated P&L, and inter-co 4000/5000 legs need
+elimination care. Then printable vouchers / the rest of the reference V1/V2 list.
+
+---
+
 ## 🆕 SESSION — 2026-07-26 (cont'd) · DASHBOARD P&L PERIOD FILTER (build-order step 4)
 
 Shipped **build-order step 4** — the Travels Dashboard "Product P&L" card now has a

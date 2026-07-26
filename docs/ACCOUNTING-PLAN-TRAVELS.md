@@ -309,6 +309,15 @@ because it ADDS posting/reporting, never changes existing screens' look.
    card reads as a monthly AND yearly P&L. Verified the ranges genuinely scope
    (all-time ৳6.47Cr → 2026 ৳6.29Cr → Jul ৳47.5L → empty year 0).
 5. Statement suite (TB/GL/BS/P&L V2) + Group consolidated P&L.
+   **◑ IN PROGRESS 2026-07-26** — per-company statement suite is now **period-aware
+   (V2)**: Travels Ledgers → **P&L** got a period selector (All · This/Last month ·
+   This/Last year · Custom) and **Trial Balance** + **Balance Sheet** got an **As-of**
+   date. Engine made period-aware additively — `trialBalance(cid,{asOf,from,to})` and
+   `balanceSheet(cid,{asOf})` (P&L already took `{from,to}`); prints carry the period.
+   Verified balanced + scoping at every range. **REMAINING:** Group **consolidated
+   P&L** (sum every concern's `pnl()` with inter-company elimination + the Group's own
+   income line) — its own focused pass because inter-co revenue/expense elimination
+   needs care.
 
 **Expense entry — DONE** (Travels Accounts → Expenses → "New Expense": guided
 Category→Sub→Details + live journal preview; posts DR head / CR cash|bank).

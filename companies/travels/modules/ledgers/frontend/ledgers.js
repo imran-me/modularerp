@@ -58,6 +58,55 @@ function sectionNav(tab) {
   return nav;
 }
 
+/* ---- period / as-of controls for the statement suite (V2, 2026-07-26) ------
+ * P&L is a RANGE (This/Last month · This/Last year · Custom); Trial Balance and
+ * Balance Sheet are AS-OF a date. Both re-query the now period-aware engine
+ * (ledger.pnl {from,to} · trialBalance/balanceSheet {asOf}) and repaint in place. */
+var STMT_REF = new Date(2026, 6, 5);                 // demo "today" = 2026-07-05
+function stmtYmd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function stmtMonthRange(y, m) { return { from: stmtYmd(new Date(y, m, 1)), to: stmtYmd(new Date(y, m + 1, 0)) }; }
+function stmtYearRange(y) { return { from: y + '-01-01', to: y + '-12-31' }; }
+var STMT_PERIODS = [
+  { key: 'all',    label: 'All time',   range: function () { return {}; } },
+  { key: 'month',  label: 'This month', range: function () { return stmtMonthRange(STMT_REF.getFullYear(), STMT_REF.getMonth()); } },
+  { key: 'lmonth', label: 'Last month', range: function () { return stmtMonthRange(STMT_REF.getFullYear(), STMT_REF.getMonth() - 1); } },
+  { key: 'year',   label: 'This year',  range: function () { return stmtYearRange(STMT_REF.getFullYear()); } },
+  { key: 'lyear',  label: 'Last year',  range: function () { return stmtYearRange(STMT_REF.getFullYear() - 1); } }
+];
+// Range picker (pills + custom From/To). onChange(range, label) fires on select.
+function periodControl(onChange) {
+  var state = { key: 'all', custom: { from: '', to: '' } };
+  function currentRange() {
+    if (state.key === 'custom') { var r = {}; if (state.custom.from) r.from = state.custom.from; if (state.custom.to) r.to = state.custom.to; return r; }
+    var p = STMT_PERIODS.filter(function (x) { return x.key === state.key; })[0]; return p ? p.range() : {};
+  }
+  function label() {
+    if (state.key === 'custom') return (state.custom.from || '…') + ' → ' + (state.custom.to || '…');
+    var p = STMT_PERIODS.filter(function (x) { return x.key === state.key; })[0]; return p ? p.label : 'All time';
+  }
+  var pills = el('div.pill-tab'), customWrap;
+  STMT_PERIODS.concat([{ key: 'custom', label: 'Custom' }]).forEach(function (p) {
+    var b = el('button' + (state.key === p.key ? '.active' : ''), { text: p.label, onclick: function () {
+      state.key = p.key;
+      Array.prototype.forEach.call(pills.children, function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      customWrap.style.display = state.key === 'custom' ? '' : 'none';
+      onChange(currentRange(), label());
+    } });
+    pills.appendChild(b);
+  });
+  var fromIn = el('input.input', { type: 'date', style: { maxWidth: '160px' }, onchange: function () { state.custom.from = this.value; onChange(currentRange(), label()); } });
+  var toIn = el('input.input', { type: 'date', style: { maxWidth: '160px' }, onchange: function () { state.custom.to = this.value; onChange(currentRange(), label()); } });
+  customWrap = el('div.flex.items-center.gap-1.mt-2', { style: { display: 'none' } }, [ el('span.text-mute.xs', { text: 'From' }), fromIn, el('span.text-mute.xs', { text: 'To' }), toIn ]);
+  return { el: el('div.mb-3', null, [ pills, customWrap ]) };
+}
+// As-of date picker. onChange(asOf|undefined, label) — undefined asOf = latest.
+function asOfControl(onChange) {
+  var input = el('input.input', { type: 'date', style: { maxWidth: '170px' }, onchange: function () { var v = this.value; onChange(v || undefined, v ? ('as of ' + v) : 'latest position'); } });
+  var clear = el('button.btn.btn-sm.btn-ghost', { text: 'Latest', onclick: function () { input.value = ''; onChange(undefined, 'latest position'); } });
+  return { el: el('div.flex.items-center.gap-1.mb-3', null, [ el('span.text-mute.sm', { text: 'As of' }), input, clear ]) };
+}
+
 EPAL.view('travels/ledgers', {
   render: function (ctx) {
     var L = EPAL.ledger;
@@ -192,32 +241,40 @@ function generalView(page, L, ctx) {
 
 /* ======================================================= TRIAL BALANCE */
 function trialView(page, L) {
-  var rows = L.trialBalance(CID); var Td = 0, Tc = 0; rows.forEach(function (r) { Td += r.debit; Tc += r.credit; });
-  var balanced = Math.abs(Td - Tc) < 1;
-  var grid = frag('kpi-grid');
-  grid.appendChild(kpi('Total Debit', ui.money(Td, { compact: true }), 'arrow-up-right-circle'));
-  grid.appendChild(kpi('Total Credit', ui.money(Tc, { compact: true }), 'arrow-down-left-circle'));
-  grid.appendChild(kpi('Accounts', String(rows.length), 'list-ol'));
-  grid.appendChild(kpi('Balance Check', balanced ? 'Balanced' : 'Out by ' + ui.money(Math.abs(Td - Tc)), balanced ? 'check2-circle' : 'exclamation-triangle', balanced ? 'text-good' : 'text-bad'));
-  page.appendChild(grid);
-  if (!balanced) page.appendChild(buildBanner('exclamation-triangle-fill', '<strong>Trial balance is out by ' + ui.money(Math.abs(Td - Tc)) + '.</strong> A posting is unbalanced — review recent journals.'));
-  var t = EPAL.table({
-    columns: [
-      { key: 'code', label: 'Code', render: function (r) { return '<span class="mono xs text-mute">' + esc(r.code) + '</span>'; } },
-      { key: 'name', label: 'Account Head', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } },
-      { key: 'type', label: 'Type', badge: { asset: 'info', liability: 'warn', equity: 'accent', income: 'good', expense: 'bad' } },
-      { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true }
-    ],
-    rows: rows, quickFilter: 'type', filterPanel: true, searchKeys: ['code', 'name'], pageSize: 30,
-    exportName: 'travels-trial-balance.csv', pdfTitle: 'Trial Balance — Epal Travels',
-    onRow: function (r) { accountLedgerModal(L, r.code); },
-    empty: { icon: 'journal-check', title: 'No postings yet' }
-  });
-  var card = frag('head-btn-card');
-  slot(card, 'title').innerHTML = ui.icon('journal-check') + ' Trial Balance';
-  slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printTrial(rows, Td, Tc, balanced); } }));
-  slot(card, 'body').appendChild(t.el);
-  page.appendChild(card);
+  page.appendChild(asOfControl(function (asOf, lbl) { paint(asOf, lbl); }).el);
+  var host = el('div'); page.appendChild(host);
+
+  function paint(asOf, lbl) {
+    var rows = L.trialBalance(CID, { asOf: asOf }); var Td = 0, Tc = 0; rows.forEach(function (r) { Td += r.debit; Tc += r.credit; });
+    var balanced = Math.abs(Td - Tc) < 1;
+    var periodTag = (asOf ? ' · ' + lbl : '');
+    host.innerHTML = '';
+    var grid = frag('kpi-grid');
+    grid.appendChild(kpi('Total Debit', ui.money(Td, { compact: true }), 'arrow-up-right-circle'));
+    grid.appendChild(kpi('Total Credit', ui.money(Tc, { compact: true }), 'arrow-down-left-circle'));
+    grid.appendChild(kpi('Accounts', String(rows.length), 'list-ol'));
+    grid.appendChild(kpi('Balance Check', balanced ? 'Balanced' : 'Out by ' + ui.money(Math.abs(Td - Tc)), balanced ? 'check2-circle' : 'exclamation-triangle', balanced ? 'text-good' : 'text-bad'));
+    host.appendChild(grid);
+    if (!balanced) host.appendChild(buildBanner('exclamation-triangle-fill', '<strong>Trial balance is out by ' + ui.money(Math.abs(Td - Tc)) + '.</strong> A posting is unbalanced — review recent journals.'));
+    var t = EPAL.table({
+      columns: [
+        { key: 'code', label: 'Code', render: function (r) { return '<span class="mono xs text-mute">' + esc(r.code) + '</span>'; } },
+        { key: 'name', label: 'Account Head', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } },
+        { key: 'type', label: 'Type', badge: { asset: 'info', liability: 'warn', equity: 'accent', income: 'good', expense: 'bad' } },
+        { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true }
+      ],
+      rows: rows, quickFilter: 'type', filterPanel: true, searchKeys: ['code', 'name'], pageSize: 30,
+      exportName: 'travels-trial-balance.csv', pdfTitle: 'Trial Balance — Epal Travels',
+      onRow: function (r) { accountLedgerModal(L, r.code); },
+      empty: { icon: 'journal-check', title: asOf ? 'No postings as of this date' : 'No postings yet' }
+    });
+    var card = frag('head-btn-card');
+    slot(card, 'title').innerHTML = ui.icon('journal-check') + ' Trial Balance' + esc(periodTag);
+    slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printTrial(rows, Td, Tc, balanced, lbl); } }));
+    slot(card, 'body').appendChild(t.el);
+    host.appendChild(card);
+  }
+  paint(undefined, 'latest position');
 }
 
 /* ======================================================= PARTY LEDGER */
@@ -280,51 +337,67 @@ function ageingView(page, L, ctx, tab) {
 
 /* ======================================================= BALANCE SHEET */
 function bsView(page, L) {
-  var bs = L.balanceSheet(CID);
-  var grid = frag('kpi-grid');
-  grid.appendChild(kpi('Total Assets', ui.money(bs.totals.assets, { compact: true }), 'building'));
-  grid.appendChild(kpi('Liabilities', ui.money(bs.totals.liabilities, { compact: true }), 'file-earmark-minus'));
-  grid.appendChild(kpi('Equity', ui.money(bs.totals.equity, { compact: true }), 'piggy-bank'));
-  grid.appendChild(kpi('Balance Check', bs.totals.balanced ? 'A = L + E' : 'Out of balance', bs.totals.balanced ? 'check2-circle' : 'exclamation-triangle', bs.totals.balanced ? 'text-good' : 'text-bad'));
-  page.appendChild(grid);
-  var prow = frag('print-row');
-  var pbtn = slot(prow, 'btn'); pbtn.innerHTML = ui.icon('printer') + ' Print Balance Sheet'; pbtn.addEventListener('click', function () { printBalanceSheet(bs); });
-  page.appendChild(prow);
-  var wrap = frag('grid-auto');
-  wrap.appendChild(sectionTable('Assets', 'building', bs.assets, bs.totals.assets));
-  var right = el('div');
-  right.appendChild(sectionTable('Liabilities', 'file-earmark-minus', bs.liabilities, bs.totals.liabilities));
-  right.appendChild(el('div.mt-3', null, [ sectionTable('Equity', 'piggy-bank', bs.equity, bs.totals.equity) ]));
-  wrap.appendChild(right);
-  page.appendChild(wrap);
+  page.appendChild(asOfControl(function (asOf, lbl) { paint(asOf, lbl); }).el);
+  var host = el('div'); page.appendChild(host);
+
+  function paint(asOf, lbl) {
+    var bs = L.balanceSheet(CID, { asOf: asOf });
+    host.innerHTML = '';
+    var grid = frag('kpi-grid');
+    grid.appendChild(kpi('Total Assets', ui.money(bs.totals.assets, { compact: true }), 'building'));
+    grid.appendChild(kpi('Liabilities', ui.money(bs.totals.liabilities, { compact: true }), 'file-earmark-minus'));
+    grid.appendChild(kpi('Equity', ui.money(bs.totals.equity, { compact: true }), 'piggy-bank'));
+    grid.appendChild(kpi('Balance Check', bs.totals.balanced ? 'A = L + E' : 'Out of balance', bs.totals.balanced ? 'check2-circle' : 'exclamation-triangle', bs.totals.balanced ? 'text-good' : 'text-bad'));
+    host.appendChild(grid);
+    var prow = frag('print-row');
+    var pbtn = slot(prow, 'btn'); pbtn.innerHTML = ui.icon('printer') + ' Print Balance Sheet' + (asOf ? ' · ' + lbl : ''); pbtn.addEventListener('click', function () { printBalanceSheet(bs, lbl); });
+    host.appendChild(prow);
+    var wrap = frag('grid-auto');
+    wrap.appendChild(sectionTable('Assets', 'building', bs.assets, bs.totals.assets));
+    var right = el('div');
+    right.appendChild(sectionTable('Liabilities', 'file-earmark-minus', bs.liabilities, bs.totals.liabilities));
+    right.appendChild(el('div.mt-3', null, [ sectionTable('Equity', 'piggy-bank', bs.equity, bs.totals.equity) ]));
+    wrap.appendChild(right);
+    host.appendChild(wrap);
+  }
+  paint(undefined, 'latest position');
 }
 
-/* ======================================================= P&L */
+/* ======================================================= P&L (period-aware V2) */
 function pnlView(page, L) {
-  var pl = L.pnl(CID);
-  var grid = frag('kpi-grid');
-  grid.appendChild(kpi('Revenue', ui.money(pl.revenue, { compact: true }), 'cash-coin'));
-  grid.appendChild(kpi('Gross Profit', ui.money(pl.gross, { compact: true }), 'graph-up', 'text-good'));
-  grid.appendChild(kpi('Expenses', ui.money(pl.expenses, { compact: true }), 'wallet2'));
-  grid.appendChild(kpi('Net Profit', ui.money(pl.net, { compact: true }), pl.net >= 0 ? 'trophy' : 'exclamation-triangle', pl.net >= 0 ? 'text-good' : 'text-bad'));
-  page.appendChild(grid);
-  var card = frag('head-btn-card');
-  slot(card, 'title').innerHTML = ui.icon('graph-up-arrow') + ' Income Statement';
-  slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printPnl(pl); } }));
-  var pbody = slot(card, 'body');
-  pbody.appendChild(pnlLine('Revenue', pl.revenue, false));
-  pbody.appendChild(pnlLine('Cost of Sales', -pl.cogs, false));
-  pbody.appendChild(pnlLine('Gross Profit', pl.gross, true));
-  pbody.appendChild(pnlLine('Operating Expenses', -pl.expenses, false));
-  pbody.appendChild(pnlLine('Net Profit', pl.net, true));
-  page.appendChild(card);
-  var t = EPAL.table({
-    columns: [ { key: 'code', label: 'Code' }, { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'amount', label: 'Amount', num: true, money: true } ],
-    rows: pl.lines, exportName: 'travels-pnl.csv', pdfTitle: 'P&L Detail — Epal Travels', searchKeys: ['code', 'name'],
-    empty: { icon: 'graph-up', title: 'No income or expense postings yet' }
-  });
-  var lbl = frag('section-label'); lbl.textContent = 'Detail by Account'; page.appendChild(lbl);
-  var dcard = frag('card-body-card'); slot(dcard, 'body').appendChild(t.el); page.appendChild(dcard);
+  page.appendChild(periodControl(function (range, lbl) { paint(range, lbl); }).el);
+  var host = el('div'); page.appendChild(host);
+
+  function paint(range, lbl) {
+    range = range || {};
+    var pl = L.pnl(CID, range);
+    var periodTag = (lbl && lbl !== 'All time') ? ' · ' + lbl : '';
+    host.innerHTML = '';
+    var grid = frag('kpi-grid');
+    grid.appendChild(kpi('Revenue', ui.money(pl.revenue, { compact: true }), 'cash-coin'));
+    grid.appendChild(kpi('Gross Profit', ui.money(pl.gross, { compact: true }), 'graph-up', 'text-good'));
+    grid.appendChild(kpi('Expenses', ui.money(pl.expenses, { compact: true }), 'wallet2'));
+    grid.appendChild(kpi('Net Profit', ui.money(pl.net, { compact: true }), pl.net >= 0 ? 'trophy' : 'exclamation-triangle', pl.net >= 0 ? 'text-good' : 'text-bad'));
+    host.appendChild(grid);
+    var card = frag('head-btn-card');
+    slot(card, 'title').innerHTML = ui.icon('graph-up-arrow') + ' Income Statement' + esc(periodTag);
+    slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printPnl(pl, lbl); } }));
+    var pbody = slot(card, 'body');
+    pbody.appendChild(pnlLine('Revenue', pl.revenue, false));
+    pbody.appendChild(pnlLine('Cost of Sales', -pl.cogs, false));
+    pbody.appendChild(pnlLine('Gross Profit', pl.gross, true));
+    pbody.appendChild(pnlLine('Operating Expenses', -pl.expenses, false));
+    pbody.appendChild(pnlLine('Net Profit', pl.net, true));
+    host.appendChild(card);
+    var t = EPAL.table({
+      columns: [ { key: 'code', label: 'Code' }, { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'amount', label: 'Amount', num: true, money: true } ],
+      rows: pl.lines, exportName: 'travels-pnl.csv', pdfTitle: 'P&L Detail — Epal Travels', searchKeys: ['code', 'name'],
+      empty: { icon: 'graph-up', title: 'No income or expense postings in this period' }
+    });
+    var secLbl = frag('section-label'); secLbl.textContent = 'Detail by Account'; host.appendChild(secLbl);
+    var dcard = frag('card-body-card'); slot(dcard, 'body').appendChild(t.el); host.appendChild(dcard);
+  }
+  paint({}, 'All time');
 }
 
 /* ======================================================= DRILL-DOWN MODALS (legacy el()) */
@@ -416,11 +489,12 @@ function journalByRef(L, ref) {
 
 /* ======================================================= BRANDED STATEMENTS */
 function docReady() { if (!EPAL.doc || !EPAL.doc.open) { ui.toast('Document engine unavailable', 'error'); return false; } return true; }
-function printTrial(rows, td, tc, balanced) {
+function printTrial(rows, td, tc, balanced, period) {
   if (!docReady()) return;
+  var asOf = (period && period !== 'latest position') ? period : 'as at ' + ui.date(TODAY_STR);
   EPAL.doc.open({ type: 'document', title: 'Trial Balance', badge: balanced ? 'Balanced' : 'Unbalanced', date: TODAY_STR, companyId: CID,
-    parties: [ { label: 'Entity', name: CO_NAME, lines: ['Trial Balance as at ' + ui.date(TODAY_STR)] }, { label: 'Prepared By', name: 'Travels Accounts', lines: ['Epal Group', 'Dhaka, Bangladesh'] } ],
-    meta: [ { label: 'Total Debit', value: ui.money(td) }, { label: 'Total Credit', value: ui.money(tc) }, { label: 'Status', value: balanced ? 'Balanced' : 'Out by ' + ui.money(Math.abs(td - tc)) } ],
+    parties: [ { label: 'Entity', name: CO_NAME, lines: ['Trial Balance ' + asOf] }, { label: 'Prepared By', name: 'Travels Accounts', lines: ['Epal Group', 'Dhaka, Bangladesh'] } ],
+    meta: [ { label: 'Period', value: asOf }, { label: 'Total Debit', value: ui.money(td) }, { label: 'Total Credit', value: ui.money(tc) }, { label: 'Status', value: balanced ? 'Balanced' : 'Out by ' + ui.money(Math.abs(td - tc)) } ],
     columns: [ { key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true } ],
     rows: rows, totals: [ { label: 'Total Debit', value: td }, { label: 'Total Credit', value: tc, grand: true } ],
     terms: 'Generated by Epal Group ERP · Confidential — for internal documentation.', sign: 'Travels Accounts' });
@@ -452,24 +526,26 @@ function printAging(kind, rows, sum) {
     rows: rows, totals: [ { label: 'Total ' + kind + ' Outstanding', value: sum.total, grand: true } ],
     terms: 'Ageing computed FIFO from open ledger invoices. E&OE.', sign: 'Travels Credit Control' });
 }
-function printBalanceSheet(bs) {
+function printBalanceSheet(bs, period) {
   if (!docReady()) return;
   var rows = [];
   bs.assets.forEach(function (a) { rows.push({ section: 'Assets', name: a.code + ' · ' + a.name, amount: a.amount }); });
   bs.liabilities.forEach(function (a) { rows.push({ section: 'Liabilities', name: a.code + ' · ' + a.name, amount: a.amount }); });
   bs.equity.forEach(function (a) { rows.push({ section: 'Equity', name: a.code + ' · ' + a.name, amount: a.amount }); });
+  var asAt = (period && period !== 'latest position') ? period.replace(/^as of /, '') : ui.date(TODAY_STR);
   EPAL.doc.open({ type: 'document', title: 'Balance Sheet', badge: bs.totals.balanced ? 'Balanced' : 'Unbalanced', date: TODAY_STR, companyId: CID,
-    parties: [ { label: 'Entity', name: CO_NAME, lines: ['As at ' + ui.date(TODAY_STR)] }, { label: 'Prepared By', name: 'Travels Accounts', lines: ['Epal Group'] } ],
-    meta: [ { label: 'Total Assets', value: ui.money(bs.totals.assets) }, { label: 'Total Liabilities', value: ui.money(bs.totals.liabilities) }, { label: 'Total Equity', value: ui.money(bs.totals.equity) } ],
+    parties: [ { label: 'Entity', name: CO_NAME, lines: ['As at ' + asAt] }, { label: 'Prepared By', name: 'Travels Accounts', lines: ['Epal Group'] } ],
+    meta: [ { label: 'As of', value: asAt }, { label: 'Total Assets', value: ui.money(bs.totals.assets) }, { label: 'Total Liabilities', value: ui.money(bs.totals.liabilities) }, { label: 'Total Equity', value: ui.money(bs.totals.equity) } ],
     columns: [ { key: 'section', label: 'Section' }, { key: 'name', label: 'Account' }, { key: 'amount', label: 'Amount', num: true, money: true } ],
     rows: rows, totals: [ { label: 'Total Assets', value: bs.totals.assets }, { label: 'Liabilities + Equity', value: bs.totals.liabilities + bs.totals.equity, grand: true } ],
     terms: 'Prepared on the double-entry ledger. Current-year earnings folded into equity. E&OE.', sign: 'Travels Accounts' });
 }
-function printPnl(pl) {
+function printPnl(pl, period) {
   if (!docReady()) return;
+  var span = (period && period !== 'All time') ? period : 'to ' + ui.date(TODAY_STR);
   EPAL.doc.open({ type: 'document', title: 'Profit & Loss Statement', badge: pl.net >= 0 ? 'Profit' : 'Loss', date: TODAY_STR, companyId: CID,
-    parties: [ { label: 'Entity', name: CO_NAME, lines: ['Income Statement to ' + ui.date(TODAY_STR)] }, { label: 'Prepared By', name: 'Travels Accounts', lines: ['Epal Group'] } ],
-    meta: [ { label: 'Revenue', value: ui.money(pl.revenue) }, { label: 'Gross Profit', value: ui.money(pl.gross) }, { label: 'Net Profit', value: ui.money(pl.net) } ],
+    parties: [ { label: 'Entity', name: CO_NAME, lines: ['Income Statement · ' + span] }, { label: 'Prepared By', name: 'Travels Accounts', lines: ['Epal Group'] } ],
+    meta: [ { label: 'Period', value: span }, { label: 'Revenue', value: ui.money(pl.revenue) }, { label: 'Gross Profit', value: ui.money(pl.gross) }, { label: 'Net Profit', value: ui.money(pl.net) } ],
     columns: [ { key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'amount', label: 'Amount', num: true, money: true } ],
     rows: pl.lines, totals: [ { label: 'Gross Profit', value: pl.gross }, { label: 'Net Profit', value: pl.net, grand: true } ],
     terms: 'Generated by Epal Group ERP from the live ledger · Confidential.', sign: 'Travels Accounts' });
