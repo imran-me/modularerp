@@ -26,13 +26,20 @@ Travels → (4) everything else**, all full-stack (FE+BE), and re-do ALL to this
 Owner (caps) reinforced: **follow the loop — before/after screenshots, cross-check,
 pixel-perfect match — for EVERY module.** Recorded in `docs/FULLSTACK-REBUILD-TRACKER.md`.
 
-**◑ IN PROGRESS — module = group-cockpit/master-accounts (priority #1).** Before-baseline
-shot: `.parity/master-accounts-before` (20 shots = 10 routes × 2 themes: overview · banks ·
-cash · payroll · schedules · journals · expenses · accounts · party-types · loans).
-Backend today: 7 controllers (accounts, banks, bank-txns, journals, customers, suppliers,
-schedules) — **missing: expenses, loans, party-types, payroll**. Plan: FE completion pass
-(residual `el()`→markup) → after-shot + pixel-diff → build the 4 missing backends
-(migrations+models+services+controllers) → test vs MySQL → sweep → push.
+**◑ IN PROGRESS — module = group-cockpit/master-accounts (priority #1).**
+- ✅ **FRONTEND (page routes) DONE** — converted all page-level `el()` script-DOM to
+  HTML template markup across all 10 routes (party-types, accounts, schedules, journals,
+  expenses, overview/bank-cards + the delegated cash/payroll/loans). Added reusable
+  fragments (titled-card, add-row, btn, a-btn, btn-strip, ledger-table/-row, sched-card,
+  body-card, month-input, tax-period-row, tax-row, section-label, bank-grid, pad-note,
+  bank-card) + helpers (addRow, btn, aBtn, btnStrip, titledCard). **Full 10-route parity
+  diff = 20/20 BYTE-IDENTICAL both themes**; sweep 222/222. Commits 851b1fd, e3087d7, 942504c.
+- ◻ **REMAINING FE:** the form modals + the inline bank-ledger detail (`bankAccountDetail`)
+  + other non-route `el()` (editBank, expenseForm, sharedExpenseForm, opening posters,
+  VAT deposit) — not in route screenshots, so convert + spot-check by opening each.
+- ◻ **BACKEND:** 7 controllers exist (accounts, banks, bank-txns, journals, customers,
+  suppliers, schedules); **build the 4 missing (expenses, loans, party-types, payroll)**
+  + test vs MySQL.
 
 ## 🚨 CORRECTION — 2026-07-26 (owner reminded me) · FULL-STACK MEANS FRONTEND **AND** BACKEND
 
