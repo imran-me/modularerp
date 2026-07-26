@@ -69,7 +69,10 @@
     pay_templates: 'group/master-accounts/payroll/templates',
     pay_runs:      'group/master-accounts/payroll/runs',
     pay_slips:     'group/master-accounts/payroll/slips',
-    pay_txns:      'group/master-accounts/payroll/txns'
+    pay_txns:      'group/master-accounts/payroll/txns',
+    tv_recurring:  'travels/accounts/books/recurring',
+    tv_cheques:    'travels/accounts/books/cheques',
+    tv_petty:      'travels/accounts/books/petty'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -106,6 +109,9 @@
     pay_runs:    'group/master-accounts/payroll/runs',
     pay_slips:   'group/master-accounts/payroll/slips',
     pay_txns:    'group/master-accounts/payroll/txns',
+    tv_recurring: 'travels/accounts/books/recurring',
+    tv_cheques:  'travels/accounts/books/cheques',
+    tv_petty:    'travels/accounts/books/petty',
     perf_reviews: 'group/employees/reviews'
   };
 
