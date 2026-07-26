@@ -300,10 +300,26 @@ because it ADDS posting/reporting, never changes existing screens' look.
 2. **Group shared-expense entry + EQUAL split** — post each concern's share via
    inter-company legs from Group HQ's expense entry.
 3. **Inter-company funding** — expense "paid from" can be another company → loan
-   legs + a payable to settle.
+   legs + a payable to settle. **✅ DONE 2026-07-26.**
 4. **Travels Dashboard P&L** — revenue, COGS, gross margin, opex, net; per-product
    contribution margin; cost-per-sale & margin-per-sale; monthly / yearly.
 5. Statement suite (TB/GL/BS/P&L V2) + Group consolidated P&L.
 
 **Expense entry — DONE** (Travels Accounts → Expenses → "New Expense": guided
 Category→Sub→Details + live journal preview; posts DR head / CR cash|bank).
+
+**Inter-company funding — DONE 2026-07-26** (Travels Accounts → Expenses):
+- The "New Expense" modal gained a **"Funded by"** selector (own funds · Group HQ ·
+  each present concern). Own funds → the normal DR head / CR cash|bank. Funded by
+  another concern X → an **inter-company loan** both sides:
+  Travels `DR head / CR 2400 Inter-co Payable` (owes X), funder X `DR 1300 Inter-co
+  Rcv / CR 1000|1010` (paid, is owed). Live journal preview shows both legs.
+- New **"Inter-company balances"** card at the top of the Expenses desk lists every
+  open position (owes / owed), each with a **Settle** (pay from own purse) or
+  **Record receipt** action that posts the mirrored repayment legs on both books.
+- Delete of a funded expense reverses BOTH legs (`GL-ACC-*` + `GL-ACF-*`).
+- Verified (`tools/verify/books`-style probe): per-company purses move exactly, the
+  debt tracks + clears, and the consolidated TB stays balanced when the funder is an
+  operating company. (Group-HQ-funded legs live on the group's own books, which the
+  operating-company `consolidatedTrialBalance()` deliberately excludes — pre-existing,
+  same as the group-paid `sharedExpenseForm`.) Sweep 222/222 both themes, 0 errors.

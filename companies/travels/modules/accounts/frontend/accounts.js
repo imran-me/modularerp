@@ -278,6 +278,9 @@ EPAL.view('travels/accounts', {
        of accounts), so Travels can see the heads without silently editing
        Woodart's books — editing stays in Master Accounts. */
     function expensesSection(p) {
+      // Inter-company loans owed/receivable (funded expenses + shared costs) sit
+      // above the desk, with a Settle action — only when a position is open.
+      var ic = intercoCard(); if (ic) p.appendChild(ic);
       var TABS = [['all', 'All Expenses'], ['budget', 'Budget Setup'], ['report', 'Expense Report'], ['categories', 'Categories']];
       var bar = el('div.pill-tab.mb-3');
       var host = el('div');
@@ -509,6 +512,162 @@ function glFor(e) {
   return null;
 }
 
+/* ==========================================================================
+ * INTER-COMPANY FUNDING (owner decision 2026-07-22 #5 · build-order step 3)
+ * --------------------------------------------------------------------------
+ * When a Travels expense is paid from ANOTHER concern's purse (e.g. the Group
+ * cash box settles a Travels bill), the money leaves the FUNDER, not Travels —
+ * so it must NOT credit Travels' own cash. Instead it books an inter-company
+ * LOAN on both sides, through the elimination control accounts (1300 Rcv /
+ * 2400 Pay), so nothing is double-counted at group level:
+ *   Borrower (Travels): DR <expense head>    / CR 2400 Inter-co Payable  (owes funder)
+ *   Funder   (X):       DR 1300 Inter-co Rcv / CR 1000|1010 cash|bank    (paid, is owed)
+ * Travels later SETTLES from its own purse (the reverse legs), clearing the
+ * debt on both books. Group consolidation eliminates 1300/2400, so the group
+ * P&L is unchanged — only the expense sits in Travels and the cash left X.
+ * ==> LARAVEL: an InterCompanyLoanService posting two mirrored JournalEntries. */
+
+// Concerns that can fund a Travels expense: Group HQ + the other present concerns.
+function fundingSources() {
+  var out = [{ id: 'group', name: 'Epal Group (HQ)' }];
+  ((EPAL.config && EPAL.config.companies) || []).forEach(function (c) {
+    if (c.type !== 'company' || c.id === CID || c.enabled === false) return;
+    if (EPAL.discovery && EPAL.discovery.presentFor && !EPAL.discovery.presentFor(c.id)) return;
+    out.push({ id: c.id, name: c.short || c.name });
+  });
+  return out;
+}
+function coLabel(id) {
+  if (!id) return '—';
+  if (id === CID) return 'Epal Travels';
+  if (id === 'group') return 'Epal Group (HQ)';
+  var c = ((EPAL.config && EPAL.config.companies) || []).filter(function (x) { return x.id === id; })[0];
+  return c ? (c.short || c.name) : id;
+}
+// Is this party a real Epal company (so its inter-co balance can be settled)?
+// Guards out 'shared' / free-text party strings that also touch 1300/2400.
+function isKnownCo(id) {
+  return id === 'group' || ((EPAL.config && EPAL.config.companies) || []).some(function (c) { return c.id === id && c.type === 'company'; });
+}
+
+// Net inter-company positions for Travels, keyed by counterparty company:
+//   owes[party]  = net 2400 Inter-co Payable   (Travels owes that concern)
+//   dueTo[party] = net 1300 Inter-co Receivable (that concern owes Travels)
+function intercoPositions() {
+  var owes = {}, dueTo = {};
+  if (!EPAL.ledger || !EPAL.ledger.entries) return { owes: owes, dueTo: dueTo };
+  EPAL.ledger.entries({ companyId: CID }).forEach(function (e) {
+    var party = e.party || '';
+    if (!isKnownCo(party)) return;
+    (e.lines || []).forEach(function (l) {
+      if (l.account === '2400') owes[party] = (owes[party] || 0) + ((+l.cr || 0) - (+l.dr || 0));
+      else if (l.account === '1300') dueTo[party] = (dueTo[party] || 0) + ((+l.dr || 0) - (+l.cr || 0));
+    });
+  });
+  return { owes: owes, dueTo: dueTo };
+}
+
+// A compact card of Travels' outstanding inter-company loans + a Settle action.
+// Rendered above the Expenses desk only when a non-zero position exists.
+function intercoCard() {
+  var pos = intercoPositions(), rows = [];
+  Object.keys(pos.owes).forEach(function (p) { if (pos.owes[p] > 0.5) rows.push({ party: p, amount: pos.owes[p], kind: 'pay' }); });
+  Object.keys(pos.dueTo).forEach(function (p) { if (pos.dueTo[p] > 0.5) rows.push({ party: p, amount: pos.dueTo[p], kind: 'receive' }); });
+  if (!rows.length) return null;
+  rows.sort(function (a, b) { return b.amount - a.amount; });
+
+  var body = el('div.card-body');
+  rows.forEach(function (r) {
+    var isPay = r.kind === 'pay';
+    body.appendChild(el('div.ma-shr-row.mb-2', null, [
+      el('div', null, [
+        el('div.strong', { html: (isPay ? ui.icon('arrow-up-right-circle') + ' Travels owes ' : ui.icon('arrow-down-left-circle') + ' Owed to Travels by ') + esc(coLabel(r.party)) }),
+        el('div.text-mute.xs', { text: isPay ? 'Inter-company payable · 2400' : 'Inter-company receivable · 1300' })
+      ]),
+      el('div.flex.items-center.gap-2', null, [
+        el('span.num.' + (isPay ? 'text-bad' : 'text-good'), { text: ui.money(r.amount) }),
+        canCreate() ? el('button.btn.btn-sm.btn-outline', { text: isPay ? 'Settle' : 'Record receipt', onclick: function () { settleInterco(r.party, r.kind, r.amount); } }) : null
+      ])
+    ]));
+  });
+  return el('div.card.mb-3', null, [
+    el('div.card-head', null, [
+      el('h3', { html: ui.icon('diagram-3') + ' Inter-company balances' }),
+      el('span.card-sub', { text: 'loans between concerns — settle to clear both books' })
+    ]),
+    body
+  ]);
+}
+
+// Settle (or record receipt of) an inter-company balance with a counterparty.
+// Posts the mirrored repayment legs on BOTH concerns' books so the debt drops
+// on each side. kind: 'pay' (Travels owes → pays) | 'receive' (owed → collects).
+function settleInterco(party, kind, balance) {
+  if (!EPAL.ledger || !EPAL.ledger.post) { ui.toast('Ledger engine unavailable', 'error'); return; }
+  var isPay = kind === 'pay';
+  var body = el('div');
+  var m = ui.modal({ title: (isPay ? 'Settle debt to ' : 'Record receipt from ') + coLabel(party), icon: 'cash-coin', size: 'md', body: body, footer: false });
+  body.appendChild(el('div.text-mute.sm.mb-2', { html: isPay
+    ? 'Travels pays <b>' + esc(coLabel(party)) + '</b> from its own cash/bank, clearing the inter-company payable on both books.'
+    : '<b>' + esc(coLabel(party)) + '</b> pays Travels, clearing the inter-company receivable on both books.' }));
+  var f = EPAL.form([
+    { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1, default: Math.round(balance) },
+    { key: 'method', label: isPay ? 'Paid from' : 'Received into', type: 'select', options: METHODS, default: 'Bank', required: true },
+    { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
+    { key: 'ref', label: 'Reference', type: 'text', placeholder: 'e.g. settlement voucher no' }
+  ], { amount: Math.round(balance), method: 'Bank', date: TODAY_STR });
+  var live = el('div.tv-exp-live');
+  function refresh() {
+    var v = f.values(), amt = +v.amount || 0, pay = v.method === 'Cash' ? '1000 Cash' : '1010 Bank';
+    live.innerHTML = '';
+    live.appendChild(el('div.tv-exp-live-t', { html: ui.icon('journal-text') + ' Journal preview — Travels' }));
+    if (isPay) {
+      live.appendChild(el('div.tv-exp-live-l', { html: '<span>DR 2400 Inter-company Payable</span><span class="num">' + ui.money(amt) + '</span>' }));
+      live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR ' + pay + '</span><span class="num">' + ui.money(amt) + '</span>' }));
+    } else {
+      live.appendChild(el('div.tv-exp-live-l', { html: '<span>DR ' + pay + '</span><span class="num">' + ui.money(amt) + '</span>' }));
+      live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR 1300 Inter-company Receivable</span><span class="num">' + ui.money(amt) + '</span>' }));
+    }
+    live.appendChild(el('div.text-mute.xs.mt-1', { text: coLabel(party) + ' books the mirror leg automatically — the balance drops on both sides.' }));
+  }
+  body.appendChild(f.el);
+  f.el.addEventListener('input', refresh); f.el.addEventListener('change', refresh);
+  body.appendChild(live); refresh();
+  body.appendChild(el('div.flex.justify-end.gap-2.mt-3', null, [
+    el('button.btn.btn-ghost', { text: 'Cancel', onclick: function () { m.close(); } }),
+    el('button.btn.btn-primary', { html: ui.icon('check2-circle') + ' ' + (isPay ? 'Settle' : 'Record receipt'), onclick: doSettle })
+  ]));
+
+  function doSettle() {
+    if (!f.validate()) { ui.toast('Enter the amount', 'error'); return; }
+    var v = f.values(), amt = Math.round(+v.amount || 0);
+    if (amt <= 0) { ui.toast('Enter a valid amount', 'error'); return; }
+    if (amt > Math.round(balance) + 0.5) { ui.toast('Amount exceeds the outstanding balance', 'error'); return; }
+    var payAcct = v.method === 'Cash' ? '1000' : '1010';
+    var ref = 'ICS-' + ui.uid('').slice(-6).toUpperCase();
+    // travelsLegs = the reverse of how the debt was raised; the counterparty
+    // books the opposite. Same shapes whether we pay out or collect.
+    var travelsPay = [{ account: '2400', dr: amt, cr: 0 }, { account: payAcct, dr: 0, cr: amt }];
+    var travelsRecv = [{ account: payAcct, dr: amt, cr: 0 }, { account: '1300', dr: 0, cr: amt }];
+    var otherRecv = [{ account: payAcct, dr: amt, cr: 0 }, { account: '1300', dr: 0, cr: amt }];
+    var otherPay = [{ account: '2400', dr: amt, cr: 0 }, { account: payAcct, dr: 0, cr: amt }];
+    try {
+      if (EPAL.ledger.ensureAccount) {
+        EPAL.ledger.ensureAccount('1300', 'Inter-company Receivable', 'asset');
+        EPAL.ledger.ensureAccount('2400', 'Inter-company Payable', 'liability');
+      }
+      EPAL.ledger.post({ id: 'GL-' + ref + '-' + CID, date: v.date, companyId: CID, ref: ref, party: party, source: 'intercompany',
+        memo: (isPay ? 'Settled inter-company debt to ' : 'Collected inter-company balance from ') + coLabel(party) + (v.ref ? ' · ' + v.ref : ''),
+        lines: isPay ? travelsPay : travelsRecv });
+      EPAL.ledger.post({ id: 'GL-' + ref + '-' + party, date: v.date, companyId: party, ref: ref, party: CID, source: 'intercompany',
+        memo: (isPay ? 'Received inter-company settlement from ' : 'Settled inter-company debt to ') + coLabel(CID) + (v.ref ? ' · ' + v.ref : ''),
+        lines: isPay ? otherRecv : otherPay });
+      ui.toast((isPay ? 'Settled ' : 'Recorded receipt of ') + ui.money(amt) + ' with ' + coLabel(party), 'success');
+      m.close(); EPAL.router.render();
+    } catch (e) { ui.toast(e.message || 'Settlement failed', 'error'); }
+  }
+}
+
 /* ---- rich add / edit entry form ---------------------------------------*/
 /* ---- CATEGORISED EXPENSE ENTRY (owner 2026-07-22) ------------------------
  * A guided, standard operating-expense capture: pick a Category (which pins the
@@ -540,12 +699,15 @@ function expenseEntry() {
 
   var details = EPAL.form([
     { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
-    { key: 'method', label: 'Paid from / method', type: 'select', options: METHODS, default: 'Bank', required: true },
+    { key: 'fundedBy', label: 'Funded by', type: 'select', required: true, default: 'travels',
+      options: [['travels', 'Epal Travels (own funds)']].concat(fundingSources().map(function (c) { return [c.id, c.name + ' — inter-company loan']; })),
+      hint: 'Whose money paid this? Another concern → booked as an inter-company loan Travels repays.' },
+    { key: 'method', label: 'Payment method', type: 'select', options: METHODS, default: 'Bank', required: true },
     { key: 'party', label: 'Paid to (vendor / staff)', type: 'text', placeholder: 'e.g. Landlord, ISP, staff name' },
     { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
     { key: 'ref', label: 'Bill / voucher no', type: 'text', placeholder: 'e.g. BR-118' },
     { key: 'desc', label: 'Notes', type: 'textarea', col2: true, placeholder: 'What is this expense for?' }
-  ], { date: TODAY_STR, method: 'Bank' });
+  ], { date: TODAY_STR, method: 'Bank', fundedBy: 'travels' });
 
   var live = el('div.tv-exp-live');
   var save = el('button.btn.btn-primary', { html: ui.icon('check2-circle') + ' Record Expense', onclick: doSave });
@@ -576,10 +738,18 @@ function expenseEntry() {
     if (!sel.cat) { live.innerHTML = ''; return; }
     var v = details.values(); var amt = +v.amount || 0;
     var pay = (v.method === 'Cash') ? '1000 Cash' : '1010 Bank';
+    var funder = (v.fundedBy && v.fundedBy !== 'travels') ? v.fundedBy : null;
+    var drLine = '<span>DR ' + sel.cat.head + ' · ' + esc(sel.cat.name) + (sel.sub ? ' <span class="text-mute">(' + esc(sel.sub) + ')</span>' : '') + '</span><span class="num">' + ui.money(amt) + '</span>';
     live.innerHTML = '';
     live.appendChild(el('div.tv-exp-live-t', { html: ui.icon('journal-text') + ' Journal preview' }));
-    live.appendChild(el('div.tv-exp-live-l', { html: '<span>DR ' + sel.cat.head + ' · ' + esc(sel.cat.name) + (sel.sub ? ' <span class="text-mute">(' + esc(sel.sub) + ')</span>' : '') + '</span><span class="num">' + ui.money(amt) + '</span>' }));
-    live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR ' + pay + '</span><span class="num">' + ui.money(amt) + '</span>' }));
+    live.appendChild(el('div.tv-exp-live-l', { html: drLine }));
+    if (funder) {
+      // another concern's purse paid — Travels books a payable, not a cash-out.
+      live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR 2400 Inter-company Payable</span><span class="num">' + ui.money(amt) + '</span>' }));
+      live.appendChild(el('div.text-mute.xs.mt-1', { html: ui.icon('diagram-3') + ' ' + esc(coLabel(funder)) + ' pays from its ' + pay + ' (DR 1300 Inter-co Rcv / CR ' + pay + '). Travels owes ' + esc(coLabel(funder)) + ' until settled.' }));
+    } else {
+      live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR ' + pay + '</span><span class="num">' + ui.money(amt) + '</span>' }));
+    }
   }
 
   body.appendChild(el('div.section-label', { text: '3 · Details' }));
@@ -596,12 +766,15 @@ function expenseEntry() {
     if (!details.validate()) { ui.toast('Enter the amount', 'error'); return; }
     var v = details.values(); var amt = +v.amount || 0;
     if (amt <= 0) { ui.toast('Enter a valid amount', 'error'); return; }
+    var funder = (v.fundedBy && v.fundedBy !== 'travels') ? v.fundedBy : '';
     var r = { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: CID, created: TODAY_STR, kind: 'Expense',
       amount: amt, category: sel.cat.name, subCategory: sel.sub || '', head: sel.cat.head, method: v.method,
-      date: v.date || TODAY_STR, party: v.party || '', ref: v.ref || '', desc: v.desc || '' };
+      fundedBy: funder, date: v.date || TODAY_STR, party: v.party || '', ref: v.ref || '', desc: v.desc || '' };
     db.save('acc_entries', r);
     mirrorToLedger(r);
-    ui.toast('Expense recorded & posted to ' + sel.cat.head + ' · ' + sel.cat.name, 'success');
+    ui.toast(funder
+      ? 'Expense recorded — funded by ' + coLabel(funder) + ' as an inter-company loan'
+      : 'Expense recorded & posted to ' + sel.cat.head + ' · ' + sel.cat.name, 'success');
     m.close(); EPAL.router.render();
   }
 }
@@ -650,6 +823,9 @@ function deleteEntry(e) {
       try {
         if (EPAL.ledger && EPAL.ledger.reverse) {
           var rev = EPAL.ledger.reverse('GL-ACC-' + e.id, { reason: 'Voucher ' + e.id + ' deleted' });
+          // a funded expense has a SECOND leg on the funder's books (GL-ACF-*) —
+          // reverse it too so the inter-company loan clears on both sides.
+          if (e.fundedBy && e.fundedBy !== CID) { try { EPAL.ledger.reverse('GL-ACF-' + e.id, { reason: 'Voucher ' + e.id + ' deleted' }); } catch (x2) {} }
           if (rev) { ui.toast('Entry removed — ledger reversal ' + rev.id + ' posted', 'success'); EPAL.router.render(); return; }
         }
       } catch (x) { ui.toast(x.message || 'Reversal failed', 'error'); }
@@ -674,9 +850,33 @@ function mirrorToLedger(rec) {
   // the categorised entry pins the CoA head (rec.head); otherwise fall back to
   // the keyword mapper. Cash method credits 1000, everything else the 1010 bank.
   var payAcct = rec.method === 'Cash' ? '1000' : '1010';
+  var head = rec.head || expenseAccountFor(rec.category);
+  // INTER-COMPANY FUNDING (decision #5): a Travels expense paid from another
+  // concern's purse. The expense sits in Travels' books, but the cash left the
+  // funder — so Travels credits a payable (owes the funder), and the funder
+  // posts its own mirror leg (DR 1300 Inter-co Rcv / CR its cash|bank). Both
+  // eliminate on consolidation; settle later via settleInterco().
+  var funder = (rec.kind === 'Expense' && rec.fundedBy && rec.fundedBy !== CID && isKnownCo(rec.fundedBy)) ? rec.fundedBy : null;
+  if (funder) {
+    try {
+      if (EPAL.ledger.ensureAccount) {
+        EPAL.ledger.ensureAccount('1300', 'Inter-company Receivable', 'asset');
+        EPAL.ledger.ensureAccount('2400', 'Inter-company Payable', 'liability');
+      }
+      EPAL.ledger.post({ id: 'GL-ACC-' + rec.id, date: rec.date, companyId: CID, ref: rec.id,
+        memo: (rec.desc || rec.category || 'Expense') + ' — funded by ' + coLabel(funder),
+        source: 'intercompany', party: funder,
+        lines: [ { account: head, dr: amt, cr: 0 }, { account: '2400', dr: 0, cr: amt } ] });
+      EPAL.ledger.post({ id: 'GL-ACF-' + rec.id, date: rec.date, companyId: funder, ref: rec.id,
+        memo: 'Funded ' + coLabel(CID) + ' expense · ' + (rec.category || 'expense'),
+        source: 'intercompany', party: CID,
+        lines: [ { account: '1300', dr: amt, cr: 0 }, { account: payAcct, dr: 0, cr: amt } ] });
+    } catch (e) { /* mirror is best-effort — never block the quick entry */ }
+    return;
+  }
   var lines = rec.kind === 'Income'
     ? [ { account: payAcct, dr: amt, cr: 0 }, { account: '4000', dr: 0, cr: amt } ]
-    : [ { account: rec.head || expenseAccountFor(rec.category), dr: amt, cr: 0 }, { account: payAcct, dr: 0, cr: amt } ];
+    : [ { account: head, dr: amt, cr: 0 }, { account: payAcct, dr: 0, cr: amt } ];
   try {
     EPAL.ledger.post({ id: 'GL-ACC-' + rec.id, date: rec.date, companyId: CID, ref: rec.id,
       memo: rec.desc || rec.category || (rec.kind + ' entry'), source: 'manual', party: rec.party || '', lines: lines });

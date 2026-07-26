@@ -19,6 +19,40 @@
 
 ---
 
+## 🆕 SESSION — 2026-07-26 · INTER-COMPANY FUNDING LEGS (accounting build-order step 3)
+
+Shipped **build-order step 3** of the Travels accounting buildout — expense "paid
+from another company" → inter-company loan + a payable to settle (owner decision #5,
+`docs/ACCOUNTING-PLAN-TRAVELS.md`). All in `companies/travels/modules/accounts/`
+(frontend `accounts.js` → rebuilt `view.js`).
+
+- **"Funded by" selector** on Travels Accounts → Expenses → **New Expense**: own
+  funds (default) · Group HQ · each present concern. Own → normal DR head / CR
+  cash|bank. Funded by concern X → **inter-company loan both sides**: Travels
+  `DR head / CR 2400 Inter-co Payable` (owes X); funder X `DR 1300 Inter-co Rcv /
+  CR 1000|1010` (paid). Live journal preview switches to show both legs. `mirrorToLedger`
+  branches on `rec.fundedBy`; the funder leg is a second GL id `GL-ACF-<id>`.
+- **"Inter-company balances" card** at the top of the Expenses desk (only when a
+  position is open) lists every owes/owed line with a **Settle** (pay from own purse)
+  or **Record receipt** action → posts the mirrored repayment legs on both books.
+  New helpers: `fundingSources()`, `coLabel()`, `isKnownCo()`, `intercoPositions()`,
+  `intercoCard()`, `settleInterco()`.
+- **Delete** of a funded expense reverses BOTH legs (`GL-ACC-*` + `GL-ACF-*`).
+- Reuses existing CSS only (`.tv-exp-live-*`, `.ma-shr-row`, `.card`), no new styles.
+- **Verified:** rebuilt view.js; **sweep 222/222 both themes, 0 errors**; a CDP books
+  probe proved per-company purses move exactly, the debt tracks + clears, and the
+  consolidated TB stays balanced with an operating-company funder. NOTE: a **Group-HQ**
+  funder's leg sits on the group's OWN books, which the operating-company
+  `consolidatedTrialBalance()` deliberately omits (`type:'company'` filter) — a
+  pre-existing property shared by the group-paid `sharedExpenseForm`, NOT a regression.
+
+**▶ NEXT (resume here):** build-order **step 4 — Travels Dashboard P&L monthly/yearly
+filter** (revenue, COGS, gross margin, opex, net; per-product contribution margin;
+cost-per-sale & margin-per-sale; period presets), then **step 5 statement suite
+(TB/GL/BS/P&L V2)** + Group consolidated P&L. Decisions all LOCKED — no re-asking.
+
+---
+
 ## 🆕 SESSION — 2026-07-22 → 07-23 · BANK PERSISTENCE FIX + TRAVELS ACCOUNTING BUILDOUT
 
 **Git is working now** (the 2026-07-21 "not a repo" blocker is resolved) — this
