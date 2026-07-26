@@ -56,7 +56,8 @@
     airports:      'travels/air-ticketing/airports',
     air_purchases: 'travels/air-ticketing/purchases',
     visaCats:      'travels/visa-processing/categories',
-    visaApps:      'travels/visa-processing/sales'
+    visaApps:      'travels/visa-processing/sales',
+    tv_passports:  'travels/passport-mgmt/passports'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;

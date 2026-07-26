@@ -44,10 +44,30 @@ had strongly instructed: build each module **100% full-stack, then move to the n
 **Full code backup taken FIRST** (owner instruction): `../modularerp-FULLSTACK-BACKUP-2026-07-26`
 (9,442 files / 119.9 MB incl. `.git`) in the mother folder.
 
-**▶ NEXT (resume here):** start module #1 = **Travels passport-mgmt** (the original
-parity pilot — simplest, self-contained) full-stack: parity-baseline → HTML+Tailwind
-frontend → Laravel backend (Passport model + migration + controller + service) → test
-vs Laragon → sweep → push. Then work down the tracker order.
+**MODULE #1 — passport-mgmt — ✅ DONE (2026-07-26).** Built the full enterprise
+Laravel slice in `companies/travels/modules/passport-mgmt/backend/` (owner spec: MVC +
+Service + Form Request + Resource + Model + migration + seeder):
+`migrations/…create_tv_passports_table.php` · `Models/Passport.php` (Eloquent, soft
+deletes, date casts) · `Http/Requests/StorePassportRequest.php` · `Http/Resources/
+PassportResource.php` (exact `tv_passports` frontend shape) · `Services/PassportService.php`
+(company-scoped list, upsert-by-id, soft delete) · `PassportController.php` (thin,
+Schema::hasTable-guarded, ScopesToCompany) · `routes.php` (GET/POST/DELETE) ·
+`Database/Seeders/PassportSeeder.php`. All auto-discovered by ModuleServiceProvider.
+- **Tested vs real MySQL** (Laragon 5.7, DB `modularerp`): all 8 files `php -l` clean;
+  `php artisan migrate --path=…` created the table; seeder inserted 3 rows (verified by
+  raw `SELECT`); a tinker CRUD test proved INDEX returns the exact frontend shape,
+  STORE creates + updates-without-dup, DESTROY soft-deletes.
+- **Frontend:** already template-structured HTML (the original parity pilot) + read-only
+  (no add/edit UI), so it stays pixel-identical — the module's only gap was the backend.
+  Wired `tv_passports` into `api.js` HYDRATE (register hydrates from DB in API mode).
+  Sweep 222/222 both themes, 0 errors.
+- **Env note:** the local `modularerp` DB is nearly empty on this new machine (production
+  dump NOT imported) — so backends use **module-owned migrations + seeders** (the
+  drop-in/drop-out pattern), testable standalone. MySQL start command that worked:
+  `C:\laragon\bin\mysql\mysql-5.7.33-winx64\bin\mysqld.exe --defaults-file=…\my.ini --datadir=C:\laragon\data\mysql`.
+
+**▶ NEXT (resume here):** module #2 = **Travels settings** — same full-stack gates (per
+`docs/FULLSTACK-REBUILD-TRACKER.md` order). Cadence: autonomous, push each.
 
 > Note: the accounting buildout (funding legs, Dashboard P&L, statement suite V2) is
 > shipped & working as frontend features; their Laravel backends are now folded into

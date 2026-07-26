@@ -41,7 +41,7 @@ Legend: ⬜ not started · ◑ in progress · ✅ done (all 7 gates)
 ### Travels
 | # | Module | FE rebuilt | Parity | Backend | Tested | Status |
 |---|--------|-----------|--------|---------|--------|--------|
-| 1 | passport-mgmt (pilot) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 1 | passport-mgmt (pilot) | ✅ already HTML | ✅ unchanged | ✅ 8 files | ✅ MySQL | ✅ |
 | 2 | settings | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 3 | file-management | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 4 | marketing | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -72,4 +72,5 @@ woodart/projects · it/projects · shop/pos · construction/projects.
 ## Log (one line per completed gate)
 | Date | Module | Gate | Verified by | Commit |
 |------|--------|------|-------------|--------|
-| 2026-07-26 | — | full backup + tracker + method locked | 9442 files backed up | (this) |
+| 2026-07-26 | — | full backup + tracker + method locked | 9442 files backed up | 702dcaf |
+| 2026-07-26 | passport-mgmt | backend 100% (8-file Laravel slice, migrated+seeded+CRUD-tested vs MySQL); FE already HTML/template + read-only so pixel-identical | tinker CRUD test + raw SQL row check + sweep 222/222 | (this) |
