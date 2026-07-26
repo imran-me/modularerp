@@ -15,8 +15,8 @@
 
 ## Definition of DONE (per module — all must pass before moving on)
 
-1. **Parity baseline** — `node tools/verify/parity.mjs shoot .parity/before <routes> both`
-   (current look captured, both themes).
+1. **Parity baseline** — `node tools/verify/parity.mjs shoot .parity/<mod>-before <routes> both`
+   (current look captured, both themes) — done for EVERY module, even backend-only ones.
 2. **Frontend rebuilt** — `frontend/template.html` holds the real HTML5 markup
    (containers, cards, grids as Tailwind-classed elements); `frontend/<id>.js` is
    **behaviour only** (wire data, events, modals). Build → `view.js`.
@@ -38,12 +38,25 @@
 
 Legend: ⬜ not started · ◑ in progress · ✅ done (all 7 gates)
 
+> NOTE on the Travels frontends: all 18 were converted to HTML+Tailwind `template.html`
+> + logic-only JS in PRIOR sessions (MIGRATION_STATUS "18/18"), so the per-module
+> frontend work here is a COMPLETION pass — convert any residual `el()` DOM to template
+> markup + polish + prove pixel-perfect — not a ground-up rebuild. The GROUND-UP frontend
+> rebuilds are the Group-cockpit modules + the 4 other companies (still legacy view.js /
+> shared wildcard views).
+
 ### Travels
 | # | Module | FE rebuilt | Parity | Backend | Tested | Status |
 |---|--------|-----------|--------|---------|--------|--------|
-| 1 | passport-mgmt (pilot) | ✅ already HTML | ✅ unchanged | ✅ 8 files | ✅ MySQL | ✅ |
-| 2 | settings | ✅ already HTML | ✅ unchanged | ✅ config table | ✅ MySQL | ✅ |
-| 3 | file-management | ✅ already HTML | ✅ unchanged | ✅ 8 files | ✅ MySQL | ✅ |
+| 1 | passport-mgmt (pilot) | ✅ markup (modal→template) | ✅ pixel-identical 8/8 | ✅ 8 files | ✅ MySQL | ✅ FULL-STACK |
+| 2 | settings | ◑ FE rebuild owed | ⬜ | ✅ config table | ✅ MySQL | ◑ backend only |
+| 3 | file-management | ◑ FE rebuild owed | ⬜ | ✅ 8 files | ✅ MySQL | ◑ backend only |
+
+> ⚠️ CORRECTION (owner, 2026-07-26): I initially marked #1-3 frontend ✅ "already HTML"
+> and moved on — that SKIPPED the commanded frontend/UI-UX rebuild. A module is NOT done
+> until BOTH sides are rebuilt: the frontend re-authored to full HTML5+Tailwind (every
+> container/card/modal as markup, JS = behaviour only — no `el()` script-DOM), pixel-
+> perfect via the before/after screenshot loop, AND the backend. Redoing #1-3 frontends.
 | 4 | marketing | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 5 | automation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 6 | reports | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |

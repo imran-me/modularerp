@@ -47,12 +47,19 @@ function printPass(p) {
       r('Date of birth', p.dob ? ui.date(p.dob) : '—') + r('Issued', p.issueDate ? ui.date(p.issueDate) : '—') + r('Expiry', p.expiry ? ui.date(p.expiry) : '—') + r('Phone', p.phone) + '</table>' });
 }
 function passDetail(p) {
-  function kv(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v == null ? '—' : String(v) }) ]); }
-  ui.modal({ title: p.holder, icon: 'person-vcard', size: 'md', body: el('div.data-list', null, [
-    kv('Passport No', p.passportNo), kv('Type', p.type), kv('Nationality', p.nationality),
-    kv('Date of birth', p.dob ? ui.date(p.dob) : '—'), kv('Issued', p.issueDate ? ui.date(p.issueDate) : '—'),
-    kv('Expiry', p.expiry ? ui.date(p.expiry) : '—'), kv('Phone', p.phone)
-  ]) });
+  // Modal body is authored as markup (template.html: detail / detail-row) and
+  // only FILLED here — no el() script-DOM. Byte-identical to the old output.
+  var list = frag('detail');
+  function kv(k, v) {
+    var r = frag('detail-row');
+    slot(r, 'k').textContent = k;
+    slot(r, 'v').textContent = (v == null || v === '') ? '—' : String(v);
+    list.appendChild(r);
+  }
+  kv('Passport No', p.passportNo); kv('Type', p.type); kv('Nationality', p.nationality);
+  kv('Date of birth', p.dob ? ui.date(p.dob) : '—'); kv('Issued', p.issueDate ? ui.date(p.issueDate) : '—');
+  kv('Expiry', p.expiry ? ui.date(p.expiry) : '—'); kv('Phone', p.phone);
+  ui.modal({ title: p.holder, icon: 'person-vcard', size: 'md', body: list });
 }
 
 var titles = { holders: 'Passport Holders', categories: 'Passport Categories', expiry: 'Expiry Radar' };
