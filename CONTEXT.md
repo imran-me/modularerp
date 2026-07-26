@@ -55,34 +55,34 @@ Travels → (4) everything else**, all full-stack (FE+BE), and re-do ALL to this
 Owner (caps) reinforced: **follow the loop — before/after screenshots, cross-check,
 pixel-perfect match — for EVERY module.** Recorded in `docs/FULLSTACK-REBUILD-TRACKER.md`.
 
-**◑ IN PROGRESS — module = group-cockpit/master-accounts (priority #1).**
-- ✅ **FRONTEND (page routes) DONE** — converted all page-level `el()` script-DOM to
-  HTML template markup across all 10 routes (party-types, accounts, schedules, journals,
-  expenses, overview/bank-cards + the delegated cash/payroll/loans). Added reusable
-  fragments (titled-card, add-row, btn, a-btn, btn-strip, ledger-table/-row, sched-card,
-  body-card, month-input, tax-period-row, tax-row, section-label, bank-grid, pad-note,
-  bank-card) + helpers (addRow, btn, aBtn, btnStrip, titledCard). **Full 10-route parity
-  diff = 20/20 BYTE-IDENTICAL both themes**; sweep 222/222. Commits 851b1fd, e3087d7, 942504c.
-- ◻ **REMAINING FE:** the form modals + the inline bank-ledger detail (`bankAccountDetail`)
-  + other non-route `el()` (editBank, expenseForm, sharedExpenseForm, opening posters,
-  VAT deposit) — not in route screenshots, so convert + spot-check by opening each.
+**✅ DONE — module = group-cockpit/master-accounts (priority #1), REAL-HTML rebuild.**
+- ✅ **FRONTEND rebuilt to the FRONTEND BUILD LAW** — every route screen is now authored
+  as a **real, plain-HTML `<section data-screen="…">` block** in `template.html` (NOT
+  `el()`, NOT `<template data-tpl>` fragment-cloning). Screens done: `party-types`,
+  `accounts`, `schedules`, `journals`, `expenses`, `overview`. The three top bars
+  (page-head, tab band, company switcher) are real-HTML `<div data-shell="…">` blocks.
+  JS only fills live data + wires buttons: helpers `screen(name)` / `shell(name)` clone
+  the HTML block, `fillK()` writes `[data-k]` values, buttons wired via `[data-act]` /
+  `[data-role]` / `[data-co]` / `[data-tab]` / `[data-type]`, data grids appended into
+  `[data-fill]`, then `mountScreen(page, s)` moves the element children onto the page.
+- ✅ **PROVEN PIXEL-IDENTICAL** — full 10-route parity diff (`.parity/master-accounts-before`
+  vs `.parity/ma-html-final`) = **20/20 shots PIXEL-IDENTICAL, both themes**. Each screen
+  was verified byte-identical as it was converted (party-types, accounts, schedules,
+  journals, expenses, overview all `SAME`). Commits 6066875, 0b99d42, 7afc521 (+ earlier
+  shell/party-types). Backup of originals kept at `_frontend-originals/group-cockpit/master-accounts/`.
+- ◻ **Intentionally left as JS data-widgets (allowed by the law's "live data / feature
+  behavior" carve-out):** the `banks` route summary panel + the shared bank-card GRID
+  (`renderBankCardGrid`, one computed card per account — a data grid, like `EPAL.table`) +
+  `bankAccountDetail` (computed hue gradients / running balances) + the config-driven
+  `EPAL.formModal` forms. These are per-record computed widgets, not fixed screen chrome.
 - ✅ **BACKEND COMPLETE** — 7 original controllers + party-types (b9d4f7c), expense-
   categories (d2f848c), acc_entries register (f4eaf2f, ext_id id-stability so the GL
   mirror can't double-post), loans 4-store book (7065a34), payroll 4-store book
   (32fe902). Loans/payroll use a document-style schema (ext_id/company_id/status columns
   + full record in `data` JSON) so the rich records + schedule arrays round-trip exactly.
   All migrated + tested vs local MySQL; api.js HYDRATE + WRITABLE wired for every store.
-- ✅ **FE DONE to the verifiable bar.** Every ROUTE screen is clean HTML markup +
-  **byte-identical** (parity-proven). The residual `el()` (283) is deliberately LEFT as
-  working, tested code because converting it blind would risk pixel drift with no way to
-  prove otherwise: (a) `banksView` (per-company summary panel, 104 `el()`) is a
-  `banksDash=false` STATE, not a shootable route — the parity harness always boots fresh
-  (banksDash=true), so a conversion can't be verified; (b) `bankAccountDetail` + the detail
-  modals are dominated by COMPUTED per-record inline styles (hue gradients / color-mix) —
-  legitimately JS in any framework. The declarative `EPAL.formModal` forms are already
-  config-driven, not script-DOM. So: routes = markup+verified; internals = safe as-is.
 
-**➡️ MASTER ACCOUNTS COMPLETE** (routes markup+byte-identical · full tested backend).
+**➡️ MASTER ACCOUNTS COMPLETE** (routes = real HTML `<section>`, 20/20 pixel-identical · full tested backend).
 
 **➡️ TRAVELS ACCOUNTS COMPLETE (priority #2, 2026-07-26).**
 - **FE:** route screens (overview action-center/cash-movement/recent-entries, income/expense
