@@ -154,13 +154,27 @@ Finance was ONE hand-written 133KB `view.js` (13 chart/table screens). Steps don
   (the law's "live data / feature" carve-out). Then final full parity + backend (LARAVEL
   blueprint exists; build the real slice + test vs MySQL) before FINANCE COMPLETE.
 
-**➡️ TRAVELS ACCOUNTS COMPLETE (priority #2, 2026-07-26).**
-- **FE:** route screens (overview action-center/cash-movement/recent-entries, income/expense
-  registers, journals + GL card, schedules, recurring, cheques, cash book, petty, inter-co
-  card) converted el()→template markup; reusable fragments + helpers added; the helpers
-  mirror `ui.appendChildren` so they're byte-identical (one call site passes a table
-  INSTANCE — raw appendChild would throw). **Parity 16/16 byte-identical both themes**;
-  sweep 222/222. Click-opened modals stay el() (dynamic/non-shootable). Commit 6e7a6e3.
+**◑ TRAVELS ACCOUNTS — real-HTML rebuild IN PROGRESS (priority #3, 2026-07-26).**
+The earlier "el()→template markup" pass (below) was the OLD `<template data-tpl>` fragment
+style the owner REJECTED — it's being REDONE as real `<section data-screen>` HTML, exactly
+like master-accounts + finance. Progress:
+- ✅ Added `screen()/shell()/fillK()/mountScreen()` helpers to `frontend/accounts.js`.
+- ✅ Converted screens to `<section data-screen>` — **banks** (full), **income + expenses**
+  (the shared `kindRegister` KPI strip). All **byte-identical** (back-to-back proven).
+  Commits f6864bd, f2f192a. Baseline shots at `.parity/tacc-before` (9 routes × 2).
+- ◻ **REMAINING screens:** overview (`overview()` @ ~392 — action-center + charts),
+  journals (`journalsView`), schedules (`schedulesView`), recurring (`recurringView`), and
+  the `kindRegister` head-chips + `entriesTable` (dynamic filter widget + data grid → stay
+  JS). `cash` + `payroll` routes delegate to shared kits (`EPAL.cashDesk`/`EPAL.payrollDesk`)
+  — out of scope. Screen dispatch map is at `accounts.js` ~line 384; shared head still uses
+  `EPAL.pageHead` + a tab-nav band (~line 269) — convert to shells like finance did.
+- **Verify BACK-TO-BACK** (my build vs the `_frontend-originals/_readability-backup/
+  travels-accounts/` or `git show HEAD:…view.js` backup) — the `.parity` baseline drifts
+  (localStorage accumulation), same as finance. See [[parity-sweep-context-journal]].
+
+**(superseded) earlier Travels Accounts FE note — was the rejected fragment style:**
+- **FE:** route screens converted el()→template markup; reusable fragments + helpers added;
+  the helpers mirror `ui.appendChildren` so they're byte-identical. Parity 16/16. Commit 6e7a6e3.
 - **BE:** `tv_recurring` / `tv_cheques` / `tv_petty` document-style Laravel slice
   (migration + 3 Models + AccountsBookService + Controller + routes + seeder), migrated +
   seeded + CRUD-tested vs MySQL; api.js HYDRATE+WRITABLE wired. Commit 7c7156f. (acc_entries/
