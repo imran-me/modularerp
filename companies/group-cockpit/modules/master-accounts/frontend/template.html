@@ -70,6 +70,43 @@
   <div class="card mb-2" data-type="expense"><div class="card-head"><h3><i class="bi bi-wallet2"></i> Expenses</h3></div><div class="card-body" data-fill="expense"></div></div>
 </section>
 
+<section data-screen="schedules">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Open Schedules</span><span class="kpi-ico"><i class="bi bi-calendar2-week"></i></span></div><div class="kpi-value" data-k="open"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Due Today</span><span class="kpi-ico"><i class="bi bi-alarm"></i></span></div><div class="kpi-value" data-k="dueToday"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Overdue</span><span class="kpi-ico"><i class="bi bi-exclamation-octagon"></i></span></div><div class="kpi-value" data-k="overdue"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Scope</span><span class="kpi-ico"><i class="bi bi-diagram-3"></i></span></div><div class="kpi-value" data-k="scope"></div></div>
+  </div>
+  <div class="mb-2" data-role="add"><button class="btn btn-sm btn-primary"><i class="bi bi-calendar2-plus"></i> Add Schedule</button></div>
+  <div class="card mb-2" data-section="Receivable"><div class="card-head"><h3><i class="bi bi-arrow-down-left-circle"></i> Receivable — amounts to collect</h3><span class="strong num" style="margin-left:auto" data-fill="total"></span></div><div class="card-body" data-fill="table"></div></div>
+  <div class="card mb-2" data-section="Payable"><div class="card-head"><h3><i class="bi bi-arrow-up-right-circle"></i> Payable — amounts due to suppliers / vendors</h3><span class="strong num" style="margin-left:auto" data-fill="total"></span></div><div class="card-body" data-fill="table"></div></div>
+</section>
+
+<section data-screen="journals">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Total Entries</span><span class="kpi-ico"><i class="bi bi-journal-text"></i></span></div><div class="kpi-value" data-k="entries"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Total Debit</span><span class="kpi-ico"><i class="bi bi-arrow-up-circle"></i></span></div><div class="kpi-value" data-k="dr"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Total Credit</span><span class="kpi-ico"><i class="bi bi-arrow-down-circle"></i></span></div><div class="kpi-value" data-k="cr"></div></div>
+    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Balanced</span><span class="kpi-ico"><i class="bi bi-check-circle"></i></span></div><div class="kpi-value" data-k="balanced"></div></div>
+  </div>
+  <div class="flex gap-1 flex-wrap mb-2" data-role="actions">
+    <button class="btn btn-sm btn-primary" data-act="credit"><i class="bi bi-arrow-down-circle"></i> Credit Journal (Money In)</button>
+    <button class="btn btn-sm btn-outline" data-act="debit"><i class="bi bi-arrow-up-circle"></i> Debit Journal (Money Out)</button>
+    <button class="btn btn-sm btn-outline" data-act="open-recv"><i class="bi bi-layers"></i> Opening Receivable</button>
+    <button class="btn btn-sm btn-outline" data-act="open-pay"><i class="bi bi-layers"></i> Opening Payable</button>
+    <button class="btn btn-sm btn-outline" data-act="open-asset"><i class="bi bi-layers-half"></i> Opening Asset</button>
+  </div>
+  <div class="card mb-2" data-role="tax">
+    <div class="card-head"><h3 data-fill="tax-title"></h3><span class="card-sub">Bangladesh NBR cycle</span></div>
+    <div class="card-body">
+      <div class="flex gap-2 items-center mb-2"><span class="text-mute sm">Return period</span><input class="input" type="month" style="width:auto" data-fill="month"><span class="text-mute xs">collected via the Credit/Debit journal tax fields · deposit clears the payable</span></div>
+      <div class="data-row" data-tax="2130"><div class="flex-1"><div class="fw-600 sm" data-fill="head"></div><div class="text-mute xs" data-fill="detail"></div></div><div class="num strong" data-fill="payable"></div></div>
+      <div class="data-row" data-tax="2140"><div class="flex-1"><div class="fw-600 sm" data-fill="head"></div><div class="text-mute xs" data-fill="detail"></div></div><div class="num strong" data-fill="payable"></div></div>
+    </div>
+  </div>
+  <div class="card" data-role="entries"><div class="card-head"><h3 data-fill="entries-title"></h3><span class="card-sub">filter by Source to see its total</span></div><div class="card-body" data-fill="entries-body"></div></div>
+</section>
+
 <!-- reusable shells (still used by the not-yet-rebuilt screens) --------------- -->
 <!-- a titled card: head (title + optional sub) over a body slot -->
 <template data-tpl="titled-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>

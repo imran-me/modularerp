@@ -708,21 +708,21 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
     function crTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.cr || 0; }); return t; }
     var sumDr = 0, sumCr = 0, balancedN = 0;
     list.forEach(function (e) { var d = drTotal(e), c = crTotal(e); sumDr += d; sumCr += c; if (Math.abs(d - c) < 0.01) balancedN++; });
-    page.appendChild(kgrid([
-      kpi('Total Entries', String(list.length), 'journal-text'),
-      kpi('Total Debit', ui.money(sumDr, { compact: true }), 'arrow-up-circle'),
-      kpi('Total Credit', ui.money(sumCr, { compact: true }), 'arrow-down-circle'),
-      kpi('Balanced', balancedN + ' / ' + list.length, 'check-circle', balancedN === list.length ? 'text-good' : 'text-warn')
-    ]));
+    var s = screen('journals');
+    fillK(s, 'entries', String(list.length));
+    fillK(s, 'dr', ui.money(sumDr, { compact: true }));
+    fillK(s, 'cr', ui.money(sumCr, { compact: true }));
+    var balEl = s.querySelector('[data-k="balanced"]');
+    balEl.classList.add(balancedN === list.length ? 'text-good' : 'text-warn');
+    balEl.textContent = balancedN + ' / ' + list.length;
+    var actions = s.querySelector('[data-role="actions"]');
     if (canCreate()) {
-      page.appendChild(btnStrip([
-        btn('btn btn-sm btn-primary', ui.icon('arrow-down-circle') + ' Credit Journal (Money In)', function () { bankJournalForm('credit'); }),
-        btn('btn btn-sm btn-outline', ui.icon('arrow-up-circle') + ' Debit Journal (Money Out)', function () { bankJournalForm('debit'); }),
-        btn('btn btn-sm btn-outline', ui.icon('layers') + ' Opening Receivable', function () { openingPartyForm('Receivable'); }),
-        btn('btn btn-sm btn-outline', ui.icon('layers') + ' Opening Payable', function () { openingPartyForm('Payable'); }),
-        btn('btn btn-sm btn-outline', ui.icon('layers-half') + ' Opening Asset', function () { openingAssetForm(); })
-      ]));
-    }
+      actions.querySelector('[data-act="credit"]').addEventListener('click', function () { bankJournalForm('credit'); });
+      actions.querySelector('[data-act="debit"]').addEventListener('click', function () { bankJournalForm('debit'); });
+      actions.querySelector('[data-act="open-recv"]').addEventListener('click', function () { openingPartyForm('Receivable'); });
+      actions.querySelector('[data-act="open-pay"]').addEventListener('click', function () { openingPartyForm('Payable'); });
+      actions.querySelector('[data-act="open-asset"]').addEventListener('click', function () { openingAssetForm(); });
+    } else { actions.parentNode.removeChild(actions); }
     // ---- P3: VAT & AIT RETURN (BD tax cycle: collect → report → deposit) ----
     (function () {
       var scope = selCo === 'all' ? {} : { companyId: selCo };
@@ -737,24 +737,21 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         return { code: code, label: label, collected: coll, deposited: dep, closing: closing };
       }
       var rows = [taxRow('2130', 'VAT (output, on services)'), taxRow('2140', 'AIT / TDS (withheld)')];
-      var mSel = frag('month-input'); mSel.value = taxYm;
+      var card = s.querySelector('[data-role="tax"]');
+      card.querySelector('[data-fill="tax-title"]').innerHTML = ui.icon('receipt') + ' VAT & AIT Return — ' + coName(selCo);
+      var mSel = card.querySelector('[data-fill="month"]'); mSel.value = taxYm;
       mSel.addEventListener('change', function () { taxYm = this.value || taxYm; EPAL.router.render(); });
-      var card = titledCard(ui.icon('receipt') + ' VAT & AIT Return — ' + coName(selCo), 'Bangladesh NBR cycle', null, 'mb-2');
-      var bodyT = slot(card, 'body');
-      var per = frag('tax-period-row'); slot(per, 'input').replaceWith(mSel); bodyT.appendChild(per);
       rows.forEach(function (r) {
-        var row = frag('tax-row');
-        slot(row, 'head').textContent = r.code + ' · ' + r.label;
-        slot(row, 'detail').textContent = taxYm + ': collected ' + ui.money(r.collected) + ' · deposited ' + ui.money(r.deposited);
-        var pay = slot(row, 'payable'); if (r.closing > 0.5) pay.classList.add('text-warn'); pay.textContent = 'Payable ' + ui.money(r.closing);
+        var row = card.querySelector('[data-tax="' + r.code + '"]');
+        row.querySelector('[data-fill="head"]').textContent = r.code + ' · ' + r.label;
+        row.querySelector('[data-fill="detail"]').textContent = taxYm + ': collected ' + ui.money(r.collected) + ' · deposited ' + ui.money(r.deposited);
+        var pay = row.querySelector('[data-fill="payable"]'); if (r.closing > 0.5) pay.classList.add('text-warn'); pay.textContent = 'Payable ' + ui.money(r.closing);
         if (canCreate() && r.closing > 0.5) {
           var dep = btn('btn btn-sm btn-outline', ui.icon('bank') + ' Record NBR Deposit', (function (rr) { return function () { nbrDepositForm(rr.code, rr.label, rr.closing); }; })(r));
           dep.style.marginLeft = '10px';
           row.appendChild(dep);
         }
-        bodyT.appendChild(row);
       });
-      page.appendChild(card);
     })();
     var cols = [
       { key: 'date', label: 'Date', date: true },
@@ -777,7 +774,10 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       ],
       empty: { icon: 'journal-text', title: 'No journal entries in this scope' }
     });
-    page.appendChild(titledCard(ui.icon('journal-text') + ' Journal Entries — ' + coName(selCo), 'filter by Source to see its total', tbl.el));
+    var entriesCard = s.querySelector('[data-role="entries"]');
+    entriesCard.querySelector('[data-fill="entries-title"]').innerHTML = ui.icon('journal-text') + ' Journal Entries — ' + coName(selCo);
+    entriesCard.querySelector('[data-fill="entries-body"]').appendChild(tbl.el);
+    mountScreen(page, s);
   }
   // P3: deposit a tax payable to the NBR — DR 2130|2140 / CR bank, logged on
   // the bank register too so the reconciliation stays exact.
@@ -997,15 +997,20 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
     var open = list.filter(function (s) { return s.status !== 'Paid' && s.status !== 'Cancelled'; });
     var dueToday = open.filter(function (s) { return s.due === TODAY_STR; });
     var overdue = open.filter(function (s) { return (s.due || '') < TODAY_STR; });
-    page.appendChild(kgrid([
-      kpi('Open Schedules', String(open.length), 'calendar2-week'),
-      kpi('Due Today', ui.money(dueToday.reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0), { compact: true }), 'alarm', dueToday.length ? 'text-warn' : null),
-      kpi('Overdue', ui.money(overdue.reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0), { compact: true }), 'exclamation-octagon', overdue.length ? 'text-bad' : null),
-      kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
-    ]));
-    if (canCreate()) page.appendChild(addRow(ui.icon('calendar2-plus') + ' Add Schedule', function () { masterScheduleForm(null); }));
+    var s = screen('schedules');
+    fillK(s, 'open', String(open.length));
+    var dtEl = s.querySelector('[data-k="dueToday"]');
+    dtEl.textContent = ui.money(dueToday.reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0), { compact: true });
+    if (dueToday.length) dtEl.classList.add('text-warn');
+    var ovEl = s.querySelector('[data-k="overdue"]');
+    ovEl.textContent = ui.money(overdue.reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0), { compact: true });
+    if (overdue.length) ovEl.classList.add('text-bad');
+    fillK(s, 'scope', selCo === 'all' ? 'All companies' : coName(selCo));
+    var addWrap = s.querySelector('[data-role="add"]');
+    if (canCreate()) addWrap.querySelector('button').addEventListener('click', function () { masterScheduleForm(null); });
+    else addWrap.parentNode.removeChild(addWrap);
 
-    function section(kind, icon, sub) {
+    function section(kind) {
       var rows = list.filter(function (s) { return (s.kind || 'Payable') === kind; });
       var openTotal = rows.filter(function (s) { return s.status !== 'Paid' && s.status !== 'Cancelled'; })
         .reduce(function (a, s) { return a + (+s.amount || 0) - (+s.paidAmount || 0); }, 0);
@@ -1052,16 +1057,15 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         ] : [{ icon: 'file-earmark-text', title: 'Details', onClick: function (s) { masterScheduleDetail(s); } }],
         empty: { icon: 'calendar2-week', title: 'No ' + kind.toLowerCase() + ' schedules' }
       });
-      var card = frag('sched-card');
-      slot(card, 'title').innerHTML = ui.icon(icon) + ' ' + (kind === 'Receivable' ? 'Receivable — amounts to collect' : 'Payable — amounts due to suppliers / vendors');
-      var tot = slot(card, 'total');
+      var card = s.querySelector('[data-section="' + kind + '"]');
+      var tot = card.querySelector('[data-fill="total"]');
       tot.classList.add(kind === 'Receivable' ? 'text-good' : 'text-warn');
       tot.textContent = 'Open total ' + ui.money(openTotal);
-      slot(card, 'body').appendChild(tbl.el);
-      page.appendChild(card);
+      card.querySelector('[data-fill="table"]').appendChild(tbl.el);
     }
-    section('Receivable', 'arrow-down-left-circle');
-    section('Payable', 'arrow-up-right-circle');
+    section('Receivable');
+    section('Payable');
+    mountScreen(page, s);
   }
   // AUDIT P2: every lifecycle action leaves a note on the schedule's TRAIL
   // (production PaymentScheduleLog parity — who, when, what, why).
