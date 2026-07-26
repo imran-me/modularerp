@@ -82,7 +82,9 @@
     tv_markup:     'travels/automation/books/markup',
     tv_contracts:  'travels/contract-file/contracts',
     leads:         'travels/crm/books/leads',
-    crm_activities: 'travels/crm/books/activities'
+    crm_activities: 'travels/crm/books/activities',
+    tv_contract_flights: 'travels/contract-flight/flights',
+    tv_leaves:     'travels/hrm/leaves'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -132,6 +134,8 @@
     tv_contracts: 'travels/contract-file/contracts',
     leads:       'travels/crm/books/leads',
     crm_activities: 'travels/crm/books/activities',
+    tv_contract_flights: 'travels/contract-flight/flights',
+    tv_leaves:   'travels/hrm/leaves',
     perf_reviews: 'group/employees/reviews'
   };
 
