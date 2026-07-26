@@ -84,7 +84,12 @@
     leads:         'travels/crm/books/leads',
     crm_activities: 'travels/crm/books/activities',
     tv_contract_flights: 'travels/contract-flight/flights',
-    tv_leaves:     'travels/hrm/leaves'
+    tv_leaves:     'travels/hrm/leaves',
+    tv_agents:     'travels/vendor-agent/books/agents',
+    vendors:       'travels/vendor-agent/books/vendors',
+    party_txns:    'travels/vendor-agent/books/party-txns',
+    tv_comm_paid:  'travels/vendor-agent/books/commissions',
+    tv_portals:    'travels/vendor-agent/books/portals'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -136,6 +141,11 @@
     crm_activities: 'travels/crm/books/activities',
     tv_contract_flights: 'travels/contract-flight/flights',
     tv_leaves:   'travels/hrm/leaves',
+    tv_agents:   'travels/vendor-agent/books/agents',
+    vendors:     'travels/vendor-agent/books/vendors',
+    party_txns:  'travels/vendor-agent/books/party-txns',
+    tv_comm_paid: 'travels/vendor-agent/books/commissions',
+    tv_portals:  'travels/vendor-agent/books/portals',
     perf_reviews: 'group/employees/reviews'
   };
 
