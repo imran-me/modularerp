@@ -1,16 +1,36 @@
 <!-- ============================================================================
-  MASTER ACCOUNTS · MARKUP
-  ----------------------------------------------------------------------------
-  Static shells only, separated from the logic (frontend/master-accounts.js) and
-  cloned + filled via [data-tpl] / [data-slot]. The group accounting desk is
-  highly dynamic — the company switcher, the expense/journal/schedule/payroll/
-  bank desks, VAT & AIT return, opening-balance posters and every table/modal/
-  form keep their legacy el()-built DOM (with inline styles) in the logic file,
-  exactly as before. Only the reusable page / section-nav / KPI shells live here,
-  in house design-system classes verbatim (no Tailwind tw- utilities).
+  MASTER ACCOUNTS — the screen markup (read this file to see the UI).
 
-  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
-  the DOM the old ui.el() calls produced.
+  HOW THIS WORKS (for the next developer)
+  ---------------------------------------------------------------------------
+  Screens are written here as plain HTML. The logic file (frontend/
+  master-accounts.js) never BUILDS DOM for a screen — it clones a block from
+  here and fills in the live data. Styling is the house design system
+  (platform/design-system/css/*): component classes (`card`, `kpi-card`,
+  `section-label`, `btn`) + utilities (`flex`, `gap-1`, `mb-2`, `text-mute`).
+
+  THE HOOKS the logic uses (grep any of these in master-accounts.js):
+    data-shell="x"  a reusable chrome block   → shell('x') clones it
+    data-screen="x" a whole screen            → screen('x') clones it
+    data-fill="x"   a slot the logic fills     (a table, a value)
+    data-k="x"      a KPI value slot           → fillK(node,'x',value)
+    data-tab="x"    a tab button              (logic marks .active + wires nav)
+    data-co="x"     a company-switcher button  → switches the active company
+    data-act="x" / data-role="x" / data-type="x"  blocks the logic finds
+    data-slot="x"   a fill point INSIDE a <template data-tpl> fragment
+  After filling, mountScreen(page, node) moves the block's children onto the page.
+
+  TWO SHAPES LIVE HERE:
+   1) <template data-tpl="…"> — small repeated fragments (a KPI card, a table
+      row). Cloned by frag()/slot(). Kept on ONE line, no inter-tag whitespace —
+      a clone must be byte-for-byte the DOM the old ui.el() calls produced.
+   2) <div data-shell> / <section data-screen> — the page chrome + whole screens.
+      Laid out multi-line for reading; a leaf run of inline tags (e.g. the <h1>
+      eyebrow·icon·title) still stays on one line so no stray space creeps in.
+
+  Some desks (company switcher forms, VAT/AIT return, opening-balance posters,
+  every modal) still build their DOM in the logic file — those are dynamic /
+  computed and are out of scope for this structural markup.
   ============================================================================ -->
 
 <!-- page shell + section-nav band (this module uses the DENSE underline band, 9 sections) -->
@@ -25,9 +45,40 @@
 <!-- ============ THE MODULE SHELL, written as real HTML ========================
      The top bars every screen shares: the page-head bar, and the tab band with all
      9 tabs. The logic fills the live title, marks the active tab, and wires clicks. -->
-<div data-shell="head" class="page-head"><div><h1 class="page-title" data-fill="title"><span class="eyebrow">Epal Group · Master Accounts</span><i class="bi bi-safe2"></i></h1><p class="page-sub" title="Group-level accounting across every sister concern — switch company with the buttons below.">Group-level accounting across every sister concern — switch company with the buttons below.</p></div><div class="page-actions"></div></div>
-<div data-shell="tabs" class="tab-underline tabs-dense mb-3"><button data-tab="banks">Manage Banks</button><button data-tab="cash">Manage Cash</button><button data-tab="payroll">Master Payroll</button><button data-tab="schedules">Payment Schedules</button><button data-tab="journals">Manage Journals</button><button data-tab="expenses">Operational Expenses</button><button data-tab="accounts">Manage Accounts</button><button data-tab="party-types">Party Types</button><button data-tab="loans">Manage Loan</button></div>
-<div data-shell="switcher" class="flex gap-1 scroll-row mb-3"><button data-co="__overview" class="btn btn-sm btn-outline"><i class="bi bi-grid-3x3-gap-fill"></i> Overview</button><button data-co="all" class="btn btn-sm btn-outline">All Companies</button><button data-co="group" class="btn btn-sm btn-outline">Group HQ</button><button data-co="travels" class="btn btn-sm btn-outline">Travels</button><button data-co="woodart" class="btn btn-sm btn-outline">Woodart</button><button data-co="it" class="btn btn-sm btn-outline">IT Solutions</button><button data-co="shop" class="btn btn-sm btn-outline">Shop</button><button data-co="construction" class="btn btn-sm btn-outline">Construction</button></div>
+<!-- page-head bar. The <h1> inner run (eyebrow · icon) stays on one line so a
+     newline can't clone as a stray space; the logic appends the title text. -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow">Epal Group · Master Accounts</span><i class="bi bi-safe2"></i></h1>
+    <p class="page-sub" title="Group-level accounting across every sister concern — switch company with the buttons below.">Group-level accounting across every sister concern — switch company with the buttons below.</p>
+  </div>
+  <div class="page-actions"></div>
+</div>
+
+<!-- section-nav band — 9 tabs. Logic marks the active one + wires navigation. -->
+<div data-shell="tabs" class="tab-underline tabs-dense mb-3">
+  <button data-tab="banks">Manage Banks</button>
+  <button data-tab="cash">Manage Cash</button>
+  <button data-tab="payroll">Master Payroll</button>
+  <button data-tab="schedules">Payment Schedules</button>
+  <button data-tab="journals">Manage Journals</button>
+  <button data-tab="expenses">Operational Expenses</button>
+  <button data-tab="accounts">Manage Accounts</button>
+  <button data-tab="party-types">Party Types</button>
+  <button data-tab="loans">Manage Loan</button>
+</div>
+
+<!-- company switcher — pick which concern (or all) the desk is scoped to. -->
+<div data-shell="switcher" class="flex gap-1 scroll-row mb-3">
+  <button data-co="__overview" class="btn btn-sm btn-outline"><i class="bi bi-grid-3x3-gap-fill"></i> Overview</button>
+  <button data-co="all" class="btn btn-sm btn-outline">All Companies</button>
+  <button data-co="group" class="btn btn-sm btn-outline">Group HQ</button>
+  <button data-co="travels" class="btn btn-sm btn-outline">Travels</button>
+  <button data-co="woodart" class="btn btn-sm btn-outline">Woodart</button>
+  <button data-co="it" class="btn btn-sm btn-outline">IT Solutions</button>
+  <button data-co="shop" class="btn btn-sm btn-outline">Shop</button>
+  <button data-co="construction" class="btn btn-sm btn-outline">Construction</button>
+</div>
 
 <!-- ============================================================================
      REAL SCREEN HTML (the foundation). Each <section data-screen="…"> is the whole
