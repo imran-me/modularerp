@@ -1449,17 +1449,19 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
 
     var counts = {};
     accts.forEach(function (a) { counts[a.type] = (counts[a.type] || 0) + 1; });
-    page.appendChild(el('div.kpi-grid', null, TYPE_META.map(function (t) {
-      return kpi(t[1], counts[t[0]] || 0, t[2], null, 'ledger accounts');
-    })));
+    var s = screen('coa');
+    var kpis = s.querySelector('[data-fill="kpis"]');
+    TYPE_META.forEach(function (t) { kpis.appendChild(kpi(t[1], counts[t[0]] || 0, t[2], null, 'ledger accounts')); });
 
     TYPE_META.forEach(function (t) {
       var list = accts.filter(function (a) { return a.type === t[0]; });
-      if (!list.length) return;
+      var lbl = s.querySelector('.section-label[data-type="' + t[0] + '"]');
+      var card = s.querySelector('.card[data-type="' + t[0] + '"]');
+      if (!list.length) { lbl.remove(); card.remove(); return; }
       var rows = list.map(function (a) {
         return { code: a.code, name: a.name, group: a.group || '—', normal: a.normal, active: a.active !== false, balance: LED().balance(a.code, {}) };
       });
-      page.appendChild(el('div.section-label', { html: ui.icon(t[2]) + ' ' + t[1] }));
+      lbl.innerHTML = ui.icon(t[2]) + ' ' + t[1];
       var tbl = EPAL.table({
         columns: [
           { key: 'code', label: 'Code', render: function (r) { return '<span class="num strong">' + ui.escapeHtml(r.code) + '</span>'; } },
@@ -1501,8 +1503,9 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
         } }] : [],
         empty: { icon: 'diagram-2', title: 'No accounts' }
       });
-      page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ tbl.el ]) ]));
+      card.querySelector('[data-fill="table"]').appendChild(tbl.el);
     });
+    mountScreen(page, s);
   }
   function openAccountLedger(code, name) {
     var rows = hasLedger() ? LED().ledgerFor(code, {}) : [];
