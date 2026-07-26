@@ -444,21 +444,23 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       // COMPANY SWITCHER — the owner's "button-wise switch of companies at the top".
       // On Master Payroll it rides IN the desk's section row (owner mark);
       // everywhere else it is its own row under the tabs.
-      var swWrap = el('div.flex.gap-1.scroll-row.mb-3');
-      // Manage Banks gets an "Overview" button at the FRONT of the company row
-      // (owner 2026-07-19): it shows the all-companies bank card DASHBOARD;
-      // picking a company shows that company's Manage-Banks table instead.
+      // company-switcher bar — real HTML ([data-shell="switcher"], all buttons written
+      // out). JS shows/marks/wires: Overview only on Banks; drop a removed-folder
+      // company (discovery) and 'all' on payroll; mark the active company primary.
+      var swWrap = shell('switcher');
+      var presentIds = {}; comps().forEach(function (c) { presentIds[c.id] = 1; });
+      var ov = swWrap.querySelector('[data-co="__overview"]');
       if (sub === 'banks') {
-        swWrap.appendChild(el('button.btn.btn-sm' + (banksDash ? '.btn-primary' : '.btn-outline'), {
-          html: ui.icon('grid-3x3-gap-fill') + ' Overview',
-          onclick: function () { banksDash = true; EPAL.router.render(); } }));
-      }
-      var swOpts = [['all', 'All Companies'], ['group', 'Group HQ']].concat(comps().map(function (c) { return [c.id, c.short]; }));
-      swOpts.forEach(function (o) {
-        if (sub === 'payroll' && o[0] === 'all') return;      // payroll needs one company
-        var active = (selCo === o[0]) && !(sub === 'banks' && banksDash);
-        swWrap.appendChild(el('button.btn.btn-sm' + (active ? '.btn-primary' : '.btn-outline'), {
-          text: o[1], onclick: function () { selCo = o[0]; if (sub === 'banks') banksDash = false; EPAL.router.render(); } }));
+        if (banksDash) ov.className = 'btn btn-sm btn-primary';
+        ov.addEventListener('click', function () { banksDash = true; EPAL.router.render(); });
+      } else { ov.parentNode.removeChild(ov); }
+      Array.prototype.forEach.call(swWrap.querySelectorAll('[data-co]'), function (b) {
+        var co = b.getAttribute('data-co');
+        if (co === '__overview') return;
+        if ((sub === 'payroll' && co === 'all') || (co !== 'all' && co !== 'group' && !presentIds[co])) { b.parentNode.removeChild(b); return; }
+        var active = (selCo === co) && !(sub === 'banks' && banksDash);
+        if (active) b.className = 'btn btn-sm btn-primary';
+        b.addEventListener('click', function () { selCo = co; if (sub === 'banks') banksDash = false; EPAL.router.render(); });
       });
       // payroll + expenses have their own sub-section row — the switcher
       // rides IN that row (one line, hairline separator); other sections
