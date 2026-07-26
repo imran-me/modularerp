@@ -84,7 +84,34 @@ pixel-perfect match — for EVERY module.** Recorded in `docs/FULLSTACK-REBUILD-
 
 **➡️ MASTER ACCOUNTS COMPLETE** (routes = real HTML `<section>`, 20/20 pixel-identical · full tested backend).
 
-**◑ GROUP FINANCE — real-HTML rebuild IN PROGRESS (priority #2, 2026-07-26).**
+**✅ GROUP FINANCE — FRONTEND real-HTML rebuild COMPLETE (priority #2, 2026-07-26).**
+ALL 13 finance screens are now authored as real-HTML `<section data-screen>` blocks:
+overview (top+bottom), pnl, cashflow, balance-sheet, receivables, payables (shared
+`aging` section), banks, coa, journal, trial-balance, consolidation, concern-pnl,
+group-expenses. Shared building blocks — `head()` (page-head bar), `pills()` (13-tab
+band), `kpi()` (KPI tile), `chartCard()` (chart card w/ `<canvas>`) — are `<div data-shell>`
+blocks, so every bar/KPI/chart across all screens is HTML from one edit each. JS only fills
+live data + wires buttons + draws charts. Dynamic data-grids (`EPAL.table`, hand-built
+consolidation matrix), computed inline-style strips (budget bars, balance-sheet line rows,
+cash-by-concern bars) and the red-flag / period-lock panels stay JS (the law's "live data /
+feature behavior" carve-out). Commits 6b30504 (split) → e3213c0 (banks).
+
+**⚠️ FINANCE PARITY VERIFICATION — the `.parity/finance-before` baseline DRIFTS.** The
+headless harness accumulates localStorage between `shoot` runs, and visiting Receivables/
+Payables (posts `GL-RECLASS-AG-*`), Consolidation (posts inter-company) and Group Expenses
+(`ensureGroupAccounts` adds COA rows) MUTATES that state — so the ledger entry count grows
+run-to-run and a stale baseline shows false coa/journal diffs. **Reliable method = BACK-TO-BACK:**
+shoot the current build → `cp` the `_frontend-originals/group-cockpit/finance/view.js` backup
+over `view.js` → shoot again → restore build → `diff` the two. Same-state compare of MY code
+vs ORIGINAL code. The 11 menu routes = 22/22 byte-identical this way; concern-pnl+expenses
+proven separately (their own before/after). Do NOT trust an isolated single-route journal
+diff. See [[parity-sweep-context-journal]].
+
+**◻ FINANCE BACKEND — still TODO:** only `backend/LARAVEL-BLUEPRINT.md` exists (no real slice
+yet). Build the Laravel controllers/services/models/migrations for the finance stores (banks,
+group_budgets, group expense entries) + test vs local MySQL, per the full-stack directive.
+
+**◑ (superseded) earlier finance notes:**
 Finance was ONE hand-written 133KB `view.js` (13 chart/table screens). Steps done + pushed:
 - ✅ **Split into the `frontend/` build** (`template.html` + `finance.js` → `view.js` via
   `build-module.mjs`), backup at `_frontend-originals/group-cockpit/finance/view.js`. The
