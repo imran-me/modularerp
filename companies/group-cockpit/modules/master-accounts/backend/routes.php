@@ -16,6 +16,7 @@ use Epal\Modules\GroupCockpit\MasterAccounts\BankTxnController;
 use Epal\Modules\GroupCockpit\MasterAccounts\JournalController;
 use Epal\Modules\GroupCockpit\MasterAccounts\CustomerController;
 use Epal\Modules\GroupCockpit\MasterAccounts\SupplierController;
+use Epal\Modules\GroupCockpit\MasterAccounts\ExpenseCategoryController;
 use Epal\Modules\GroupCockpit\MasterAccounts\PartyTypeController;
 use Epal\Modules\GroupCockpit\MasterAccounts\PaymentScheduleController;
 use Illuminate\Support\Facades\Route;
@@ -60,3 +61,8 @@ Route::delete('group/master-accounts/schedules/{id}', [PaymentScheduleController
 Route::get('group/master-accounts/party-types', [PartyTypeController::class, 'index']);
 Route::post('group/master-accounts/party-types', [PartyTypeController::class, 'store']);
 Route::delete('group/master-accounts/party-types/{id}', [PartyTypeController::class, 'destroy']);
+
+// Expense categories (module-owned `exp_categories` lookup) — frontend `exp_categories` store.
+Route::get('group/master-accounts/expense-categories', [ExpenseCategoryController::class, 'index']);
+Route::post('group/master-accounts/expense-categories', [ExpenseCategoryController::class, 'store']);
+Route::delete('group/master-accounts/expense-categories/{id}', [ExpenseCategoryController::class, 'destroy']);
