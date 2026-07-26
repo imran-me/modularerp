@@ -29,6 +29,8 @@
 <template data-tpl="add-row"><div class="mb-2"><button class="btn btn-sm btn-primary" data-slot="btn"></button></div></template>
 <!-- a bare button (class + html + onclick set by the logic) -->
 <template data-tpl="btn"><button class="btn"></button></template>
+<!-- a link styled as a button (class + href + html set by the logic) -->
+<template data-tpl="a-btn"><a class="btn"></a></template>
 <!-- a wrapping flex row for a button strip -->
 <template data-tpl="btn-strip"><div class="flex gap-1 flex-wrap mb-2"></div></template>
 <!-- a scrollable simple ledger table (modal) + one row -->
@@ -42,3 +44,11 @@
 <template data-tpl="month-input"><input class="input" type="month" style="width:auto"></template>
 <template data-tpl="tax-period-row"><div class="flex gap-2 items-center mb-2"><span class="text-mute sm">Return period</span><span data-slot="input"></span><span class="text-mute xs">collected via the Credit/Debit journal tax fields · deposit clears the payable</span></div></template>
 <template data-tpl="tax-row"><div class="data-row"><div class="flex-1"><div class="fw-600 sm" data-slot="head"></div><div class="text-mute xs" data-slot="detail"></div></div><div class="num strong" data-slot="payable"></div></div></template>
+
+<!-- a plain section label -->
+<template data-tpl="section-label"><div class="section-label"></div></template>
+<!-- bank overview: the card grid, an inline detail host, an empty note, and ONE premium bank card -->
+<template data-tpl="bank-grid"><div class="grid-auto stagger bank-acct-grid"></div></template>
+<template data-tpl="bank-detail-host"><div class="mt-3"></div></template>
+<template data-tpl="pad-note"><div class="card"><div class="card-pad text-mute" data-slot="body"></div></div></template>
+<template data-tpl="bank-card"><div class="card bank-card" style="cursor:pointer"><div class="bank-card-top"><div class="bank-card-ico" data-slot="ico"><i data-slot="glyph"></i><span class="bank-card-coico" data-slot="coico"><i data-slot="coicon"></i></span></div><div class="bank-card-id"><div class="bank-card-name" data-slot="name"></div><div class="bank-card-sub" data-slot="sub"></div></div><span class="bank-card-status" data-slot="status"></span><div class="bank-card-actions" data-slot="actions"></div></div><div class="bank-card-hero"><div class="bank-card-caprow"><span class="bank-card-caplabel" data-slot="caplabel"></span><span class="bank-card-delta" data-slot="delta"></span></div><div class="bank-card-bal" data-slot="bal"></div><div class="bank-card-acct" data-slot="acct"></div></div><div class="bank-card-foot"><div class="bank-card-metric"><span class="k">Opening</span><div class="v" data-slot="opening"></div></div><div class="bank-card-metric right"><span class="k">Activity</span><div class="v" data-slot="activity"></div></div></div></div></template>

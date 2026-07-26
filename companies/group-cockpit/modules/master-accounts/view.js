@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  MASTER ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/master-accounts.js) and\n  cloned + filled via [data-tpl] / [data-slot]. The group accounting desk is\n  highly dynamic — the company switcher, the expense/journal/schedule/payroll/\n  bank desks, VAT & AIT return, opening-balance posters and every table/modal/\n  form keep their legacy el()-built DOM (with inline styles) in the logic file,\n  exactly as before. Only the reusable page / section-nav / KPI shells live here,\n  in house design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band, 9 sections) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n\n<!-- reusable shells (markup, filled by the logic) --------------------------- -->\n<!-- a titled card: head (title + optional sub) over a body slot -->\n<template data-tpl=\"titled-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- a primary action button on its own row (fill data-slot=\"btn\") -->\n<template data-tpl=\"add-row\"><div class=\"mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\n<!-- a bare button (class + html + onclick set by the logic) -->\n<template data-tpl=\"btn\"><button class=\"btn\"></button></template>\n<!-- a wrapping flex row for a button strip -->\n<template data-tpl=\"btn-strip\"><div class=\"flex gap-1 flex-wrap mb-2\"></div></template>\n<!-- a scrollable simple ledger table (modal) + one row -->\n<template data-tpl=\"ledger-table\"><div class=\"table-wrap\"><table class=\"tbl\"><thead><tr><th>Date</th><th>Ref</th><th>Memo</th><th class=\"num\">Debit</th><th class=\"num\">Credit</th><th class=\"num\">Balance</th></tr></thead><tbody data-slot=\"rows\"></tbody></table></div></template>\n<template data-tpl=\"ledger-row\"><tr><td data-slot=\"date\"></td><td data-slot=\"ref\"></td><td data-slot=\"memo\"></td><td class=\"num\" data-slot=\"debit\"></td><td class=\"num\" data-slot=\"credit\"></td><td class=\"num\" data-slot=\"balance\"></td></tr></template>\n<!-- schedule section card: head has a right-aligned running total (tone set by logic) -->\n<template data-tpl=\"sched-card\"><div class=\"card mb-2\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"strong num\" style=\"margin-left:auto\" data-slot=\"total\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- a plain card = just a body (no head), for guards/notes -->\n<template data-tpl=\"body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- VAT/AIT return: month input, the period row, one tax row -->\n<template data-tpl=\"month-input\"><input class=\"input\" type=\"month\" style=\"width:auto\"></template>\n<template data-tpl=\"tax-period-row\"><div class=\"flex gap-2 items-center mb-2\"><span class=\"text-mute sm\">Return period</span><span data-slot=\"input\"></span><span class=\"text-mute xs\">collected via the Credit/Debit journal tax fields · deposit clears the payable</span></div></template>\n<template data-tpl=\"tax-row\"><div class=\"data-row\"><div class=\"flex-1\"><div class=\"fw-600 sm\" data-slot=\"head\"></div><div class=\"text-mute xs\" data-slot=\"detail\"></div></div><div class=\"num strong\" data-slot=\"payable\"></div></div></template>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  MASTER ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/master-accounts.js) and\n  cloned + filled via [data-tpl] / [data-slot]. The group accounting desk is\n  highly dynamic — the company switcher, the expense/journal/schedule/payroll/\n  bank desks, VAT & AIT return, opening-balance posters and every table/modal/\n  form keep their legacy el()-built DOM (with inline styles) in the logic file,\n  exactly as before. Only the reusable page / section-nav / KPI shells live here,\n  in house design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band, 9 sections) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n\n<!-- reusable shells (markup, filled by the logic) --------------------------- -->\n<!-- a titled card: head (title + optional sub) over a body slot -->\n<template data-tpl=\"titled-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- a primary action button on its own row (fill data-slot=\"btn\") -->\n<template data-tpl=\"add-row\"><div class=\"mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\n<!-- a bare button (class + html + onclick set by the logic) -->\n<template data-tpl=\"btn\"><button class=\"btn\"></button></template>\n<!-- a link styled as a button (class + href + html set by the logic) -->\n<template data-tpl=\"a-btn\"><a class=\"btn\"></a></template>\n<!-- a wrapping flex row for a button strip -->\n<template data-tpl=\"btn-strip\"><div class=\"flex gap-1 flex-wrap mb-2\"></div></template>\n<!-- a scrollable simple ledger table (modal) + one row -->\n<template data-tpl=\"ledger-table\"><div class=\"table-wrap\"><table class=\"tbl\"><thead><tr><th>Date</th><th>Ref</th><th>Memo</th><th class=\"num\">Debit</th><th class=\"num\">Credit</th><th class=\"num\">Balance</th></tr></thead><tbody data-slot=\"rows\"></tbody></table></div></template>\n<template data-tpl=\"ledger-row\"><tr><td data-slot=\"date\"></td><td data-slot=\"ref\"></td><td data-slot=\"memo\"></td><td class=\"num\" data-slot=\"debit\"></td><td class=\"num\" data-slot=\"credit\"></td><td class=\"num\" data-slot=\"balance\"></td></tr></template>\n<!-- schedule section card: head has a right-aligned running total (tone set by logic) -->\n<template data-tpl=\"sched-card\"><div class=\"card mb-2\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"strong num\" style=\"margin-left:auto\" data-slot=\"total\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- a plain card = just a body (no head), for guards/notes -->\n<template data-tpl=\"body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- VAT/AIT return: month input, the period row, one tax row -->\n<template data-tpl=\"month-input\"><input class=\"input\" type=\"month\" style=\"width:auto\"></template>\n<template data-tpl=\"tax-period-row\"><div class=\"flex gap-2 items-center mb-2\"><span class=\"text-mute sm\">Return period</span><span data-slot=\"input\"></span><span class=\"text-mute xs\">collected via the Credit/Debit journal tax fields · deposit clears the payable</span></div></template>\n<template data-tpl=\"tax-row\"><div class=\"data-row\"><div class=\"flex-1\"><div class=\"fw-600 sm\" data-slot=\"head\"></div><div class=\"text-mute xs\" data-slot=\"detail\"></div></div><div class=\"num strong\" data-slot=\"payable\"></div></div></template>\n\n<!-- a plain section label -->\n<template data-tpl=\"section-label\"><div class=\"section-label\"></div></template>\n<!-- bank overview: the card grid, an inline detail host, an empty note, and ONE premium bank card -->\n<template data-tpl=\"bank-grid\"><div class=\"grid-auto stagger bank-acct-grid\"></div></template>\n<template data-tpl=\"bank-detail-host\"><div class=\"mt-3\"></div></template>\n<template data-tpl=\"pad-note\"><div class=\"card\"><div class=\"card-pad text-mute\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"bank-card\"><div class=\"card bank-card\" style=\"cursor:pointer\"><div class=\"bank-card-top\"><div class=\"bank-card-ico\" data-slot=\"ico\"><i data-slot=\"glyph\"></i><span class=\"bank-card-coico\" data-slot=\"coico\"><i data-slot=\"coicon\"></i></span></div><div class=\"bank-card-id\"><div class=\"bank-card-name\" data-slot=\"name\"></div><div class=\"bank-card-sub\" data-slot=\"sub\"></div></div><span class=\"bank-card-status\" data-slot=\"status\"></span><div class=\"bank-card-actions\" data-slot=\"actions\"></div></div><div class=\"bank-card-hero\"><div class=\"bank-card-caprow\"><span class=\"bank-card-caplabel\" data-slot=\"caplabel\"></span><span class=\"bank-card-delta\" data-slot=\"delta\"></span></div><div class=\"bank-card-bal\" data-slot=\"bal\"></div><div class=\"bank-card-acct\" data-slot=\"acct\"></div></div><div class=\"bank-card-foot\"><div class=\"bank-card-metric\"><span class=\"k\">Opening</span><div class=\"v\" data-slot=\"opening\"></div></div><div class=\"bank-card-metric right\"><span class=\"k\">Activity</span><div class=\"v\" data-slot=\"activity\"></div></div></div></div></template>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="group-cockpit/master-accounts"]')) {
     var st = document.createElement('style');
@@ -64,6 +64,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
 // el('div.card',…) shells they replace; the sub span is dropped when empty.
 function addRow(html, onClick) { var r = frag('add-row'); var b = slot(r, 'btn'); b.innerHTML = html; b.addEventListener('click', onClick); return r; }
 function btn(cls, html, onClick) { var b = frag('btn'); b.className = cls; b.innerHTML = html; if (onClick) b.addEventListener('click', onClick); return b; }
+function aBtn(cls, href, html) { var a = frag('a-btn'); a.className = cls; a.setAttribute('href', href); a.innerHTML = html; return a; }
 function btnStrip(children, cls) { var s = frag('btn-strip'); if (cls) s.className = cls; (children || []).forEach(function (c) { if (c) s.appendChild(c); }); return s; }
 function titledCard(titleHtml, subText, bodyEl, extraClass) {
   var c = frag('titled-card');
@@ -1576,12 +1577,12 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
 
-    if (canCreate()) page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
-      el('button.btn.btn-sm.btn-primary', { html: ui.icon('plus-lg') + ' Add New Bank', onclick: function () { editBank(null); } }),
-      el('a.btn.btn-sm.btn-outline', { href: '#/group/master-accounts/cash', html: ui.icon('cash-stack') + ' Manage cash' })
+    if (canCreate()) page.appendChild(btnStrip([
+      btn('btn btn-sm btn-primary', ui.icon('plus-lg') + ' Add New Bank', function () { editBank(null); }),
+      aBtn('btn btn-sm btn-outline', '#/group/master-accounts/cash', ui.icon('cash-stack') + ' Manage cash')
     ]));
 
-    page.appendChild(el('div.section-label', { text: 'Bank Accounts — ' + (selCo === 'all' ? 'all sister concerns' : coName(selCo)) }));
+    var sl = frag('section-label'); sl.textContent = 'Bank Accounts — ' + (selCo === 'all' ? 'all sister concerns' : coName(selCo)); page.appendChild(sl);
     renderBankCardGrid(banks, page);
   }
 
@@ -1590,10 +1591,10 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
    * (default true) opens the first account's inline ledger below the grid. */
   function renderBankCardGrid(banks, page, opts) {
     opts = opts || {};
-    if (!banks.length) { page.appendChild(el('div.card', null, [ el('div.card-pad.text-mute', { text: 'No bank accounts in this scope.' }) ])); return; }
+    if (!banks.length) { var pn = frag('pad-note'); slot(pn, 'body').textContent = 'No bank accounts in this scope.'; page.appendChild(pn); return; }
     var txns = S.list('bank_txns');
-    var detailHost = el('div.mt-3');        // the clicked account's ledger renders INLINE here (not a modal)
-    var grid = el('div.grid-auto.stagger.bank-acct-grid');
+    var detailHost = frag('bank-detail-host');  // the clicked account's ledger renders INLINE here (not a modal)
+    var grid = frag('bank-grid');
     // in/out sense for a txn — walks a bank's opening back from its closing
     // balance, and labels the last movement on the card.
     var isIn = function (t) { return t.type === 'deposit' || t.type === 'transfer-in' || t.type === 'opening'; };
@@ -1608,45 +1609,37 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       var activityStr = txCount ? (txCount + ' txn' + (txCount === 1 ? '' : 's') + (lastDate ? ' · ' + lastDate : '')) : 'No activity yet';
       var active = (b.status || 'Active') !== 'Inactive';
       var glyph = b.type === 'Cash Box' ? 'cash-stack' : 'bank';
-      var card = el('div.card.bank-card', { style: { cursor: 'pointer' }, onclick: function () {
-          ui.$$('.card', grid).forEach(function (c) { c.classList.remove('sel'); });
-          card.classList.add('sel');
-          bankAccountDetail(b, detailHost);
-          detailHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } }, [
-        el('div.bank-card-top', null, [
-          el('div.bank-card-ico' + (active ? '.is-active' : ''), { title: active ? 'Active' : 'Inactive' }, [
-            ui.frag('<i class="bi bi-' + glyph + '"></i>'),
-            ui.frag('<span class="bank-card-coico" title="' + esc(coName(b.companyId || 'group')) + '"><i class="bi bi-' + ((EPAL.config.company(b.companyId || 'group') || {}).icon || 'building') + '"></i></span>')
-          ]),
-          el('div.bank-card-id', null, [
-            el('div.bank-card-name', { title: b.name, text: b.name }),
-            el('div.bank-card-sub', { text: coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '') })
-          ]),
-          el('span.bank-card-status' + (active ? '.is-active' : '.is-inactive'), { text: active ? 'Active' : 'Inactive' }),
-          canCreate() ? el('div.bank-card-actions', null, [
-            el('button.icon-btn.btn-sm', { title: 'Edit', html: ui.icon('pencil'),
-              onclick: function (e) { e.stopPropagation(); editBank(b); } }),
-            el('button.icon-btn.btn-sm', { title: 'Delete', html: ui.icon('trash'),
-              onclick: function (e) { e.stopPropagation(); deleteBank(b); } })
-          ]) : null
-        ]),
-        el('div.bank-card-hero', null, [
-          el('div.bank-card-caprow', null, [
-            el('span.bank-card-caplabel', { text: b.type === 'Cash Box' ? 'Cash on hand' : 'Current balance' }),
-            net === 0
-              ? el('span.bank-card-delta.is-flat', { text: 'No change' })
-              : el('span.bank-card-delta.' + (net > 0 ? 'is-up' : 'is-down'), { html: ui.icon(net > 0 ? 'arrow-up-short' : 'arrow-down-short') + ui.money(Math.abs(net)) })
-          ]),
-          el('div.bank-card-bal' + (closing < 0 ? '.text-bad' : ''), { text: ui.money(b.balance) }),
-          el('div.bank-card-acct', { text: b.account ? 'A/C ' + b.account : 'No account number' })
-        ]),
-        el('div.bank-card-foot', null, [
-          el('div.bank-card-metric', null, [ el('span.k', { text: 'Opening' }), el('div.v', { text: ui.money(opening) }) ]),
-          el('div.bank-card-metric.right', null, [ el('span.k', { text: 'Activity' }), el('div.v', { title: activityStr, text: activityStr }) ])
-        ])
-      ]);
-      card.style.setProperty('--bank-hue', ui.colorFor(b.name));   // el()'s style object can't set a custom prop
+      var card = frag('bank-card');
+      card.addEventListener('click', function () {
+        ui.$$('.card', grid).forEach(function (c) { c.classList.remove('sel'); });
+        card.classList.add('sel');
+        bankAccountDetail(b, detailHost);
+        detailHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+      // top: identity chip (glyph + company icon), name/sub, status, edit/delete
+      var ico = slot(card, 'ico'); if (active) ico.classList.add('is-active'); ico.title = active ? 'Active' : 'Inactive';
+      slot(card, 'glyph').className = 'bi bi-' + glyph;
+      var coico = slot(card, 'coico'); coico.title = coName(b.companyId || 'group');
+      slot(card, 'coicon').className = 'bi bi-' + ((EPAL.config.company(b.companyId || 'group') || {}).icon || 'building');
+      var nm = slot(card, 'name'); nm.title = b.name; nm.textContent = b.name;
+      slot(card, 'sub').textContent = coName(b.companyId || 'group') + (b.branch ? ' · ' + b.branch : '');
+      var stt = slot(card, 'status'); stt.classList.add(active ? 'is-active' : 'is-inactive'); stt.textContent = active ? 'Active' : 'Inactive';
+      var acts = slot(card, 'actions');
+      if (canCreate()) {
+        acts.appendChild(btn('icon-btn btn-sm', ui.icon('pencil'), function (e) { e.stopPropagation(); editBank(b); })).title = 'Edit';
+        acts.appendChild(btn('icon-btn btn-sm', ui.icon('trash'), function (e) { e.stopPropagation(); deleteBank(b); })).title = 'Delete';
+      } else { acts.parentNode.removeChild(acts); }
+      // hero: caption + delta chip, big balance, account no
+      slot(card, 'caplabel').textContent = b.type === 'Cash Box' ? 'Cash on hand' : 'Current balance';
+      var delta = slot(card, 'delta');
+      if (net === 0) { delta.classList.add('is-flat'); delta.textContent = 'No change'; }
+      else { delta.classList.add(net > 0 ? 'is-up' : 'is-down'); delta.innerHTML = ui.icon(net > 0 ? 'arrow-up-short' : 'arrow-down-short') + ui.money(Math.abs(net)); }
+      var balEl = slot(card, 'bal'); if (closing < 0) balEl.classList.add('text-bad'); balEl.textContent = ui.money(b.balance);
+      slot(card, 'acct').textContent = b.account ? 'A/C ' + b.account : 'No account number';
+      // foot: opening + activity metrics
+      slot(card, 'opening').textContent = ui.money(opening);
+      var act = slot(card, 'activity'); act.title = activityStr; act.textContent = activityStr;
+      card.style.setProperty('--bank-hue', ui.colorFor(b.name));
       grid.appendChild(card);
     });
     page.appendChild(grid);
