@@ -694,20 +694,15 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     ]));
     page.appendChild(pills(null));
 
+    var top = screen('overview-top');
+    var actions = top.querySelector('[data-role="actions"]');
     if (hasLedger()) {
-      page.appendChild(el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' } }, [
-        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('diagram-2') + ' Chart of Accounts',
-          onclick: function () { EPAL.router.navigate('group/finance/coa'); } }),
-        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('journal-text') + ' Group Journal',
-          onclick: function () { EPAL.router.navigate('group/finance/journal'); } }),
-        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('list-columns-reverse') + ' Trial Balance',
-          onclick: function () { EPAL.router.navigate('group/finance/trial-balance'); } }),
-        el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-left-right') + ' Fund Transfer',
-          onclick: function () { fundTransferForm(); } }),
-        el('button.btn.btn-sm.btn-primary', { html: ui.icon('journal-plus') + ' New Journal',
-          onclick: function () { newJournal(); } })
-      ]));
-    }
+      actions.querySelector('[data-act="coa"]').addEventListener('click', function () { EPAL.router.navigate('group/finance/coa'); });
+      actions.querySelector('[data-act="journal"]').addEventListener('click', function () { EPAL.router.navigate('group/finance/journal'); });
+      actions.querySelector('[data-act="tb"]').addEventListener('click', function () { EPAL.router.navigate('group/finance/trial-balance'); });
+      actions.querySelector('[data-act="ft"]').addEventListener('click', function () { fundTransferForm(); });
+      actions.querySelector('[data-act="nj"]').addEventListener('click', function () { newJournal(); });
+    } else { actions.remove(); }
 
     // Seven facts, laid out 4+3 instead of seven-abreast (owner review
     // 2026-07-15). At seven the cards were thin enough that every label broke to
@@ -717,23 +712,23 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     // ragged 5+2. Labels shortened to hold one line at the new 12px — the
     // per-tile sub-caption underneath already carries the qualifier ("to
     // collect", "to settle"), so the label doesn't need to repeat it.
-    page.appendChild(el('div.kpi-grid.stagger', { style: '--kpi-cols:4' }, [
-      kpi('Revenue 12M', ui.money(f.revenue, { compact: true }), 'graph-up-arrow', 'group/finance/pnl', 'all concerns'),
-      kpi('Expense 12M', ui.money(f.expense, { compact: true }), 'wallet2', 'group/finance/pnl', 'all concerns'),
-      kpi('Net Profit', ui.money(f.profit, { compact: true }), 'cash-stack', 'group/finance/pnl', 'revenue less expense'),
-      kpi('Margin', ui.pct(f.margin), 'pie-chart-fill', 'group/finance/pnl', 'blended, group-wide'),
-      kpi('Cash', ui.money(cash, { compact: true }), 'bank', 'group/finance/banks', db().col('banks').length + ' accounts'),
-      kpi('Receivables', ui.money(ar, { compact: true }), 'arrow-down-left-circle', 'group/finance/receivables', 'to collect'),
-      kpi('Payables', ui.money(ap, { compact: true }), 'arrow-up-right-circle', 'group/finance/payables', 'to settle')
-    ]));
+    var kpis = top.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Revenue 12M', ui.money(f.revenue, { compact: true }), 'graph-up-arrow', 'group/finance/pnl', 'all concerns'));
+    kpis.appendChild(kpi('Expense 12M', ui.money(f.expense, { compact: true }), 'wallet2', 'group/finance/pnl', 'all concerns'));
+    kpis.appendChild(kpi('Net Profit', ui.money(f.profit, { compact: true }), 'cash-stack', 'group/finance/pnl', 'revenue less expense'));
+    kpis.appendChild(kpi('Margin', ui.pct(f.margin), 'pie-chart-fill', 'group/finance/pnl', 'blended, group-wide'));
+    kpis.appendChild(kpi('Cash', ui.money(cash, { compact: true }), 'bank', 'group/finance/banks', db().col('banks').length + ' accounts'));
+    kpis.appendChild(kpi('Receivables', ui.money(ar, { compact: true }), 'arrow-down-left-circle', 'group/finance/receivables', 'to collect'));
+    kpis.appendChild(kpi('Payables', ui.money(ap, { compact: true }), 'arrow-up-right-circle', 'group/finance/payables', 'to settle'));
+    mountScreen(page, top);
 
     renderRedFlagPanel(page);
     renderPeriodLock(page);
 
+    var bottom = screen('overview-bottom');
     var trendId = ui.uid('gfTrend');
-    page.appendChild(chartCard('Revenue, Expense & Profit — Consolidated', 'activity', trendId, 'monthly · all concerns combined', 300));
+    bottom.querySelector('[data-fill="chart"]').replaceWith(chartCard('Revenue, Expense & Profit — Consolidated', 'activity', trendId, 'monthly · all concerns combined', 300));
 
-    page.appendChild(el('div.section-label', { text: 'Per-Company Performance (12M) — click a row to open that concern’s accounts' }));
     var rows = activeCompanies().map(function (c) {
       var cf = ledgerFinance(c.id);
       return { id: c.id, short: c.short, accent: c.accent, icon: c.icon,
@@ -765,7 +760,8 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       onRow: function (r) { EPAL.router.navigate(r.id === 'group' ? 'group/finance/expenses' : r.id + '/accounts'); },
       empty: { icon: 'diagram-3', title: 'No active concerns' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ table.el ]) ]));
+    bottom.querySelector('[data-fill="table"]').appendChild(table.el);
+    mountScreen(page, bottom);
 
     requestAnimationFrame(function () {
       var s = ledgerSeries(null);

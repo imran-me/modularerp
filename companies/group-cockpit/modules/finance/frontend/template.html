@@ -45,6 +45,23 @@
   <div class="card" data-type="expense"><div class="card-pad" data-fill="table"></div></div>
 </section>
 
+<section data-screen="overview-top">
+  <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;" data-role="actions">
+    <button class="btn btn-sm btn-ghost" data-act="coa"><i class="bi bi-diagram-2"></i> Chart of Accounts</button>
+    <button class="btn btn-sm btn-ghost" data-act="journal"><i class="bi bi-journal-text"></i> Group Journal</button>
+    <button class="btn btn-sm btn-ghost" data-act="tb"><i class="bi bi-list-columns-reverse"></i> Trial Balance</button>
+    <button class="btn btn-sm btn-ghost" data-act="ft"><i class="bi bi-arrow-left-right"></i> Fund Transfer</button>
+    <button class="btn btn-sm btn-primary" data-act="nj"><i class="bi bi-journal-plus"></i> New Journal</button>
+  </div>
+  <div class="kpi-grid stagger" style="--kpi-cols:4" data-fill="kpis"></div>
+</section>
+
+<section data-screen="overview-bottom">
+  <div data-fill="chart"></div>
+  <div class="section-label">Per-Company Performance (12M) — click a row to open that concern’s accounts</div>
+  <div class="card"><div class="card-pad" data-fill="table"></div></div>
+</section>
+
 <section data-screen="balance-sheet">
   <div class="kpi-grid" data-fill="kpis"></div>
   <div class="two-col">
