@@ -45,6 +45,22 @@
   <div class="card" data-type="expense"><div class="card-pad" data-fill="table"></div></div>
 </section>
 
+<section data-screen="consolidation">
+  <div class="kpi-grid" data-fill="kpis"></div>
+  <div class="section-label">Consolidated Trial Balance — debit shown plainly · credit in (parentheses) · inter-company rows eliminated</div>
+  <div class="card"><div class="card-pad"><div class="table-wrap" data-fill="main-table"></div></div></div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-head"><h3><i class="bi bi-info-circle"></i> How consolidation works</h3><span class="card-sub">why the group column differs from the sum of concerns</span></div>
+      <div class="card-body">
+        <p class="text-mute" style="font-size: 13px; line-height: 1.7; margin-top: 0;">When one concern sells to another, the seller books <b>1300 Inter-company Receivable</b> and the buyer books <b>2400 Inter-company Payable</b> for the same amount. Across the group these are the same money owed to itself, so on consolidation they are moved into the <b>Elimination</b> column and their <b>Group</b> figure nets to zero — the group only reports what it is owed by, and owes to, outside parties.</p>
+        <div class="mt-2" data-fill="callout" style="display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 10px; border: 1px dashed rgba(200,162,74,.45); font-size: 12.5px;"></div>
+      </div>
+    </div>
+    <div data-fill="chart"></div>
+  </div>
+</section>
+
 <section data-screen="group-expenses">
   <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
   <div class="card"><div class="card-head"><h3 data-fill="bva-title"></h3><span class="card-sub">live from the ledger</span></div><div class="card-body" data-fill="bva-body"></div></div>

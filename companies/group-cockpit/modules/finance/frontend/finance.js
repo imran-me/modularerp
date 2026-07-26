@@ -1861,18 +1861,14 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     ]));
     page.appendChild(pills('consolidation'));
 
-    page.appendChild(el('div.kpi-grid', null, [
-      kpi('Companies Consolidated', comps.length, 'diagram-3', null, 'operating concerns'),
-      kpi('Eliminations', ui.money(elimGross, { compact: true }), 'x-circle', null, 'netted on consolidation'),
-      kpi('Consolidated Assets', ui.money(groupAssets, { compact: true }), 'safe2', null, 'group, post-elimination'),
-      kpi('IC Transactions', icCount, 'arrow-left-right', null, icRowCount + ' control accounts')
-    ]));
+    var scr = screen('consolidation');
+    var kpis = scr.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Companies Consolidated', comps.length, 'diagram-3', null, 'operating concerns'));
+    kpis.appendChild(kpi('Eliminations', ui.money(elimGross, { compact: true }), 'x-circle', null, 'netted on consolidation'));
+    kpis.appendChild(kpi('Consolidated Assets', ui.money(groupAssets, { compact: true }), 'safe2', null, 'group, post-elimination'));
+    kpis.appendChild(kpi('IC Transactions', icCount, 'arrow-left-right', null, icRowCount + ' control accounts'));
 
     // MAIN TABLE — Account | per-company nets | Elimination | Group ---------
-    page.appendChild(el('div.section-label', {
-      text: 'Consolidated Trial Balance — debit shown plainly · credit in (parentheses) · inter-company rows eliminated'
-    }));
-
     var t = el('table.tbl');
     var headCells = [ el('th', { text: 'Account' }) ];
     comps.forEach(function (c) { headCells.push(el('th.num', { title: c.name, text: c.short })); });
@@ -1900,31 +1896,15 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     footCells.push(el('td.num', { html: '<span class="num strong" style="color:' + GOLD + '">' + ui.money(data.totals.group.debit) + '</span>' }));
     tb.appendChild(el('tr', { style: { borderTop: '2px solid rgba(128,128,128,.3)' } }, footCells));
     t.appendChild(tb);
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ el('div.table-wrap', null, [ t ]) ]) ]));
+    scr.querySelector('[data-fill="main-table"]').appendChild(t);
 
     // explainer + per-company revenue bar ----------------------------------
-    var row = el('div.two-col');
-    row.appendChild(el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('info-circle') + ' How consolidation works' }),
-        el('span.card-sub', { text: 'why the group column differs from the sum of concerns' }) ]),
-      el('div.card-body', null, [
-        el('p.text-mute', { style: { fontSize: '13px', lineHeight: '1.7', marginTop: '0' },
-          html: 'When one concern sells to another, the seller books <b>1300 Inter-company Receivable</b> and the ' +
-            'buyer books <b>2400 Inter-company Payable</b> for the same amount. Across the group these are the same ' +
-            'money owed to itself, so on consolidation they are moved into the <b>Elimination</b> column and their ' +
-            '<b>Group</b> figure nets to zero — the group only reports what it is owed by, and owes to, outside parties.' }),
-        el('div.mt-2', {
-          style: { display: 'flex', gap: '10px', alignItems: 'flex-start', padding: '12px',
-            borderRadius: '10px', border: '1px dashed rgba(200,162,74,.45)', fontSize: '12.5px' },
-          html: ui.icon('x-circle') + ' <span class="text-mute"><b>' + ui.money(elimGross) + '</b> of inter-company ' +
-            'balances eliminated across <b>' + icCount + '</b> transaction' + (icCount === 1 ? '' : 's') +
-            ', on the <b>1300</b> / <b>2400</b> control accounts.</span>'
-        })
-      ])
-    ]));
+    scr.querySelector('[data-fill="callout"]').innerHTML = ui.icon('x-circle') + ' <span class="text-mute"><b>' + ui.money(elimGross) + '</b> of inter-company ' +
+      'balances eliminated across <b>' + icCount + '</b> transaction' + (icCount === 1 ? '' : 's') +
+      ', on the <b>1300</b> / <b>2400</b> control accounts.</span>';
     var revBarId = ui.uid('consRev');
-    row.appendChild(chartCard('Revenue by Concern', 'bar-chart', revBarId, 'trailing 12 months · per operating company', 280));
-    page.appendChild(row);
+    scr.querySelector('[data-fill="chart"]').replaceWith(chartCard('Revenue by Concern', 'bar-chart', revBarId, 'trailing 12 months · per operating company', 280));
+    mountScreen(page, scr);
 
     requestAnimationFrame(function () {
       var snap = db().groupSnapshot();
