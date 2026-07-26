@@ -1,28 +1,106 @@
 <!-- ============================================================================
-  Group Consolidated Finance — real-HTML screens (FRONTEND BUILD LAW).
-  Each route screen is authored below as a plain-HTML <section data-screen="…">
-  block; frontend/finance.js fills live data + draws charts into the <canvas>
-  placeholders. Screens are converted one at a time, pixel-verified byte-identical.
+  GROUP CONSOLIDATED FINANCE — the screen markup (read this file to see the UI).
+
+  HOW THIS WORKS (for the next developer)
+  ---------------------------------------------------------------------------
+  Every screen is written here as plain HTML. The logic file (frontend/finance.js)
+  never BUILDS DOM — it only clones a block from here and fills in the live data.
+
+  Styling is the house design system (platform/design-system/css/*): component
+  classes (`card`, `kpi-card`, `card-head`, `section-label`, `two-col`, `btn`,
+  `kpi-grid`) + utility classes (`flex`, `gap-2`, `mb-2`, `text-mute`). No inline
+  styles except a few computed ones the logic sets (e.g. a status border colour).
+
+  THE HOOKS the logic uses (grep any of these in finance.js to see the wiring):
+    data-shell="x"  a reusable chrome block  → shell('x') clones it
+    data-screen="x" a whole route screen     → screen('x') clones it
+    data-fill="x"   a slot the logic fills    (a table, a chart, a text value)
+    data-k="x"      a KPI value slot          → fillK(node,'x',value)
+    data-tab="x"    a tab button              (logic marks .active + wires nav)
+    data-drill="r"  a KPI that navigates to route r on click
+    data-role="x" / data-type="x"   a block the logic finds to fill or remove
+  After filling, mountScreen(page, node) moves the block's children onto the page.
+
+  WHY SOME LINES ARE ONE LONG LINE: a shell/KPI card is cloned as-is, so newlines
+  BETWEEN inline tags (a <span> next to a <span>/<i>) would clone as real spaces
+  and shift the pixels. Those leaf blocks are kept on one line ON PURPOSE. Block-
+  level rows (one per line) are safe and are laid out one-per-line for reading.
+
+  RULE: this file is structure only. Change a look? change the CSS. Change data
+  or behaviour? change finance.js. Every edit is re-proven pixel-identical.
 ============================================================================ -->
 
-<!-- Shared building blocks — a KPI tile and a chart card, authored as real HTML.
-     kpi() / chartCard() clone these and fill label / value / icon / canvas. -->
-<div data-shell="kpi" class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-fill="label"></span><span class="kpi-ico" data-fill="ico"></span></div><div class="kpi-value" data-fill="value"></div></div>
+<!-- Shared building blocks — a KPI tile and a chart card. kpi() / chartCard()
+     clone these and fill label / value / icon / canvas. (kpi-top is flex and
+     kpi-card/card-body are block, so the line breaks below add no pixels.) -->
+<div data-shell="kpi" class="kpi-card">
+  <div class="kpi-top">
+    <span class="kpi-label" data-fill="label"></span>
+    <span class="kpi-ico" data-fill="ico"></span>
+  </div>
+  <div class="kpi-value" data-fill="value"></div>
+</div>
 
-<div data-shell="chart-card" class="card"><div class="card-head"><h3 data-fill="title"></h3><span class="card-sub" data-fill="sub"></span></div><div class="card-body"><div data-fill="canvas-box" style="position: relative;"><canvas data-fill="canvas"></canvas></div></div></div>
+<div data-shell="chart-card" class="card">
+  <div class="card-head">
+    <h3 data-fill="title"></h3>
+    <span class="card-sub" data-fill="sub"></span>
+  </div>
+  <div class="card-body">
+    <div data-fill="canvas-box" style="position: relative;"><canvas data-fill="canvas"></canvas></div>
+  </div>
+</div>
 
 <!-- Shared chrome — the page-head bar (mirrors EPAL.pageHead markup) and the
-     finance tab band. head() / pills() clone + fill these. -->
-<div data-shell="head" class="page-head"><div><h1 class="page-title" data-fill="title"><span class="eyebrow">Epal Group · Consolidated Finance</span><i class="bi" data-fill="icon"></i></h1><p class="page-sub" data-fill="sub"></p></div><div class="page-actions" data-fill="actions"></div></div>
+     finance tab band. head() / pills() clone + fill these. NOTE: the <h1> inner
+     run (eyebrow span · icon · title text) stays on ONE line on purpose — a
+     newline between those inline tags would clone as a real space. -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow">Epal Group · Consolidated Finance</span><i class="bi" data-fill="icon"></i></h1>
+    <p class="page-sub" data-fill="sub"></p>
+  </div>
+  <div class="page-actions" data-fill="actions"></div>
+</div>
 
-<div data-shell="pills"><div class="tab-underline tabs-dense mb-3" data-fill="tabs"><button data-tab="">Overview</button><button data-tab="pnl">P&amp;L</button><button data-tab="cashflow">Cash Flow</button><button data-tab="balance-sheet">Balance Sheet</button><button data-tab="receivables">Receivables</button><button data-tab="payables">Payables</button><button data-tab="banks">Banks</button><button data-tab="coa">Chart of Accounts</button><button data-tab="journal">Journal</button><button data-tab="trial-balance">Trial Balance</button><button data-tab="consolidation">Consolidation</button><button data-tab="concern-pnl">P&amp;L by Concern</button><button data-tab="expenses">Group Expenses</button></div></div>
+<div data-shell="pills">
+  <div class="tab-underline tabs-dense mb-3" data-fill="tabs">
+    <button data-tab="">Overview</button>
+    <button data-tab="pnl">P&amp;L</button>
+    <button data-tab="cashflow">Cash Flow</button>
+    <button data-tab="balance-sheet">Balance Sheet</button>
+    <button data-tab="receivables">Receivables</button>
+    <button data-tab="payables">Payables</button>
+    <button data-tab="banks">Banks</button>
+    <button data-tab="coa">Chart of Accounts</button>
+    <button data-tab="journal">Journal</button>
+    <button data-tab="trial-balance">Trial Balance</button>
+    <button data-tab="consolidation">Consolidation</button>
+    <button data-tab="concern-pnl">P&amp;L by Concern</button>
+    <button data-tab="expenses">Group Expenses</button>
+  </div>
+</div>
 
 <section data-screen="trial-balance">
   <div class="kpi-grid">
-    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Total Debits</span><span class="kpi-ico"><i class="bi bi-arrow-down-circle"></i></span></div><div class="kpi-value" data-k="dr"></div></div>
-    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Total Credits</span><span class="kpi-ico"><i class="bi bi-arrow-up-circle"></i></span></div><div class="kpi-value" data-k="cr"></div></div>
-    <div class="kpi-card"><div class="kpi-top"><span class="kpi-label">Difference</span><span class="kpi-ico"><i class="bi" data-fill="diff-ico"></i></span></div><div class="kpi-value" data-k="diff"></div><div class="kpi-foot"><span class="text-muted" data-fill="diff-foot"></span></div></div>
-    <div class="kpi-card drill" data-drill="group/finance/coa"><div class="kpi-top"><span class="kpi-label">Accounts</span><span class="kpi-ico"><i class="bi bi-diagram-2"></i></span></div><div class="kpi-value" data-k="accounts"></div><div class="kpi-foot"><span class="text-muted">with movement</span></div></div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Debits</span><span class="kpi-ico"><i class="bi bi-arrow-down-circle"></i></span></div>
+      <div class="kpi-value" data-k="dr"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Credits</span><span class="kpi-ico"><i class="bi bi-arrow-up-circle"></i></span></div>
+      <div class="kpi-value" data-k="cr"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Difference</span><span class="kpi-ico"><i class="bi" data-fill="diff-ico"></i></span></div>
+      <div class="kpi-value" data-k="diff"></div>
+      <div class="kpi-foot"><span class="text-muted" data-fill="diff-foot"></span></div>
+    </div>
+    <div class="kpi-card drill" data-drill="group/finance/coa">
+      <div class="kpi-top"><span class="kpi-label">Accounts</span><span class="kpi-ico"><i class="bi bi-diagram-2"></i></span></div>
+      <div class="kpi-value" data-k="accounts"></div>
+      <div class="kpi-foot"><span class="text-muted">with movement</span></div>
+    </div>
   </div>
   <div class="card" data-role="status"></div>
   <div class="section-label">Trial Balance — all accounts with movement</div>
