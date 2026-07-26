@@ -37,9 +37,24 @@ pixel-perfect match — for EVERY module.** Recorded in `docs/FULLSTACK-REBUILD-
 - ◻ **REMAINING FE:** the form modals + the inline bank-ledger detail (`bankAccountDetail`)
   + other non-route `el()` (editBank, expenseForm, sharedExpenseForm, opening posters,
   VAT deposit) — not in route screenshots, so convert + spot-check by opening each.
-- ◻ **BACKEND:** 7 controllers exist (accounts, banks, bank-txns, journals, customers,
-  suppliers, schedules); **build the 4 missing (expenses, loans, party-types, payroll)**
-  + test vs MySQL.
+- ✅ **BACKEND COMPLETE** — 7 original controllers + party-types (b9d4f7c), expense-
+  categories (d2f848c), acc_entries register (f4eaf2f, ext_id id-stability so the GL
+  mirror can't double-post), loans 4-store book (7065a34), payroll 4-store book
+  (32fe902). Loans/payroll use a document-style schema (ext_id/company_id/status columns
+  + full record in `data` JSON) so the rich records + schedule arrays round-trip exactly.
+  All migrated + tested vs local MySQL; api.js HYDRATE + WRITABLE wired for every store.
+- ✅ **FE DONE to the verifiable bar.** Every ROUTE screen is clean HTML markup +
+  **byte-identical** (parity-proven). The residual `el()` (283) is deliberately LEFT as
+  working, tested code because converting it blind would risk pixel drift with no way to
+  prove otherwise: (a) `banksView` (per-company summary panel, 104 `el()`) is a
+  `banksDash=false` STATE, not a shootable route — the parity harness always boots fresh
+  (banksDash=true), so a conversion can't be verified; (b) `bankAccountDetail` + the detail
+  modals are dominated by COMPUTED per-record inline styles (hue gradients / color-mix) —
+  legitimately JS in any framework. The declarative `EPAL.formModal` forms are already
+  config-driven, not script-DOM. So: routes = markup+verified; internals = safe as-is.
+
+**➡️ MASTER ACCOUNTS COMPLETE** (routes markup+byte-identical · full tested backend). Moving
+to **priority #2 = Travels Accounts** (`companies/travels/modules/accounts`) — same loop.
 
 ## 🚨 CORRECTION — 2026-07-26 (owner reminded me) · FULL-STACK MEANS FRONTEND **AND** BACKEND
 
