@@ -66,7 +66,16 @@ Schema::hasTable-guarded, ScopesToCompany) · `routes.php` (GET/POST/DELETE) ·
   drop-in/drop-out pattern), testable standalone. MySQL start command that worked:
   `C:\laragon\bin\mysql\mysql-5.7.33-winx64\bin\mysqld.exe --defaults-file=…\my.ini --datadir=C:\laragon\data\mysql`.
 
-**▶ NEXT (resume here):** module #2 = **Travels settings** — same full-stack gates (per
+**MODULE #2 — settings — ✅ DONE (2026-07-26).** Backend: `company_settings` JSON
+table + `CompanySetting` model + `SettingsService` (shallow-merge, mirrors the
+frontend's per-tab `S.patch` no-clobber) + `SaveSettingsRequest` + `SettingsController`
+(company-scoped, defaults to Travels=2) + routes `travels/settings/config`. Migrated +
+tested vs MySQL (merge keeps all tabs' keys, single row per company). FE already
+template-structured, untouched (pixel-identical). Settings is a keyed config blob (not
+a collection), so it stays on the proven local-persist path with the API ready for
+server sync — no `api.js`/SPA change, sweep unaffected.
+
+**▶ NEXT (resume here):** module #3 = **Travels file-management** — same gates (per
 `docs/FULLSTACK-REBUILD-TRACKER.md` order). Cadence: autonomous, push each.
 
 > Note: the accounting buildout (funding legs, Dashboard P&L, statement suite V2) is

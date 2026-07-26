@@ -42,7 +42,7 @@ Legend: ⬜ not started · ◑ in progress · ✅ done (all 7 gates)
 | # | Module | FE rebuilt | Parity | Backend | Tested | Status |
 |---|--------|-----------|--------|---------|--------|--------|
 | 1 | passport-mgmt (pilot) | ✅ already HTML | ✅ unchanged | ✅ 8 files | ✅ MySQL | ✅ |
-| 2 | settings | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| 2 | settings | ✅ already HTML | ✅ unchanged | ✅ config table | ✅ MySQL | ✅ |
 | 3 | file-management | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 4 | marketing | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
 | 5 | automation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
@@ -73,4 +73,5 @@ woodart/projects · it/projects · shop/pos · construction/projects.
 | Date | Module | Gate | Verified by | Commit |
 |------|--------|------|-------------|--------|
 | 2026-07-26 | — | full backup + tracker + method locked | 9442 files backed up | 702dcaf |
-| 2026-07-26 | passport-mgmt | backend 100% (8-file Laravel slice, migrated+seeded+CRUD-tested vs MySQL); FE already HTML/template + read-only so pixel-identical | tinker CRUD test + raw SQL row check + sweep 222/222 | (this) |
+| 2026-07-26 | passport-mgmt | backend 100% (8-file Laravel slice, migrated+seeded+CRUD-tested vs MySQL); FE already HTML/template + read-only so pixel-identical | tinker CRUD test + raw SQL row check + sweep 222/222 | 99e5af4 |
+| 2026-07-26 | settings | backend 100% (company_settings JSON table + Model/Service/Request/Controller; migrated+tested vs MySQL, shallow-merge no-clobber proven); FE already HTML/template, untouched | tinker merge test vs MySQL | (this) |
