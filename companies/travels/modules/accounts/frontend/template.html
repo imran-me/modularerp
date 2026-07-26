@@ -31,3 +31,22 @@
 <template data-tpl="btn-strip"><div class="flex gap-1 flex-wrap mb-2"></div></template>
 <template data-tpl="section-label"><div class="section-label"></div></template>
 <template data-tpl="body-card"><div class="card"><div class="card-body" data-slot="body"></div></div></template>
+
+<!-- ============================================================================
+     REAL SCREEN HTML (the foundation) — each <section data-screen="…"> is a whole
+     Travels Accounts screen written as plain HTML. accounts.js fills the live
+     values ([data-k]) + drops data tables into [data-fill], then mountScreen()
+     moves the block onto the page. Converted one screen at a time, pixel-verified.
+     ============================================================================ -->
+<section data-screen="banks">
+  <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
+  <div class="text-mute sm mb-2" data-fill="note"></div>
+  <div class="card mb-2">
+    <div class="card-head"><h3><i class="bi bi-bank"></i> Travels Bank Accounts</h3><span class="card-sub">read-only</span></div>
+    <div class="card-body" data-fill="banks-table"></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-clock-history"></i> Recent Movements</h3><span class="card-sub">newest first · read-only</span></div>
+    <div class="card-body" data-fill="txns-table"></div>
+  </div>
+</section>

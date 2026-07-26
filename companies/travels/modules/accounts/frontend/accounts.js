@@ -28,6 +28,14 @@ function frag(name) {
   return t.content.firstElementChild.cloneNode(true);
 }
 function slot(root, name) { return root.querySelector('[data-slot="' + name + '"]'); }
+// clone a REAL SCREEN written as plain HTML in template.html (<section data-screen>).
+// The logic then fills [data-k]/[data-fill] + wires buttons — HTML is the foundation.
+function screen(name) { return TPL.querySelector('[data-screen="' + name + '"]').cloneNode(true); }
+function shell(name) { return TPL.querySelector('[data-shell="' + name + '"]').cloneNode(true); }
+function fillK(root, k, v) { var n = root.querySelector('[data-k="' + k + '"]'); if (n) n.textContent = String(v); }
+// move a screen's element children onto `page` (no wrapper, no whitespace nodes)
+// so the final DOM is exactly what the old code produced.
+function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(function (c) { page.appendChild(c); }); }
 
 /* reusable markup shells (template.html) — byte-identical to the el() shells they
  * replace. addRow = a primary-action button on its own row; btn/aBtn = a bare
@@ -86,53 +94,23 @@ var SCHEDULE_STATUS = ['Pending', 'Partial', 'Paid'];
 /* ==========================================================================
  * PAYMENT SOURCES — WHICH ACCOUNT THE MONEY LEAVES (owner 2026-07-26)
  * --------------------------------------------------------------------------
- * Money never leaves "Bank" in the abstract, it leaves a NAMED account. So the
- * expense form offers the REAL accounts opened in Master Accounts › Manage
+ * Money never leaves "Bank" in the abstract, it leaves a NAMED account. Every
+ * money form here offers the REAL accounts opened in Master Accounts › Manage
  * Banks — bank accounts, bKash/Nagad wallets, cards and cash boxes (hard cash
- * / petty cash) — belonging to whoever funds the spend, in the owner's order:
- * banks first, then cash, then the wallets. Picking a real account is what
- * lets the posting reach the BANK REGISTER as well as the ledger (balance down
- * + a withdrawal row in that account's history — see syncRegisterLeg).
- * The generic methods stay at the END of the list: a cheque or a card swipe
- * that no registered account carries must still be recordable (R3).
- * ==> LARAVEL: GET /api/group/master-accounts/banks already serves these;
- *     ExpensePostingService resolves the same account server-side.
+ * / petty cash) — belonging to whoever funds the spend, banks first then cash
+ * then the wallets, with the generic methods LAST so a cheque or card swipe
+ * with no registered account is still recordable (R3).
+ *
+ * The helpers live in the platform cash kit (EPAL.pay, platform/kit/cash.js)
+ * because Master Accounts' expense + shared-cost desks ask the same question —
+ * one implementation, or the day someone fixes a bug in one it drifts in the
+ * other. These thin locals just keep the call sites in this file readable.
+ * ==> LARAVEL: App\Services\BankRegisterService + ExpensePostingService.
  * ========================================================================*/
-var SRC_ORDER = { 'Bank': 0, 'Cash Box': 1, 'bKash': 2, 'Nagad': 3, 'Card': 4 };
-function srcRank(b) { var r = SRC_ORDER[b.type || 'Bank']; return r == null ? 9 : r; }
-
-// Every ACTIVE payment account owned by one concern, banks → cash → wallets.
-function accountsOf(owner) {
-  return db.col('banks').filter(function (b) {
-    return (b.companyId || 'group') === owner && (b.status || 'Active') !== 'Inactive';
-  }).sort(function (a, b) { return (srcRank(a) - srcRank(b)) || String(a.name || '').localeCompare(String(b.name || '')); });
-}
-function accountById(id) { return db.col('banks').filter(function (b) { return b.id === id; })[0] || null; }
-// A cash box IS hard cash on the books (1000); every other account is bank (1010).
-function glAcctOf(bank) { return (bank && bank.type === 'Cash Box') ? '1000' : '1010'; }
-function srcLabel(b) {
-  var bits = [b.name];
-  if (b.branch && b.branch !== '—') bits.push(b.branch);
-  if (b.account && b.type !== 'Cash Box') bits.push('…' + String(b.account).slice(-4));
-  return (b.type && b.type !== 'Bank' ? b.type + ' · ' : '') + bits.join(' · ') + ' — ' + ui.money(b.balance || 0, { compact: true });
-}
-function paySourceOptions(owner) {
-  var opts = accountsOf(owner).map(function (b) { return ['bank:' + b.id, srcLabel(b)]; });
-  METHODS.forEach(function (m) { opts.push(['m:' + m, m + ' — no registered account']); });
-  return opts;
-}
-// 'bank:<id>' | 'm:<Method>' → { bank, method, gl }. `method` stays one of the
-// short METHODS values so the register badge, the Method filter facet and the
-// method-mix chart keep reading exactly as they do today.
-function resolveSource(val) {
-  val = String(val || '');
-  if (val.indexOf('bank:') === 0) {
-    var b = accountById(val.slice(5));
-    if (b) return { bank: b, method: b.type === 'Cash Box' ? 'Cash' : (b.type || 'Bank'), gl: glAcctOf(b) };
-  }
-  var m = val.indexOf('m:') === 0 ? val.slice(2) : 'Bank';
-  return { bank: null, method: m, gl: m === 'Cash' ? '1000' : '1010' };
-}
+function pay() { return EPAL.pay; }
+function accountById(id) { return pay().byId(id); }
+function paySourceOptions(owner) { return pay().options(owner); }
+function resolveSource(val) { return pay().resolve(val); }
 
 /* ---- THE WHOLE CHART OF ACCOUNTS, SEARCHABLE (owner 2026-07-26) -----------
  * The ten category cards are the fast path, not the whole truth — a bookkeeper
@@ -324,13 +302,13 @@ EPAL.view('travels/accounts', {
       var scopeIds = {}; banks.forEach(function (b) { scopeIds[b.id] = b; });
       var txns = S.list('bank_txns').filter(function (t) { return !!scopeIds[t.bankId]; });
       function isIn(t) { return t.type === 'deposit' || t.type === 'transfer-in'; }
-      var kg = frag('kpi-grid');
+      var s = screen('banks');
+      var kg = s.querySelector('[data-fill="kpis"]');
       kg.appendChild(kpi('Total Balance', ui.money(total, { compact: true }), 'safe2'));
       kg.appendChild(kpi('Accounts', String(banks.length), 'bank'));
       kg.appendChild(kpi('Active', String(banks.filter(function (b) { return (b.status || 'Active') !== 'Inactive'; }).length), 'check-circle'));
       kg.appendChild(kpi('Movements', String(txns.length), 'clock-history'));
-      p.appendChild(kg);
-      p.appendChild(el('div.text-mute.sm.mb-2', { html: ui.icon('lock') + ' Read-only — Travels’ banks are opened and operated by the Group in <a class="text-accent" href="#/group/master-accounts/banks">Master Accounts › Manage Banks</a>. To move cash, use <a class="text-accent" href="#/travels/accounts/cash">Manage Cash</a>.' }));
+      s.querySelector('[data-fill="note"]').innerHTML = ui.icon('lock') + ' Read-only — Travels’ banks are opened and operated by the Group in <a class="text-accent" href="#/group/master-accounts/banks">Master Accounts › Manage Banks</a>. To move cash, use <a class="text-accent" href="#/travels/accounts/cash">Manage Cash</a>.';
       var bt = EPAL.table({
         columns: [
           { key: 'name', label: 'Bank', render: function (b) { return '<span class="strong">' + ui.escapeHtml(b.name || '') + '</span><div class="text-mute xs">' + ui.escapeHtml(b.branch || '') + '</div>'; } },
@@ -342,10 +320,7 @@ EPAL.view('travels/accounts', {
         rows: banks, pageSize: 10, searchKeys: ['name', 'account', 'branch'], exportName: 'travels-banks.csv',
         empty: { icon: 'bank', title: 'No bank accounts for Travels', hint: 'The Group opens bank accounts in Master Accounts › Manage Banks.' }
       });
-      p.appendChild(el('div.card.mb-2', null, [
-        el('div.card-head', null, [el('h3', { html: ui.icon('bank') + ' Travels Bank Accounts' }), el('span.card-sub', { text: 'read-only' })]),
-        el('div.card-body', null, [bt.el])
-      ]));
+      s.querySelector('[data-fill="banks-table"]').appendChild(bt.el);
       var recent = txns.slice().sort(function (a, b) { return (a.date === b.date) ? 0 : (a.date < b.date ? 1 : -1); }).slice(0, 50);
       var tt = EPAL.table({
         columns: [
@@ -359,10 +334,8 @@ EPAL.view('travels/accounts', {
         rows: recent, pageSize: 10, searchKeys: ['bankName', 'desc', 'ref'], exportName: 'travels-bank-transactions.csv',
         empty: { icon: 'clock-history', title: 'No bank movements yet' }
       });
-      p.appendChild(el('div.card', null, [
-        el('div.card-head', null, [el('h3', { html: ui.icon('clock-history') + ' Recent Movements' }), el('span.card-sub', { text: 'newest first · read-only' })]),
-        el('div.card-body', null, [tt.el])
-      ]));
+      s.querySelector('[data-fill="txns-table"]').appendChild(tt.el);
+      mountScreen(p, s);
     }
     function cashSection(p) {
       if (!EPAL.cashDesk) { p.appendChild(el('div.card', null, [el('div.card-body', { text: 'Cash desk unavailable.' })])); return; }
@@ -964,15 +937,23 @@ function expenseEntry() {
 function entryForm(rec) {
   var isNew = !rec;
   var kind = (rec && rec.kind) || 'Expense';
+  // The plain "Method" select became the real ACCOUNT select here too (owner
+  // 2026-07-26) — an Income entry lands the money IN an account and an Expense
+  // takes it OUT, so either way the entry must name which one and move its
+  // register. The generic methods are still in the list for a cheque or a card
+  // swipe no registered account carries.
+  var seed = Object.assign({ kind: kind, date: TODAY_STR }, rec || {}, { source: EPAL.pay.valueOf(rec) });
   EPAL.formModal({
-    title: isNew ? 'New Journal Entry' : 'Edit Entry', icon: 'journal-plus', size: 'md', record: rec || { kind: kind, date: TODAY_STR },
+    title: isNew ? 'New Journal Entry' : 'Edit Entry', icon: 'journal-plus', size: 'md', record: seed,
     fields: [
       { type: 'section', label: 'Entry' },
       { key: 'kind', label: 'Kind', type: 'select', options: ['Income', 'Expense'], default: kind, required: true },
       { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
       { key: 'category', label: 'Head / Category', type: 'text', required: true, placeholder: 'e.g. Air Ticket, Office Rent',
         hint: 'Income: ' + INCOME_HEADS.slice(0, 4).join(', ') + '… · Expense: ' + EXPENSE_HEADS.slice(0, 4).join(', ') + '…' },
-      { key: 'method', label: 'Method', type: 'select', options: METHODS, default: 'Bank', required: true },
+      { key: 'source', label: 'Bank / cash account', type: 'select', required: true, searchable: true,
+        options: paySourceOptions(CID),
+        hint: 'Expense → the money leaves this account. Income → it lands in it. Either way its balance and history follow.' },
       { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
       { type: 'section', label: 'Reference' },
       { key: 'party', label: 'Party (optional)', type: 'text', placeholder: 'Customer / vendor / staff' },
@@ -986,14 +967,26 @@ function entryForm(rec) {
       // snapshot the cash effect BEFORE the edit — an entry paid from a real
       // account must move that account's register by the difference, not be
       // left behind by an amount or kind change (owner 2026-07-26).
-      var before = rec ? { kind: rec.kind, amount: rec.amount } : null;
+      // snapshot BEFORE the record is mutated — the register leg is applied as a
+      // delta against what this entry previously told the account
+      var before = rec ? Object.assign({}, rec) : null;
       var r = rec || { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: CID, created: TODAY_STR };
-      r.kind = val.kind; r.amount = amt; r.category = (val.category || '').trim(); r.method = val.method;
+      r.kind = val.kind; r.amount = amt; r.category = (val.category || '').trim();
+      pay().stamp(r, val.source);          // method + payAcct + bankId/bankName
       r.date = val.date || TODAY_STR; r.party = val.party; r.ref = val.ref; r.desc = val.desc;
       db.save('acc_entries', r);
       mirrorToLedger(r);
-      if (r.bankId) syncRegisterLeg(r, before, before ? 'Adjustment ·' : '');
-      ui.toast('Entry ' + r.id + ' saved & posted to the ledger', 'success');
+      if (before && before.bankId && before.bankId !== r.bankId) {
+        // the entry was moved to a DIFFERENT account: the old one gets the whole
+        // amount back and the new one takes the whole amount — two honest rows,
+        // never a silent balance swap between two accounts
+        pay().reverseRegister(before, TODAY_STR);
+        syncRegisterLeg(r, null);
+      } else {
+        syncRegisterLeg(r, before, before ? 'Adjustment ·' : '');
+      }
+      if (r.kind === 'Expense') rollUp(r);
+      ui.toast('Entry ' + r.id + ' saved & posted to the ledger' + (r.bankName ? ' · ' + r.bankName : ''), 'success');
       EPAL.router.render();
       return true;
     }
@@ -1057,35 +1050,8 @@ function printEntry(e) {
  * ==> LARAVEL: App\Services\BankRegisterService::apply() does both writes in
  *     the same transaction as the journal — see ExpensePostingService.
  * ========================================================================*/
-function cashEffect(rec) {
-  var a = +(rec && rec.amount) || 0;
-  return (rec && rec.kind === 'Income') ? a : -a;
-}
-function syncRegisterLeg(rec, prev, note) {
-  if (!rec || !rec.bankId || !EPAL.bankTxnApply) return;
-  var bank = accountById(rec.bankId); if (!bank) return;
-  var delta = cashEffect(rec) - cashEffect(prev);
-  if (Math.abs(delta) < 0.005) return;
-  var isIn = delta > 0, amt = Math.abs(delta);
-  var what = (rec.category || 'Expense') + (rec.subCategory ? ' · ' + rec.subCategory : '') + (rec.party ? ' — ' + rec.party : '');
-  var glId = (rec.fundedBy && rec.fundedBy !== CID) ? 'GL-ACF-' + rec.id : 'GL-ACC-' + rec.id;
-  EPAL.bankTxnApply(bank, isIn ? 'deposit' : 'withdraw', amt, rec.date || TODAY_STR,
-    (note ? note + ' ' : '') + what, rec.ref || rec.id, glId,
-    { entryId: rec.id, reversal: note === 'Reversal of:' });
-}
-// Un-move the register for a deleted voucher: the same delta machinery, with
-// the entry's cash effect going to zero, plus the original row flagged reversed
-// so Manage Banks cannot reverse it twice.
-function reverseRegisterLeg(e) {
-  if (!e || !e.bankId) return;
-  syncRegisterLeg({ id: e.id, bankId: e.bankId, kind: e.kind, amount: 0, category: e.category, subCategory: e.subCategory,
-    party: e.party, ref: e.ref, date: TODAY_STR, fundedBy: e.fundedBy }, e, 'Reversal of:');
-  try {
-    S.list('bank_txns').forEach(function (t) {
-      if (t.entryId === e.id && !t.reversal && !t.reversed) { t.reversed = true; db.save('bank_txns', t); }
-    });
-  } catch (x) {}
-}
+function syncRegisterLeg(rec, prev, note) { return pay().syncRegister(rec, prev, note); }
+function reverseRegisterLeg(e) { return pay().reverseRegister(e, TODAY_STR); }
 // The group bridge event for a money movement (docs/ADDING-A-FEATURE.md): an
 // observable rollup seam for the Laravel port. Additive — it changes no total,
 // the group books are computed on read from the same ledger.
