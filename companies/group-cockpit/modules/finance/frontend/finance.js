@@ -794,22 +794,21 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     ]));
     page.appendChild(pills('pnl'));
 
-    page.appendChild(el('div.kpi-grid', null, [
-      kpi('Revenue (12M)', ui.money(f.revenue, { compact: true }), 'cash-coin'),
-      kpi('Expense (12M)', ui.money(f.expense, { compact: true }), 'wallet2'),
-      kpi('Net Profit', ui.money(f.profit, { compact: true }), 'cash-stack', null, ui.pct(f.margin) + ' margin'),
-      kpi('Best Month', s.labels[best], 'trophy', null, ui.money(s.profit[best], { compact: true }) + ' profit')
-    ]));
+    var scr = screen('pnl');
+    var kpis = scr.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Revenue (12M)', ui.money(f.revenue, { compact: true }), 'cash-coin'));
+    kpis.appendChild(kpi('Expense (12M)', ui.money(f.expense, { compact: true }), 'wallet2'));
+    kpis.appendChild(kpi('Net Profit', ui.money(f.profit, { compact: true }), 'cash-stack', null, ui.pct(f.margin) + ' margin'));
+    kpis.appendChild(kpi('Best Month', s.labels[best], 'trophy', null, ui.money(s.profit[best], { compact: true }) + ' profit'));
 
     var barId = ui.uid('pnlBar');
-    page.appendChild(chartCard('Revenue vs Expense', 'bar-chart', barId, 'monthly · consolidated', 280));
+    scr.querySelector('[data-fill="chart"]').replaceWith(chartCard('Revenue vs Expense', 'bar-chart', barId, 'monthly · consolidated', 280));
 
     var monthRows = yms.map(function (ym, i) {
       var rev = s.revenue[i];
       return { month: s.labels[i] + ' ' + ym.slice(0, 4), ym: ym, revenue: rev,
         expense: s.expense[i], profit: s.profit[i], margin: rev ? s.profit[i] / rev * 100 : 0 };
     });
-    page.appendChild(el('div.section-label', { text: 'Monthly P&L Statement' }));
     var t = EPAL.table({
       columns: [
         { key: 'month', label: 'Month', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.month) + '</span>'; } },
@@ -825,7 +824,7 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       exportName: 'group-pnl-monthly.csv',
       empty: { icon: 'graph-up-arrow', title: 'No financial rows yet' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ t.el ]) ]));
+    scr.querySelector('[data-fill="table1"]').appendChild(t.el);
 
     // per-company revenue matrix (Month × Company)
     var matrixCols = [{ key: 'month', label: 'Month', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.month) + '</span>'; } }];
@@ -839,13 +838,13 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       perCo.forEach(function (p) { o[p.co.id] = p.series.revenue[i]; });
       return o;
     });
-    page.appendChild(el('div.section-label', { text: 'Revenue by Company by Month' }));
     var t2 = EPAL.table({
       columns: matrixCols, rows: matrixRows, pageSize: 12, searchKeys: ['month'],
       exportName: 'group-revenue-matrix.csv',
       empty: { icon: 'grid-3x3', title: 'No revenue rows yet' }
     });
-    page.appendChild(el('div.card', null, [ el('div.card-pad', null, [ t2.el ]) ]));
+    scr.querySelector('[data-fill="table2"]').appendChild(t2.el);
+    mountScreen(page, scr);
 
     requestAnimationFrame(function () {
       var c = document.getElementById(barId);
