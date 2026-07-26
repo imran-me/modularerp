@@ -35,9 +35,11 @@
  *   - The items repeater enforces a minimum row count (min, or 1 when required).
  *
  * PUBLIC API (window.EPAL.*):
- *   EPAL.form(fields, record) -> { el, values(), validate(), setErr(k,msg), ctrls }
+ *   EPAL.form(fields, record) -> { el, values(), validate(), setErr(k,msg), ctrls,
+ *                                   setOptions(key, options, preferValue) }
  *       — build a form; values() returns the typed record, validate() paints
- *         inline errors and returns bool.
+ *         inline errors and returns bool. setOptions() repopulates a select AFTER
+ *         the form is built (dependent dropdowns: pick a concern -> its accounts).
  *   EPAL.formModal({title,icon,size,fields,record,saveLabel,onSave}) -> modal
  *       — onSave(values, record); return false to keep the modal open.
  *
@@ -136,6 +138,13 @@
     });
   }
 
+  // Should this select be rendered as the searchable combobox? >= 8 options, or
+  // forced with searchable:true / off with searchable:false. One rule, used both
+  // at build time and by setOptions() when a dependent list is swapped in.
+  function wantsCombo(f, count) {
+    return !!count && (f.searchable === true || (f.searchable !== false && count >= 8));
+  }
+
   EPAL.form = function (fields, record) {
     record = record || {};
     var root = el('div.form-grid');
@@ -196,7 +205,7 @@
         // Auto-upgrade any longer select (>= 8 options) to the searchable combobox
         // — banks, vendors, chart of accounts, etc. Force on with searchable:true
         // (any length) or off with searchable:false.
-        if (opts.length && (f.searchable === true || (f.searchable !== false && opts.length >= 8))) { fieldEl = makeCombobox(input, f); }
+        if (wantsCombo(f, opts.length)) { fieldEl = makeCombobox(input, f); }
       } else if (f.type === 'textarea') {
         input = el('textarea.input', { id: 'f-' + f.key, rows: f.rows || 3, placeholder: f.placeholder || '' });
         input.value = val;
@@ -316,6 +325,47 @@
       return out;
     }
 
+    /* Repopulate a select AFTER the form is built — DEPENDENT DROPDOWNS (pick the
+     * concern that funds an expense -> only ITS bank/cash accounts are offered).
+     * Keeps the value contract intact: the same <select> element stays in ctrls,
+     * so values()/validate()/showIf never notice. The searchable combobox is
+     * rebuilt around it (its option list is snapshotted at creation), and a
+     * `change` is dispatched so live previews recompute. Returns the value now
+     * selected — the old one when it survived the swap, else the first option. */
+    function setOptions(key, options, preferValue) {
+      var c = ctrls[key];
+      if (!c || c.spec.type !== 'select') return null;
+      var sel = c.input, f = c.spec;
+      var keep = preferValue != null ? String(preferValue) : String(sel.value || '');
+      var opts = options || [];
+
+      sel.innerHTML = '';
+      opts.forEach(function (o) {
+        var v = Array.isArray(o) ? o[0] : o, label = Array.isArray(o) ? o[1] : o;
+        sel.appendChild(el('option', { value: v, text: label }));
+      });
+      var survived = [].some.call(sel.options, function (o) { return o.value === keep; });
+      sel.value = survived ? keep : (sel.options[0] ? sel.options[0].value : '');
+
+      // Swap the visible widget: combobox <-> bare select, whichever the new
+      // option count calls for. makeCombobox() MOVES sel into its own wrapper, so
+      // hold the slot with a marker first — by the time the new widget exists the
+      // old node may already have given sel up.
+      var old = (sel.parentNode && sel.parentNode.classList && sel.parentNode.classList.contains('combo')) ? sel.parentNode : sel;
+      var host = old.parentNode;
+      if (host) {
+        var marker = document.createComment('field');
+        host.replaceChild(marker, old);
+        var widget;
+        if (wantsCombo(f, opts.length)) { widget = makeCombobox(sel, f); }
+        else { sel.style.display = ''; widget = sel; }
+        host.replaceChild(widget, marker);
+      }
+      clearErr(key);
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return sel.value;
+    }
+
     function setErr(key, msg) {
       var c = ctrls[key]; if (!c) return;
       if (!c.isItems) c.input.classList.add('invalid');
@@ -365,7 +415,7 @@
     }
     applyShowIf();
 
-    return { el: root, values: values, validate: validate, setErr: setErr, ctrls: ctrls };
+    return { el: root, values: values, validate: validate, setErr: setErr, ctrls: ctrls, setOptions: setOptions };
   };
 
   /* Convenience: a modal wrapping a form with Cancel/Save + validation. ----*/

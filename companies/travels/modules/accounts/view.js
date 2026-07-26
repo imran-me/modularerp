@@ -102,6 +102,92 @@ var TV_EXPENSE_CATS = [
 var SCHEDULE_KINDS = ['Payable', 'Receivable'];
 var SCHEDULE_STATUS = ['Pending', 'Partial', 'Paid'];
 
+/* ==========================================================================
+ * PAYMENT SOURCES — WHICH ACCOUNT THE MONEY LEAVES (owner 2026-07-26)
+ * --------------------------------------------------------------------------
+ * Money never leaves "Bank" in the abstract, it leaves a NAMED account. So the
+ * expense form offers the REAL accounts opened in Master Accounts › Manage
+ * Banks — bank accounts, bKash/Nagad wallets, cards and cash boxes (hard cash
+ * / petty cash) — belonging to whoever funds the spend, in the owner's order:
+ * banks first, then cash, then the wallets. Picking a real account is what
+ * lets the posting reach the BANK REGISTER as well as the ledger (balance down
+ * + a withdrawal row in that account's history — see syncRegisterLeg).
+ * The generic methods stay at the END of the list: a cheque or a card swipe
+ * that no registered account carries must still be recordable (R3).
+ * ==> LARAVEL: GET /api/group/master-accounts/banks already serves these;
+ *     ExpensePostingService resolves the same account server-side.
+ * ========================================================================*/
+var SRC_ORDER = { 'Bank': 0, 'Cash Box': 1, 'bKash': 2, 'Nagad': 3, 'Card': 4 };
+function srcRank(b) { var r = SRC_ORDER[b.type || 'Bank']; return r == null ? 9 : r; }
+
+// Every ACTIVE payment account owned by one concern, banks → cash → wallets.
+function accountsOf(owner) {
+  return db.col('banks').filter(function (b) {
+    return (b.companyId || 'group') === owner && (b.status || 'Active') !== 'Inactive';
+  }).sort(function (a, b) { return (srcRank(a) - srcRank(b)) || String(a.name || '').localeCompare(String(b.name || '')); });
+}
+function accountById(id) { return db.col('banks').filter(function (b) { return b.id === id; })[0] || null; }
+// A cash box IS hard cash on the books (1000); every other account is bank (1010).
+function glAcctOf(bank) { return (bank && bank.type === 'Cash Box') ? '1000' : '1010'; }
+function srcLabel(b) {
+  var bits = [b.name];
+  if (b.branch && b.branch !== '—') bits.push(b.branch);
+  if (b.account && b.type !== 'Cash Box') bits.push('…' + String(b.account).slice(-4));
+  return (b.type && b.type !== 'Bank' ? b.type + ' · ' : '') + bits.join(' · ') + ' — ' + ui.money(b.balance || 0, { compact: true });
+}
+function paySourceOptions(owner) {
+  var opts = accountsOf(owner).map(function (b) { return ['bank:' + b.id, srcLabel(b)]; });
+  METHODS.forEach(function (m) { opts.push(['m:' + m, m + ' — no registered account']); });
+  return opts;
+}
+// 'bank:<id>' | 'm:<Method>' → { bank, method, gl }. `method` stays one of the
+// short METHODS values so the register badge, the Method filter facet and the
+// method-mix chart keep reading exactly as they do today.
+function resolveSource(val) {
+  val = String(val || '');
+  if (val.indexOf('bank:') === 0) {
+    var b = accountById(val.slice(5));
+    if (b) return { bank: b, method: b.type === 'Cash Box' ? 'Cash' : (b.type || 'Bank'), gl: glAcctOf(b) };
+  }
+  var m = val.indexOf('m:') === 0 ? val.slice(2) : 'Bank';
+  return { bank: null, method: m, gl: m === 'Cash' ? '1000' : '1010' };
+}
+
+/* ---- THE WHOLE CHART OF ACCOUNTS, SEARCHABLE (owner 2026-07-26) -----------
+ * The ten category cards are the fast path, not the whole truth — a bookkeeper
+ * must also be able to reach ANY account code. This builds the pick-list for
+ * the searchable field beside the cards, ordered as the owner asked: every
+ * EXPENSE head first (the ten cards, then any other expense code in the
+ * chart), then the common ITEMS under each head so you can search what you
+ * actually bought ("tea" → Tea / Coffee (Guest) and Tea & Coffee) instead of
+ * having to know the code, and finally the rest of the chart.
+ * Value grammar: 'cat:<key>' · 'sub:<key>|<item>' · 'coa:<code>'. */
+function coaAccounts() {
+  try {
+    if (!(EPAL.ledger && EPAL.ledger.accounts)) return [];
+    return EPAL.ledger.accounts().slice().sort(function (a, b) { return String(a.code).localeCompare(String(b.code)); });
+  } catch (e) { return []; }
+}
+function headPickOptions() {
+  var opts = [['', 'Search or pick any account…']], carded = {};
+  TV_EXPENSE_CATS.forEach(function (c) { carded[c.head] = true; opts.push(['cat:' + c.key, c.head + ' · ' + c.name]); });
+  var rest = coaAccounts();
+  rest.forEach(function (a) { if (a.type === 'expense' && !carded[a.code]) opts.push(['coa:' + a.code, a.code + ' · ' + a.name]); });
+  TV_EXPENSE_CATS.forEach(function (c) {
+    (c.subs || []).forEach(function (s) { opts.push(['sub:' + c.key + '|' + s, s + ' — ' + c.head + ' ' + c.name]); });
+  });
+  rest.forEach(function (a) { if (a.type !== 'expense') opts.push(['coa:' + a.code, a.code + ' · ' + a.name + ' — ' + a.type]); });
+  return opts;
+}
+function catByKey(k) { return TV_EXPENSE_CATS.filter(function (c) { return c.key === k; })[0] || null; }
+// A chart account picked directly behaves like a one-off category: it pins the
+// head the journal debits and carries no preset sub-categories.
+function coaAsCat(code) {
+  var a = coaAccounts().filter(function (x) { return String(x.code) === String(code); })[0];
+  if (!a) return null;
+  return { key: 'coa:' + a.code, name: a.name, icon: 'journal-text', head: String(a.code), tone: '#3A5A96', subs: [], coa: true, acctType: a.type };
+}
+
 // seed a little recurring-expense + cheque demo data (idempotent; survives db.reset)
 EPAL.registerEngine({ name: 'travels-accounts-seed', seed: function () {
   S.seedOnce('tv_recurring', [
@@ -496,7 +582,9 @@ function entriesTable(rows, kind) {
     rows: rows, dateKey: 'date',
     quickFilter: 'category', filterPanel: true,
     filters: kind ? [{ key: 'method', label: 'Method' }] : [{ key: 'kind', label: 'Kind' }, { key: 'method', label: 'Method' }],
-    searchKeys: ['id', 'category', 'desc', 'method', 'party'],
+    // bankName: an entry is findable by the ACCOUNT it was paid from ("City Bank"),
+    // not only by how ("Bank") — the account is on the record now (owner 2026-07-26).
+    searchKeys: ['id', 'category', 'desc', 'method', 'bankName', 'party'],
     pageSize: 12, exportName: 'travels-' + (kind ? kind.toLowerCase() : 'accounts') + '.csv', pdfTitle: 'Travels ' + (kind || 'Accounts') + ' Register',
     onRow: function (e) { entryDetail(e); },
     actions: ui.actions({
@@ -532,7 +620,13 @@ function entryDetail(e) {
     el('div.stat-row', null, [
       st2('Amount', ui.money(e.amount)), st2('Kind', e.kind), st2('Method', e.method || '—'), st2('Date', ui.date(e.date))
     ]),
-    e.party ? el('div.data-list.mt-2', null, [ drow('Party', e.party), drow('Reference', e.ref) ]) : null,
+    // "Paid from" only appears for an entry that named a real account — legacy
+    // rows keep exactly the Party/Reference list they render today.
+    (e.party || e.bankName) ? el('div.data-list.mt-2', null, [
+      e.bankName ? drow('Paid from', e.bankName + (e.fundedBy ? ' · ' + coLabel(e.fundedBy) + '’s account' : '')) : null,
+      e.party ? drow('Party', e.party) : null,
+      e.party ? drow('Reference', e.ref) : null
+    ]) : null,
     e.desc ? el('p.text-mute.mt-2', { text: e.desc }) : null
   ]) ]));
 
@@ -717,7 +811,7 @@ function expenseEntry() {
   var body = el('div.tv-exp-entry');
   var m = ui.modal({ title: 'Record Expense · Epal Travels', icon: 'wallet2', size: 'lg', body: body, footer: false });
 
-  body.appendChild(el('div.section-label.mt-0', { text: '1 · Category' }));
+  body.appendChild(el('div.section-label.mt-0', { text: '1 · Account head' }));
   var grid = el('div.tv-exp-cats');
   var subHost = el('div.tv-exp-subhost');
   var catBtns = {};
@@ -731,6 +825,43 @@ function expenseEntry() {
     catBtns[c.key] = b; grid.appendChild(b);
   });
   body.appendChild(grid);
+
+  // BOTH WAYS IN (owner 2026-07-26): the cards above are the ten everyday
+  // heads; this field reaches the WHOLE chart of accounts and is searchable by
+  // what you bought, not just by code. The two stay in lockstep — picking a
+  // card fills this field, picking here lights the card (and its item chip).
+  var picker = EPAL.form([
+    { key: 'head', label: 'Or search the whole account list', type: 'select', col2: true, searchable: true,
+      options: headPickOptions(), placeholder: 'Search a code, a head or an item — e.g. “tea”, “5550”, “fuel”…',
+      hint: 'Every account code, expense heads first. Searching an item (“tea for guest”, “fuel”) picks its head for you.' }
+  ], { head: '' });
+  body.appendChild(picker.el);
+  var pickerSel = picker.ctrls.head.input, syncing = false;
+  // the pick-list value that stands for "this head, with this item chosen"
+  function pickerVal(c, sub) {
+    if (sub && (c.subs || []).indexOf(sub) >= 0) return 'sub:' + c.key + '|' + sub;
+    return c.coa ? 'coa:' + c.head : 'cat:' + c.key;
+  }
+  function syncPicker(val) {
+    if (pickerSel.value === val) return;
+    syncing = true;
+    pickerSel.value = val;
+    pickerSel.dispatchEvent(new Event('change', { bubbles: true }));   // repaints the combobox display
+    syncing = false;
+  }
+  pickerSel.addEventListener('change', function () {
+    if (syncing) return;
+    var v = String(this.value || '');
+    if (!v) return;
+    if (v.indexOf('cat:') === 0) { var c = catByKey(v.slice(4)); if (c) pickCat(c); return; }
+    if (v.indexOf('sub:') === 0) {
+      var parts = v.slice(4).split('|'), c2 = catByKey(parts[0]);
+      if (c2) pickCat(c2, parts.slice(1).join('|'));
+      return;
+    }
+    if (v.indexOf('coa:') === 0) { var c3 = coaAsCat(v.slice(4)); if (c3) pickCat(c3); }
+  });
+
   body.appendChild(subHost);
 
   var details = EPAL.form([
@@ -738,42 +869,61 @@ function expenseEntry() {
     { key: 'fundedBy', label: 'Funded by', type: 'select', required: true, default: 'travels',
       options: [['travels', 'Epal Travels (own funds)']].concat(fundingSources().map(function (c) { return [c.id, c.name + ' — inter-company loan']; })),
       hint: 'Whose money paid this? Another concern → booked as an inter-company loan Travels repays.' },
-    { key: 'method', label: 'Payment method', type: 'select', options: METHODS, default: 'Bank', required: true },
+    { key: 'source', label: 'Paid from (bank / cash account)', type: 'select', required: true, searchable: true,
+      options: paySourceOptions(CID),
+      hint: 'The real account the money leaves — its balance drops and the spend lands in its transaction history.' },
     { key: 'party', label: 'Paid to (vendor / staff)', type: 'text', placeholder: 'e.g. Landlord, ISP, staff name' },
     { key: 'date', label: 'Date', type: 'date', required: true, default: TODAY_STR },
     { key: 'ref', label: 'Bill / voucher no', type: 'text', placeholder: 'e.g. BR-118' },
     { key: 'desc', label: 'Notes', type: 'textarea', col2: true, placeholder: 'What is this expense for?' }
-  ], { date: TODAY_STR, method: 'Bank', fundedBy: 'travels' });
+  ], { date: TODAY_STR, fundedBy: 'travels' });
+
+  // The cash leaves the FUNDER's purse, so the account list follows "Funded by":
+  // Travels' own funds → Travels' accounts; another concern → that concern's.
+  details.ctrls.fundedBy.input.addEventListener('change', function () {
+    details.setOptions('source', paySourceOptions(this.value || CID));
+  });
 
   var live = el('div.tv-exp-live');
   var save = el('button.btn.btn-primary', { html: ui.icon('check2-circle') + ' Record Expense', onclick: doSave });
 
-  function pickCat(c) {
-    sel.cat = c; sel.sub = '';
+  // presetSub: an item picked from the searchable account list arrives with its
+  // chip already chosen, so both routes in leave the form in the same state.
+  function pickCat(c, presetSub) {
+    sel.cat = c; sel.sub = presetSub || '';
     Object.keys(catBtns).forEach(function (k) { catBtns[k].classList.toggle('sel', k === c.key); });
     subHost.innerHTML = '';
     subHost.appendChild(el('div.section-label', { text: '2 · Sub-category' }));
     var chips = el('div.tv-exp-subs');
-    var subInput;
-    c.subs.forEach(function (s) {
+    var subInput, known = false;
+    (c.subs || []).forEach(function (s) {
       var chip = el('button.tv-exp-sub', { type: 'button', onclick: function () {
         sel.sub = s; Array.prototype.forEach.call(chips.children, function (x) { x.classList.remove('sel'); }); chip.classList.add('sel');
-        if (subInput) subInput.value = ''; refreshLive();
+        if (subInput) subInput.value = ''; syncPicker(pickerVal(c, s)); refreshLive();
       } }, [ el('span', { text: s }), (c.sharedSubs && c.sharedSubs.indexOf(s) >= 0) ? el('span.tv-exp-shared', { text: 'shared' }) : null ]);
+      if (s === sel.sub) { chip.classList.add('sel'); known = true; }
       chips.appendChild(chip);
     });
-    subHost.appendChild(chips);
-    subInput = el('input.input.mt-2', { type: 'text', placeholder: '…or type a custom sub-category',
-      oninput: function () { sel.sub = this.value; Array.prototype.forEach.call(chips.children, function (x) { x.classList.remove('sel'); }); refreshLive(); } });
+    if (c.subs && c.subs.length) subHost.appendChild(chips);
+    subInput = el('input.input' + (c.subs && c.subs.length ? '.mt-2' : ''), { type: 'text', placeholder: '…or type a custom sub-category',
+      oninput: function () { sel.sub = this.value; Array.prototype.forEach.call(chips.children, function (x) { x.classList.remove('sel'); }); syncPicker(pickerVal(c, '')); refreshLive(); } });
+    if (sel.sub && !known) subInput.value = sel.sub;
     subHost.appendChild(subInput);
     if (c.shared) subHost.appendChild(el('div.tv-exp-note', { html: ui.icon('diagram-3') + ' <b>Shared cost.</b> Record it here, then split it across concerns in <a class="text-accent" href="#/group/finance">Group Finance › Allocate Costs</a>.' }));
+    // a head that is not an expense account (a capitalised buy, a prepayment)
+    // is legal but worth saying out loud — it lands on the balance sheet, not the P&L.
+    if (c.coa && c.acctType && c.acctType !== 'expense') {
+      subHost.appendChild(el('div.tv-exp-note', { html: ui.icon('info-circle') + ' <b>' + esc(c.head) + '</b> is an ' + esc(c.acctType) + ' account — this posting lands on the balance sheet, not in the P&L.' }));
+    }
+    syncPicker(pickerVal(c, sel.sub));
     refreshLive();
   }
 
   function refreshLive() {
     if (!sel.cat) { live.innerHTML = ''; return; }
     var v = details.values(); var amt = +v.amount || 0;
-    var pay = (v.method === 'Cash') ? '1000 Cash' : '1010 Bank';
+    var src = resolveSource(v.source);
+    var pay = src.gl + (src.gl === '1000' ? ' Cash' : ' Bank') + (src.bank ? ' · ' + src.bank.name : '');
     var funder = (v.fundedBy && v.fundedBy !== 'travels') ? v.fundedBy : null;
     var drLine = '<span>DR ' + sel.cat.head + ' · ' + esc(sel.cat.name) + (sel.sub ? ' <span class="text-mute">(' + esc(sel.sub) + ')</span>' : '') + '</span><span class="num">' + ui.money(amt) + '</span>';
     live.innerHTML = '';
@@ -782,9 +932,16 @@ function expenseEntry() {
     if (funder) {
       // another concern's purse paid — Travels books a payable, not a cash-out.
       live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR 2400 Inter-company Payable</span><span class="num">' + ui.money(amt) + '</span>' }));
-      live.appendChild(el('div.text-mute.xs.mt-1', { html: ui.icon('diagram-3') + ' ' + esc(coLabel(funder)) + ' pays from its ' + pay + ' (DR 1300 Inter-co Rcv / CR ' + pay + '). Travels owes ' + esc(coLabel(funder)) + ' until settled.' }));
+      live.appendChild(el('div.text-mute.xs.mt-1', { html: ui.icon('diagram-3') + ' ' + esc(coLabel(funder)) + ' pays from its ' + esc(pay) + ' (DR 1300 Inter-co Rcv / CR ' + esc(pay) + '). Travels owes ' + esc(coLabel(funder)) + ' until settled.' }));
     } else {
-      live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR ' + pay + '</span><span class="num">' + ui.money(amt) + '</span>' }));
+      live.appendChild(el('div.tv-exp-live-l', { html: '<span>CR ' + esc(pay) + '</span><span class="num">' + ui.money(amt) + '</span>' }));
+    }
+    // what the chosen account's register will read after saving — the same
+    // number Manage Banks / Travels › Banks will show.
+    if (src.bank) {
+      var before = +src.bank.balance || 0;
+      live.appendChild(el('div.text-mute.xs.mt-1', { html: ui.icon('bank') + ' ' + esc(src.bank.name) + ' · ' +
+        ui.money(before) + ' → <b>' + ui.money(before - amt) + '</b> — logged as a withdrawal in its transaction history.' }));
     }
   }
 
@@ -798,19 +955,27 @@ function expenseEntry() {
   ]));
 
   function doSave() {
-    if (!sel.cat) { ui.toast('Pick a category first', 'error'); return; }
+    if (!sel.cat) { ui.toast('Pick an account head first', 'error'); return; }
     if (!details.validate()) { ui.toast('Enter the amount', 'error'); return; }
     var v = details.values(); var amt = +v.amount || 0;
     if (amt <= 0) { ui.toast('Enter a valid amount', 'error'); return; }
     var funder = (v.fundedBy && v.fundedBy !== 'travels') ? v.fundedBy : '';
+    var src = resolveSource(v.source);
+    // payAcct / bankId travel WITH the record: the ledger mirror and the bank
+    // register both read them back, so an edit or a delete can undo exactly
+    // what this posting did (see mirrorToLedger + syncRegisterLeg).
     var r = { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: CID, created: TODAY_STR, kind: 'Expense',
-      amount: amt, category: sel.cat.name, subCategory: sel.sub || '', head: sel.cat.head, method: v.method,
+      amount: amt, category: sel.cat.name, subCategory: sel.sub || '', head: sel.cat.head, method: src.method,
+      payAcct: src.gl, bankId: src.bank ? src.bank.id : '', bankName: src.bank ? src.bank.name : '',
       fundedBy: funder, date: v.date || TODAY_STR, party: v.party || '', ref: v.ref || '', desc: v.desc || '' };
-    db.save('acc_entries', r);
-    mirrorToLedger(r);
+    db.save('acc_entries', r);          // the Travels expense register / history
+    mirrorToLedger(r);                  // journals · ledgers · P&L · group books
+    syncRegisterLeg(r, null);           // the paying account's balance + history
+    rollUp(r);                          // the group bridge event
     ui.toast(funder
       ? 'Expense recorded — funded by ' + coLabel(funder) + ' as an inter-company loan'
-      : 'Expense recorded & posted to ' + sel.cat.head + ' · ' + sel.cat.name, 'success');
+      : 'Expense recorded & posted to ' + sel.cat.head + ' · ' + sel.cat.name +
+        (src.bank ? ' · paid from ' + src.bank.name : ''), 'success');
     m.close(); EPAL.router.render();
   }
 }
@@ -837,11 +1002,16 @@ function entryForm(rec) {
     onSave: function (val) {
       var amt = +val.amount || 0;
       if (amt <= 0) { ui.toast('Enter a valid amount', 'error'); return false; }
+      // snapshot the cash effect BEFORE the edit — an entry paid from a real
+      // account must move that account's register by the difference, not be
+      // left behind by an amount or kind change (owner 2026-07-26).
+      var before = rec ? { kind: rec.kind, amount: rec.amount } : null;
       var r = rec || { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: CID, created: TODAY_STR };
       r.kind = val.kind; r.amount = amt; r.category = (val.category || '').trim(); r.method = val.method;
       r.date = val.date || TODAY_STR; r.party = val.party; r.ref = val.ref; r.desc = val.desc;
       db.save('acc_entries', r);
       mirrorToLedger(r);
+      if (r.bankId) syncRegisterLeg(r, before, before ? 'Adjustment ·' : '');
       ui.toast('Entry ' + r.id + ' saved & posted to the ledger', 'success');
       EPAL.router.render();
       return true;
@@ -853,9 +1023,11 @@ function deleteEntry(e) {
   // voucher posts an equal-and-opposite REVERSAL journal dated today; the
   // original + REV- pair stay in the ledger forever and net to zero, while
   // the voucher leaves the register.
-  ui.confirm({ title: 'Delete entry ' + e.id + '?', text: 'The voucher leaves this register; its ledger posting is REVERSED (not erased) — the original and the reversal stay on the books for audit.', danger: true, confirmLabel: 'Delete & Reverse' })
+  ui.confirm({ title: 'Delete entry ' + e.id + '?', text: 'The voucher leaves this register; its ledger posting is REVERSED (not erased) — the original and the reversal stay on the books for audit.' +
+      (e.bankId ? ' ' + (e.bankName || 'The paying account') + ' gets the money back as a reversal row in its transaction history.' : ''), danger: true, confirmLabel: 'Delete & Reverse' })
     .then(function (ok) { if (!ok) return;
       db.remove('acc_entries', e.id);
+      reverseRegisterLeg(e);       // the paying account gets its money back, on the record
       try {
         if (EPAL.ledger && EPAL.ledger.reverse) {
           var rev = EPAL.ledger.reverse('GL-ACC-' + e.id, { reason: 'Voucher ' + e.id + ' deleted' });
@@ -872,8 +1044,76 @@ function printEntry(e) {
   ui.printDoc({ title: (e.kind === 'Income' ? 'Receipt Voucher' : 'Payment Voucher') + ' · ' + e.id,
     subtitle: 'Epal Travels & Consultancy', meta: e.kind + ' entry · ' + ui.date(e.date), footer: 'Accounts Department · Confidential',
     bodyHtml: '<table>' + r('Voucher No', e.id) + r('Date', ui.date(e.date)) + r('Kind', e.kind) + r('Head', e.category) +
-      r('Method', e.method) + r('Party', e.party) + r('Reference', e.ref) + r('Description', e.desc) +
+      r('Method', e.method) + (e.bankName ? r('Paid from', e.bankName) : '') +
+      r('Party', e.party) + r('Reference', e.ref) + r('Description', e.desc) +
       '<tr><th>Amount</th><th>' + ui.money(e.amount) + '</th></tr></table>' });
+}
+
+/* ==========================================================================
+ * THE BANK / CASH REGISTER LEG (owner 2026-07-26)
+ * --------------------------------------------------------------------------
+ * The ledger is not the only book money moves in. When a spend is paid from a
+ * REAL account, that account must show it too: balance down, and a withdrawal
+ * row in its transaction history — the same movement Travels › Banks and
+ * Master Accounts › Manage Banks (with its running balance and reconciliation
+ * card) already render for deposits and transfers. We move it through the
+ * SHARED EPAL.bankTxnApply() that Manage Banks and Manage Loan use, so there is
+ * exactly one implementation keeping the register reconciled with the ledger.
+ *
+ * WHOSE account? The FUNDER's. An expense another concern paid for leaves THAT
+ * concern's account — which is precisely why Travels ends up owing it (2400 /
+ * 1300). So the register row is tagged with the funder's GL id (GL-ACF-…).
+ *
+ * ONE function serves post / edit / delete: it applies the DELTA between what
+ * the register was told before and the cash effect now, so an edited amount
+ * posts a visible adjustment row and a delete posts a visible reversal —
+ * balances are never silently rewritten (AUDIT P2: the books keep the trail).
+ *
+ * NOTE (API mode): `banks` is a writable endpoint, so the balance change
+ * persists to the DB; the `bank_txns` log is still browser-side until the
+ * bank_transactions table is provisioned server-side — exactly as it is today
+ * for deposits and withdrawals (see platform/data/api.js WRITABLE).
+ * ==> LARAVEL: App\Services\BankRegisterService::apply() does both writes in
+ *     the same transaction as the journal — see ExpensePostingService.
+ * ========================================================================*/
+function cashEffect(rec) {
+  var a = +(rec && rec.amount) || 0;
+  return (rec && rec.kind === 'Income') ? a : -a;
+}
+function syncRegisterLeg(rec, prev, note) {
+  if (!rec || !rec.bankId || !EPAL.bankTxnApply) return;
+  var bank = accountById(rec.bankId); if (!bank) return;
+  var delta = cashEffect(rec) - cashEffect(prev);
+  if (Math.abs(delta) < 0.005) return;
+  var isIn = delta > 0, amt = Math.abs(delta);
+  var what = (rec.category || 'Expense') + (rec.subCategory ? ' · ' + rec.subCategory : '') + (rec.party ? ' — ' + rec.party : '');
+  var glId = (rec.fundedBy && rec.fundedBy !== CID) ? 'GL-ACF-' + rec.id : 'GL-ACC-' + rec.id;
+  EPAL.bankTxnApply(bank, isIn ? 'deposit' : 'withdraw', amt, rec.date || TODAY_STR,
+    (note ? note + ' ' : '') + what, rec.ref || rec.id, glId,
+    { entryId: rec.id, reversal: note === 'Reversal of:' });
+}
+// Un-move the register for a deleted voucher: the same delta machinery, with
+// the entry's cash effect going to zero, plus the original row flagged reversed
+// so Manage Banks cannot reverse it twice.
+function reverseRegisterLeg(e) {
+  if (!e || !e.bankId) return;
+  syncRegisterLeg({ id: e.id, bankId: e.bankId, kind: e.kind, amount: 0, category: e.category, subCategory: e.subCategory,
+    party: e.party, ref: e.ref, date: TODAY_STR, fundedBy: e.fundedBy }, e, 'Reversal of:');
+  try {
+    S.list('bank_txns').forEach(function (t) {
+      if (t.entryId === e.id && !t.reversal && !t.reversed) { t.reversed = true; db.save('bank_txns', t); }
+    });
+  } catch (x) {}
+}
+// The group bridge event for a money movement (docs/ADDING-A-FEATURE.md): an
+// observable rollup seam for the Laravel port. Additive — it changes no total,
+// the group books are computed on read from the same ledger.
+function rollUp(rec) {
+  try {
+    if (EPAL.bridge && EPAL.bridge.emit && rec.kind === 'Expense') {
+      EPAL.bridge.emit(CID, 'expense.recorded', { amount: +rec.amount || 0, ref: rec.id, at: rec.date });
+    }
+  } catch (x) {}
 }
 
 /* --- mirror a single quick entry into the double-entry ledger -----------
@@ -884,8 +1124,10 @@ function mirrorToLedger(rec) {
   if (!EPAL.ledger || !EPAL.ledger.post) return;
   var amt = +rec.amount || 0; if (amt <= 0) return;
   // the categorised entry pins the CoA head (rec.head); otherwise fall back to
-  // the keyword mapper. Cash method credits 1000, everything else the 1010 bank.
-  var payAcct = rec.method === 'Cash' ? '1000' : '1010';
+  // the keyword mapper. The paying side is pinned too when the entry named a
+  // real account (rec.payAcct — a cash box IS 1000, every other account 1010);
+  // legacy rows without it keep the old rule: Cash credits 1000, else 1010.
+  var payAcct = rec.payAcct || (rec.method === 'Cash' ? '1000' : '1010');
   var head = rec.head || expenseAccountFor(rec.category);
   // INTER-COMPANY FUNDING (decision #5): a Travels expense paid from another
   // concern's purse. The expense sits in Travels' books, but the cash left the

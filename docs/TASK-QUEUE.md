@@ -7,6 +7,57 @@
 
 ## ⏳ OPEN
 
+### T-EXP-SOURCE — Record Expense: real accounts + whole-chart search + full propagation
+**Reported:** 2026-07-26, screenshot of `#/travels/accounts/expenses` with the
+**Record Expense** modal open and the **“Payment method” select circled in red**
+(it showed only `Bank`). Three asks, then a fourth:
+1. That field must list **all the accounts** — every bank, plus cash and petty cash —
+   ordered **Travels' bank first, then cash**.
+2. The account head must work **both ways**: the ten cards above are too few, so it
+   must also be pickable from the **whole account list**, expense codes first,
+   **searchable by title** ("tea for guest", "tea for office").
+3. An expense must record **everywhere it connects**: the Travels expense history,
+   the journals/ledgers, the **bank or cash account it was paid from** (balance
+   deducted + in that account's transaction history), and — when another concern
+   funded it — as a **loan Travels owes**, reflected in the Group's Master Accounts.
+4. Backend in **real Laravel**: proper controller, readable and usable by a dev.
+
+**DONE 2026-07-26 (this commit).**
+- **Paid from (bank / cash account)** replaces "Payment method": the real accounts
+  from Manage Banks (bank → cash box/petty cash → wallets/cards), and it **follows
+  "Funded by"** — another concern's money offers THAT concern's accounts, because
+  that is whose account the cash leaves. The 7 generic methods stay at the end of
+  the list, labelled "no registered account", so a cheque/card spend with no
+  registered account is still recordable (nothing removed).
+- **"Or search the whole account list"** beside the cards: every chart code with
+  expense heads first, then each head's items, then the rest of the chart. Typing
+  "tea" finds *Tea / Coffee (Guest)* and *Tea & Coffee*; picking an item lights its
+  card **and** its chip, and clicking a card fills the field back. Non-expense codes
+  are pickable too (owner asked for the whole list) with a note that they land on
+  the balance sheet.
+- **Propagation:** register (`acc_entries`, now carrying `bankId`/`bankName`/`payAcct`)
+  → GL (`GL-ACC-…`, plus `GL-ACF-…` on the funder's books) → the paying account's
+  **balance + a withdrawal row** in its history (through the shared `bankTxnApply`)
+  → the group bridge `expense.recorded` event. An **edit** posts an adjustment row
+  and a **delete** posts a reversal row + flags the original — balances never change
+  without a row explaining why.
+- **Laravel:** `ExpensePostingService::record()/void()` (kernel) does all three
+  books in ONE transaction; `LedgerService` is now THE poster (JournalController
+  delegates to it, same HTTP contract); `BankRegisterService` is the server twin of
+  `bankTxnApply`; `ExpenseController` + `StoreExpenseRequest` are the Travels HTTP
+  surface (`GET|POST /api/travels/accounts/expenses`, `GET …/expenses/form`,
+  `DELETE …/expenses/{voucher}`). Two migrations. **9 feature tests** in
+  `platform/backend/tests/Feature/ExpensePostingTest.php` (11/11 suite green).
+- **Verified:** boot sweep 222/222 routes × both themes, 0 console errors; a
+  headless drive of the modal — 18/18 assertions — proved the ordering, the "tea"
+  search, both-ways sync, the funder re-filter, the GL legs, the balance deduction
+  and the inter-company legs on both books.
+- **Left open on purpose (owner's call):** in API mode the `bank_txns` LOG is still
+  browser-only (its table needs `php artisan migrate` on the host — the balance
+  itself does persist); the generic `entryForm` (New Journal Entry) still has the
+  plain Method select, not the account picker; Master Accounts' own expense
+  recorder was not touched.
+
 ### T-BANKS — condense the Manage Banks summary block (space utilization)
 **Reported:** 2026-07-22, screenshot of Master Accounts › Manage Banks › Group HQ.
 Owner: the four KPI tiles "take too much space for their little info."

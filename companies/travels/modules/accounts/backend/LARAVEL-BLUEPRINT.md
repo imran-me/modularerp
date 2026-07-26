@@ -28,7 +28,10 @@ override of the shared `*/accounts` view (router prefers a specific view).
 | kind | enum | Income · Expense |
 | category | string | posting head (free text; common heads offered on form) |
 | amount | int (BDT) | integer taka, no cents |
-| method | enum | Bank · Cash · bKash · Nagad · Card · Cheque |
+| method | enum | Bank · Cash · bKash · Nagad · Card · Cheque (HOW it was paid) |
+| bank_id | string? | WHICH account it left — a `banks` row; null for an unregistered method (cheque, card swipe) |
+| bank_name | string? | captured at posting time, so a later rename doesn't rewrite old vouchers |
+| pay_acct | string? | the GL side credited: `1000` hard cash · `1010` bank — pinned per entry |
 | date | date | YYYY-MM-DD |
 | party | string? | customer / vendor / staff (optional) |
 | ref | string? | voucher / cheque / invoice ref (optional) |
@@ -55,11 +58,79 @@ per-method aggregates; monthly income/expense series.
 - Every quick `AccountEntry` **mirrors into the double-entry ledger** with a stable
   GL id `GL-ACC-<id>` (an edit re-posts/upserts, never duplicates):
   - Income  → DR `1010 Bank` / CR `4000 Sales Revenue`.
-  - Expense → DR `5xxx` (by head via `expenseAccountFor`) / CR `1010 Bank`.
+  - Expense → DR `5xxx` (the head the form pinned, else `expenseAccountFor`) /
+    CR `pay_acct` — `1000` when the money left a cash box, else `1010`.
+- An entry that named a real account also **moves that account's register**:
+  balance down + a withdrawal row in `bank_transactions` tagged with the voucher
+  (`entry_ref`). Editing the amount posts an adjustment row and deleting posts a
+  reversal row — a balance never changes without a row saying why. That is what
+  keeps Manage Banks reconciled with the trial balance.
 - **Cash & Bank** KPI reads ledger account `1010` balance (asset, Dr − Cr).
 - Journals must balance (`|Σdr − Σcr| ≤ 0.5` and Σdr > 0) before posting — the
   LedgerService enforces the same invariant server-side.
 - A schedule marked **Paid** is settled; overdue = `due < today` and not Paid.
+
+## BUILT — Record Expense (owner 2026-07-26) · the one call that hits every book
+
+Not a blueprint any more: this endpoint exists. `POST /api/travels/accounts/expenses`
+records a spend in **three books inside one transaction**, and nothing else has to
+be remembered afterwards.
+
+| # | Book | Table(s) | What lands there |
+|---|------|----------|------------------|
+| 1 | the concern's register | `acc_entries` | the voucher — the row the Expenses screen lists |
+| 2 | the general ledger | `journal_entries` + `journal_items` | the double entry every report READS (journals, account ledgers, trial balance, P&L, group consolidation) |
+| 3 | the paying account | `banks` + `bank_transactions` | balance down + one withdrawal row in that account's own history |
+
+**The double entry**
+
+```
+paid from our own account       DR <head e.g. 5550>   /  CR 1010 Bank | 1000 Cash
+paid from ANOTHER concern       us:     DR <head>     /  CR 2400 Inter-company Payable
+  (inter-company funding)       funder: DR 1300 Rcv   /  CR 1010|1000  (THEIR account moves)
+```
+
+Consolidation eliminates 1300 against 2400, so the group P&L carries the expense
+once and the cash is never double-counted. The debt is settled later with the
+reverse legs.
+
+**Files** (posting rules in the kernel, HTTP surface in the module — a company
+module never reaches into another company's code):
+
+| File | Role |
+|------|------|
+| `platform/backend/app/Services/ExpensePostingService.php` | `record()` / `void()` — the three books, one transaction |
+| `platform/backend/app/Services/LedgerService.php` | `post()` / `reverse()` / `expenseAccountFor()` — THE ledger; balance check, code→id, idempotent upsert |
+| `platform/backend/app/Services/BankRegisterService.php` | `apply()` / `reverseFor()` — balance + `bank_transactions`, the server twin of the SPA's `bankTxnApply()` |
+| `platform/backend/app/Support/CompanySlugs.php` | the one slug ↔ `companies.id` map |
+| `…/accounts/backend/ExpenseController.php` | the routes below |
+| `…/accounts/backend/Http/Requests/StoreExpenseRequest.php` | validation, field for field with the SPA form |
+| `platform/backend/tests/Feature/ExpensePostingTest.php` | 9 tests: all three books, cash box → 1000, inter-company legs, wrong-owner refusal, unknown head, re-post idempotency, void reverses everything |
+
+```
+GET    /api/travels/accounts/expenses            expense register (filters: from, to, head)
+GET    /api/travels/accounts/expenses/form       heads (expense codes FIRST) + payment
+                                                 accounts (Travels' first, bank → cash → wallet)
+POST   /api/travels/accounts/expenses            record one — see the example below
+DELETE /api/travels/accounts/expenses/{voucher}  void: register row removed, ledger
+                                                 REVERSED (never erased), account refunded
+```
+
+```jsonc
+// POST /api/travels/accounts/expenses   — "tea for a guest, paid from City Bank"
+{ "amount": 1250, "head": "5550", "category": "Guest & Entertainment",
+  "subCategory": "Tea / Coffee (Guest)", "bankId": "12", "method": "Bank",
+  "party": "Star Kabab", "date": "2026-07-26", "ref": "BR-118" }
+// -> 201 { success:true, data:{ entry, journal, funderJournal, register } }
+// add  "fundedBy": "group"  and it becomes an inter-company loan instead
+```
+
+Refusals come back as `422 { success:false, message }` — unbalanced, unknown
+account code, an account belonging to another concern, a zero amount.
+
+**Migrations to run:** `php artisan migrate`
+(`…master-accounts/backend/migrations/2026_07_26_002000_add_payment_source_to_acc_entries.php`,
+`platform/backend/database/migrations/2026_07_26_003000_add_entry_trail_to_bank_transactions.php`.)
 
 ## Routes (Laravel)
 ```

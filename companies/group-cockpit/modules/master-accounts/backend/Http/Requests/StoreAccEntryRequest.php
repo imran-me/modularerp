@@ -22,6 +22,9 @@ class StoreAccEntryRequest extends FormRequest
             'subCategory' => 'nullable|string|max:255',
             'head'        => 'nullable|string|max:50',
             'method'      => 'nullable|string|max:50',
+            'bankId'      => 'nullable|string|max:40',      // which account the money left
+            'bankName'    => 'nullable|string|max:255',
+            'payAcct'     => 'nullable|string|max:20',      // GL side credited: 1000 cash | 1010 bank
             'date'        => 'nullable|date',
             'party'       => 'nullable|string|max:255',
             'ref'         => 'nullable|string|max:255',

@@ -7,8 +7,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * Shapes an AccEntry into the EXACT frontend `acc_entries` record. The id is the
  * stable `ext_id` (never the DB id), so the client-side GL mirror keeps working.
- *   { id, companyId, kind, amount, category, subCategory, head, method, date,
- *     party, ref, desc, items, alloc, fundedBy, created }
+ *   { id, companyId, kind, amount, category, subCategory, head, method, payAcct,
+ *     bankId, bankName, date, party, ref, desc, items, alloc, fundedBy, created }
  */
 class AccEntryResource extends JsonResource
 {
@@ -23,6 +23,9 @@ class AccEntryResource extends JsonResource
             'subCategory' => $this->sub_category,
             'head'        => $this->head,
             'method'      => $this->method,
+            'payAcct'     => $this->pay_acct ?: '',
+            'bankId'      => $this->bank_id ?: '',
+            'bankName'    => $this->bank_name ?: '',
             'date'        => optional($this->date)->format('Y-m-d'),
             'party'       => $this->party,
             'ref'         => $this->ref,

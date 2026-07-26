@@ -69,6 +69,10 @@ class BankTxnController
             'desc'     => $r->description ?: '',
             'ref'      => $r->reference ?: '',
             'glId'     => $r->gl_id ?: '',
+            // the voucher that caused the movement + whether it was given back
+            // (2026_07_26_003000) — how a deleted expense finds its own row
+            'entryId'  => $r->entry_ref ?? '',
+            'reversed' => (bool) ($r->reversed ?? false),
         ];
     }
 
@@ -107,6 +111,12 @@ class BankTxnController
             'gl_id'       => (string) ($v['glId'] ?? ''),
             'updated_at'  => $now,
         ];
+        // Voucher trail columns arrived in a later migration — write them only
+        // when they exist, so an un-migrated host still logs the movement.
+        if (Schema::hasColumn('bank_transactions', 'entry_ref')) {
+            $row['entry_ref'] = ((string) ($v['entryId'] ?? '')) ?: null;
+            $row['reversed']  = ! empty($v['reversed']);
+        }
 
         // idempotent by the frontend client id — a re-post updates in place
         $existing = $clientId !== ''

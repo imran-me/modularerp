@@ -42,6 +42,11 @@ class AccEntryService
             'alloc'        => $data['alloc'] ?? false,
             'funded_by'    => $data['fundedBy'] ?? null,
             'created'      => $data['created'] ?? null,
+            // the account the money left + the GL side it credited — see the
+            // 2026_07_26_002000 migration for why these are pinned per entry
+            'bank_id'      => $data['bankId'] ?? null,
+            'bank_name'    => $data['bankName'] ?? null,
+            'pay_acct'     => $data['payAcct'] ?? null,
         ]);
         $entry->save();
 
