@@ -22,3 +22,12 @@
 <!-- KPI grid (compact, one row) + one KPI card -->
 <template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
 <template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+
+<!-- reusable shells (markup, filled by the logic) --------------------------- -->
+<template data-tpl="titled-card"><div class="card"><div class="card-head"><h3 data-slot="title"></h3><span class="card-sub" data-slot="sub"></span></div><div class="card-body" data-slot="body"></div></div></template>
+<template data-tpl="add-row"><div class="mb-2"><button class="btn btn-sm btn-primary" data-slot="btn"></button></div></template>
+<template data-tpl="btn"><button class="btn"></button></template>
+<template data-tpl="a-btn"><a class="btn"></a></template>
+<template data-tpl="btn-strip"><div class="flex gap-1 flex-wrap mb-2"></div></template>
+<template data-tpl="section-label"><div class="section-label"></div></template>
+<template data-tpl="body-card"><div class="card"><div class="card-body" data-slot="body"></div></div></template>

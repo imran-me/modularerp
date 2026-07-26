@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/accounts.js) and cloned +\n  filled via [data-tpl] / [data-slot]. The money desk is highly dynamic — the\n  overview cockpit + Action Center, income/expense registers, the double-entry\n  journal poster, payment-schedule tracker, recurring/cheque/petty/cash-book\n  desks, the shared cash/expense/payroll kits, and every table/modal/form keep\n  their legacy el()-built DOM (with their inline styles) in the logic file, exactly\n  as before. Only the reusable page / section-nav / KPI shells live here, house\n  design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/accounts.js) and cloned +\n  filled via [data-tpl] / [data-slot]. The money desk is highly dynamic — the\n  overview cockpit + Action Center, income/expense registers, the double-entry\n  journal poster, payment-schedule tracker, recurring/cheque/petty/cash-book\n  desks, the shared cash/expense/payroll kits, and every table/modal/form keep\n  their legacy el()-built DOM (with their inline styles) in the logic file, exactly\n  as before. Only the reusable page / section-nav / KPI shells live here, house\n  design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n\n<!-- reusable shells (markup, filled by the logic) --------------------------- -->\n<template data-tpl=\"titled-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"add-row\"><div class=\"mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\n<template data-tpl=\"btn\"><button class=\"btn\"></button></template>\n<template data-tpl=\"a-btn\"><a class=\"btn\"></a></template>\n<template data-tpl=\"btn-strip\"><div class=\"flex gap-1 flex-wrap mb-2\"></div></template>\n<template data-tpl=\"section-label\"><div class=\"section-label\"></div></template>\n<template data-tpl=\"body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="travels/accounts"]')) {
     var st = document.createElement('style');
@@ -47,6 +47,26 @@ function frag(name) {
   return t.content.firstElementChild.cloneNode(true);
 }
 function slot(root, name) { return root.querySelector('[data-slot="' + name + '"]'); }
+
+/* reusable markup shells (template.html) — byte-identical to the el() shells they
+ * replace. addRow = a primary-action button on its own row; btn/aBtn = a bare
+ * button/link; btnStrip = a wrapping flex row; titledCard = card head+sub over a
+ * body (the sub span is dropped when empty). */
+function addRow(html, onClick) { var r = frag('add-row'); var b = slot(r, 'btn'); b.innerHTML = html; b.addEventListener('click', onClick); return r; }
+function btn(cls, html, onClick) { var b = frag('btn'); b.className = cls; b.innerHTML = html; if (onClick) b.addEventListener('click', onClick); return b; }
+function aBtn(cls, href, html) { var a = frag('a-btn'); a.className = cls; a.setAttribute('href', href); a.innerHTML = html; return a; }
+function btnStrip(children, cls) { var s = frag('btn-strip'); if (cls) s.className = cls; (children || []).forEach(function (c) { if (c) s.appendChild(c); }); return s; }
+function sectionLabel(text, extraClass) { var l = frag('section-label'); if (extraClass) l.className += ' ' + extraClass; l.textContent = text; return l; }
+function bodyCard(bodyEl) { var c = frag('body-card'); if (bodyEl != null) ui.appendChildren(slot(c, 'body'), bodyEl); return c; }
+function titledCard(titleHtml, subText, bodyEl, extraClass) {
+  var c = frag('titled-card');
+  if (extraClass) c.className += ' ' + extraClass;
+  slot(c, 'title').innerHTML = titleHtml;
+  var sub = slot(c, 'sub');
+  if (subText == null || subText === '') sub.parentNode.removeChild(sub); else sub.textContent = subText;
+  if (bodyEl != null) ui.appendChildren(slot(c, 'body'), bodyEl);
+  return c;
+}
 
 var CID = 'travels';
 var expTab = 'all';                               // active button inside Operational Expenses
@@ -363,22 +383,24 @@ function overview(page) {
   if (cash < 100000) actions.push({ tone: 'error', icon: 'wallet2',
     text: '<strong>Low cash.</strong> Cash & bank position is ' + ui.money(cash) + ' — review upcoming payables.', go: 'travels/accounts/schedules' });
 
-  page.appendChild(el('div.section-label', { text: 'Action Center — needs attention' }));
+  page.appendChild(sectionLabel('Action Center — needs attention'));
   if (actions.length) {
-    page.appendChild(el('div.card', null, [ el('div.card-body', null, actions.map(function (a) {
-      return el('div.data-row', { style: { cursor: 'pointer' }, onclick: (function (go) { return function () { EPAL.router.navigate(go); }; })(a.go) }, [
+    var acCard = frag('body-card'), acBody = slot(acCard, 'body');
+    actions.forEach(function (a) {
+      acBody.appendChild(el('div.data-row', { style: { cursor: 'pointer' }, onclick: (function (go) { return function () { EPAL.router.navigate(go); }; })(a.go) }, [
         ui.frag('<span class="notif-ico notif-' + a.tone + '">' + ui.icon(a.icon) + '</span>'),
         el('div.flex-1', { html: a.text }),
         ui.frag('<span class="text-mute">' + ui.icon('chevron-right') + '</span>')
-      ]);
-    })) ]));
+      ]));
+    });
+    page.appendChild(acCard);
   } else {
     page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('check-circle-fill')),
       el('div', { html: '<strong>All clear.</strong> No overdue or imminent settlements — the books are current.' }) ]));
   }
 
   // ---- charts: monthly income vs expense + expense mix + method mix ------
-  page.appendChild(el('div.section-label', { text: 'Cash Movement' }));
+  page.appendChild(sectionLabel('Cash Movement'));
   var trendId = ui.uid('acc-trend'), mixId = ui.uid('acc-mix'), methId = ui.uid('acc-meth');
   page.appendChild(el('div.grid-auto', null, [
     chartCard('Income vs Expense — monthly', 'activity', trendId, 'last 8 months', 250),
@@ -403,8 +425,8 @@ function overview(page) {
   });
 
   // ---- recent entries register ------------------------------------------
-  page.appendChild(el('div.section-label', { text: 'Recent Entries' }));
-  page.appendChild(el('div.card', null, [ el('div.card-body', null, [ entriesTable(entries(), null) ]) ]));
+  page.appendChild(sectionLabel('Recent Entries'));
+  page.appendChild(bodyCard(entriesTable(entries(), null)));
 }
 
 /* ======================================================= INCOME / EXPENSES */
@@ -434,7 +456,7 @@ function kindRegister(page, kind, heads, color) {
 
   // clickable head chips — biggest posting heads, tap to filter the register
   if (heads2.length) {
-    page.appendChild(el('div.section-label.mt-0', { text: kind + ' Heads — tap to filter' }));
+    page.appendChild(sectionLabel(kind + ' Heads — tap to filter', 'mt-0'));
     var chipWrap = el('div.grid-auto.kpi-compact.stagger.mb-3');
     var selected = null, tableRef = null;
     heads2.slice(0, 8).forEach(function (h) {
@@ -451,9 +473,9 @@ function kindRegister(page, kind, heads, color) {
       ]) ]));
     });
     page.appendChild(chipWrap);
-    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ (tableRef = entriesTable(list, kind)) && tableRef.el ]) ]));
+    page.appendChild(bodyCard((tableRef = entriesTable(list, kind)) && tableRef.el));
   } else {
-    page.appendChild(el('div.card', null, [ el('div.card-body', null, [ entriesTable(list, kind).el ]) ]));
+    page.appendChild(bodyCard(entriesTable(list, kind).el));
   }
 }
 
@@ -595,7 +617,8 @@ function intercoCard() {
   if (!rows.length) return null;
   rows.sort(function (a, b) { return b.amount - a.amount; });
 
-  var body = el('div.card-body');
+  var card = titledCard(ui.icon('diagram-3') + ' Inter-company balances', 'loans between concerns — settle to clear both books', null, 'mb-3');
+  var body = slot(card, 'body');
   rows.forEach(function (r) {
     var isPay = r.kind === 'pay';
     body.appendChild(el('div.ma-shr-row.mb-2', null, [
@@ -609,13 +632,7 @@ function intercoCard() {
       ])
     ]));
   });
-  return el('div.card.mb-3', null, [
-    el('div.card-head', null, [
-      el('h3', { html: ui.icon('diagram-3') + ' Inter-company balances' }),
-      el('span.card-sub', { text: 'loans between concerns — settle to clear both books' })
-    ]),
-    body
-  ]);
+  return card;
 }
 
 // Settle (or record receipt of) an inter-company balance with a counterparty.
@@ -957,10 +974,9 @@ function journalsView(page) {
   });
   refreshBalance([]);
 
-  page.appendChild(el('div.card', null, [
-    el('div.card-head', null, [ el('h3', { html: ui.icon('journal-plus') + ' New Double-Entry Journal' }), el('span.card-sub', { text: 'Debits must equal credits' }) ]),
-    el('div.card-body', null, [ form.el, el('div.flex.justify-between.items-center.mt-2', null, [ balStrip, postBtn ]) ])
-  ]));
+  var jc = titledCard(ui.icon('journal-plus') + ' New Double-Entry Journal', 'Debits must equal credits', form.el);
+  slot(jc, 'body').appendChild(el('div.flex.justify-between.items-center.mt-2', null, [ balStrip, postBtn ]));
+  page.appendChild(jc);
 
   // recent GL entries for Travels (newest first)
   var glRows = (EPAL.ledger && EPAL.ledger.entries) ? EPAL.ledger.entries({ companyId: CID }).slice().reverse() : [];
@@ -978,8 +994,8 @@ function journalsView(page) {
     onRow: function (e) { showEntry(e); },
     empty: { icon: 'journal-text', title: 'No ledger entries yet — post one above' }
   });
-  page.appendChild(el('div.section-label', { text: 'Recent Ledger Entries' }));
-  page.appendChild(el('div.card', null, [ el('div.card-body', null, [ glTable.el ]) ]));
+  page.appendChild(sectionLabel('Recent Ledger Entries'));
+  page.appendChild(bodyCard(glTable.el));
 
   function showEntry(e) {
     var lines = (e.lines || []).map(function (l) { var a = EPAL.ledger.account(l.account); return { account: l.account + ' · ' + (a ? a.name : ''), debit: +l.dr || 0, credit: +l.cr || 0 }; });
@@ -1044,10 +1060,7 @@ function schedulesView(page) {
     }),
     empty: { icon: 'calendar2-week', title: 'No schedules yet', hint: 'Add a payable or receivable to track it.' }
   });
-  page.appendChild(el('div.card', null, [
-    el('div.card-head', null, [ el('h3', { html: ui.icon('calendar2-week') + ' Payment Schedules' }), el('span.card-sub', { text: list.length + ' items · click for detail' }) ]),
-    el('div.card-body', null, [ t.el ])
-  ]));
+  page.appendChild(titledCard(ui.icon('calendar2-week') + ' Payment Schedules', list.length + ' items · click for detail', t.el));
 }
 
 function scheduleDetail(s) {
@@ -1164,7 +1177,7 @@ function recurringView(page) {
     }),
     empty: { icon: 'arrow-repeat', title: 'No recurring expenses', hint: 'Add rent, internet or other monthly costs to auto-generate.' }
   });
-  page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('arrow-repeat') + ' Recurring Expenses' }), el('span.card-sub', { text: 'auto-created monthly on their day' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+  page.appendChild(titledCard(ui.icon('arrow-repeat') + ' Recurring Expenses', 'auto-created monthly on their day', tbl.el));
 }
 function recurringForm(rec) {
   var isNew = !rec;
@@ -1221,7 +1234,7 @@ function chequesView(page) {
     }),
     empty: { icon: 'bank', title: 'No cheques', hint: 'Record issued & received cheques to track clearing.' }
   });
-  page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('bank') + ' Cheque Register' }), el('span.card-sub', { text: 'issued & received · clearing status' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+  page.appendChild(titledCard(ui.icon('bank') + ' Cheque Register', 'issued & received · clearing status', tbl.el));
 }
 function chequeDetail(c) {
   var body = el('div');
@@ -1305,7 +1318,7 @@ function cashBookView(page) {
     onRow: canCreate() ? function (r) { var m = S.get('tv_recon', {}); if (m[r.id]) delete m[r.id]; else m[r.id] = true; S.set('tv_recon', m); EPAL.router.render(); } : null,
     empty: { icon: 'bank', title: 'No cash movements yet' }
   });
-  page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('bank') + ' Cash & Bank Book' }), el('span.card-sub', { text: 'closing balance ' + ui.money(closing) } ) ]), el('div.card-body', null, [ tbl.el ]) ]));
+  page.appendChild(titledCard(ui.icon('bank') + ' Cash & Bank Book', 'closing balance ' + ui.money(closing), tbl.el));
 }
 
 /* ======================================================= PETTY CASH (spec D5) */
@@ -1338,7 +1351,7 @@ function pettyView(page) {
     }),
     empty: { icon: 'cash', title: 'No petty-cash slips', hint: 'Give an IOU to staff for petty expenses.' }
   });
-  page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('cash') + ' Petty Cash — IOU Register' }), el('span.card-sub', { text: 'click an open slip to settle against a bill' }) ]), el('div.card-body', null, [ tbl.el ]) ]));
+  page.appendChild(titledCard(ui.icon('cash') + ' Petty Cash — IOU Register', 'click an open slip to settle against a bill', tbl.el));
 }
 function pettyForm(rec) {
   EPAL.formModal({
