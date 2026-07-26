@@ -303,6 +303,11 @@ because it ADDS posting/reporting, never changes existing screens' look.
    legs + a payable to settle. **✅ DONE 2026-07-26.**
 4. **Travels Dashboard P&L** — revenue, COGS, gross margin, opex, net; per-product
    contribution margin; cost-per-sale & margin-per-sale; monthly / yearly.
+   **✅ DONE 2026-07-26** — the Dashboard "Product P&L" card gained a period
+   selector (All time · This/Last month · This/Last year · Custom range) that
+   re-queries the already period-aware `ledger.pnl`/`pnlByProduct`, so the same
+   card reads as a monthly AND yearly P&L. Verified the ranges genuinely scope
+   (all-time ৳6.47Cr → 2026 ৳6.29Cr → Jul ৳47.5L → empty year 0).
 5. Statement suite (TB/GL/BS/P&L V2) + Group consolidated P&L.
 
 **Expense entry — DONE** (Travels Accounts → Expenses → "New Expense": guided

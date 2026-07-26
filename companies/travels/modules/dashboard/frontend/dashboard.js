@@ -201,18 +201,70 @@ EPAL.view('travels/dashboard', {
     // shown on the Travels Dashboard". Contribution view straight from the ONE
     // ledger — Revenue − direct COGS per product (Air / Visa / Contract), with
     // the count-driven cost-per-sale; the company opex + net close the block.
-    // Reads EPAL.ledger.pnlByProduct + pnl, so it can't drift from the books. ---
+    // Reads EPAL.ledger.pnlByProduct + pnl, so it can't drift from the books.
+    // Build-order step 4 (2026-07-26): a PERIOD selector (This/Last month · This/
+    // Last year · Custom) re-queries the already period-aware pnl/pnlByProduct so
+    // the same card is a monthly & yearly P&L, not just an all-time snapshot. ---
     (function () {
-      var prods = [], P = { revenue: 0, cogs: 0, gross: 0, expenses: 0, net: 0 };
-      try { prods = EPAL.ledger.pnlByProduct('travels') || []; P = EPAL.ledger.pnl('travels') || P; } catch (e) {}
+      var REF = new Date(2026, 6, 5);                        // demo "today" = 2026-07-05
+      function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+      function monthRange(y, m) { return { from: ymd(new Date(y, m, 1)), to: ymd(new Date(y, m + 1, 0)) }; }
+      function yearRange(y) { return { from: y + '-01-01', to: y + '-12-31' }; }
+      var PERIODS = [
+        { key: 'all',    label: 'All time',   range: function () { return {}; } },
+        { key: 'month',  label: 'This month', range: function () { return monthRange(REF.getFullYear(), REF.getMonth()); } },
+        { key: 'lmonth', label: 'Last month', range: function () { return monthRange(REF.getFullYear(), REF.getMonth() - 1); } },
+        { key: 'year',   label: 'This year',  range: function () { return yearRange(REF.getFullYear()); } },
+        { key: 'lyear',  label: 'Last year',  range: function () { return yearRange(REF.getFullYear() - 1); } }
+      ];
+      var active = 'all', custom = { from: '', to: '' };
+
       function st(label, val, cls) {
         return el('div.stat', null, [ el('div.stat-label', { text: label }),
           el('div.stat-value.num' + (cls ? '.' + cls : ''), { text: val }) ]);
       }
-      var body = el('div.card-body');
-      if (!prods.length) {
-        body.appendChild(el('p.text-mute.sm', { html: ui.icon('inbox') + ' No product sales posted to the books yet — issue a ticket, visa or contract sale and its revenue, cost and margin appear here.' }));
-      } else {
+      function currentRange() {
+        if (active === 'custom') { var r = {}; if (custom.from) r.from = custom.from; if (custom.to) r.to = custom.to; return r; }
+        var p = PERIODS.filter(function (x) { return x.key === active; })[0];
+        return p ? p.range() : {};
+      }
+      function rangeLabel() {
+        if (active === 'custom') return (custom.from || '…') + ' → ' + (custom.to || '…');
+        var p = PERIODS.filter(function (x) { return x.key === active; })[0];
+        return p ? p.label : 'All time';
+      }
+
+      // period switcher (persists across repaints)
+      var sub = el('span.card-sub', { text: 'straight from the books · all products · All time' });
+      var pills = el('div.pill-tab');
+      PERIODS.concat([{ key: 'custom', label: 'Custom' }]).forEach(function (p) {
+        var b = el('button' + (active === p.key ? '.active' : ''), { text: p.label, onclick: function () {
+          active = p.key;
+          Array.prototype.forEach.call(pills.children, function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          customWrap.style.display = active === 'custom' ? '' : 'none';
+          paint();
+        } });
+        pills.appendChild(b);
+      });
+      var fromIn = el('input.input', { type: 'date', style: { maxWidth: '160px' }, onchange: function () { custom.from = this.value; paint(); } });
+      var toIn = el('input.input', { type: 'date', style: { maxWidth: '160px' }, onchange: function () { custom.to = this.value; paint(); } });
+      var customWrap = el('div.flex.items-center.gap-1.mt-2', { style: { display: 'none' } }, [
+        el('span.text-mute.xs', { text: 'From' }), fromIn, el('span.text-mute.xs', { text: 'To' }), toIn ]);
+      var controls = el('div.mb-3', null, [ pills, customWrap ]);
+
+      var tableHost = el('div');
+      var body = el('div.card-body', null, [ controls, tableHost ]);
+
+      function paint() {
+        var range = currentRange(), prods = [], P = { revenue: 0, cogs: 0, gross: 0, expenses: 0, net: 0 };
+        try { prods = EPAL.ledger.pnlByProduct('travels', range) || []; P = EPAL.ledger.pnl('travels', range) || P; } catch (e) {}
+        sub.textContent = 'straight from the books · all products · ' + rangeLabel();
+        tableHost.innerHTML = '';
+        if (!prods.length) {
+          tableHost.appendChild(el('p.text-mute.sm', { html: ui.icon('inbox') + ' No product sales in this period — pick a wider range, or issue a ticket, visa or contract sale and its revenue, cost and margin appear here.' }));
+          return;
+        }
         var routeOf = { 'Air Ticket': 'travels/air-ticketing/manage-sales', 'Visa': 'travels/visa-processing/manage-sales', 'Contract': 'travels/contract-flight', 'EMD/Ancillary': 'travels/air-ticketing/manage-sales' };
         var tb = el('tbody');
         prods.forEach(function (p) {
@@ -229,15 +281,14 @@ EPAL.view('travels/dashboard', {
           if (route) { tr.setAttribute('title', 'Open ' + p.product + ' sales'); tr.addEventListener('click', function () { EPAL.router.navigate(route); }); }
           tb.appendChild(tr);
         });
-        var tbl = el('table.tbl', null, [
+        tableHost.appendChild(el('table.tbl', null, [
           el('thead', null, [ el('tr', null, [
             el('th', { text: 'Product' }), el('th.num', { text: 'Sales' }), el('th.num', { text: 'Revenue' }),
             el('th.num', { text: 'Direct Cost' }), el('th.num', { text: 'Gross Margin' }),
             el('th.num', { text: 'Margin %' }), el('th.num', { text: 'Cost / Sale' }) ]) ]),
           tb
-        ]);
-        body.appendChild(tbl);
-        body.appendChild(el('div.stat-row.mt-3', null, [
+        ]));
+        tableHost.appendChild(el('div.stat-row.mt-3', null, [
           st('Revenue', ui.money(P.revenue)),
           st('COGS', ui.money(P.cogs)),
           st('Gross Margin', ui.money(P.gross), P.gross >= 0 ? 'text-good' : 'text-bad'),
@@ -245,10 +296,12 @@ EPAL.view('travels/dashboard', {
           st(P.net >= 0 ? 'Net Profit' : 'Net Loss', ui.money(Math.abs(P.net)), P.net >= 0 ? 'text-good' : 'text-bad')
         ]));
       }
+      paint();
+
       page.appendChild(el('div.card.mb-3', null, [
         el('div.card-head', null, [
           el('h3', { html: ui.icon('graph-up-arrow') + ' Product P&L — cost &amp; margin per sale' }),
-          el('span.card-sub', { text: 'straight from the books · all products' })
+          sub
         ]),
         body
       ]));

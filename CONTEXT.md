@@ -19,6 +19,28 @@
 
 ---
 
+## 🆕 SESSION — 2026-07-26 (cont'd) · DASHBOARD P&L PERIOD FILTER (build-order step 4)
+
+Shipped **build-order step 4** — the Travels Dashboard "Product P&L" card now has a
+**period selector** so it doubles as a monthly & yearly P&L. All in
+`companies/travels/modules/dashboard/frontend/dashboard.js` → rebuilt `view.js`.
+
+- Period pills: **All time · This month · Last month · This year · Last year ·
+  Custom** (custom reveals From/To date inputs). Anchored to demo today 2026-07-05.
+- On change it re-queries the already period-aware `EPAL.ledger.pnl('travels',{from,to})`
+  + `pnlByProduct('travels',{from,to})` and repaints only the table+footer (the pill
+  bar persists). The card sub-title shows the active range. No engine change needed —
+  both ledger fns already accept `{from,to}`.
+- **Verified:** rebuilt view.js; **sweep 222/222 both themes, 0 errors**; a CDP probe
+  proved the ranges genuinely scope — all-time ৳6.47Cr → 2026 ৳6.29Cr → 2026-07
+  ৳47.5L → an empty past year = ৳0 / 0 products.
+
+**▶ NEXT (resume here):** build-order **step 5 — statement suite (TB / GL / BS / P&L
+V2)** + Group consolidated P&L, drawing on the reference-ERP V1/V2 report advantage
+list (`docs/TASK-QUEUE.md`). Decisions all LOCKED.
+
+---
+
 ## 🆕 SESSION — 2026-07-26 · INTER-COMPANY FUNDING LEGS (accounting build-order step 3)
 
 Shipped **build-order step 3** of the Travels accounting buildout — expense "paid
