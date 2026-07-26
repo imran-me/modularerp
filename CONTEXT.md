@@ -84,6 +84,28 @@ pixel-perfect match — for EVERY module.** Recorded in `docs/FULLSTACK-REBUILD-
 
 **➡️ MASTER ACCOUNTS COMPLETE** (routes = real HTML `<section>`, 20/20 pixel-identical · full tested backend).
 
+**◑ GROUP FINANCE — real-HTML rebuild IN PROGRESS (priority #2, 2026-07-26).**
+Finance was ONE hand-written 133KB `view.js` (13 chart/table screens). Steps done + pushed:
+- ✅ **Split into the `frontend/` build** (`template.html` + `finance.js` → `view.js` via
+  `build-module.mjs`), backup at `_frontend-originals/group-cockpit/finance/view.js`. The
+  split alone is **byte-identical to the original** (proven by re-shooting the backup).
+  Fresh baseline at `.parity/finance-before` (22 shots). Commit 6b30504.
+- ✅ **Shared chrome → real-HTML shells:** `head()` (page-head bar, mirrors `EPAL.pageHead`)
+  + `pills()` (13-tab band) are now `<div data-shell>` blocks filled by JS. Commit bafc8fc.
+- ✅ **Shared building blocks → shells:** `kpi()` (KPI tile) + `chartCard()` (chart card w/
+  `<canvas>`) are `<div data-shell>` — so **every KPI tile + chart card across all 13
+  screens is now real HTML** from two helper edits. Commit f430b10.
+- ✅ **trial-balance** screen body → `<section data-screen="trial-balance">` (KPI grid +
+  balanced-status banner + tables). Commit 79c1f59.
+- **Each step re-verified 22/22 (or per-route) PIXEL-IDENTICAL vs `.parity/finance-before`.**
+- ◻ **REMAINING finance bodies:** overview, pnl, cashflow, balance-sheet, receivables,
+  payables, banks, coa, journal, consolidation, concern-pnl, group-expenses — convert each
+  screen's section-labels + table-container cards + custom panels to `<section data-screen>`
+  HTML (the KPIs/charts/bars they use are already HTML via the shells). Dynamic data-grids
+  (`EPAL.table`, hand-built consolidation matrix) + computed inline-style strips stay JS
+  (the law's "live data / feature" carve-out). Then final full parity + backend (LARAVEL
+  blueprint exists; build the real slice + test vs MySQL) before FINANCE COMPLETE.
+
 **➡️ TRAVELS ACCOUNTS COMPLETE (priority #2, 2026-07-26).**
 - **FE:** route screens (overview action-center/cash-movement/recent-entries, income/expense
   registers, journals + GL card, schedules, recurring, cheques, cash book, petty, inter-co
