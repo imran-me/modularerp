@@ -252,13 +252,13 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     function tot(arr) { return arr.reduce(function (x, y) { return x + y; }, 0); }
     var revTotal = tot(revByEnt), expTotal = tot(expByEnt), netTotal = revTotal - expTotal;
 
-    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
-      kpi('Group Revenue', ui.money(revTotal, { compact: true }), 'graph-up-arrow'),
-      kpi('Group Expense', ui.money(expTotal, { compact: true }), 'graph-down-arrow'),
-      kpi('Group Net', ui.money(netTotal, { compact: true }), 'wallet2'),
-      kpi('Group Margin', (revTotal ? (netTotal / revTotal * 100).toFixed(1) : '0.0') + '%', 'percent'),
-      kpi('Entities', String(ents.length), 'diagram-3')
-    ]));
+    var scr = screen('concern-pnl');
+    var kpis = scr.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Group Revenue', ui.money(revTotal, { compact: true }), 'graph-up-arrow'));
+    kpis.appendChild(kpi('Group Expense', ui.money(expTotal, { compact: true }), 'graph-down-arrow'));
+    kpis.appendChild(kpi('Group Net', ui.money(netTotal, { compact: true }), 'wallet2'));
+    kpis.appendChild(kpi('Group Margin', (revTotal ? (netTotal / revTotal * 100).toFixed(1) : '0.0') + '%', 'percent'));
+    kpis.appendChild(kpi('Entities', String(ents.length), 'diagram-3'));
 
     // ---- the pivot table (Category | each entity | Total) ----
     var thr = el('tr'); thr.appendChild(el('th', { text: 'Category' }));
@@ -285,22 +285,23 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     tbody.appendChild(netTr);
 
     var table = el('table.tbl', null, [ el('thead', null, [thr]), tbody ]);
-    page.appendChild(el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('table') + ' Consolidated Income Statement' }), el('span.card-sub', { text: ents.length + ' entities · concerns + Group HQ' }) ]),
-      el('div.card-body', null, [ el('div.table-wrap', null, [table]) ])
-    ]));
+    scr.querySelector('[data-fill="pivot-sub"]').textContent = ents.length + ' entities · concerns + Group HQ';
+    scr.querySelector('[data-fill="pivot-table"]').appendChild(table);
 
     // ---- expense mix by entity (stacked) ----
     var expHeads = expense.filter(function (a) { return tot(vals(a)) > 0; });
     if (expHeads.length) {
       var chartId = ui.uid('cpnl');
-      page.appendChild(chartCard('Expense by Entity', 'bar-chart', chartId, 'each expense head across the entities', 280));
+      scr.querySelector('[data-fill="chart"]').replaceWith(chartCard('Expense by Entity', 'bar-chart', chartId, 'each expense head across the entities', 280));
       requestAnimationFrame(function () {
         var c = document.getElementById(chartId); if (!c) return;
         EPAL.charts.bar(c, { labels: ents.map(function (e) { return e.short; }), stacked: true, legend: true,
           datasets: expHeads.map(function (a, i) { return { label: a.name, data: ents.map(function (e) { return pnlAmt(a.code, e.id); }), color: ['#1A43BF', '#23c17e', '#f4b740', '#e2721b', '#f0506e', '#7b5cff', '#12b5c9', '#a0522d'][i % 8] }; }) });
       });
+    } else {
+      scr.querySelector('[data-fill="chart"]').remove();
     }
+    mountScreen(page, scr);
   }
   function byCode(a, b) { return String(a.code) < String(b.code) ? -1 : 1; }
   function exportConcernCsv() {
@@ -365,16 +366,17 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     var overCount = list.filter(function (x) { return x.budget > 0 && x.actual > x.budget; }).length;
     var biggest = list.slice().sort(function (a, b) { return b.actual - a.actual; })[0];
 
-    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
-      kpi('Spent (' + yr + ')', ui.money(totalActual, { compact: true }), 'cash-stack'),
-      kpi('Budget', totalBudget ? ui.money(totalBudget, { compact: true }) : '—', 'bullseye'),
-      kpi('Used', totalBudget ? Math.round(totalActual / totalBudget * 100) + '%' : '—', 'speedometer2', null, totalBudget && totalActual > totalBudget ? 'over budget' : ''),
-      kpi('Biggest Head', biggest ? biggest.head : '—', 'pie-chart'),
-      kpi('Over Budget', String(overCount), 'exclamation-triangle', null, overCount ? 'heads over' : 'all within')
-    ]));
+    var scr = screen('group-expenses');
+    var kpis = scr.querySelector('[data-fill="kpis"]');
+    kpis.appendChild(kpi('Spent (' + yr + ')', ui.money(totalActual, { compact: true }), 'cash-stack'));
+    kpis.appendChild(kpi('Budget', totalBudget ? ui.money(totalBudget, { compact: true }) : '—', 'bullseye'));
+    kpis.appendChild(kpi('Used', totalBudget ? Math.round(totalActual / totalBudget * 100) + '%' : '—', 'speedometer2', null, totalBudget && totalActual > totalBudget ? 'over budget' : ''));
+    kpis.appendChild(kpi('Biggest Head', biggest ? biggest.head : '—', 'pie-chart'));
+    kpis.appendChild(kpi('Over Budget', String(overCount), 'exclamation-triangle', null, overCount ? 'heads over' : 'all within'));
+    scr.querySelector('[data-fill="bva-title"]').innerHTML = ui.icon('speedometer2') + ' Budget vs Actual — ' + yr;
 
     // ---- budget vs actual ----
-    var bvaBody = el('div.card-body');
+    var bvaBody = scr.querySelector('[data-fill="bva-body"]');
     if (!list.length) bvaBody.appendChild(el('div.text-mute.sm', { text: 'No group expenses yet — record one, or set a budget head.' }));
     list.slice().sort(function (a, b) { return b.actual - a.actual; }).forEach(function (x) {
       var pct = x.budget ? Math.min(150, Math.round(x.actual / x.budget * 100)) : 0;
@@ -390,8 +392,6 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
         x.budget ? el('div.text-mute.xs', { style: { marginTop: '2px' }, text: over ? ('Over by ' + ui.money(x.actual - x.budget)) : (ui.money(x.budget - x.actual) + ' remaining · ' + pct + '% used') }) : null
       ].filter(Boolean)));
     });
-    page.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('speedometer2') + ' Budget vs Actual — ' + yr } ), el('span.card-sub', { text: 'live from the ledger' }) ]), bvaBody ]));
-
     // ---- expense register ----
     var entries = groupExpenses().slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
     var tbl = EPAL.table({
@@ -412,10 +412,9 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
       }),
       empty: { icon: 'receipt', title: 'No group expenses', hint: 'Record office, food or utility costs for the group.' }
     });
-    page.appendChild(el('div.card', null, [
-      el('div.card-head', null, [ el('h3', { html: ui.icon('receipt') + ' Expense Register' }), el('span.card-sub', { text: entries.length + ' entries · posted to the group ledger' }) ]),
-      el('div.card-body', null, [ tbl.el ])
-    ]));
+    scr.querySelector('[data-fill="reg-sub"]').textContent = entries.length + ' entries · posted to the group ledger';
+    scr.querySelector('[data-fill="reg-table"]').appendChild(tbl.el);
+    mountScreen(page, scr);
   }
   function groupExpenseForm(existing) {
     EPAL.formModal({
