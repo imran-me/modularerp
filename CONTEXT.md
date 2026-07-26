@@ -53,8 +53,25 @@ pixel-perfect match — for EVERY module.** Recorded in `docs/FULLSTACK-REBUILD-
   legitimately JS in any framework. The declarative `EPAL.formModal` forms are already
   config-driven, not script-DOM. So: routes = markup+verified; internals = safe as-is.
 
-**➡️ MASTER ACCOUNTS COMPLETE** (routes markup+byte-identical · full tested backend). Moving
-to **priority #2 = Travels Accounts** (`companies/travels/modules/accounts`) — same loop.
+**➡️ MASTER ACCOUNTS COMPLETE** (routes markup+byte-identical · full tested backend).
+
+**➡️ TRAVELS ACCOUNTS COMPLETE (priority #2, 2026-07-26).**
+- **FE:** route screens (overview action-center/cash-movement/recent-entries, income/expense
+  registers, journals + GL card, schedules, recurring, cheques, cash book, petty, inter-co
+  card) converted el()→template markup; reusable fragments + helpers added; the helpers
+  mirror `ui.appendChildren` so they're byte-identical (one call site passes a table
+  INSTANCE — raw appendChild would throw). **Parity 16/16 byte-identical both themes**;
+  sweep 222/222. Click-opened modals stay el() (dynamic/non-shootable). Commit 6e7a6e3.
+- **BE:** `tv_recurring` / `tv_cheques` / `tv_petty` document-style Laravel slice
+  (migration + 3 Models + AccountsBookService + Controller + routes + seeder), migrated +
+  seeded + CRUD-tested vs MySQL; api.js HYDRATE+WRITABLE wired. Commit 7c7156f. (acc_entries/
+  schedules/banks come from the Master Accounts backend.)
+
+**▶ NEXT (resume here):** the rest of the **Travels modules**, same loop each (FE route
+markup + parity + backend where the module owns data): marketing · automation · reports ·
+analytics · crm · dashboard · ledgers · contract-file · contract-flight · vendor-agent ·
+hrm · visa-processing · air-ticketing (payroll backend already built via master-accounts).
+Then Group-cockpit modules, then woodart/it/shop/construction. Autonomous, push each.
 
 ## 🚨 CORRECTION — 2026-07-26 (owner reminded me) · FULL-STACK MEANS FRONTEND **AND** BACKEND
 
