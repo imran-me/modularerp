@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  MASTER ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/master-accounts.js) and\n  cloned + filled via [data-tpl] / [data-slot]. The group accounting desk is\n  highly dynamic — the company switcher, the expense/journal/schedule/payroll/\n  bank desks, VAT & AIT return, opening-balance posters and every table/modal/\n  form keep their legacy el()-built DOM (with inline styles) in the logic file,\n  exactly as before. Only the reusable page / section-nav / KPI shells live here,\n  in house design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band, 9 sections) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n\n<!-- reusable shells (markup, filled by the logic) --------------------------- -->\n<!-- a titled card: head (title + optional sub) over a body slot -->\n<template data-tpl=\"titled-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- a primary action button on its own row (fill data-slot=\"btn\") -->\n<template data-tpl=\"add-row\"><div class=\"mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\n<!-- a bare button (class + html + onclick set by the logic) -->\n<template data-tpl=\"btn\"><button class=\"btn\"></button></template>\n<!-- a wrapping flex row for a button strip -->\n<template data-tpl=\"btn-strip\"><div class=\"flex gap-1 flex-wrap mb-2\"></div></template>\n<!-- a scrollable simple ledger table (modal) + one row -->\n<template data-tpl=\"ledger-table\"><div class=\"table-wrap\"><table class=\"tbl\"><thead><tr><th>Date</th><th>Ref</th><th>Memo</th><th class=\"num\">Debit</th><th class=\"num\">Credit</th><th class=\"num\">Balance</th></tr></thead><tbody data-slot=\"rows\"></tbody></table></div></template>\n<template data-tpl=\"ledger-row\"><tr><td data-slot=\"date\"></td><td data-slot=\"ref\"></td><td data-slot=\"memo\"></td><td class=\"num\" data-slot=\"debit\"></td><td class=\"num\" data-slot=\"credit\"></td><td class=\"num\" data-slot=\"balance\"></td></tr></template>\n<!-- schedule section card: head has a right-aligned running total (tone set by logic) -->\n<template data-tpl=\"sched-card\"><div class=\"card mb-2\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"strong num\" style=\"margin-left:auto\" data-slot=\"total\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  MASTER ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/master-accounts.js) and\n  cloned + filled via [data-tpl] / [data-slot]. The group accounting desk is\n  highly dynamic — the company switcher, the expense/journal/schedule/payroll/\n  bank desks, VAT & AIT return, opening-balance posters and every table/modal/\n  form keep their legacy el()-built DOM (with inline styles) in the logic file,\n  exactly as before. Only the reusable page / section-nav / KPI shells live here,\n  in house design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band, 9 sections) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n\n<!-- reusable shells (markup, filled by the logic) --------------------------- -->\n<!-- a titled card: head (title + optional sub) over a body slot -->\n<template data-tpl=\"titled-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- a primary action button on its own row (fill data-slot=\"btn\") -->\n<template data-tpl=\"add-row\"><div class=\"mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\n<!-- a bare button (class + html + onclick set by the logic) -->\n<template data-tpl=\"btn\"><button class=\"btn\"></button></template>\n<!-- a wrapping flex row for a button strip -->\n<template data-tpl=\"btn-strip\"><div class=\"flex gap-1 flex-wrap mb-2\"></div></template>\n<!-- a scrollable simple ledger table (modal) + one row -->\n<template data-tpl=\"ledger-table\"><div class=\"table-wrap\"><table class=\"tbl\"><thead><tr><th>Date</th><th>Ref</th><th>Memo</th><th class=\"num\">Debit</th><th class=\"num\">Credit</th><th class=\"num\">Balance</th></tr></thead><tbody data-slot=\"rows\"></tbody></table></div></template>\n<template data-tpl=\"ledger-row\"><tr><td data-slot=\"date\"></td><td data-slot=\"ref\"></td><td data-slot=\"memo\"></td><td class=\"num\" data-slot=\"debit\"></td><td class=\"num\" data-slot=\"credit\"></td><td class=\"num\" data-slot=\"balance\"></td></tr></template>\n<!-- schedule section card: head has a right-aligned running total (tone set by logic) -->\n<template data-tpl=\"sched-card\"><div class=\"card mb-2\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"strong num\" style=\"margin-left:auto\" data-slot=\"total\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- a plain card = just a body (no head), for guards/notes -->\n<template data-tpl=\"body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<!-- VAT/AIT return: month input, the period row, one tax row -->\n<template data-tpl=\"month-input\"><input class=\"input\" type=\"month\" style=\"width:auto\"></template>\n<template data-tpl=\"tax-period-row\"><div class=\"flex gap-2 items-center mb-2\"><span class=\"text-mute sm\">Return period</span><span data-slot=\"input\"></span><span class=\"text-mute xs\">collected via the Credit/Debit journal tax fields · deposit clears the payable</span></div></template>\n<template data-tpl=\"tax-row\"><div class=\"data-row\"><div class=\"flex-1\"><div class=\"fw-600 sm\" data-slot=\"head\"></div><div class=\"text-mute xs\" data-slot=\"detail\"></div></div><div class=\"num strong\" data-slot=\"payable\"></div></div></template>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="group-cockpit/master-accounts"]')) {
     var st = document.createElement('style');
@@ -64,7 +64,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
 // el('div.card',…) shells they replace; the sub span is dropped when empty.
 function addRow(html, onClick) { var r = frag('add-row'); var b = slot(r, 'btn'); b.innerHTML = html; b.addEventListener('click', onClick); return r; }
 function btn(cls, html, onClick) { var b = frag('btn'); b.className = cls; b.innerHTML = html; if (onClick) b.addEventListener('click', onClick); return b; }
-function btnStrip(children) { var s = frag('btn-strip'); (children || []).forEach(function (c) { if (c) s.appendChild(c); }); return s; }
+function btnStrip(children, cls) { var s = frag('btn-strip'); if (cls) s.className = cls; (children || []).forEach(function (c) { if (c) s.appendChild(c); }); return s; }
 function titledCard(titleHtml, subText, bodyEl, extraClass) {
   var c = frag('titled-card');
   if (extraClass) c.className += ' ' + extraClass;
@@ -508,10 +508,14 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       kpi('Entries', String(list.length), 'card-list'),
       kpi('Scope', selCo === 'all' ? 'All companies' : coName(selCo), 'diagram-3')
     ]));
-    if (canCreate()) page.appendChild(el('div.flex.gap-2.mb-2', null, [
-      el('button.btn.btn-primary', { html: ui.icon('plus-lg') + ' New Expense', onclick: function () { expenseForm(null); } }),
-      el('button.btn.btn-outline', { html: ui.icon('diagram-3') + ' Shared Cost', title: 'Enter a shared cost (rent, subscriptions) once and split it equally across concerns', onclick: function () { sharedExpenseForm(); } })
-    ]));
+    if (canCreate()) {
+      var scBtn = btn('btn btn-outline', ui.icon('diagram-3') + ' Shared Cost', function () { sharedExpenseForm(); });
+      scBtn.title = 'Enter a shared cost (rent, subscriptions) once and split it equally across concerns';
+      page.appendChild(btnStrip([
+        btn('btn btn-primary', ui.icon('plus-lg') + ' New Expense', function () { expenseForm(null); }),
+        scBtn
+      ], 'flex gap-2 mb-2'));
+    }
     var cols = [
       { key: 'date', label: 'Date', date: true },
       { key: 'category', label: 'Category', badge: {} },
@@ -529,7 +533,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       actions: ui.actions({ edit: canCreate() ? function (e) { expenseForm(e); } : null }),
       empty: { icon: 'wallet2', title: 'No expenses in this scope', hint: 'Record one with New Expense.' }
     });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('wallet2') + ' All Expenses — ' + coName(selCo) })]), el('div.card-body', null, [tbl.el])]));
+    page.appendChild(titledCard(ui.icon('wallet2') + ' All Expenses — ' + coName(selCo), '', tbl.el));
   }
   function expenseForm(rec) {
     var catList = cats();
@@ -701,7 +705,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
   function reportView(page) { EPAL.expenseViews.report(page, selCo, { onBack: function () { expTab = 'all'; EPAL.router.render(); } }); }
   function journalsView(page) {
     var L = EPAL.ledger;
-    if (!L || !L.entries) { page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Ledger unavailable.' })])); return; }
+    if (!L || !L.entries) { var g = frag('body-card'); slot(g, 'body').textContent = 'Ledger unavailable.'; page.appendChild(g); return; }
     var list = L.entries(selCo === 'all' ? {} : { companyId: selCo }).slice().reverse();
     function drTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.dr || 0; }); return t; }
     function crTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.cr || 0; }); return t; }
@@ -714,12 +718,12 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       kpi('Balanced', balancedN + ' / ' + list.length, 'check-circle', balancedN === list.length ? 'text-good' : 'text-warn')
     ]));
     if (canCreate()) {
-      page.appendChild(el('div.flex.gap-1.flex-wrap.mb-2', null, [
-        el('button.btn.btn-sm.btn-primary', { html: ui.icon('arrow-down-circle') + ' Credit Journal (Money In)', onclick: function () { bankJournalForm('credit'); } }),
-        el('button.btn.btn-sm.btn-outline', { html: ui.icon('arrow-up-circle') + ' Debit Journal (Money Out)', onclick: function () { bankJournalForm('debit'); } }),
-        el('button.btn.btn-sm.btn-outline', { html: ui.icon('layers') + ' Opening Receivable', onclick: function () { openingPartyForm('Receivable'); } }),
-        el('button.btn.btn-sm.btn-outline', { html: ui.icon('layers') + ' Opening Payable', onclick: function () { openingPartyForm('Payable'); } }),
-        el('button.btn.btn-sm.btn-outline', { html: ui.icon('layers-half') + ' Opening Asset', onclick: function () { openingAssetForm(); } })
+      page.appendChild(btnStrip([
+        btn('btn btn-sm btn-primary', ui.icon('arrow-down-circle') + ' Credit Journal (Money In)', function () { bankJournalForm('credit'); }),
+        btn('btn btn-sm btn-outline', ui.icon('arrow-up-circle') + ' Debit Journal (Money Out)', function () { bankJournalForm('debit'); }),
+        btn('btn btn-sm btn-outline', ui.icon('layers') + ' Opening Receivable', function () { openingPartyForm('Receivable'); }),
+        btn('btn btn-sm btn-outline', ui.icon('layers') + ' Opening Payable', function () { openingPartyForm('Payable'); }),
+        btn('btn btn-sm btn-outline', ui.icon('layers-half') + ' Opening Asset', function () { openingAssetForm(); })
       ]));
     }
     // ---- P3: VAT & AIT RETURN (BD tax cycle: collect → report → deposit) ----
@@ -736,22 +740,24 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         return { code: code, label: label, collected: coll, deposited: dep, closing: closing };
       }
       var rows = [taxRow('2130', 'VAT (output, on services)'), taxRow('2140', 'AIT / TDS (withheld)')];
-      var mSel = el('input.input', { type: 'month', value: taxYm, style: { width: 'auto' }, onchange: function () { taxYm = this.value || taxYm; EPAL.router.render(); } });
-      var bodyT = el('div.card-body');
-      bodyT.appendChild(el('div.flex.gap-2.items-center.mb-2', null, [el('span.text-mute.sm', { text: 'Return period' }), mSel,
-        el('span.text-mute.xs', { text: 'collected via the Credit/Debit journal tax fields · deposit clears the payable' })]));
+      var mSel = frag('month-input'); mSel.value = taxYm;
+      mSel.addEventListener('change', function () { taxYm = this.value || taxYm; EPAL.router.render(); });
+      var card = titledCard(ui.icon('receipt') + ' VAT & AIT Return — ' + coName(selCo), 'Bangladesh NBR cycle', null, 'mb-2');
+      var bodyT = slot(card, 'body');
+      var per = frag('tax-period-row'); slot(per, 'input').replaceWith(mSel); bodyT.appendChild(per);
       rows.forEach(function (r) {
-        bodyT.appendChild(el('div.data-row', null, [
-          el('div.flex-1', null, [el('div.fw-600.sm', { text: r.code + ' · ' + r.label }),
-            el('div.text-mute.xs', { text: taxYm + ': collected ' + ui.money(r.collected) + ' · deposited ' + ui.money(r.deposited) })]),
-          el('div.num.strong' + (r.closing > 0.5 ? '.text-warn' : ''), { text: 'Payable ' + ui.money(r.closing) }),
-          canCreate() && r.closing > 0.5 ? el('button.btn.btn-sm.btn-outline', { style: { marginLeft: '10px' },
-            html: ui.icon('bank') + ' Record NBR Deposit', onclick: function () { nbrDepositForm(r.code, r.label, r.closing); } }) : null
-        ].filter(Boolean)));
+        var row = frag('tax-row');
+        slot(row, 'head').textContent = r.code + ' · ' + r.label;
+        slot(row, 'detail').textContent = taxYm + ': collected ' + ui.money(r.collected) + ' · deposited ' + ui.money(r.deposited);
+        var pay = slot(row, 'payable'); if (r.closing > 0.5) pay.classList.add('text-warn'); pay.textContent = 'Payable ' + ui.money(r.closing);
+        if (canCreate() && r.closing > 0.5) {
+          var dep = btn('btn btn-sm btn-outline', ui.icon('bank') + ' Record NBR Deposit', (function (rr) { return function () { nbrDepositForm(rr.code, rr.label, rr.closing); }; })(r));
+          dep.style.marginLeft = '10px';
+          row.appendChild(dep);
+        }
+        bodyT.appendChild(row);
       });
-      page.appendChild(el('div.card.mb-2', null, [
-        el('div.card-head', null, [el('h3', { html: ui.icon('receipt') + ' VAT & AIT Return — ' + coName(selCo) }),
-          el('span.card-sub', { text: 'Bangladesh NBR cycle' })]), bodyT]));
+      page.appendChild(card);
     })();
     var cols = [
       { key: 'date', label: 'Date', date: true },
@@ -774,7 +780,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       ],
       empty: { icon: 'journal-text', title: 'No journal entries in this scope' }
     });
-    page.appendChild(el('div.card', null, [el('div.card-head', null, [el('h3', { html: ui.icon('journal-text') + ' Journal Entries — ' + coName(selCo) }), el('span.card-sub', { text: 'filter by Source to see its total' })]), el('div.card-body', null, [tbl.el])]));
+    page.appendChild(titledCard(ui.icon('journal-text') + ' Journal Entries — ' + coName(selCo), 'filter by Source to see its total', tbl.el));
   }
   // P3: deposit a tax payable to the NBR — DR 2130|2140 / CR bank, logged on
   // the bank register too so the reconciliation stays exact.

@@ -36,3 +36,9 @@
 <template data-tpl="ledger-row"><tr><td data-slot="date"></td><td data-slot="ref"></td><td data-slot="memo"></td><td class="num" data-slot="debit"></td><td class="num" data-slot="credit"></td><td class="num" data-slot="balance"></td></tr></template>
 <!-- schedule section card: head has a right-aligned running total (tone set by logic) -->
 <template data-tpl="sched-card"><div class="card mb-2"><div class="card-head"><h3 data-slot="title"></h3><span class="strong num" style="margin-left:auto" data-slot="total"></span></div><div class="card-body" data-slot="body"></div></div></template>
+<!-- a plain card = just a body (no head), for guards/notes -->
+<template data-tpl="body-card"><div class="card"><div class="card-body" data-slot="body"></div></div></template>
+<!-- VAT/AIT return: month input, the period row, one tax row -->
+<template data-tpl="month-input"><input class="input" type="month" style="width:auto"></template>
+<template data-tpl="tax-period-row"><div class="flex gap-2 items-center mb-2"><span class="text-mute sm">Return period</span><span data-slot="input"></span><span class="text-mute xs">collected via the Credit/Debit journal tax fields · deposit clears the payable</span></div></template>
+<template data-tpl="tax-row"><div class="data-row"><div class="flex-1"><div class="fw-600 sm" data-slot="head"></div><div class="text-mute xs" data-slot="detail"></div></div><div class="num strong" data-slot="payable"></div></div></template>
