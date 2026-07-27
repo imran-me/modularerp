@@ -211,15 +211,36 @@ each migrated + CRUD-tested vs MySQL + api.js wired: accounts (7c7156f), marketi
 vendor-agent 5 stores (b011c26). Plus passport-mgmt/settings/file-management earlier.
 reports/analytics/dashboard/ledgers are read-only views (no owned stores → no backend).
 
-**▶ NEXT (resume here):** priorities #1–#3 (master-accounts · finance · travels-accounts)
-are all real-HTML COMPLETE. Next is the FRONTEND pass for the remaining Travels modules —
+**✅ TRAVELS LEDGERS — real-HTML rebuild COMPLETE (priority #4, 2026-07-27).**
+The whole module was in the REJECTED `<template data-tpl>` fragment style; all 8 tabs are
+now real `<section data-screen>` HTML. Backup kept at `_frontend-originals/travels/ledgers/`.
+- ✅ **chrome** (page-head mirroring `EPAL.pageHead` + the 8-tab band) · **overview** ·
+  **party** · **AR/AP ageing** (ONE shell serves both tabs) — commit 916aa32.
+- ✅ **general · trial · balance sheet · pnl** — the REPAINT-driven tabs: each clones its
+  section per paint (As-of date, period range, account select). The balance sheet inserts
+  Assets before the claims column and Liabilities above the Equity slot so the DOM order
+  matches the old builder exactly. Commit 6702e87.
+- ✅ **PRUNED the retired fragments** — nav · nav-btn · kpi-grid · kpi-grid-plain ·
+  section-label · grid-auto · head-btn-card · build-banner · chart-card · select-card ·
+  print-row, plus the `chartCard()`/`buildBanner()` builders that lost their callers.
+  **The rule that survived:** a `<template>` is only justified when the logic emits 0..N of
+  the thing and the COUNT is data, not layout — kpi · kpi-drill · action-row · reg-card ·
+  card-body-card. Everything that is a fixed part of a screen is markup.
+- **PROOF:** back-to-back parity 16/16 over all 8 tabs × both themes; **DOM dump
+  character-identical** on all 8; a headless drive of the repaint paths **10/10**
+  (P&L ৳6.47Cr all-time → ৳17.93L last year · Trial Balance ৳11.84Cr → ৳0 as-of 2025-01-01
+  · Balance Sheet keeps Assets|Liabilities|Equity in order · General Ledger 1010 → 1200 —
+  and none of them stack a duplicate card). Sweep 222/222 × both themes, 0 errors.
+
+**▶ NEXT (resume here):** priorities #1–#4 (master-accounts · finance · travels-accounts ·
+travels-ledgers) are all real-HTML COMPLETE. Next is the FRONTEND pass for the remaining Travels modules —
 most were "converted" in prior sessions (structural shells templated, dynamic content
 el(), like marketing), so per-module: shoot baseline → convert any UN-templated route
-cards (exactly as Travels Accounts needed) → parity byte-identical. Modules to check:
-**travels/ledgers first** (it is the statement suite the accounting build order is still
-working through), then automation · reports · analytics · crm · dashboard ·
-contract-file · contract-flight · vendor-agent · hrm · visa-processing · air-ticketing
-(payroll backend already built via master-accounts). Then Group-cockpit modules, then
+cards (exactly as Travels Accounts and Ledgers needed) → parity byte-identical + a DOM
+dump. Modules to check: **dashboard** (it carries the Product P&L card the accounting work
+keeps touching), then reports · analytics · automation · crm · contract-file ·
+contract-flight · vendor-agent · hrm · visa-processing · air-ticketing (payroll backend
+already built via master-accounts). Then Group-cockpit modules, then
 woodart/it/shop/construction. Autonomous, push each.
 
 > Also still open from the ACCOUNTING build order (independent of the HTML work):
