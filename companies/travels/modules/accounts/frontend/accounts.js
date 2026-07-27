@@ -36,6 +36,20 @@ function fillK(root, k, v) { var n = root.querySelector('[data-k="' + k + '"]');
 // move a screen's element children onto `page` (no wrapper, no whitespace nodes)
 // so the final DOM is exactly what the old code produced.
 function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(function (c) { page.appendChild(c); }); }
+// The page-head bar, from the real HTML in template.html instead of the shared
+// EPAL.pageHead() builder — same markup, same classes, same one-line <h1> run;
+// the title is a TEXT NODE after the icon exactly as pageHead appends it, and
+// the sub carries title= so the pinned one-line head stays readable on hover.
+function head(o) {
+  var h = shell('head');
+  h.querySelector('[data-fill="eyebrow"]').textContent = o.eyebrow || '';
+  h.querySelector('[data-fill="title"]').appendChild(document.createTextNode(o.title || ''));
+  var sub = h.querySelector('[data-fill="sub"]');
+  sub.textContent = o.sub || ''; sub.setAttribute('title', o.sub || '');
+  var acts = h.querySelector('[data-fill="actions"]');
+  (o.actions || []).forEach(function (a) { if (a) acts.appendChild(a); });
+  return h;
+}
 
 /* reusable markup shells (template.html) — byte-identical to the el() shells they
  * replace. addRow = a primary-action button on its own row; btn/aBtn = a bare
@@ -237,9 +251,11 @@ EPAL.view('travels/accounts', {
       pettycash: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
       payroll: 'Salary run, payslips, loans & advances — posted to the ledger.' };
 
-    page.appendChild(EPAL.pageHead({
+    // page-head bar — real HTML ([data-shell="head"] in template.html, mirroring
+    // EPAL.pageHead's markup); JS fills only the per-screen words + actions.
+    page.appendChild(head({
       eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
-      icon: 'cash-stack', title: titles[sub], sub: subs[sub],
+      title: titles[sub], sub: subs[sub],
       actions: [
         canCreate() && sub === 'expenses'
           ? el('button.btn.btn-primary', { html: ui.icon('wallet2') + ' New Expense', onclick: function () { expenseEntry(); } }) : null,
@@ -265,22 +281,22 @@ EPAL.view('travels/accounts', {
     // 8 sections since Cheques + Cash Book + Petty Cash folded into the ONE
     // Manage Cash desk (owner 2026-07-15) — the same shape as Master Accounts,
     // where cash is one section with its books as tabs, not three siblings.
-    var pills = frag('nav');
+    var nav = shell('nav');
     var active = CASH_SUBS[sub] ? 'cash' : sub;      // an old cash link still lights Manage Cash
-    [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['payroll', 'Payroll'],
-     ['recurring', 'Recurring'], ['banks', 'Banks'], ['cash', 'Manage Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
-      var b = frag('nav-btn');
-      if (active === p[0]) b.classList.add('active');
-      b.textContent = p[1];
-      b.addEventListener('click', function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); });
-      pills.appendChild(b);
+    Array.prototype.forEach.call(nav.querySelectorAll('[data-tab]'), function (b) {
+      var key = b.getAttribute('data-tab');
+      if (active === key) b.classList.add('active');
+      b.removeAttribute('data-tab');                 // the hook is not part of the shipped DOM
+      b.addEventListener('click', function () { EPAL.router.navigate('travels/accounts' + (key === 'overview' ? '' : '/' + key)); });
     });
-    page.appendChild(pills);
+    page.appendChild(nav);
     // AUDIT P2: the period lock is VISIBLE wherever money is handled
     var lockYm = (EPAL.ledger && EPAL.ledger.lockedThrough) ? EPAL.ledger.lockedThrough() : null;
-    if (lockYm) page.appendChild(el('div.mb-2', null, [
-      el('span.badge.badge-warn', { html: ui.icon('lock-fill') + ' Books locked through ' + ui.escapeHtml(lockYm) + ' — back-dated entries are blocked' })
-    ]));
+    if (lockYm) {
+      var lockEl = shell('lock');
+      lockEl.querySelector('[data-fill="lock-text"]').innerHTML = ui.icon('lock-fill') + ' Books locked through ' + ui.escapeHtml(lockYm) + ' — back-dated entries are blocked';
+      page.appendChild(lockEl);
+    }
 
     /* MANAGE CASH — the shared desk (platform/kit/cash.js), scoped to Travels.
        At group level its Petty/Cheque tabs are read-only mirrors because entry
@@ -395,14 +411,14 @@ function overview(page) {
   var open = openSchedules(), overdue = overdueSchedules();
   var outstanding = open.reduce(function (a, s) { return a + (+s.amount || 0); }, 0);
 
-  var kg = frag('kpi-grid');
+  var ov = screen('overview');
+  var kg = ov.querySelector('[data-fill="kpis"]');
   kg.appendChild(kpiDrill('Income', ui.money(inc, { compact: true }), 'arrow-down-left-circle', 'travels/accounts/income'));
   kg.appendChild(kpiDrill('Expenses', ui.money(exp, { compact: true }), 'arrow-up-right-circle', 'travels/accounts/expenses'));
   kg.appendChild(kpi('Net Result', ui.money(net, { compact: true }), net >= 0 ? 'graph-up-arrow' : 'graph-down-arrow', net >= 0 ? 'text-good' : 'text-bad'));
   kg.appendChild(kpi('Cash & Bank', ui.money(cash, { compact: true }), 'bank2'));
   kg.appendChild(kpiDrill('Open Schedules', String(open.length), 'calendar2-week', 'travels/accounts/schedules', ui.money(outstanding, { compact: true }) + ' outstanding'));
   kg.appendChild(kpi('Overdue', ui.money(overdue.reduce(function (a, s) { return a + (+s.amount || 0); }, 0), { compact: true }), 'exclamation-triangle', overdue.length ? 'text-bad' : ''));
-  page.appendChild(kg);
 
   // ---- Action Center — what the money desk must act on TODAY -------------
   var actions = [];
@@ -423,9 +439,13 @@ function overview(page) {
   if (cash < 100000) actions.push({ tone: 'error', icon: 'wallet2',
     text: '<strong>Low cash.</strong> Cash & bank position is ' + ui.money(cash) + ' — review upcoming payables.', go: 'travels/accounts/schedules' });
 
-  page.appendChild(sectionLabel('Action Center — needs attention'));
+  // the card and the "all clear" banner both live in the markup — keep the one
+  // this state calls for, drop the other
+  var acCard = ov.querySelector('[data-fill="action-card"]');
+  var allClear = ov.querySelector('[data-fill="all-clear"]');
   if (actions.length) {
-    var acCard = frag('body-card'), acBody = slot(acCard, 'body');
+    allClear.parentNode.removeChild(allClear);
+    var acBody = ov.querySelector('[data-fill="actions"]');
     actions.forEach(function (a) {
       acBody.appendChild(el('div.data-row', { style: { cursor: 'pointer' }, onclick: (function (go) { return function () { EPAL.router.navigate(go); }; })(a.go) }, [
         ui.frag('<span class="notif-ico notif-' + a.tone + '">' + ui.icon(a.icon) + '</span>'),
@@ -433,21 +453,19 @@ function overview(page) {
         ui.frag('<span class="text-mute">' + ui.icon('chevron-right') + '</span>')
       ]));
     });
-    page.appendChild(acCard);
   } else {
-    page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('check-circle-fill')),
-      el('div', { html: '<strong>All clear.</strong> No overdue or imminent settlements — the books are current.' }) ]));
+    acCard.parentNode.removeChild(acCard);
   }
 
   // ---- charts: monthly income vs expense + expense mix + method mix ------
-  page.appendChild(sectionLabel('Cash Movement'));
+  // the three cards are markup; only their canvas ids are minted here (each
+  // render needs a fresh id so Chart.js binds to THIS instance of the screen)
   var trendId = ui.uid('acc-trend'), mixId = ui.uid('acc-mix'), methId = ui.uid('acc-meth');
-  page.appendChild(el('div.grid-auto', null, [
-    chartCard('Income vs Expense — monthly', 'activity', trendId, 'last 8 months', 250),
-    chartCard('Expense by Head', 'pie-chart', mixId, 'where the money goes', 250)
-  ]));
+  [['trend', trendId], ['mix', mixId], ['meth', methId]].forEach(function (p) {
+    var c = ov.querySelector('[data-canvas="' + p[0] + '"]');
+    c.id = p[1]; c.removeAttribute('data-canvas');
+  });
   var methods = groupBy(entries(), 'method');
-  page.appendChild(chartCard('Payment Method Mix', 'credit-card', methId, 'income + expense by channel', 220));
 
   requestAnimationFrame(function () {
     var months = lastYm(8);
@@ -465,8 +483,8 @@ function overview(page) {
   });
 
   // ---- recent entries register ------------------------------------------
-  page.appendChild(sectionLabel('Recent Entries'));
-  page.appendChild(bodyCard(entriesTable(entries(), null)));
+  ui.appendChildren(ov.querySelector('[data-fill="recent"]'), entriesTable(entries(), null));
+  mountScreen(page, ov);
 }
 
 /* ======================================================= INCOME / EXPENSES */

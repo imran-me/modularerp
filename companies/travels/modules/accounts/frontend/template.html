@@ -33,6 +33,38 @@
 <template data-tpl="body-card"><div class="card"><div class="card-body" data-slot="body"></div></div></template>
 
 <!-- ============================================================================
+     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup) and the
+     section-nav band, as real HTML like Group Finance. head()/navBand() clone +
+     fill these. NOTE: the <h1> inner run (eyebrow · icon) stays on ONE line on
+     purpose — a newline between those inline tags clones as a real space.
+     ============================================================================ -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow" data-fill="eyebrow"></span><i class="bi bi-cash-stack"></i></h1>
+    <p class="page-sub" data-fill="sub"></p>
+  </div>
+  <div class="page-actions" data-fill="actions"></div>
+</div>
+
+<!-- SECTION NAV — the calm full-bleed underline band (house rule: section nav =
+     underline tabs; pills are for switchers/filters BELOW it). 9 sections since
+     Cheques + Cash Book + Petty Cash folded into the ONE Manage Cash desk. -->
+<div data-shell="nav" class="tab-underline tabs-dense mb-3">
+  <button data-tab="overview">Overview</button>
+  <button data-tab="income">Income</button>
+  <button data-tab="expenses">Expenses</button>
+  <button data-tab="payroll">Payroll</button>
+  <button data-tab="recurring">Recurring</button>
+  <button data-tab="banks">Banks</button>
+  <button data-tab="cash">Manage Cash</button>
+  <button data-tab="journals">Journals</button>
+  <button data-tab="schedules">Schedules</button>
+</div>
+
+<!-- AUDIT P2: the period lock is VISIBLE wherever money is handled -->
+<div data-shell="lock" class="mb-2"><span class="badge badge-warn" data-fill="lock-text"></span></div>
+
+<!-- ============================================================================
      REAL SCREEN HTML (the foundation) — each <section data-screen="…"> is a whole
      Travels Accounts screen written as plain HTML. accounts.js fills the live
      values ([data-k]) + drops data tables into [data-fill], then mountScreen()
@@ -43,6 +75,42 @@
      appended by the logic below it (dynamic/interactive → JS). -->
 <section data-screen="kind-register">
   <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
+</section>
+
+<!-- OVERVIEW (the cockpit) — KPI strip · Action Center · the three charts ·
+     recent entries. The Action Center ROWS are built from live data (0..N), the
+     charts are Chart.js canvases and the register is a data grid — everything
+     AROUND them is this markup. The card and the "all clear" banner are both
+     here; the logic keeps whichever applies and removes the other. -->
+<section data-screen="overview">
+  <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
+  <div class="section-label">Action Center — needs attention</div>
+  <div class="card" data-fill="action-card">
+    <div class="card-body" data-fill="actions"></div>
+  </div>
+  <div class="build-banner mb-3" data-fill="all-clear">
+    <i class="bi bi-check-circle-fill"></i>
+    <div><strong>All clear.</strong> No overdue or imminent settlements — the books are current.</div>
+  </div>
+  <div class="section-label">Cash Movement</div>
+  <div class="grid-auto">
+    <div class="card">
+      <div class="card-head"><h3><i class="bi bi-activity"></i> Income vs Expense — monthly</h3><span class="card-sub">last 8 months</span></div>
+      <div class="card-body"><div style="height: 250px; position: relative;"><canvas data-canvas="trend"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3><i class="bi bi-pie-chart"></i> Expense by Head</h3><span class="card-sub">where the money goes</span></div>
+      <div class="card-body"><div style="height: 250px; position: relative;"><canvas data-canvas="mix"></canvas></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-credit-card"></i> Payment Method Mix</h3><span class="card-sub">income + expense by channel</span></div>
+    <div class="card-body"><div style="height: 220px; position: relative;"><canvas data-canvas="meth"></canvas></div></div>
+  </div>
+  <div class="section-label">Recent Entries</div>
+  <div class="card">
+    <div class="card-body" data-fill="recent"></div>
+  </div>
 </section>
 
 <!-- JOURNALS — the double-entry poster card (its FORM is the shared EPAL.form

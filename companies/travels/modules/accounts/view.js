@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  Static shells only, separated from the logic (frontend/accounts.js) and cloned +\n  filled via [data-tpl] / [data-slot]. The money desk is highly dynamic — the\n  overview cockpit + Action Center, income/expense registers, the double-entry\n  journal poster, payment-schedule tracker, recurring/cheque/petty/cash-book\n  desks, the shared cash/expense/payroll kits, and every table/modal/form keep\n  their legacy el()-built DOM (with their inline styles) in the logic file, exactly\n  as before. Only the reusable page / section-nav / KPI shells live here, house\n  design-system classes verbatim (no Tailwind tw- utilities).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section-nav band (this module uses the DENSE underline band) -->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid (compact, one row) + one KPI card -->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n\n<!-- reusable shells (markup, filled by the logic) --------------------------- -->\n<template data-tpl=\"titled-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"add-row\"><div class=\"mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\n<template data-tpl=\"btn\"><button class=\"btn\"></button></template>\n<template data-tpl=\"a-btn\"><a class=\"btn\"></a></template>\n<template data-tpl=\"btn-strip\"><div class=\"flex gap-1 flex-wrap mb-2\"></div></template>\n<template data-tpl=\"section-label\"><div class=\"section-label\"></div></template>\n<template data-tpl=\"body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n\n<!-- ============================================================================\n     REAL SCREEN HTML (the foundation) — each <section data-screen=\"…\"> is a whole\n     Travels Accounts screen written as plain HTML. accounts.js fills the live\n     values ([data-k]) + drops data tables into [data-fill], then mountScreen()\n     moves the block onto the page. Converted one screen at a time, pixel-verified.\n     ============================================================================ -->\n<!-- income & expense register share this shell — the KPI strip is real HTML; the\n     clickable head chips (an interactive filter) + the entries data-grid are\n     appended by the logic below it (dynamic/interactive → JS). -->\n<section data-screen=\"kind-register\">\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\n</section>\n\n<!-- JOURNALS — the double-entry poster card (its FORM is the shared EPAL.form\n     engine, inserted before the balance row) over the recent-GL card. The Dr/Cr\n     badges are recomputed on every keystroke, so the logic fills them. -->\n<section data-screen=\"journals\">\n  <div class=\"card\">\n    <div class=\"card-head\"><h3><i class=\"bi bi-journal-plus\"></i> New Double-Entry Journal</h3><span class=\"card-sub\">Debits must equal credits</span></div>\n    <div class=\"card-body\" data-fill=\"poster\">\n      <div class=\"flex justify-between items-center mt-2\">\n        <div class=\"flex gap-2 items-center\" data-fill=\"balance\"></div>\n        <button class=\"btn btn-primary\" data-act=\"post\" disabled><i class=\"bi bi-journal-plus\"></i> Post Journal</button>\n      </div>\n    </div>\n  </div>\n  <div class=\"section-label\">Recent Ledger Entries</div>\n  <div class=\"card\">\n    <div class=\"card-body\" data-fill=\"gl-table\"></div>\n  </div>\n</section>\n\n<!-- PAYMENT SCHEDULES — the \"upcoming 15 days\" banner comes FIRST by owner\n     decision (checklist 06: \"shobar age/upore\"), then the KPI strip, then the\n     overdue banner (only when something IS overdue), then the tracker card. -->\n<section data-screen=\"schedules\">\n  <div class=\"build-banner mb-3\">\n    <i class=\"bi bi-calendar-week\"></i>\n    <div class=\"flex-1\" data-fill=\"next15\"></div>\n  </div>\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\n  <div class=\"build-banner mb-3\" data-fill=\"overdue-banner\">\n    <i class=\"bi bi-exclamation-octagon-fill\"></i>\n    <div data-fill=\"overdue-text\"></div>\n  </div>\n  <div class=\"card\">\n    <div class=\"card-head\"><h3><i class=\"bi bi-calendar2-week\"></i> Payment Schedules</h3><span class=\"card-sub\" data-k=\"count\"></span></div>\n    <div class=\"card-body\" data-fill=\"table\"></div>\n  </div>\n</section>\n\n<!-- RECURRING EXPENSES — KPI strip, the \"due this month\" banner (shown only when\n     something is due; the logic fills its sentence + wires Generate All) and the\n     table card. Only the data grid itself is JS (sort/search/pagination). -->\n<section data-screen=\"recurring\">\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\n  <div class=\"build-banner mb-3\" data-fill=\"due-banner\">\n    <i class=\"bi bi-calendar-check\"></i>\n    <div class=\"flex-1\" data-fill=\"due-text\"></div>\n    <button class=\"btn btn-sm btn-primary\" data-act=\"generate\"><i class=\"bi bi-play-circle\"></i> Generate All</button>\n  </div>\n  <div class=\"card\">\n    <div class=\"card-head\"><h3><i class=\"bi bi-arrow-repeat\"></i> Recurring Expenses</h3><span class=\"card-sub\">auto-created monthly on their day</span></div>\n    <div class=\"card-body\" data-fill=\"table\"></div>\n  </div>\n</section>\n\n<section data-screen=\"banks\">\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\n  <div class=\"text-mute sm mb-2\" data-fill=\"note\"></div>\n  <div class=\"card mb-2\">\n    <div class=\"card-head\"><h3><i class=\"bi bi-bank\"></i> Travels Bank Accounts</h3><span class=\"card-sub\">read-only</span></div>\n    <div class=\"card-body\" data-fill=\"banks-table\"></div>\n  </div>\n  <div class=\"card\">\n    <div class=\"card-head\"><h3><i class=\"bi bi-clock-history\"></i> Recent Movements</h3><span class=\"card-sub\">newest first · read-only</span></div>\n    <div class=\"card-body\" data-fill=\"txns-table\"></div>\n  </div>\n</section>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\r\n  TRAVELS · ACCOUNTS · MARKUP\r\n  ----------------------------------------------------------------------------\r\n  Static shells only, separated from the logic (frontend/accounts.js) and cloned +\r\n  filled via [data-tpl] / [data-slot]. The money desk is highly dynamic — the\r\n  overview cockpit + Action Center, income/expense registers, the double-entry\r\n  journal poster, payment-schedule tracker, recurring/cheque/petty/cash-book\r\n  desks, the shared cash/expense/payroll kits, and every table/modal/form keep\r\n  their legacy el()-built DOM (with their inline styles) in the logic file, exactly\r\n  as before. Only the reusable page / section-nav / KPI shells live here, house\r\n  design-system classes verbatim (no Tailwind tw- utilities).\r\n\r\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\r\n  the DOM the old ui.el() calls produced.\r\n  ============================================================================ -->\r\n\r\n<!-- page shell + section-nav band (this module uses the DENSE underline band) -->\r\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\r\n<template data-tpl=\"nav\"><div class=\"tab-underline tabs-dense mb-3\"></div></template>\r\n<template data-tpl=\"nav-btn\"><button></button></template>\r\n\r\n<!-- KPI grid (compact, one row) + one KPI card -->\r\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\r\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\r\n\r\n<!-- reusable shells (markup, filled by the logic) --------------------------- -->\r\n<template data-tpl=\"titled-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n<template data-tpl=\"add-row\"><div class=\"mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\r\n<template data-tpl=\"btn\"><button class=\"btn\"></button></template>\r\n<template data-tpl=\"a-btn\"><a class=\"btn\"></a></template>\r\n<template data-tpl=\"btn-strip\"><div class=\"flex gap-1 flex-wrap mb-2\"></div></template>\r\n<template data-tpl=\"section-label\"><div class=\"section-label\"></div></template>\r\n<template data-tpl=\"body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n\r\n<!-- ============================================================================\r\n     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup) and the\r\n     section-nav band, as real HTML like Group Finance. head()/navBand() clone +\r\n     fill these. NOTE: the <h1> inner run (eyebrow · icon) stays on ONE line on\r\n     purpose — a newline between those inline tags clones as a real space.\r\n     ============================================================================ -->\r\n<div data-shell=\"head\" class=\"page-head\">\r\n  <div>\r\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-cash-stack\"></i></h1>\r\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\r\n  </div>\r\n  <div class=\"page-actions\" data-fill=\"actions\"></div>\r\n</div>\r\n\r\n<!-- SECTION NAV — the calm full-bleed underline band (house rule: section nav =\r\n     underline tabs; pills are for switchers/filters BELOW it). 9 sections since\r\n     Cheques + Cash Book + Petty Cash folded into the ONE Manage Cash desk. -->\r\n<div data-shell=\"nav\" class=\"tab-underline tabs-dense mb-3\">\r\n  <button data-tab=\"overview\">Overview</button>\r\n  <button data-tab=\"income\">Income</button>\r\n  <button data-tab=\"expenses\">Expenses</button>\r\n  <button data-tab=\"payroll\">Payroll</button>\r\n  <button data-tab=\"recurring\">Recurring</button>\r\n  <button data-tab=\"banks\">Banks</button>\r\n  <button data-tab=\"cash\">Manage Cash</button>\r\n  <button data-tab=\"journals\">Journals</button>\r\n  <button data-tab=\"schedules\">Schedules</button>\r\n</div>\r\n\r\n<!-- AUDIT P2: the period lock is VISIBLE wherever money is handled -->\r\n<div data-shell=\"lock\" class=\"mb-2\"><span class=\"badge badge-warn\" data-fill=\"lock-text\"></span></div>\r\n\r\n<!-- ============================================================================\r\n     REAL SCREEN HTML (the foundation) — each <section data-screen=\"…\"> is a whole\r\n     Travels Accounts screen written as plain HTML. accounts.js fills the live\r\n     values ([data-k]) + drops data tables into [data-fill], then mountScreen()\r\n     moves the block onto the page. Converted one screen at a time, pixel-verified.\r\n     ============================================================================ -->\r\n<!-- income & expense register share this shell — the KPI strip is real HTML; the\r\n     clickable head chips (an interactive filter) + the entries data-grid are\r\n     appended by the logic below it (dynamic/interactive → JS). -->\r\n<section data-screen=\"kind-register\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n</section>\r\n\r\n<!-- OVERVIEW (the cockpit) — KPI strip · Action Center · the three charts ·\r\n     recent entries. The Action Center ROWS are built from live data (0..N), the\r\n     charts are Chart.js canvases and the register is a data grid — everything\r\n     AROUND them is this markup. The card and the \"all clear\" banner are both\r\n     here; the logic keeps whichever applies and removes the other. -->\r\n<section data-screen=\"overview\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"section-label\">Action Center — needs attention</div>\r\n  <div class=\"card\" data-fill=\"action-card\">\r\n    <div class=\"card-body\" data-fill=\"actions\"></div>\r\n  </div>\r\n  <div class=\"build-banner mb-3\" data-fill=\"all-clear\">\r\n    <i class=\"bi bi-check-circle-fill\"></i>\r\n    <div><strong>All clear.</strong> No overdue or imminent settlements — the books are current.</div>\r\n  </div>\r\n  <div class=\"section-label\">Cash Movement</div>\r\n  <div class=\"grid-auto\">\r\n    <div class=\"card\">\r\n      <div class=\"card-head\"><h3><i class=\"bi bi-activity\"></i> Income vs Expense — monthly</h3><span class=\"card-sub\">last 8 months</span></div>\r\n      <div class=\"card-body\"><div style=\"height: 250px; position: relative;\"><canvas data-canvas=\"trend\"></canvas></div></div>\r\n    </div>\r\n    <div class=\"card\">\r\n      <div class=\"card-head\"><h3><i class=\"bi bi-pie-chart\"></i> Expense by Head</h3><span class=\"card-sub\">where the money goes</span></div>\r\n      <div class=\"card-body\"><div style=\"height: 250px; position: relative;\"><canvas data-canvas=\"mix\"></canvas></div></div>\r\n    </div>\r\n  </div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-credit-card\"></i> Payment Method Mix</h3><span class=\"card-sub\">income + expense by channel</span></div>\r\n    <div class=\"card-body\"><div style=\"height: 220px; position: relative;\"><canvas data-canvas=\"meth\"></canvas></div></div>\r\n  </div>\r\n  <div class=\"section-label\">Recent Entries</div>\r\n  <div class=\"card\">\r\n    <div class=\"card-body\" data-fill=\"recent\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- JOURNALS — the double-entry poster card (its FORM is the shared EPAL.form\r\n     engine, inserted before the balance row) over the recent-GL card. The Dr/Cr\r\n     badges are recomputed on every keystroke, so the logic fills them. -->\r\n<section data-screen=\"journals\">\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-journal-plus\"></i> New Double-Entry Journal</h3><span class=\"card-sub\">Debits must equal credits</span></div>\r\n    <div class=\"card-body\" data-fill=\"poster\">\r\n      <div class=\"flex justify-between items-center mt-2\">\r\n        <div class=\"flex gap-2 items-center\" data-fill=\"balance\"></div>\r\n        <button class=\"btn btn-primary\" data-act=\"post\" disabled><i class=\"bi bi-journal-plus\"></i> Post Journal</button>\r\n      </div>\r\n    </div>\r\n  </div>\r\n  <div class=\"section-label\">Recent Ledger Entries</div>\r\n  <div class=\"card\">\r\n    <div class=\"card-body\" data-fill=\"gl-table\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- PAYMENT SCHEDULES — the \"upcoming 15 days\" banner comes FIRST by owner\r\n     decision (checklist 06: \"shobar age/upore\"), then the KPI strip, then the\r\n     overdue banner (only when something IS overdue), then the tracker card. -->\r\n<section data-screen=\"schedules\">\r\n  <div class=\"build-banner mb-3\">\r\n    <i class=\"bi bi-calendar-week\"></i>\r\n    <div class=\"flex-1\" data-fill=\"next15\"></div>\r\n  </div>\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"build-banner mb-3\" data-fill=\"overdue-banner\">\r\n    <i class=\"bi bi-exclamation-octagon-fill\"></i>\r\n    <div data-fill=\"overdue-text\"></div>\r\n  </div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-calendar2-week\"></i> Payment Schedules</h3><span class=\"card-sub\" data-k=\"count\"></span></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- RECURRING EXPENSES — KPI strip, the \"due this month\" banner (shown only when\r\n     something is due; the logic fills its sentence + wires Generate All) and the\r\n     table card. Only the data grid itself is JS (sort/search/pagination). -->\r\n<section data-screen=\"recurring\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"build-banner mb-3\" data-fill=\"due-banner\">\r\n    <i class=\"bi bi-calendar-check\"></i>\r\n    <div class=\"flex-1\" data-fill=\"due-text\"></div>\r\n    <button class=\"btn btn-sm btn-primary\" data-act=\"generate\"><i class=\"bi bi-play-circle\"></i> Generate All</button>\r\n  </div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-arrow-repeat\"></i> Recurring Expenses</h3><span class=\"card-sub\">auto-created monthly on their day</span></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n\r\n<section data-screen=\"banks\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"text-mute sm mb-2\" data-fill=\"note\"></div>\r\n  <div class=\"card mb-2\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-bank\"></i> Travels Bank Accounts</h3><span class=\"card-sub\">read-only</span></div>\r\n    <div class=\"card-body\" data-fill=\"banks-table\"></div>\r\n  </div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-clock-history\"></i> Recent Movements</h3><span class=\"card-sub\">newest first · read-only</span></div>\r\n    <div class=\"card-body\" data-fill=\"txns-table\"></div>\r\n  </div>\r\n</section>\r\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="travels/accounts"]')) {
     var st = document.createElement('style');
@@ -55,6 +55,20 @@ function fillK(root, k, v) { var n = root.querySelector('[data-k="' + k + '"]');
 // move a screen's element children onto `page` (no wrapper, no whitespace nodes)
 // so the final DOM is exactly what the old code produced.
 function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(function (c) { page.appendChild(c); }); }
+// The page-head bar, from the real HTML in template.html instead of the shared
+// EPAL.pageHead() builder — same markup, same classes, same one-line <h1> run;
+// the title is a TEXT NODE after the icon exactly as pageHead appends it, and
+// the sub carries title= so the pinned one-line head stays readable on hover.
+function head(o) {
+  var h = shell('head');
+  h.querySelector('[data-fill="eyebrow"]').textContent = o.eyebrow || '';
+  h.querySelector('[data-fill="title"]').appendChild(document.createTextNode(o.title || ''));
+  var sub = h.querySelector('[data-fill="sub"]');
+  sub.textContent = o.sub || ''; sub.setAttribute('title', o.sub || '');
+  var acts = h.querySelector('[data-fill="actions"]');
+  (o.actions || []).forEach(function (a) { if (a) acts.appendChild(a); });
+  return h;
+}
 
 /* reusable markup shells (template.html) — byte-identical to the el() shells they
  * replace. addRow = a primary-action button on its own row; btn/aBtn = a bare
@@ -256,9 +270,11 @@ EPAL.view('travels/accounts', {
       pettycash: 'Hard cash, the cash book, petty cash and cheques — Travels’ whole cash desk.',
       payroll: 'Salary run, payslips, loans & advances — posted to the ledger.' };
 
-    page.appendChild(EPAL.pageHead({
+    // page-head bar — real HTML ([data-shell="head"] in template.html, mirroring
+    // EPAL.pageHead's markup); JS fills only the per-screen words + actions.
+    page.appendChild(head({
       eyebrow: sub === 'overview' ? 'Epal Travels' : 'Travels › Accounts',
-      icon: 'cash-stack', title: titles[sub], sub: subs[sub],
+      title: titles[sub], sub: subs[sub],
       actions: [
         canCreate() && sub === 'expenses'
           ? el('button.btn.btn-primary', { html: ui.icon('wallet2') + ' New Expense', onclick: function () { expenseEntry(); } }) : null,
@@ -284,22 +300,22 @@ EPAL.view('travels/accounts', {
     // 8 sections since Cheques + Cash Book + Petty Cash folded into the ONE
     // Manage Cash desk (owner 2026-07-15) — the same shape as Master Accounts,
     // where cash is one section with its books as tabs, not three siblings.
-    var pills = frag('nav');
+    var nav = shell('nav');
     var active = CASH_SUBS[sub] ? 'cash' : sub;      // an old cash link still lights Manage Cash
-    [['overview', 'Overview'], ['income', 'Income'], ['expenses', 'Expenses'], ['payroll', 'Payroll'],
-     ['recurring', 'Recurring'], ['banks', 'Banks'], ['cash', 'Manage Cash'], ['journals', 'Journals'], ['schedules', 'Schedules']].forEach(function (p) {
-      var b = frag('nav-btn');
-      if (active === p[0]) b.classList.add('active');
-      b.textContent = p[1];
-      b.addEventListener('click', function () { EPAL.router.navigate('travels/accounts' + (p[0] === 'overview' ? '' : '/' + p[0])); });
-      pills.appendChild(b);
+    Array.prototype.forEach.call(nav.querySelectorAll('[data-tab]'), function (b) {
+      var key = b.getAttribute('data-tab');
+      if (active === key) b.classList.add('active');
+      b.removeAttribute('data-tab');                 // the hook is not part of the shipped DOM
+      b.addEventListener('click', function () { EPAL.router.navigate('travels/accounts' + (key === 'overview' ? '' : '/' + key)); });
     });
-    page.appendChild(pills);
+    page.appendChild(nav);
     // AUDIT P2: the period lock is VISIBLE wherever money is handled
     var lockYm = (EPAL.ledger && EPAL.ledger.lockedThrough) ? EPAL.ledger.lockedThrough() : null;
-    if (lockYm) page.appendChild(el('div.mb-2', null, [
-      el('span.badge.badge-warn', { html: ui.icon('lock-fill') + ' Books locked through ' + ui.escapeHtml(lockYm) + ' — back-dated entries are blocked' })
-    ]));
+    if (lockYm) {
+      var lockEl = shell('lock');
+      lockEl.querySelector('[data-fill="lock-text"]').innerHTML = ui.icon('lock-fill') + ' Books locked through ' + ui.escapeHtml(lockYm) + ' — back-dated entries are blocked';
+      page.appendChild(lockEl);
+    }
 
     /* MANAGE CASH — the shared desk (platform/kit/cash.js), scoped to Travels.
        At group level its Petty/Cheque tabs are read-only mirrors because entry
@@ -414,14 +430,14 @@ function overview(page) {
   var open = openSchedules(), overdue = overdueSchedules();
   var outstanding = open.reduce(function (a, s) { return a + (+s.amount || 0); }, 0);
 
-  var kg = frag('kpi-grid');
+  var ov = screen('overview');
+  var kg = ov.querySelector('[data-fill="kpis"]');
   kg.appendChild(kpiDrill('Income', ui.money(inc, { compact: true }), 'arrow-down-left-circle', 'travels/accounts/income'));
   kg.appendChild(kpiDrill('Expenses', ui.money(exp, { compact: true }), 'arrow-up-right-circle', 'travels/accounts/expenses'));
   kg.appendChild(kpi('Net Result', ui.money(net, { compact: true }), net >= 0 ? 'graph-up-arrow' : 'graph-down-arrow', net >= 0 ? 'text-good' : 'text-bad'));
   kg.appendChild(kpi('Cash & Bank', ui.money(cash, { compact: true }), 'bank2'));
   kg.appendChild(kpiDrill('Open Schedules', String(open.length), 'calendar2-week', 'travels/accounts/schedules', ui.money(outstanding, { compact: true }) + ' outstanding'));
   kg.appendChild(kpi('Overdue', ui.money(overdue.reduce(function (a, s) { return a + (+s.amount || 0); }, 0), { compact: true }), 'exclamation-triangle', overdue.length ? 'text-bad' : ''));
-  page.appendChild(kg);
 
   // ---- Action Center — what the money desk must act on TODAY -------------
   var actions = [];
@@ -442,9 +458,13 @@ function overview(page) {
   if (cash < 100000) actions.push({ tone: 'error', icon: 'wallet2',
     text: '<strong>Low cash.</strong> Cash & bank position is ' + ui.money(cash) + ' — review upcoming payables.', go: 'travels/accounts/schedules' });
 
-  page.appendChild(sectionLabel('Action Center — needs attention'));
+  // the card and the "all clear" banner both live in the markup — keep the one
+  // this state calls for, drop the other
+  var acCard = ov.querySelector('[data-fill="action-card"]');
+  var allClear = ov.querySelector('[data-fill="all-clear"]');
   if (actions.length) {
-    var acCard = frag('body-card'), acBody = slot(acCard, 'body');
+    allClear.parentNode.removeChild(allClear);
+    var acBody = ov.querySelector('[data-fill="actions"]');
     actions.forEach(function (a) {
       acBody.appendChild(el('div.data-row', { style: { cursor: 'pointer' }, onclick: (function (go) { return function () { EPAL.router.navigate(go); }; })(a.go) }, [
         ui.frag('<span class="notif-ico notif-' + a.tone + '">' + ui.icon(a.icon) + '</span>'),
@@ -452,21 +472,19 @@ function overview(page) {
         ui.frag('<span class="text-mute">' + ui.icon('chevron-right') + '</span>')
       ]));
     });
-    page.appendChild(acCard);
   } else {
-    page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('check-circle-fill')),
-      el('div', { html: '<strong>All clear.</strong> No overdue or imminent settlements — the books are current.' }) ]));
+    acCard.parentNode.removeChild(acCard);
   }
 
   // ---- charts: monthly income vs expense + expense mix + method mix ------
-  page.appendChild(sectionLabel('Cash Movement'));
+  // the three cards are markup; only their canvas ids are minted here (each
+  // render needs a fresh id so Chart.js binds to THIS instance of the screen)
   var trendId = ui.uid('acc-trend'), mixId = ui.uid('acc-mix'), methId = ui.uid('acc-meth');
-  page.appendChild(el('div.grid-auto', null, [
-    chartCard('Income vs Expense — monthly', 'activity', trendId, 'last 8 months', 250),
-    chartCard('Expense by Head', 'pie-chart', mixId, 'where the money goes', 250)
-  ]));
+  [['trend', trendId], ['mix', mixId], ['meth', methId]].forEach(function (p) {
+    var c = ov.querySelector('[data-canvas="' + p[0] + '"]');
+    c.id = p[1]; c.removeAttribute('data-canvas');
+  });
   var methods = groupBy(entries(), 'method');
-  page.appendChild(chartCard('Payment Method Mix', 'credit-card', methId, 'income + expense by channel', 220));
 
   requestAnimationFrame(function () {
     var months = lastYm(8);
@@ -484,8 +502,8 @@ function overview(page) {
   });
 
   // ---- recent entries register ------------------------------------------
-  page.appendChild(sectionLabel('Recent Entries'));
-  page.appendChild(bodyCard(entriesTable(entries(), null)));
+  ui.appendChildren(ov.querySelector('[data-fill="recent"]'), entriesTable(entries(), null));
+  mountScreen(page, ov);
 }
 
 /* ======================================================= INCOME / EXPENSES */
