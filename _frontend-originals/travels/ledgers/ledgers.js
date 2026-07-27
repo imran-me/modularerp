@@ -24,29 +24,6 @@ function frag(name) {
 }
 function slot(root, name) { return root.querySelector('[data-slot="' + name + '"]'); }
 
-/* ---- REAL-HTML plumbing: a whole screen written as plain HTML -------------
- * <section data-screen="…"> / <div data-shell="…"> in template.html ARE the
- * screens; the logic below only fills [data-k]/[data-fill] and wires buttons.
- * mountScreen moves the section's element children onto the page so the final
- * DOM has no wrapper and no whitespace nodes the old el() code never produced. */
-function screen(name) { return TPL.querySelector('[data-screen="' + name + '"]').cloneNode(true); }
-function shell(name) { return TPL.querySelector('[data-shell="' + name + '"]').cloneNode(true); }
-function fillK(root, k, v) { var n = root.querySelector('[data-k="' + k + '"]'); if (n) n.textContent = String(v); }
-function fill(root, k) { return root.querySelector('[data-fill="' + k + '"]'); }
-function drop(node) { if (node && node.parentNode) node.parentNode.removeChild(node); }
-function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(function (c) { page.appendChild(c); }); }
-// The page-head bar from real HTML instead of the shared EPAL.pageHead() builder
-// — same markup, same classes; the title is a TEXT NODE after the icon exactly
-// as pageHead appends it, and the sub carries title= for the pinned one-line head.
-function head(o) {
-  var h = shell('head');
-  fill(h, 'eyebrow').textContent = o.eyebrow || '';
-  fill(h, 'title').appendChild(document.createTextNode(o.title || ''));
-  var sub = fill(h, 'sub');
-  sub.textContent = o.sub || ''; sub.setAttribute('title', o.sub || '');
-  return h;
-}
-
 var CID = 'travels';
 var CO_NAME = 'Epal Travels & Consultancy';
 var TODAY_STR = '2026-07-05';
@@ -71,15 +48,12 @@ function chartCard(title, icon, canvasId, subLabel, height) {
 }
 function buildBanner(icon, html) { var b = frag('build-banner'); slot(b, 'ico').classList.add('bi-' + icon); slot(b, 'msg').innerHTML = html; return b; }
 
-// the 8-tab band is real HTML ([data-shell="nav"]); this only lights the active
-// one and wires the clicks, then strips the data-tab hook off the shipped DOM
 function sectionNav(tab) {
-  var nav = shell('nav');
-  Array.prototype.forEach.call(nav.querySelectorAll('[data-tab]'), function (btn) {
-    var key = btn.getAttribute('data-tab');
-    if (tab === key) btn.classList.add('active');
-    btn.removeAttribute('data-tab');
-    btn.addEventListener('click', function () { EPAL.router.navigate('travels/ledgers', { tab: key }); });
+  var nav = frag('nav');
+  TABS.forEach(function (p) {
+    var btn = frag('nav-btn'); if (tab === p[0]) btn.classList.add('active'); btn.textContent = p[1];
+    btn.addEventListener('click', function () { EPAL.router.navigate('travels/ledgers', { tab: p[0] }); });
+    nav.appendChild(btn);
   });
   return nav;
 }
@@ -139,12 +113,11 @@ EPAL.view('travels/ledgers', {
     var tab = (ctx.params && ctx.params.tab) || 'overview';
     if (!TABS.some(function (t) { return t[0] === tab; })) tab = 'overview';
     var page = frag('page');
-    // page-head bar — real HTML ([data-shell="head"], mirroring EPAL.pageHead's
-    // markup); its single "Accounts" action is static so it lives there too.
-    page.appendChild(head({
-      eyebrow: tab === 'overview' ? 'Epal Travels' : 'Travels › Ledgers',
+    page.appendChild(EPAL.pageHead({
+      eyebrow: tab === 'overview' ? 'Epal Travels' : 'Travels › Ledgers', icon: 'journal-text',
       title: tab === 'overview' ? 'Ledgers' : (TABS.filter(function (t) { return t[0] === tab; })[0][1]),
-      sub: 'Real double-entry general ledger, trial balance, party subledgers, ageing and statements for Epal Travels.'
+      sub: 'Real double-entry general ledger, trial balance, party subledgers, ageing and statements for Epal Travels.',
+      actions: [ el('a.btn.btn-ghost', { href: '#/travels/accounts', html: ui.icon('cash-stack') + ' Accounts' }) ]
     }));
     if (!L) { var c = frag('card-body-card'); slot(c, 'body').appendChild(el('p.text-mute', { text: 'The ledger engine is not available.' })); page.appendChild(c); ctx.mount.appendChild(page); return; }
 
@@ -164,14 +137,14 @@ function overview(page, L) {
   var arTot = ar.reduce(function (a, r) { return a + r.total; }, 0), apTot = ap.reduce(function (a, r) { return a + r.total; }, 0);
   var arOverdue = ar.reduce(function (a, r) { return a + r.d30 + r.d60 + r.d90; }, 0), apOverdue = ap.reduce(function (a, r) { return a + r.d30 + r.d60 + r.d90; }, 0);
 
-  var ov = screen('overview');
-  var grid = fill(ov, 'kpis');
+  var grid = frag('kpi-grid');
   grid.appendChild(kpiDrill('Revenue', ui.money(pl.revenue, { compact: true }), 'cash-coin', 'pnl'));
   grid.appendChild(kpi('Net Profit', ui.money(pl.net, { compact: true }), pl.net >= 0 ? 'trophy' : 'exclamation-triangle', pl.net >= 0 ? 'text-good' : 'text-bad'));
   grid.appendChild(kpi('Cash & Bank', ui.money(cash, { compact: true }), 'bank2'));
   grid.appendChild(kpiDrill('Receivable', ui.money(arTot, { compact: true }), 'arrow-down-left-circle', 'ar', arOverdue ? ui.money(arOverdue, { compact: true }) + ' overdue' : 'all current'));
   grid.appendChild(kpiDrill('Payable', ui.money(apTot, { compact: true }), 'arrow-up-right-circle', 'ap', apOverdue ? ui.money(apOverdue, { compact: true }) + ' overdue' : 'all current'));
   grid.appendChild(kpi('Total Assets', ui.money(bs.totals.assets, { compact: true }), 'building'));
+  page.appendChild(grid);
 
   // balance-check + action center
   var acts = [];
@@ -183,11 +156,9 @@ function overview(page, L) {
   ap.slice().sort(function (a, b) { return (b.d60 + b.d90) - (a.d60 + a.d90); }).filter(function (r) { return r.d60 + r.d90 > 0; }).slice(0, 2).forEach(function (r) {
     acts.push({ tone: 'info', icon: 'clock-history', text: 'Overdue payable: <strong>' + esc(r.party) + '</strong> · ' + ui.money(r.d60 + r.d90) + ' 31d+', go: 'ap', party: r.party });
   });
-  // the card and the all-clean banner are both in the markup — keep the one this
-  // state calls for. The ROWS are live data, so they stay the action-row fragment.
+  var lbl1 = frag('section-label'); lbl1.textContent = 'Action Center — needs attention'; page.appendChild(lbl1);
   if (acts.length) {
-    drop(fill(ov, 'clean'));
-    var abody = fill(ov, 'actions');
+    var acard = frag('card-body-card'); var abody = slot(acard, 'body');
     acts.forEach(function (a) {
       var row = frag('action-row');
       var ico = slot(row, 'ico'); ico.classList.add('notif-' + a.tone); ico.innerHTML = ui.icon(a.icon);
@@ -195,22 +166,27 @@ function overview(page, L) {
       row.addEventListener('click', (function (go) { return function () { EPAL.router.navigate('travels/ledgers', { tab: go }); }; })(a.go));
       abody.appendChild(row);
     });
+    page.appendChild(acard);
   } else {
-    drop(fill(ov, 'action-card'));
+    page.appendChild(buildBanner('check-circle-fill', '<strong>Books are clean.</strong> Trial balance and balance sheet both balance; nothing seriously overdue.'));
   }
 
-  // income statement snapshot + assets/claims chart (the rows are the pnlLine
-  // helper — a compound inline style; the canvas id is minted per render)
-  var incBody = fill(ov, 'pnl-lines');
+  // income statement snapshot + assets/claims chart
+  var lbl2 = frag('section-label'); lbl2.textContent = 'Financial Snapshot'; page.appendChild(lbl2);
+  var pId = ui.uid('bsmix');
+  var row2 = frag('grid-auto');
+  var incCard = frag('reg-card');
+  slot(incCard, 'title').innerHTML = ui.icon('graph-up-arrow') + ' Income Statement';
+  slot(incCard, 'sub').textContent = 'live ledger P&L';
+  var incBody = slot(incCard, 'body');
   incBody.appendChild(pnlLine('Revenue', pl.revenue, false));
   incBody.appendChild(pnlLine('Cost of Sales', -pl.cogs, false));
   incBody.appendChild(pnlLine('Gross Profit', pl.gross, true));
   incBody.appendChild(pnlLine('Operating Expenses', -pl.expenses, false));
   incBody.appendChild(pnlLine('Net Profit', pl.net, true));
-  var pId = ui.uid('bsmix');
-  var cv = ov.querySelector('[data-canvas="bsmix"]');
-  cv.id = pId; cv.removeAttribute('data-canvas');
-  mountScreen(page, ov);
+  row2.appendChild(incCard);
+  row2.appendChild(chartCard('Assets vs Claims', 'pie-chart', pId, 'A = L + E', 240));
+  page.appendChild(row2);
   requestAnimationFrame(function () { var c = document.getElementById(pId); if (!c) return;
     EPAL.charts.doughnut(c, { labels: ['Assets', 'Liabilities', 'Equity'], data: [bs.totals.assets, bs.totals.liabilities, bs.totals.equity], colors: ['#1A43BF', '#f4b740', '#23c17e'] }); });
 }
@@ -321,10 +297,11 @@ function partyView(page, L) {
     onRow: function (r) { partyStatementModal(L, r.party); },
     empty: { icon: 'people', title: 'No parties' }
   });
-  var pv = screen('party');
-  fillK(pv, 'count', rows.length + ' parties · click for statement');
-  fill(pv, 'table').appendChild(t.el);
-  mountScreen(page, pv);
+  var card = frag('reg-card');
+  slot(card, 'title').innerHTML = ui.icon('people-fill') + ' Party Ledger';
+  slot(card, 'sub').textContent = rows.length + ' parties · click for statement';
+  slot(card, 'body').appendChild(t.el);
+  page.appendChild(card);
 }
 
 /* ======================================================= AR / AP AGEING */
@@ -332,13 +309,13 @@ function ageingView(page, L, ctx, tab) {
   var kind = tab === 'ap' ? 'AP' : 'AR';
   var rows = L.aging(kind, { companyId: CID });
   var sum = rows.reduce(function (a, r) { a.current += r.current; a.d30 += r.d30; a.d60 += r.d60; a.d90 += r.d90; a.total += r.total; return a; }, { current: 0, d30: 0, d60: 0, d90: 0, total: 0 });
-  var av = screen('ageing');
-  var grid = fill(av, 'kpis');
+  var grid = frag('kpi-grid');
   grid.appendChild(kpi('Current', ui.money(sum.current, { compact: true }), 'clock', 'text-good'));
   grid.appendChild(kpi('1–30 days', ui.money(sum.d30, { compact: true }), 'clock-history'));
   grid.appendChild(kpi('31–60 days', ui.money(sum.d60, { compact: true }), 'hourglass-split', 'text-warn'));
   grid.appendChild(kpi('60+ days', ui.money(sum.d90, { compact: true }), 'exclamation-octagon', sum.d90 ? 'text-bad' : ''));
   grid.appendChild(kpi('Total ' + kind, ui.money(sum.total, { compact: true }), kind === 'AR' ? 'arrow-down-left-circle' : 'arrow-up-right-circle'));
+  page.appendChild(grid);
   var t = EPAL.table({
     columns: [
       { key: 'party', label: 'Party', render: function (r) { return '<span class="strong">' + esc(r.party) + '</span>'; } },
@@ -351,12 +328,11 @@ function ageingView(page, L, ctx, tab) {
     onRow: function (r) { partyStatementModal(L, r.party); },
     empty: { icon: 'check2-circle', title: 'Nothing outstanding — all settled' }
   });
-  fill(av, 'title').innerHTML = ui.icon(kind === 'AR' ? 'arrow-down-left-circle' : 'arrow-up-right-circle') + ' ' + (kind === 'AR' ? 'Receivable' : 'Payable') + ' Ageing';
-  var pb = av.querySelector('[data-act="print"]');
-  pb.removeAttribute('data-act');
-  pb.addEventListener('click', function () { printAging(kind, rows, sum); });
-  fill(av, 'table').appendChild(t.el);
-  mountScreen(page, av);
+  var card = frag('head-btn-card');
+  slot(card, 'title').innerHTML = ui.icon(kind === 'AR' ? 'arrow-down-left-circle' : 'arrow-up-right-circle') + ' ' + (kind === 'AR' ? 'Receivable' : 'Payable') + ' Ageing';
+  slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printAging(kind, rows, sum); } }));
+  slot(card, 'body').appendChild(t.el);
+  page.appendChild(card);
 }
 
 /* ======================================================= BALANCE SHEET */

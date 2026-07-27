@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · LEDGERS · MARKUP\n  ----------------------------------------------------------------------------\n  The screen's HTML, separated from its logic (frontend/ledgers.js). Cloned +\n  filled at runtime via [data-tpl] / [data-slot] hooks. Tabs are driven by the\n  ?tab= query param.\n\n  The drill-down MODALS (account ledger, party statement, journal, receive-\n  payment form) and every branded PDF (EPAL.doc.open) keep their legacy el()-\n  built DOM in the logic file. The income-statement rows (pnlLine) also stay a\n  legacy el() helper — a compound inline style (padding + an rgba divider) that\n  is impractical to express as a utility. STYLING = the house design system;\n  tw- utils only where a captured screen used a static inline style:\n    tw-max-w-[360px] == style=\"max-width:360px\"  (General-Ledger account select)\n    tw-relative      == style=\"position:relative\"  (chart box; height runtime)\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section band ----------------------------------------------->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grids + plain + drill KPI card -------------------------------------->\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi-grid-plain\"><div class=\"kpi-grid kpi-compact\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n<template data-tpl=\"kpi-drill\"><div class=\"kpi-card drill\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div><div class=\"kpi-foot\" data-slot=\"foot\"></div></div></template>\n\n<!-- generic layout bits ----------------------------------------------------->\n<template data-tpl=\"section-label\"><div class=\"section-label\"></div></template>\n<template data-tpl=\"grid-auto\"><div class=\"grid-auto\"></div></template>\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"head-btn-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span data-slot=\"action\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"build-banner\"><div class=\"build-banner mb-3\"><i class=\"bi\" data-slot=\"ico\"></i><div data-slot=\"msg\"></div></div></template>\n\n<!-- overview Action Center row (cursor + tone in logic; chevron static) ----->\n<template data-tpl=\"action-row\"><div class=\"data-row tw-cursor-pointer\"><span class=\"notif-ico\" data-slot=\"ico\"></span><div class=\"flex-1\" data-slot=\"text\"></div><span class=\"text-mute\"><i class=\"bi bi-chevron-right\"></i></span></div></template>\n\n<!-- chart card (relative box + canvas; height set in logic) ---------------->\n<template data-tpl=\"chart-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\"><div class=\"tw-relative\" data-slot=\"box\"><canvas data-slot=\"canvas\"></canvas></div></div></div></template>\n\n<!-- General Ledger: the account picker card -------------------------------->\n<template data-tpl=\"select-card\"><div class=\"card\"><div class=\"card-body\"><div class=\"section-label mt-0\">Select account</div><select class=\"select tw-max-w-[360px]\" data-slot=\"sel\"></select></div></div></template>\n\n<!-- Party ledger empty state ----------------------------------------------->\n<template data-tpl=\"party-empty\"><div class=\"empty-state\"><i class=\"bi bi-people\"></i><h3>No party movement yet</h3><p class=\"text-muted\">Party postings (sales, payments) will appear here.</p></div></template>\n\n<!-- Balance-sheet Print row (right-aligned button) ------------------------->\n<template data-tpl=\"print-row\"><div class=\"flex justify-end mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\r\n  TRAVELS · LEDGERS · MARKUP\r\n  ----------------------------------------------------------------------------\r\n  The screen's HTML, separated from its logic (frontend/ledgers.js). Cloned +\r\n  filled at runtime via [data-tpl] / [data-slot] hooks. Tabs are driven by the\r\n  ?tab= query param.\r\n\r\n  The drill-down MODALS (account ledger, party statement, journal, receive-\r\n  payment form) and every branded PDF (EPAL.doc.open) keep their legacy el()-\r\n  built DOM in the logic file. The income-statement rows (pnlLine) also stay a\r\n  legacy el() helper — a compound inline style (padding + an rgba divider) that\r\n  is impractical to express as a utility. STYLING = the house design system;\r\n  tw- utils only where a captured screen used a static inline style:\r\n    tw-max-w-[360px] == style=\"max-width:360px\"  (General-Ledger account select)\r\n    tw-relative      == style=\"position:relative\"  (chart box; height runtime)\r\n\r\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\r\n  the DOM the old ui.el() calls produced.\r\n  ============================================================================ -->\r\n\r\n<!-- page shell + section band ----------------------------------------------->\r\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\r\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\r\n<template data-tpl=\"nav-btn\"><button></button></template>\r\n\r\n<!-- KPI grids + plain + drill KPI card -------------------------------------->\r\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\r\n<template data-tpl=\"kpi-grid-plain\"><div class=\"kpi-grid kpi-compact\"></div></template>\r\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\r\n<template data-tpl=\"kpi-drill\"><div class=\"kpi-card drill\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div><div class=\"kpi-foot\" data-slot=\"foot\"></div></div></template>\r\n\r\n<!-- generic layout bits ----------------------------------------------------->\r\n<template data-tpl=\"section-label\"><div class=\"section-label\"></div></template>\r\n<template data-tpl=\"grid-auto\"><div class=\"grid-auto\"></div></template>\r\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n<template data-tpl=\"head-btn-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span data-slot=\"action\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n<template data-tpl=\"build-banner\"><div class=\"build-banner mb-3\"><i class=\"bi\" data-slot=\"ico\"></i><div data-slot=\"msg\"></div></div></template>\r\n\r\n<!-- overview Action Center row (cursor + tone in logic; chevron static) ----->\r\n<template data-tpl=\"action-row\"><div class=\"data-row tw-cursor-pointer\"><span class=\"notif-ico\" data-slot=\"ico\"></span><div class=\"flex-1\" data-slot=\"text\"></div><span class=\"text-mute\"><i class=\"bi bi-chevron-right\"></i></span></div></template>\r\n\r\n<!-- chart card (relative box + canvas; height set in logic) ---------------->\r\n<template data-tpl=\"chart-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\"><div class=\"tw-relative\" data-slot=\"box\"><canvas data-slot=\"canvas\"></canvas></div></div></div></template>\r\n\r\n<!-- General Ledger: the account picker card -------------------------------->\r\n<template data-tpl=\"select-card\"><div class=\"card\"><div class=\"card-body\"><div class=\"section-label mt-0\">Select account</div><select class=\"select tw-max-w-[360px]\" data-slot=\"sel\"></select></div></div></template>\r\n\r\n<!-- Party ledger empty state ----------------------------------------------->\r\n<template data-tpl=\"party-empty\"><div class=\"empty-state\"><i class=\"bi bi-people\"></i><h3>No party movement yet</h3><p class=\"text-muted\">Party postings (sales, payments) will appear here.</p></div></template>\r\n\r\n<!-- Balance-sheet Print row (right-aligned button) ------------------------->\r\n<template data-tpl=\"print-row\"><div class=\"flex justify-end mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\r\n\r\n<!-- ============================================================================\r\n     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup) and the\r\n     8-tab section band, as real HTML. head()/navBand() clone + fill these.\r\n     NOTE: the <h1> inner run stays ONE line — a newline between those inline\r\n     tags clones as a real space.\r\n     ============================================================================ -->\r\n<div data-shell=\"head\" class=\"page-head\">\r\n  <div>\r\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-journal-text\"></i></h1>\r\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\r\n  </div>\r\n  <div class=\"page-actions\"><a class=\"btn btn-ghost\" href=\"#/travels/accounts\"><i class=\"bi bi-cash-stack\"></i> Accounts</a></div>\r\n</div>\r\n\r\n<div data-shell=\"nav\" class=\"tab-underline mb-3\">\r\n  <button data-tab=\"overview\">Overview</button>\r\n  <button data-tab=\"general\">General Ledger</button>\r\n  <button data-tab=\"trial\">Trial Balance</button>\r\n  <button data-tab=\"party\">Party Ledger</button>\r\n  <button data-tab=\"ar\">AR Ageing</button>\r\n  <button data-tab=\"ap\">AP Ageing</button>\r\n  <button data-tab=\"bs\">Balance Sheet</button>\r\n  <button data-tab=\"pnl\">P&amp;L</button>\r\n</div>\r\n\r\n<!-- ============================================================================\r\n     REAL SCREEN HTML (the foundation) — each <section data-screen=\"…\"> is a whole\r\n     Ledgers tab written as plain HTML. ledgers.js fills the live values and drops\r\n     the data grids / chart canvases in, then mountScreen() moves the block onto\r\n     the page. Converted one screen at a time, pixel-verified.\r\n     ============================================================================ -->\r\n\r\n<!-- OVERVIEW (cockpit) — KPI strip · Action Center (its ROWS come from live data,\r\n     so they stay the action-row fragment) or the all-clean banner · the income\r\n     statement snapshot beside the assets/claims doughnut. -->\r\n<section data-screen=\"overview\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"section-label\">Action Center — needs attention</div>\r\n  <div class=\"card\" data-fill=\"action-card\">\r\n    <div class=\"card-body\" data-fill=\"actions\"></div>\r\n  </div>\r\n  <div class=\"build-banner mb-3\" data-fill=\"clean\">\r\n    <i class=\"bi bi-check-circle-fill\"></i>\r\n    <div><strong>Books are clean.</strong> Trial balance and balance sheet both balance; nothing seriously overdue.</div>\r\n  </div>\r\n  <div class=\"section-label\">Financial Snapshot</div>\r\n  <div class=\"grid-auto\">\r\n    <div class=\"card\">\r\n      <div class=\"card-head\"><h3><i class=\"bi bi-graph-up-arrow\"></i> Income Statement</h3><span class=\"card-sub\">live ledger P&amp;L</span></div>\r\n      <div class=\"card-body\" data-fill=\"pnl-lines\"></div>\r\n    </div>\r\n    <div class=\"card\">\r\n      <div class=\"card-head\"><h3><i class=\"bi bi-pie-chart\"></i> Assets vs Claims</h3><span class=\"card-sub\">A = L + E</span></div>\r\n      <div class=\"card-body\"><div class=\"tw-relative\" style=\"height: 240px;\"><canvas data-canvas=\"bsmix\"></canvas></div></div>\r\n    </div>\r\n  </div>\r\n</section>\r\n\r\n<!-- PARTY LEDGER — one card; the empty state is its own shell. -->\r\n<section data-screen=\"party\">\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-people-fill\"></i> Party Ledger</h3><span class=\"card-sub\" data-k=\"count\"></span></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- AR / AP AGEING — one shell serves both; the logic fills the words. -->\r\n<section data-screen=\"ageing\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3 data-fill=\"title\"></h3><button class=\"btn btn-sm btn-primary\" data-act=\"print\"><i class=\"bi bi-printer\"></i> Print</button></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="travels/ledgers"]')) {
     var st = document.createElement('style');
@@ -43,6 +43,29 @@ function frag(name) {
 }
 function slot(root, name) { return root.querySelector('[data-slot="' + name + '"]'); }
 
+/* ---- REAL-HTML plumbing: a whole screen written as plain HTML -------------
+ * <section data-screen="…"> / <div data-shell="…"> in template.html ARE the
+ * screens; the logic below only fills [data-k]/[data-fill] and wires buttons.
+ * mountScreen moves the section's element children onto the page so the final
+ * DOM has no wrapper and no whitespace nodes the old el() code never produced. */
+function screen(name) { return TPL.querySelector('[data-screen="' + name + '"]').cloneNode(true); }
+function shell(name) { return TPL.querySelector('[data-shell="' + name + '"]').cloneNode(true); }
+function fillK(root, k, v) { var n = root.querySelector('[data-k="' + k + '"]'); if (n) n.textContent = String(v); }
+function fill(root, k) { return root.querySelector('[data-fill="' + k + '"]'); }
+function drop(node) { if (node && node.parentNode) node.parentNode.removeChild(node); }
+function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(function (c) { page.appendChild(c); }); }
+// The page-head bar from real HTML instead of the shared EPAL.pageHead() builder
+// — same markup, same classes; the title is a TEXT NODE after the icon exactly
+// as pageHead appends it, and the sub carries title= for the pinned one-line head.
+function head(o) {
+  var h = shell('head');
+  fill(h, 'eyebrow').textContent = o.eyebrow || '';
+  fill(h, 'title').appendChild(document.createTextNode(o.title || ''));
+  var sub = fill(h, 'sub');
+  sub.textContent = o.sub || ''; sub.setAttribute('title', o.sub || '');
+  return h;
+}
+
 var CID = 'travels';
 var CO_NAME = 'Epal Travels & Consultancy';
 var TODAY_STR = '2026-07-05';
@@ -67,12 +90,15 @@ function chartCard(title, icon, canvasId, subLabel, height) {
 }
 function buildBanner(icon, html) { var b = frag('build-banner'); slot(b, 'ico').classList.add('bi-' + icon); slot(b, 'msg').innerHTML = html; return b; }
 
+// the 8-tab band is real HTML ([data-shell="nav"]); this only lights the active
+// one and wires the clicks, then strips the data-tab hook off the shipped DOM
 function sectionNav(tab) {
-  var nav = frag('nav');
-  TABS.forEach(function (p) {
-    var btn = frag('nav-btn'); if (tab === p[0]) btn.classList.add('active'); btn.textContent = p[1];
-    btn.addEventListener('click', function () { EPAL.router.navigate('travels/ledgers', { tab: p[0] }); });
-    nav.appendChild(btn);
+  var nav = shell('nav');
+  Array.prototype.forEach.call(nav.querySelectorAll('[data-tab]'), function (btn) {
+    var key = btn.getAttribute('data-tab');
+    if (tab === key) btn.classList.add('active');
+    btn.removeAttribute('data-tab');
+    btn.addEventListener('click', function () { EPAL.router.navigate('travels/ledgers', { tab: key }); });
   });
   return nav;
 }
@@ -132,11 +158,12 @@ EPAL.view('travels/ledgers', {
     var tab = (ctx.params && ctx.params.tab) || 'overview';
     if (!TABS.some(function (t) { return t[0] === tab; })) tab = 'overview';
     var page = frag('page');
-    page.appendChild(EPAL.pageHead({
-      eyebrow: tab === 'overview' ? 'Epal Travels' : 'Travels › Ledgers', icon: 'journal-text',
+    // page-head bar — real HTML ([data-shell="head"], mirroring EPAL.pageHead's
+    // markup); its single "Accounts" action is static so it lives there too.
+    page.appendChild(head({
+      eyebrow: tab === 'overview' ? 'Epal Travels' : 'Travels › Ledgers',
       title: tab === 'overview' ? 'Ledgers' : (TABS.filter(function (t) { return t[0] === tab; })[0][1]),
-      sub: 'Real double-entry general ledger, trial balance, party subledgers, ageing and statements for Epal Travels.',
-      actions: [ el('a.btn.btn-ghost', { href: '#/travels/accounts', html: ui.icon('cash-stack') + ' Accounts' }) ]
+      sub: 'Real double-entry general ledger, trial balance, party subledgers, ageing and statements for Epal Travels.'
     }));
     if (!L) { var c = frag('card-body-card'); slot(c, 'body').appendChild(el('p.text-mute', { text: 'The ledger engine is not available.' })); page.appendChild(c); ctx.mount.appendChild(page); return; }
 
@@ -156,14 +183,14 @@ function overview(page, L) {
   var arTot = ar.reduce(function (a, r) { return a + r.total; }, 0), apTot = ap.reduce(function (a, r) { return a + r.total; }, 0);
   var arOverdue = ar.reduce(function (a, r) { return a + r.d30 + r.d60 + r.d90; }, 0), apOverdue = ap.reduce(function (a, r) { return a + r.d30 + r.d60 + r.d90; }, 0);
 
-  var grid = frag('kpi-grid');
+  var ov = screen('overview');
+  var grid = fill(ov, 'kpis');
   grid.appendChild(kpiDrill('Revenue', ui.money(pl.revenue, { compact: true }), 'cash-coin', 'pnl'));
   grid.appendChild(kpi('Net Profit', ui.money(pl.net, { compact: true }), pl.net >= 0 ? 'trophy' : 'exclamation-triangle', pl.net >= 0 ? 'text-good' : 'text-bad'));
   grid.appendChild(kpi('Cash & Bank', ui.money(cash, { compact: true }), 'bank2'));
   grid.appendChild(kpiDrill('Receivable', ui.money(arTot, { compact: true }), 'arrow-down-left-circle', 'ar', arOverdue ? ui.money(arOverdue, { compact: true }) + ' overdue' : 'all current'));
   grid.appendChild(kpiDrill('Payable', ui.money(apTot, { compact: true }), 'arrow-up-right-circle', 'ap', apOverdue ? ui.money(apOverdue, { compact: true }) + ' overdue' : 'all current'));
   grid.appendChild(kpi('Total Assets', ui.money(bs.totals.assets, { compact: true }), 'building'));
-  page.appendChild(grid);
 
   // balance-check + action center
   var acts = [];
@@ -175,9 +202,11 @@ function overview(page, L) {
   ap.slice().sort(function (a, b) { return (b.d60 + b.d90) - (a.d60 + a.d90); }).filter(function (r) { return r.d60 + r.d90 > 0; }).slice(0, 2).forEach(function (r) {
     acts.push({ tone: 'info', icon: 'clock-history', text: 'Overdue payable: <strong>' + esc(r.party) + '</strong> · ' + ui.money(r.d60 + r.d90) + ' 31d+', go: 'ap', party: r.party });
   });
-  var lbl1 = frag('section-label'); lbl1.textContent = 'Action Center — needs attention'; page.appendChild(lbl1);
+  // the card and the all-clean banner are both in the markup — keep the one this
+  // state calls for. The ROWS are live data, so they stay the action-row fragment.
   if (acts.length) {
-    var acard = frag('card-body-card'); var abody = slot(acard, 'body');
+    drop(fill(ov, 'clean'));
+    var abody = fill(ov, 'actions');
     acts.forEach(function (a) {
       var row = frag('action-row');
       var ico = slot(row, 'ico'); ico.classList.add('notif-' + a.tone); ico.innerHTML = ui.icon(a.icon);
@@ -185,27 +214,22 @@ function overview(page, L) {
       row.addEventListener('click', (function (go) { return function () { EPAL.router.navigate('travels/ledgers', { tab: go }); }; })(a.go));
       abody.appendChild(row);
     });
-    page.appendChild(acard);
   } else {
-    page.appendChild(buildBanner('check-circle-fill', '<strong>Books are clean.</strong> Trial balance and balance sheet both balance; nothing seriously overdue.'));
+    drop(fill(ov, 'action-card'));
   }
 
-  // income statement snapshot + assets/claims chart
-  var lbl2 = frag('section-label'); lbl2.textContent = 'Financial Snapshot'; page.appendChild(lbl2);
-  var pId = ui.uid('bsmix');
-  var row2 = frag('grid-auto');
-  var incCard = frag('reg-card');
-  slot(incCard, 'title').innerHTML = ui.icon('graph-up-arrow') + ' Income Statement';
-  slot(incCard, 'sub').textContent = 'live ledger P&L';
-  var incBody = slot(incCard, 'body');
+  // income statement snapshot + assets/claims chart (the rows are the pnlLine
+  // helper — a compound inline style; the canvas id is minted per render)
+  var incBody = fill(ov, 'pnl-lines');
   incBody.appendChild(pnlLine('Revenue', pl.revenue, false));
   incBody.appendChild(pnlLine('Cost of Sales', -pl.cogs, false));
   incBody.appendChild(pnlLine('Gross Profit', pl.gross, true));
   incBody.appendChild(pnlLine('Operating Expenses', -pl.expenses, false));
   incBody.appendChild(pnlLine('Net Profit', pl.net, true));
-  row2.appendChild(incCard);
-  row2.appendChild(chartCard('Assets vs Claims', 'pie-chart', pId, 'A = L + E', 240));
-  page.appendChild(row2);
+  var pId = ui.uid('bsmix');
+  var cv = ov.querySelector('[data-canvas="bsmix"]');
+  cv.id = pId; cv.removeAttribute('data-canvas');
+  mountScreen(page, ov);
   requestAnimationFrame(function () { var c = document.getElementById(pId); if (!c) return;
     EPAL.charts.doughnut(c, { labels: ['Assets', 'Liabilities', 'Equity'], data: [bs.totals.assets, bs.totals.liabilities, bs.totals.equity], colors: ['#1A43BF', '#f4b740', '#23c17e'] }); });
 }
@@ -316,11 +340,10 @@ function partyView(page, L) {
     onRow: function (r) { partyStatementModal(L, r.party); },
     empty: { icon: 'people', title: 'No parties' }
   });
-  var card = frag('reg-card');
-  slot(card, 'title').innerHTML = ui.icon('people-fill') + ' Party Ledger';
-  slot(card, 'sub').textContent = rows.length + ' parties · click for statement';
-  slot(card, 'body').appendChild(t.el);
-  page.appendChild(card);
+  var pv = screen('party');
+  fillK(pv, 'count', rows.length + ' parties · click for statement');
+  fill(pv, 'table').appendChild(t.el);
+  mountScreen(page, pv);
 }
 
 /* ======================================================= AR / AP AGEING */
@@ -328,13 +351,13 @@ function ageingView(page, L, ctx, tab) {
   var kind = tab === 'ap' ? 'AP' : 'AR';
   var rows = L.aging(kind, { companyId: CID });
   var sum = rows.reduce(function (a, r) { a.current += r.current; a.d30 += r.d30; a.d60 += r.d60; a.d90 += r.d90; a.total += r.total; return a; }, { current: 0, d30: 0, d60: 0, d90: 0, total: 0 });
-  var grid = frag('kpi-grid');
+  var av = screen('ageing');
+  var grid = fill(av, 'kpis');
   grid.appendChild(kpi('Current', ui.money(sum.current, { compact: true }), 'clock', 'text-good'));
   grid.appendChild(kpi('1–30 days', ui.money(sum.d30, { compact: true }), 'clock-history'));
   grid.appendChild(kpi('31–60 days', ui.money(sum.d60, { compact: true }), 'hourglass-split', 'text-warn'));
   grid.appendChild(kpi('60+ days', ui.money(sum.d90, { compact: true }), 'exclamation-octagon', sum.d90 ? 'text-bad' : ''));
   grid.appendChild(kpi('Total ' + kind, ui.money(sum.total, { compact: true }), kind === 'AR' ? 'arrow-down-left-circle' : 'arrow-up-right-circle'));
-  page.appendChild(grid);
   var t = EPAL.table({
     columns: [
       { key: 'party', label: 'Party', render: function (r) { return '<span class="strong">' + esc(r.party) + '</span>'; } },
@@ -347,11 +370,12 @@ function ageingView(page, L, ctx, tab) {
     onRow: function (r) { partyStatementModal(L, r.party); },
     empty: { icon: 'check2-circle', title: 'Nothing outstanding — all settled' }
   });
-  var card = frag('head-btn-card');
-  slot(card, 'title').innerHTML = ui.icon(kind === 'AR' ? 'arrow-down-left-circle' : 'arrow-up-right-circle') + ' ' + (kind === 'AR' ? 'Receivable' : 'Payable') + ' Ageing';
-  slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printAging(kind, rows, sum); } }));
-  slot(card, 'body').appendChild(t.el);
-  page.appendChild(card);
+  fill(av, 'title').innerHTML = ui.icon(kind === 'AR' ? 'arrow-down-left-circle' : 'arrow-up-right-circle') + ' ' + (kind === 'AR' ? 'Receivable' : 'Payable') + ' Ageing';
+  var pb = av.querySelector('[data-act="print"]');
+  pb.removeAttribute('data-act');
+  pb.addEventListener('click', function () { printAging(kind, rows, sum); });
+  fill(av, 'table').appendChild(t.el);
+  mountScreen(page, av);
 }
 
 /* ======================================================= BALANCE SHEET */
