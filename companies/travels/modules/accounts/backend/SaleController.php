@@ -8,6 +8,8 @@ use App\Services\SalePostingService;
 use App\Support\ScopesToCompany;
 use Epal\Modules\Travels\Accounts\Http\Requests\StoreReceiptRequest;
 use Epal\Modules\Travels\Accounts\Http\Requests\StoreSaleRequest;
+use Epal\Modules\Travels\Accounts\Http\Resources\ReceiptResource;
+use Epal\Modules\Travels\Accounts\Http\Resources\SalePostingResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -70,7 +72,7 @@ class SaleController
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['success' => true, 'data' => $result], 201);
+        return response()->json(['success' => true, 'data' => new SalePostingResource($result)], 201);
     }
 
     /** Void a sale: both journals reversed, any account movement given back. */
@@ -96,7 +98,7 @@ class SaleController
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['success' => true, 'data' => $result], 201);
+        return response()->json(['success' => true, 'data' => new ReceiptResource($result)], 201);
     }
 
     /** Un-pay: reverse the receipt(s); the receivable returns to the ageing book. */

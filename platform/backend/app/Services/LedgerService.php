@@ -239,15 +239,36 @@ class LedgerService
         return DB::table('accounts')->whereNull('deleted_at')->where('code', $code)->exists();
     }
 
-    /** Line array -> journal_items rows, refusing unknown account codes up front. */
+    /**
+     * Line array -> journal_items rows, refusing unknown account codes up front.
+     *
+     * A code that is missing but belongs to the STANDARD chart is topped up rather
+     * than refused (ChartOfAccounts::ensure) — the SPA has always done this for its
+     * own chart via ensureExtraAccounts(), and the mismatch is what made live
+     * expenses fail with "Unknown account code: 5600" while the browser was happily
+     * posting to it. Anything NOT on the standard chart still throws: a typo must
+     * not quietly create an account.
+     */
     private function resolveItems(array $lines): array
     {
         $idByCode = DB::table('accounts')->whereNull('deleted_at')->pluck('id', 'code');
+        $topUp = null;
+        foreach ($lines as $ln) {
+            $code = (string) ($ln['account'] ?? '');
+            if ($code !== '' && ! isset($idByCode[$code])) {
+                $topUp = $topUp ?: app(ChartOfAccounts::class);
+                if ($topUp->ensure($code)) {
+                    $idByCode = DB::table('accounts')->whereNull('deleted_at')->pluck('id', 'code');
+                }
+            }
+        }
+
         $items = [];
         foreach ($lines as $ln) {
             $code = (string) ($ln['account'] ?? '');
             if (! isset($idByCode[$code])) {
-                throw new LedgerException('Unknown account code: ' . $code);
+                throw new LedgerException('Unknown account code: ' . $code
+                    . ' — add it in Master Accounts › Chart of Accounts.');
             }
             $items[] = [
                 'account_id' => (int) $idByCode[$code],

@@ -308,6 +308,16 @@
      * on failure the temp record is rolled back and the user is told. */
     wireWrites: function () {
       var S = EPAL.store;
+      // one notice per store, not one per save — a bookkeeper entering twenty
+      // expenses should not be told twenty times that the table needs migrating
+      var warned = {};
+      function warnUnprovisioned(store, message) {
+        if (warned[store]) return;
+        warned[store] = true;
+        var text = message || ('“' + store + '” is not migrated on the server yet — entries stay in this browser. Run: php artisan migrate');
+        try { console.warn('[api] ' + store + ': ' + text); } catch (e) {}
+        EPAL.bus.emit('notify', { text: text, level: 'warning', title: 'Saved in this browser only' });
+      }
       EPAL.bus.on('data:changed', function (e) {
         var path = WRITABLE[e.store];
         if (!path) return;                 // not a writable store — read-only for now
@@ -317,6 +327,13 @@
         if (e.action === 'upsert') {
           var before = e.record.id;
           call(path, { method: 'POST', body: e.record }).then(function (j) {
+            // THE SERVER ISN'T READY (a table this deploy hasn't migrated yet) is NOT
+            // a rejection. It used to be treated as one: the row was rolled back and
+            // the user watched a just-recorded expense vanish, register reading "No
+            // entries yet" (owner, live, 2026-07-27). The endpoint now answers
+            // provisioned:false instead, and we KEEP the optimistic row — the app
+            // stays usable browser-side — and say so once, plainly.
+            if (j && j.provisioned === false) { warnUnprovisioned(e.store, j.message); return; }
             if (j.data && j.data.id && j.data.id !== before) {
               S.removeFrom(e.store, before);   // temp client id -> real server id
               if (j.data) S.upsert(e.store, j.data);

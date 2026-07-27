@@ -7,6 +7,7 @@ use App\Services\ExpensePostingService;
 use App\Support\CompanySlugs;
 use App\Support\ScopesToCompany;
 use Epal\Modules\Travels\Accounts\Http\Requests\StoreExpenseRequest;
+use Epal\Modules\Travels\Accounts\Http\Resources\ExpenseVoucherResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -132,7 +133,7 @@ class ExpenseController
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['success' => true, 'data' => $result], 201);
+        return response()->json(['success' => true, 'data' => new ExpenseVoucherResource($result)], 201);
     }
 
     /** Void a voucher: register row removed, ledger reversed, account refunded. */

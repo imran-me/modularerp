@@ -65,6 +65,85 @@ class TravelsMoneyApiTest extends TestCase
         $this->getJson('/api/travels/accounts/receivables')->assertOk()->assertJsonPath('total', 0);
     }
 
+    /**
+     * THE RESPONSE CONTRACT. The posting services build internal arrays; API
+     * Resources decide what a client actually sees. Asserting the full shape here is
+     * what stops the internals leaking into the contract — and what makes it safe to
+     * refactor a service without silently changing the API.
+     */
+    public function test_the_sale_response_has_the_documented_shape(): void
+    {
+        $r = $this->postJson('/api/travels/accounts/sales', [
+            'ref' => 'SHAPE-1', 'amount' => 11500, 'vat' => 1500, 'cost' => 6000,
+            'category' => 'visa', 'customer' => 'Mr Rahman', 'vendor' => 'VFS',
+            'paid' => true, 'bankId' => '1', 'costPaid' => true, 'costBankId' => '2',
+            'date' => '2026-07-27', 'desc' => 'Visa Saudi Arabia',
+        ]);
+
+        $r->assertStatus(201)->assertJsonStructure(['success', 'data' => [
+            'ref', 'product', 'paid', 'debitedTo',
+            'revenue'  => ['id', 'date', 'companyId', 'ref', 'memo', 'source', 'party',
+                           'lines' => [['account', 'dr', 'cr']]],
+            'cost'     => ['id', 'lines'],
+            'register' => ['in' => ['bankId', 'bankName', 'type', 'amount', 'date', 'desc', 'ref', 'glId', 'balance'],
+                           'out' => ['bankId', 'type', 'amount']],
+        ]]);
+
+        // and the values are the real accounting, not placeholders
+        $r->assertJsonPath('data.product', 'Visa')
+          ->assertJsonPath('data.paid', true)
+          ->assertJsonPath('data.debitedTo', '1010')
+          ->assertJsonPath('data.register.in.type', 'deposit')
+          ->assertJsonPath('data.register.in.balance', 900000 + 11500)
+          ->assertJsonPath('data.register.out.type', 'withdraw');
+
+        // the VAT split is visible in the journal the client gets back
+        $lines = collect($r->json('data.revenue.lines'))->keyBy('account');
+        // assertEquals, not assertSame: JSON has no int/float distinction, so a whole
+        // 10000.0 comes back as int 10000 — the VALUE is the contract, not its PHP type
+        $this->assertEquals(10000, $lines['4020']['cr']);      // net revenue
+        $this->assertEquals(1500, $lines['2130']['cr']);       // the tax
+    }
+
+    public function test_the_receipt_response_has_the_documented_shape(): void
+    {
+        $this->postJson('/api/travels/accounts/sales', [
+            'ref' => 'SHAPE-2', 'amount' => 9000, 'cost' => 0, 'category' => 'air',
+        ])->assertStatus(201);
+
+        $r = $this->postJson('/api/travels/accounts/receipts', [
+            'ref' => 'SHAPE-2', 'amount' => 4000, 'bankId' => '2',
+        ]);
+
+        $r->assertStatus(201)->assertJsonStructure(['success', 'data' => [
+            'arAccount', 'settled', 'outstanding', 'into', 'account',
+            'journal'  => ['id', 'lines' => [['account', 'dr', 'cr']]],
+            'register' => ['bankId', 'type', 'amount', 'balance'],
+        ]]);
+        $r->assertJsonPath('data.into', '1000')                // a cash box IS hard cash
+          ->assertJsonPath('data.settled', 4000)
+          ->assertJsonPath('data.outstanding', 5000)           // partial, 5,000 still owed
+          ->assertJsonPath('data.account', 'Travels Petty Cash')
+          ->assertJsonPath('data.register.balance', 40000 + 4000);
+    }
+
+    public function test_the_expense_response_has_the_documented_shape(): void
+    {
+        $r = $this->postJson('/api/travels/accounts/expenses', [
+            'amount' => 3000, 'head' => '5500', 'category' => 'Office & Admin',
+            'fundedBy' => 'group', 'bankId' => '3',
+        ]);
+
+        $r->assertStatus(201)->assertJsonStructure(['success', 'data' => [
+            'entry', 'journal' => ['id', 'lines'], 'funderJournal' => ['id', 'lines'],
+            'register' => ['bankId', 'type', 'amount', 'balance'],
+        ]]);
+        // funderJournal present == the spend became an inter-company loan
+        $funder = collect($r->json('data.funderJournal.lines'))->keyBy('account');
+        $this->assertEquals(3000, $funder['1300']['dr']);
+        $this->assertEquals(3000, $funder['1010']['cr']);
+    }
+
     public function test_validation_refuses_a_sale_with_no_reference(): void
     {
         $this->postJson('/api/travels/accounts/sales', ['amount' => 1000])

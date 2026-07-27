@@ -89,6 +89,49 @@ class LedgerServiceTest extends TestCase
         $this->entry([['account' => '5550', 'dr' => 1000, 'cr' => 0]]);
     }
 
+    /**
+     * THE LIVE FAILURE, 2026-07-27. Recording a Conveyance expense on
+     * dev.epal.com.bd answered "Save failed: Unknown account code: 5600" and the
+     * register went empty. The SPA tops its own chart up at boot
+     * (ensureExtraAccounts) but the imported production `accounts` table never had
+     * 5500/5550/5600/5800/5350/4050/2130/2140 — so the browser could post to a head
+     * the API would refuse. A code on the STANDARD chart is now topped up instead.
+     */
+    public function test_a_missing_standard_head_is_topped_up_instead_of_refused(): void
+    {
+        DB::table('accounts')->where('code', '5600')->delete();      // as production was
+        $this->assertSame(0, DB::table('accounts')->where('code', '5600')->count());
+
+        $this->entry([
+            ['account' => '5600', 'dr' => 800, 'cr' => 0],
+            ['account' => '1010', 'dr' => 0, 'cr' => 800],
+        ]);
+
+        // the head now exists, correctly typed, and the posting went through
+        $head = DB::table('accounts')->where('code', '5600')->first();
+        $this->assertNotNull($head);
+        $this->assertSame('Conveyance & Travel', $head->name);
+        $this->assertSame('expense', $head->type);
+        $this->assertSame(800.0, $this->lineOn('GL-T1', '5600', 'debit'));
+        $this->assertTrue($this->booksBalance());
+    }
+
+    /** …but a code that is NOT on the standard chart must still be refused: a typo
+     *  must not quietly invent an account. */
+    public function test_a_non_standard_code_is_still_refused(): void
+    {
+        try {
+            $this->entry([
+                ['account' => '7777', 'dr' => 100, 'cr' => 0],
+                ['account' => '1010', 'dr' => 0, 'cr' => 100],
+            ]);
+            $this->fail('expected a LedgerException');
+        } catch (LedgerException $e) {
+            $this->assertStringContainsString('7777', $e->getMessage());
+        }
+        $this->assertSame(0, DB::table('accounts')->where('code', '7777')->count());
+    }
+
     public function test_an_unknown_account_code_is_refused_before_anything_is_written(): void
     {
         try {
