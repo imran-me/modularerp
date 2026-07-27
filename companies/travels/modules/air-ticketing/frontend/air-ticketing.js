@@ -1022,6 +1022,18 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     }));
   }
 
+  /* The Travels payment accounts, for the "which account" selects — one shared
+   * list (EPAL.pay, platform/kit/cash.js) so ticketing offers exactly what the
+   * expense desk and Manage Banks do, in the same order (bank → cash → wallet). */
+  function payAccountOptions() {
+    return (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options('travels') : [];
+  }
+  /* 'bank:BNK-3' → 'BNK-3'; the generic 'm:…' placeholders name no real account. */
+  function bankIdOf(v) {
+    v = String(v || '');
+    return v.indexOf('bank:') === 0 ? v.slice(5) : '';
+  }
+
   /* ======================================================= DIRECT SALE (issue) */
   function directSale(page) {
     var als = airlines().filter(function(a){ return a.status==='active'; });
@@ -1084,7 +1096,20 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       { key:'receiveFrom', label:'Receive from', type:'text', placeholder:'Customer · Sub-agent' },
       { key:'receivableAmount', label:'Receivable amount', type:'money', default:0 },
       { key:'receivableDate', label:'Receivable by', type:'date' },
-      { key:'payStatus', label:'Pay status (to vendor)', type:'select', options:['Paid','Partial','Due'], default:'Due' }
+      { key:'payStatus', label:'Pay status (to vendor)', type:'select', options:['Paid','Partial','Due'], default:'Due' },
+      /* WHERE THE MONEY ACTUALLY GOES (owner 2026-07-27). Until now a ticket sale
+       * only ever booked to 1200 Receivable and 2000 Payable, so the books could not
+       * say which bank took the fare or which account paid the airline. Naming an
+       * account here posts the sale straight to it AND moves its balance + history;
+       * leaving it on the default keeps the old behaviour (a receivable to collect
+       * later via Mark Paid), which is still the right answer for credit sales. */
+      { type:'section', label:'Money movement — which account' },
+      { key:'receivedInto', label:'Customer paid into', type:'select', searchable:true,
+        options:[['m:Due','Not paid yet — book as Receivable']].concat(payAccountOptions()),
+        default:'m:Due', hint:'Naming an account posts the fare into it now and moves its balance.' },
+      { key:'vendorPaidFrom', label:'Vendor / airline paid from', type:'select', searchable:true,
+        options:[['m:Due','Not paid yet — book as Payable']].concat(payAccountOptions()),
+        default:'m:Due', hint:'Only applies when Pay status (to vendor) is Paid.' }
     ];
 
     form = EPAL.form(fields, {});
@@ -1183,12 +1208,21 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           timeline:[{ at: Date.now(), text:'Ticket issued' }]
         };
         db.saveAirTicket(t);
-        // cross-company sale → Travels + Group finance + ledger auto-post.
-        // Include agent commission in the posted cost so ledger profit
-        // (sale - cost - commission) reconciles with the module's Net Profit.
-        db.postSale('travels', { amount:t.sale, cost:t.cost + (t.commission||0), ref:t.id,
+        /* cross-company sale → Travels + Group finance + ledger auto-post.
+         * commission is passed SEPARATELY (owner 2026-07-27). It used to be added
+         * into `cost`, which buried the agent's cut inside 5000 Cost of Sales: the
+         * books could not say what we owe agents, and gross margin read low while
+         * agent-commission expense read zero. The ledger now posts it to its own
+         * head — DR 5350 Agent Commission / CR 2000 payable to that agent — so the
+         * net profit is unchanged but every figure is attributable.
+         * bankId = the account the customer's money landed in, when they paid now;
+         * costBankId = the account the vendor was paid from. */
+        db.postSale('travels', { amount:t.sale, cost:t.cost, ref:t.id,
           desc:'Air ticket '+route+' ('+v.airlineCode+') · '+t.passenger, customer:t.passenger,
-          category:'air', vendor:(t.vendor||''), costPaid:(+t.costPaid||0) > 0 });
+          category:'air', vendor:(t.vendor||''), costPaid:(+t.costPaid||0) > 0,
+          commission:(+t.commission||0), agent:(t.agentName||''),
+          paid: !!v.receivedInto && v.receivedInto !== 'm:Due', payStatus: v.receivedInto && v.receivedInto !== 'm:Due' ? 'Paid' : 'Due',
+          bankId: bankIdOf(v.receivedInto), costBankId: bankIdOf(v.vendorPaidFrom) });
         docRows.push({ passenger:t.passenger, ticketNo:t.ticketNo||'—', sector:route, base:base, tax:tax, fee:mShare, total:sale });
         sumBase+=base; sumTax+=tax; sumSale+=sale; sumComm+=comm;
       });

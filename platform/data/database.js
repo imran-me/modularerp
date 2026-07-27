@@ -575,13 +575,21 @@
         // splits it out to the VAT-payable liability instead of counting it as
         // revenue. (Bookkeeping audit fix 6 — VAT was booked as income.)
         vat: +sale.vat || 0,
-        profit: (+sale.amount || 0) - (+sale.cost || 0),
+        // profit is NET of the agent's cut too. Until commission was split out of
+        // `cost` (2026-07-27) the selling module folded it in, so this was right by
+        // accident; now it has to subtract it explicitly or every "profit" reads high.
+        profit: (+sale.amount || 0) - (+sale.cost || 0) - (+sale.commission || 0),
         ref: sale.ref || '', desc: sale.desc || '', customer: sale.customer || '',
         // accounting hints for the ledger auto-post: categorised income + whether the
         // customer paid (cash vs receivable) + the vendor and whether they're paid.
         category: sale.category || '', incomeAccount: sale.incomeAccount || '',
         vendor: sale.vendor || '', paid: sale.paid === true, costPaid: sale.costPaid === true,
         payStatus: sale.payStatus || '',
+        // AGENT COMMISSION rides WITH the sale (owner 2026-07-27) so the ledger can
+        // post it to its own head — 5350 Agent Commission, owed to that agent — instead
+        // of it being added into `cost` by the selling module and vanishing inside 5000.
+        commission: +sale.commission || 0, agent: sale.agent || '',
+        commissionPaid: sale.commissionPaid === true,
         // WHICH account the money moved through (owner review 2026-07-27) —
         // bankId = where the customer's payment landed, costBankId = where the
         // vendor was paid from (defaults to bankId). Optional: a sale that names
@@ -595,7 +603,10 @@
                      .sort(function (a, b) { return a.ym < b.ym ? -1 : 1; });
       var last = mine[mine.length - 1];
       if (last) {
-        last.revenue += rec.amount; last.expense += rec.cost;
+        // the agent's cut is a cost of doing the sale — it belongs in `expense` here
+        // too, or the summary store's margin drifts above the ledger's (same reason
+        // as `profit` above)
+        last.revenue += rec.amount; last.expense += rec.cost + rec.commission;
         S.set('financials', fins);
       }
       bus.emit('sale:recorded', rec);

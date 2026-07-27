@@ -11,7 +11,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  *   { ref, product, paid, debitedTo,
  *     revenue:  <journal>,            DR receivable|account / CR income (+ VAT)
- *     cost:     <journal>|null,       DR 5000 / CR payable|account
+ *     cost:       <journal>|null,     DR 5000 / CR payable|account
+ *     commission: <journal>|null,     DR 5350 Agent Commission / CR payable to the agent
  *     register: { in?: <movement>, out?: <movement> } }
  *
  * `debitedTo` is the code the customer's side landed on — 1200 customer AR, 1150
@@ -36,6 +37,8 @@ class SalePostingResource extends JsonResource
             'debitedTo' => (string) ($r['debitedTo'] ?? ''),
             'revenue'   => isset($r['revenue']) ? new JournalResource($r['revenue']) : null,
             'cost'      => isset($r['cost']) && $r['cost'] ? new JournalResource($r['cost']) : null,
+            // present only when a sub-agent earned a cut — DR 5350 / CR payable to them
+            'commission' => isset($r['commission']) && $r['commission'] ? new JournalResource($r['commission']) : null,
             'register'  => [
                 'in'  => isset($reg['in']) ? new RegisterMovementResource($reg['in']) : null,
                 'out' => isset($reg['out']) ? new RegisterMovementResource($reg['out']) : null,

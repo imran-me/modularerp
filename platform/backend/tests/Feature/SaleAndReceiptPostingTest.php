@@ -155,6 +155,54 @@ class SaleAndReceiptPostingTest extends TestCase
         $this->assertSame(1000.0, $this->lineOn('GL-STKT-4E', '1200', 'debit'));
     }
 
+    /**
+     * AGENT COMMISSION IS NOT COST OF SALES (owner 2026-07-27: "minusing agent or
+     * vendor fees automatically").
+     *
+     * The ticket module used to add the agent's cut into `cost`, so it disappeared
+     * inside 5000: the books could not answer "what do we owe agents this month",
+     * gross margin read low, and 5350 Agent Commission — which exists in the chart —
+     * was always zero. It is now its own leg, owed to that agent by name.
+     *
+     * The whole point is that NET PROFIT is unchanged; only the attribution is right.
+     */
+    public function test_agent_commission_posts_to_its_own_head_not_into_cost_of_sales(): void
+    {
+        // fare 100,000 · airline cost 70,000 · sub-agent earns 5,000
+        $this->sales->record([
+            'ref' => 'TKT-COMM', 'companyId' => 'travels', 'amount' => 100000, 'cost' => 70000,
+            'commission' => 5000, 'agent' => 'Sky Travels', 'category' => 'air',
+            'customer' => 'Mr Rahman', 'vendor' => 'Emirates',
+        ]);
+
+        $this->assertSame(70000.0, $this->lineOn('GL-SCTKT-COMM', '5000', 'debit'));   // cost ONLY
+        $this->assertSame(5000.0, $this->lineOn('GL-SMTKT-COMM', '5350', 'debit'));    // the cut
+        $this->assertSame(5000.0, $this->lineOn('GL-SMTKT-COMM', '2000', 'credit'));   // owed to them
+        // it is attributed to the AGENT, so it lands in their payable sub-ledger
+        $this->assertSame('Sky Travels', $this->journalEntry('GL-SMTKT-COMM')->party);
+
+        // net profit: 100,000 − 70,000 − 5,000 = 25,000, and every part is visible
+        $this->assertSame(100000.0, -$this->netOn('4010'));
+        $this->assertSame(70000.0, $this->netOn('5000'));
+        $this->assertSame(5000.0, $this->netOn('5350'));
+        $this->assertTrue($this->booksBalance());
+    }
+
+    /** Commission already paid out of an account leaves that account, not a payable. */
+    public function test_commission_paid_now_comes_out_of_the_named_account(): void
+    {
+        $this->sales->record([
+            'ref' => 'TKT-COMM2', 'companyId' => 'travels', 'amount' => 20000, 'cost' => 0,
+            'commission' => 1500, 'agent' => 'Sky Travels', 'commissionPaid' => true,
+            'costPaid' => true, 'costBankId' => '2', 'category' => 'air',
+        ]);
+
+        $this->assertSame(1500.0, $this->lineOn('GL-SMTKT-COMM2', '5350', 'debit'));
+        $this->assertSame(1500.0, $this->lineOn('GL-SMTKT-COMM2', '1000', 'credit'));  // the cash box
+        $this->assertSame(0.0, $this->lineOn('GL-SMTKT-COMM2', '2000', 'credit'));     // nothing owed
+        $this->assertTrue($this->booksBalance());
+    }
+
     /** A void/refund carries a NEGATIVE cost — the cost leg must still reverse. */
     public function test_a_negative_cost_still_posts(): void
     {

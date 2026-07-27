@@ -54,6 +54,7 @@ class SalePostingService
     ];
 
     public const COGS = '5000';
+    public const AGENT_COMMISSION = '5350';
     public const AR_CUSTOMER = '1200';
     public const AR_AGENT = '1150';
     public const AP_VENDOR = '2000';
@@ -150,6 +151,29 @@ class SalePostingService
                 ], CompanySlugs::dbId($companySlug));
             }
 
+            // AGENT COMMISSION — its OWN head, never buried in the cost of sales.
+            // A sub-agent's cut is not what the ticket cost us; it is what we owe the
+            // agent for bringing the customer. Inside 5000 it was invisible: the books
+            // could not say what is owed to agents, and gross margin read low while
+            // commission expense read zero. party = the agent, so it lands in their
+            // payable sub-ledger and settles like any other supplier balance.
+            $commissionJournal = null;
+            $commission = round((float) ($in['commission'] ?? 0), 2);
+            if (abs($commission) >= 0.01) {
+                $commissionCredit = ($in['commissionPaid'] ?? false) === true
+                    ? ($outBank ? $this->register->glAccountFor($outBank) : '1010')
+                    : self::AP_VENDOR;
+                $commissionJournal = $this->ledger->post([
+                    'id' => 'GL-SM' . $ref, 'date' => $date, 'companyId' => $companySlug, 'ref' => $ref,
+                    'memo' => $memo . ' — agent commission' . (($in['agent'] ?? '') !== '' ? ' · ' . $in['agent'] : ''),
+                    'source' => 'sale', 'party' => (string) ($in['agent'] ?? $in['customer'] ?? ''),
+                    'lines' => [
+                        ['account' => self::AGENT_COMMISSION, 'dr' => $commission, 'cr' => 0],
+                        ['account' => $commissionCredit, 'dr' => 0, 'cr' => $commission],
+                    ],
+                ], CompanySlugs::dbId($companySlug));
+            }
+
             // the accounts' own books — balance + a row in their history
             $moves = [];
             if ($inBank && $amount > 0) {
@@ -163,7 +187,7 @@ class SalePostingService
 
             return [
                 'ref' => $ref, 'product' => $product,
-                'revenue' => $revenue, 'cost' => $costJournal, 'register' => $moves,
+                'revenue' => $revenue, 'cost' => $costJournal, 'commission' => $commissionJournal, 'register' => $moves,
                 'debitedTo' => $debit, 'paid' => $debit !== self::AR_CUSTOMER && $debit !== self::AR_AGENT,
             ];
         });

@@ -1115,6 +1115,24 @@
             ref: rec.ref, memo: (rec.desc || 'Sale') + ' — cost', source: 'sale', party: rec.vendor || rec.customer || '',
             lines: [ { account: '5000', dr: cost, cr: 0, product: prod }, { account: creditCost, dr: 0, cr: cost } ] });
         }
+        // AGENT COMMISSION — its OWN head, never buried in the cost of sales
+        // (owner 2026-07-27: "minusing agent or vendor fees automatically").
+        // A sub-agent's cut is not what the ticket COST us — it is what we owe the
+        // agent for bringing the customer. Folding it into 5000 hid it: the books
+        // could not answer "how much do we owe agents this month" and gross margin
+        // read low while commission expense read zero. So:
+        //     DR 5350 Agent Commission  /  CR 2000 Payable (or the account that paid)
+        // party = the agent, so it lands in their payable sub-ledger and can be
+        // settled like any other supplier balance.
+        var commission = +rec.commission || 0;
+        if (commission !== 0) {
+          var commAcct = rec.commissionPaid === true ? (outAcct ? pay.glAcctOf(outAcct) : '1010') : '2000';
+          post({ id: 'GL-SM' + (rec.id || key), date: rec.date, companyId: rec.companyId,
+            ref: rec.ref, memo: (rec.desc || 'Sale') + ' — agent commission' + (rec.agent ? ' · ' + rec.agent : ''),
+            source: 'sale', party: rec.agent || rec.customer || '',
+            lines: [ { account: '5350', dr: commission, cr: 0, product: prod },
+                     { account: commAcct, dr: 0, cr: commission } ] });
+        }
         // THE ACCOUNT'S OWN BOOK — balance + a row in its transaction history, so
         // the money is where the owner looks for it. Runs inside the same
         // once-per-sale guard above, so it can never double-move.
