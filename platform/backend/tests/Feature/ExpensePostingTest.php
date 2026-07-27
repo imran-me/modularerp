@@ -6,6 +6,7 @@ use App\Exceptions\LedgerException;
 use App\Services\ExpensePostingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\BuildsMoneySchema;
 use Tests\TestCase;
 
 /**
@@ -29,13 +30,16 @@ use Tests\TestCase;
  */
 class ExpensePostingTest extends TestCase
 {
+    use BuildsMoneySchema;
+
     private ExpensePostingService $expenses;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->buildSchema();
-        $this->seedChartAndAccounts();
+        $this->buildMoneySchema();
+        $this->seedChart();
+        $this->seedAccountsFor();
         $this->expenses = $this->app->make(ExpensePostingService::class);
     }
 
@@ -117,8 +121,8 @@ class ExpensePostingTest extends TestCase
         $this->assertEquals(900000, $this->balanceOf(1));          // ours untouched
 
         // and each leg is on the right company's books
-        $this->assertSame(2, (int) $this->entry('GL-ACC-JV-ICO001')->company_id);   // travels
-        $this->assertSame(4, (int) $this->entry('GL-ACF-JV-ICO001')->company_id);   // group
+        $this->assertSame(2, (int) $this->journalEntry('GL-ACC-JV-ICO001')->company_id);   // travels
+        $this->assertSame(4, (int) $this->journalEntry('GL-ACF-JV-ICO001')->company_id);   // group
     }
 
     /** An account may only be spent from by the concern that owns it. */
@@ -236,161 +240,5 @@ class ExpensePostingTest extends TestCase
         $this->assertSame('1', $out['entry']['bankId']);
     }
 
-    /* ---------------------------------------------------------------- helpers */
-
-    private function entry(string $reference): object
-    {
-        return DB::table('journal_entries')->where('reference', $reference)->whereNull('deleted_at')->first();
-    }
-
-    /** Debit or credit posted to one account code inside one journal entry. */
-    private function lineOn(string $reference, string $code, string $side): float
-    {
-        $entry = $this->entry($reference);
-        if (! $entry) {
-            return 0.0;
-        }
-
-        return (float) DB::table('journal_items')
-            ->join('accounts', 'accounts.id', '=', 'journal_items.account_id')
-            ->where('journal_items.journal_entry_id', $entry->id)
-            ->whereNull('journal_items.deleted_at')
-            ->where('accounts.code', $code)
-            ->sum('journal_items.' . $side);
-    }
-
-    /** Net Dr − Cr across EVERY entry for one account code. */
-    private function netOn(string $code): float
-    {
-        $rows = DB::table('journal_items')
-            ->join('accounts', 'accounts.id', '=', 'journal_items.account_id')
-            ->whereNull('journal_items.deleted_at')
-            ->where('accounts.code', $code)
-            ->selectRaw('SUM(debit) as dr, SUM(credit) as cr')->first();
-
-        return (float) $rows->dr - (float) $rows->cr;
-    }
-
-    private function balances(string $reference): bool
-    {
-        $entry = $this->entry($reference);
-        $sums = DB::table('journal_items')->where('journal_entry_id', $entry->id)->whereNull('deleted_at')
-            ->selectRaw('SUM(debit) as dr, SUM(credit) as cr')->first();
-
-        return abs((float) $sums->dr - (float) $sums->cr) < 0.01;
-    }
-
-    private function balanceOf(int $bankId): float
-    {
-        return (float) DB::table('banks')->where('id', $bankId)->value('balance');
-    }
-
-    /* ------------------------------------------------------------- the fixture */
-
-    private function buildSchema(): void
-    {
-        Schema::create('accounts', function ($t) {
-            $t->id();
-            $t->string('code', 20)->index();
-            $t->string('name');
-            $t->string('type', 20)->default('expense');
-            $t->softDeletes();
-        });
-        Schema::create('journal_entries', function ($t) {
-            $t->id();
-            $t->unsignedBigInteger('company_id')->nullable();
-            $t->date('date')->nullable();
-            $t->string('source', 40)->nullable();
-            $t->string('reference')->nullable()->index();
-            $t->text('description')->nullable();
-            $t->unsignedBigInteger('created_by')->nullable();
-            $t->softDeletes();
-            $t->timestamps();
-        });
-        Schema::create('journal_items', function ($t) {
-            $t->id();
-            $t->unsignedBigInteger('journal_entry_id')->index();
-            $t->unsignedBigInteger('account_id');
-            $t->decimal('debit', 15, 2)->default(0);
-            $t->decimal('credit', 15, 2)->default(0);
-            $t->softDeletes();
-            $t->timestamps();
-        });
-        Schema::create('banks', function ($t) {
-            $t->id();
-            $t->string('name');
-            $t->string('branch_name')->nullable();
-            $t->string('account_name')->nullable();
-            $t->string('account_type', 20)->default('current');
-            $t->string('type', 30)->default('bank');       // bank | cash | mobile_banking | digital_wallet
-            $t->string('routing_number')->nullable();
-            $t->string('account_number')->nullable();
-            $t->string('currency', 8)->default('BDT');
-            $t->decimal('balance', 15, 2)->default(0);
-            $t->tinyInteger('status')->default(1);
-            $t->unsignedBigInteger('company_id')->nullable();
-            $t->softDeletes();
-            $t->timestamps();
-        });
-        // same columns as the real migrations (acc_entries + the payment-source
-        // columns, bank_transactions + the voucher trail)
-        Schema::create('acc_entries', function ($t) {
-            $t->id();
-            $t->string('ext_id')->unique();
-            $t->string('company_id')->default('group');
-            $t->string('kind')->default('Expense');
-            $t->decimal('amount', 14, 2)->default(0);
-            $t->string('category')->nullable();
-            $t->string('sub_category')->nullable();
-            $t->string('head')->nullable();
-            $t->string('method')->nullable();
-            $t->string('bank_id', 40)->nullable();
-            $t->string('bank_name')->nullable();
-            $t->string('pay_acct', 20)->nullable();
-            $t->date('date')->nullable();
-            $t->string('party')->nullable();
-            $t->string('ref')->nullable();
-            $t->text('description')->nullable();
-            $t->json('items')->nullable();
-            $t->boolean('alloc')->default(false);
-            $t->string('funded_by')->nullable();
-            $t->string('created')->nullable();
-            $t->timestamps();
-        });
-        Schema::create('bank_transactions', function ($t) {
-            $t->id();
-            $t->string('client_id', 40)->nullable();
-            $t->string('bank_ref', 64)->nullable();
-            $t->string('bank_name')->nullable();
-            $t->string('type', 30);
-            $t->decimal('amount', 15, 2)->default(0);
-            $t->date('date')->nullable();
-            $t->string('reference')->nullable();
-            $t->text('description')->nullable();
-            $t->string('gl_id', 64)->nullable();
-            $t->string('entry_ref', 64)->nullable();
-            $t->boolean('reversed')->default(false);
-            $t->softDeletes();
-            $t->timestamps();
-        });
-    }
-
-    private function seedChartAndAccounts(): void
-    {
-        foreach ([
-            ['1000', 'Cash', 'asset'], ['1010', 'Bank', 'asset'],
-            ['1300', 'Inter-company Receivable', 'asset'], ['2400', 'Inter-company Payable', 'liability'],
-            ['5100', 'Salaries', 'expense'], ['5200', 'Rent', 'expense'],
-            ['5400', 'Marketing', 'expense'], ['5500', 'Office & Admin', 'expense'],
-            ['5550', 'Food & Entertainment', 'expense'], ['5600', 'Conveyance & Travel', 'expense'],
-        ] as [$code, $name, $type]) {
-            DB::table('accounts')->insert(['code' => $code, 'name' => $name, 'type' => $type]);
-        }
-        // company_id 2 = travels, 4 = group (App\Support\CompanySlugs)
-        DB::table('banks')->insert([
-            ['id' => 1, 'name' => 'City Bank (Travels)', 'type' => 'bank', 'balance' => 900000, 'status' => 1, 'company_id' => 2],
-            ['id' => 2, 'name' => 'Travels Petty Cash', 'type' => 'cash', 'balance' => 40000, 'status' => 1, 'company_id' => 2],
-            ['id' => 3, 'name' => 'Group HQ Current', 'type' => 'bank', 'balance' => 5000000, 'status' => 1, 'company_id' => 4],
-        ]);
-    }
+    /* helpers + the money-table fixture now live in TestsSupportBuildsMoneySchema */
 }

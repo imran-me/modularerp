@@ -23,8 +23,25 @@ use Illuminate\Support\Facades\Schema;
  */
 trait BuildsMoneySchema
 {
+    /** The six tables these tests own, dropped in reverse-dependency order. */
+    private const MONEY_TABLES = [
+        'bank_transactions', 'acc_entries', 'journal_items', 'journal_entries', 'banks', 'accounts',
+    ];
+
+    /**
+     * Build them fresh. The DROP first is what lets the SAME suite run against a real
+     * MySQL database as well as sqlite :memory: — sqlite hands every test a brand-new
+     * in-memory database, MySQL does not, so without this the second test would die on
+     * "table already exists". Running these against MySQL is worth it: strict mode,
+     * DECIMAL rounding, LIKE collation and ORDER BY CASE all behave differently there,
+     * and those differences only ever show up in production.
+     *
+     *   DB_CONNECTION=mysql DB_DATABASE=<a scratch db> php vendor/bin/phpunit
+     */
     protected function buildMoneySchema(): void
     {
+        $this->dropMoneySchema();
+
         Schema::create('accounts', function ($t) {
             $t->id();
             $t->string('code', 20)->index();
@@ -110,6 +127,13 @@ trait BuildsMoneySchema
         });
     }
 
+    protected function dropMoneySchema(): void
+    {
+        foreach (self::MONEY_TABLES as $t) {
+            Schema::dropIfExists($t);
+        }
+    }
+
     /** The chart of accounts the money flows touch. */
     protected function seedChart(): void
     {
@@ -144,10 +168,30 @@ trait BuildsMoneySchema
 
     /* ------------------------------------------------------------- assertions */
 
+    /** One journal entry by its stable client id, or null. Named journalEntry()
+     *  rather than entry() because a test class may have its own entry() poster. */
+    protected function journalEntry(string $reference): ?object
+    {
+        return DB::table('journal_entries')->where('reference', $reference)->whereNull('deleted_at')->first();
+    }
+
+    /** Does THIS one entry balance? (booksBalance() checks the whole book.) */
+    protected function balances(string $reference): bool
+    {
+        $entry = $this->journalEntry($reference);
+        if (! $entry) {
+            return false;
+        }
+        $sums = DB::table('journal_items')->where('journal_entry_id', $entry->id)->whereNull('deleted_at')
+            ->selectRaw('SUM(debit) as dr, SUM(credit) as cr')->first();
+
+        return abs((float) $sums->dr - (float) $sums->cr) < 0.01;
+    }
+
     /** Debit or credit posted to one account code inside one journal entry. */
     protected function lineOn(string $reference, string $code, string $side): float
     {
-        $entry = DB::table('journal_entries')->where('reference', $reference)->whereNull('deleted_at')->first();
+        $entry = $this->journalEntry($reference);
         if (! $entry) {
             return 0.0;
         }
