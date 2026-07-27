@@ -483,7 +483,11 @@ function overview(page) {
   });
 
   // ---- recent entries register ------------------------------------------
-  ui.appendChildren(ov.querySelector('[data-fill="recent"]'), entriesTable(entries(), null));
+  // BUG FIX (2026-07-27): this passed the table INSTANCE, not its element, so
+  // appendChildren stringified it and the card read a literal "[object Object]"
+  // where the register should be. entriesTable() returns { el, state, … } —
+  // every other caller uses `.el` (see kindRegister).
+  ov.querySelector('[data-fill="recent"]').appendChild(entriesTable(entries(), null).el);
   mountScreen(page, ov);
 }
 
