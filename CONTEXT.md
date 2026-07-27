@@ -290,6 +290,18 @@ authorities (docs only — no screen touched, sweep 222/222 × both themes):
   split out of the blueprint. `wa_materials` wired into api.js HYDRATE+WRITABLE.
   Verified: PHP `-l` 8/8, tw gate green, **sweep 225/225 × both themes, 0 errors**
   (222→225 = the 3 new sub-routes). ◻ MySQL CRUD test still owed.
+- **⭐ MODULE BUILT: `woodart/production` (Workshop)** (2026-07-27) — module #4.
+  Job Register · Workshop Board · Station Load. The board is the clearest
+  example in the codebase of the line the FRONTEND BUILD LAW draws: its four
+  COLUMNS are fixed HTML (they are the workshop's states, not data) and only the
+  CARDS are `[hidden][data-proto]` clones. Two rules worth knowing: the **demo
+  clock is an explicit constructor argument** on the service (never a hidden
+  `now()`) and is echoed by `GET /load`, so the server can never disagree with a
+  screen about what "overdue" means — proven by tests that MOVE the clock and
+  watch the overdue count move with it; and an **orphan job** (pointing at a
+  project id that no longer exists) is KEPT and flagged, because losing real
+  shop-floor history because a parent vanished is worse than showing the
+  problem. Verified: sweep **234/234 × both themes**, backend **41/41 vs MySQL**.
 - **⭐ MODULE BUILT: `woodart/procurement`** (2026-07-27) — module #3, and the
   first owning TWO entities: two thin controllers over ONE shared service,
   because the rules that matter span both. **⚠️ It deliberately does NOT post to
