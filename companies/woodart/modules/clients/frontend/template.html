@@ -1,0 +1,219 @@
+<!-- ============================================================================
+  WOODART · CLIENTS · MARKUP
+  ----------------------------------------------------------------------------
+  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.
+  Nothing here is built by JavaScript. No <script> tag, no <template> tag —
+  standing owner rule (companies/woodart/MODULE-STANDARD.md §2.1).
+
+  THE HOOKS the logic uses (all documented in that standard):
+    [data-shell]  reusable chrome (head bar, tab band)   → shell('x')
+    [data-screen] a whole screen                          → screen('x')
+    [data-fill]   a slot a built widget drops into
+    [data-k]      a live scalar slot (a KPI number)       → fillK(node,'x',v)
+    [data-tab]    a tab button (logic marks .active, wires, strips the hook)
+    [data-act]    a button the logic wires an action onto
+    [data-when]   a block the logic REMOVES when the condition is false
+    [data-proto]  a hidden prototype row cloned once per record
+    [data-slot]   a fill point inside a cloned [data-proto] row
+
+  STYLING: every UTILITY is Tailwind (tw-). The house COMPONENT classes stay
+  (card · kpi-card · btn · page-head · badge · data-row · progress · num) —
+  they are the universal vocabulary that keeps all six companies identical.
+  The only inline styles are computed bar widths, which are values, not
+  utilities (UI-CONTRACT §4.3).
+  ============================================================================ -->
+
+
+<!-- ============================================================================
+     SHARED CHROME — page-head bar (mirrors EPAL.pageHead) + the 3-tab band.
+     The <h1> inner run stays on ONE line: a newline between those inline tags
+     clones as a real space and shifts pixels.
+     ============================================================================ -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow" data-fill="eyebrow"></span><i class="bi bi-person-hearts"></i></h1>
+    <p class="page-sub" data-fill="sub"></p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="#/woodart/projects/active"><i class="bi bi-easel2-fill"></i> Projects</a>
+    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> New Client</button>
+  </div>
+</div>
+
+<div data-shell="tabs" class="tab-underline mb-3">
+  <button data-tab="directory">Directory</button>
+  <button data-tab="portfolio">Portfolio</button>
+  <button data-tab="segments">Segments</button>
+</div>
+
+
+<!-- ============================================================================
+     SCREEN 1 · DIRECTORY — who Woodart builds for.
+     ============================================================================ -->
+<section data-screen="directory">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Clients</span><span class="kpi-ico"><i class="bi bi-person-hearts"></i></span></div>
+      <div class="kpi-value" data-k="clients">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">With Live Work</span><span class="kpi-ico"><i class="bi bi-hammer"></i></span></div>
+      <div class="kpi-value" data-k="live">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Portfolio Value</span><span class="kpi-ico"><i class="bi bi-cash-coin"></i></span></div>
+      <div class="kpi-value" data-k="value">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Repeat Clients</span><span class="kpi-ico"><i class="bi bi-arrow-repeat"></i></span></div>
+      <div class="kpi-value" data-k="repeat">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Segments</span><span class="kpi-ico"><i class="bi bi-tags"></i></span></div>
+      <div class="kpi-value" data-k="segments">—</div>
+    </div>
+  </div>
+
+  <!-- Shown only when a client has never been given work. Removed otherwise. -->
+  <div class="build-banner" data-when="idle">
+    <i class="bi bi-info-circle"></i>
+    <div><strong data-k="idleInline">0</strong> client(s) have no project or estimate on record —
+      worth a follow-up before they go cold.
+      <button class="link-btn" data-act="goPortfolio">See the portfolio</button>.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-person-lines-fill"></i> Client Directory</h3>
+      <span class="card-sub">Homeowners, developers and corporates Woodart works with</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 2 · PORTFOLIO — what each client is actually worth.
+     Two mutually exclusive states, BOTH authored here; the logic removes one.
+     ============================================================================ -->
+<section data-screen="portfolio">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Contract Value</span><span class="kpi-ico"><i class="bi bi-cash-stack"></i></span></div>
+      <div class="kpi-value" data-k="value">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Committed Cost</span><span class="kpi-ico"><i class="bi bi-wallet2"></i></span></div>
+      <div class="kpi-value" data-k="cost">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Portfolio Margin</span><span class="kpi-ico"><i class="bi bi-graph-up-arrow"></i></span></div>
+      <div class="kpi-value" data-k="margin">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Top Client</span><span class="kpi-ico"><i class="bi bi-trophy"></i></span></div>
+      <div class="kpi-value" data-k="top">—</div>
+    </div>
+  </div>
+
+  <!-- STATE A · no work recorded against anybody yet -->
+  <div class="empty-state" data-when="none">
+    <i class="bi bi-easel2"></i>
+    <h3>No client work on record</h3>
+    <p class="tw-text-ink-dim">Projects and estimates raised against a client will roll up here.</p>
+  </div>
+
+  <!-- STATE B · there is work to show -->
+  <div data-when="some">
+    <div class="build-banner">
+      <i class="bi bi-info-circle"></i>
+      <div>Value is the sum of each client's projects. <strong>Won</strong> counts approved
+        estimates; <strong>Open</strong> is quoted work still in play — raise new quotes in
+        <a href="#/woodart/estimates/quotations">Estimates &amp; BOQ</a>.</div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-bar-chart-steps"></i> Client Portfolio</h3>
+        <span class="card-sub">Highest contract value first</span>
+      </div>
+      <div class="card-body" data-fill="register"></div>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 3 · SEGMENTS — which kind of client the business actually runs on.
+     ============================================================================ -->
+<section data-screen="segments">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Segments</span><span class="kpi-ico"><i class="bi bi-tags"></i></span></div>
+      <div class="kpi-value" data-k="segments">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Largest Segment</span><span class="kpi-ico"><i class="bi bi-trophy"></i></span></div>
+      <div class="kpi-value" data-k="top">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Avg Client Value</span><span class="kpi-ico"><i class="bi bi-calculator"></i></span></div>
+      <div class="kpi-value" data-k="avg">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Never Given Work</span><span class="kpi-ico"><i class="bi bi-slash-circle"></i></span></div>
+      <div class="kpi-value" data-k="idle">—</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-bar-chart-fill"></i> Value by Segment</h3>
+        <span class="card-sub">Share of total contract value</span>
+      </div>
+      <div class="card-body">
+        <div class="data-list" data-fill="segments">
+          <!-- PROTOTYPE ROW — cloned once per segment; the number of segments is
+               DATA, not layout. The bar width is computed, so the logic sets it
+               as an inline style (UI-CONTRACT §4.3). -->
+          <div class="data-row" data-proto="seg" hidden>
+            <div class="tw-flex-1">
+              <div class="tw-font-semibold" data-slot="name"></div>
+              <div class="progress tw-mt-[6px]"><div class="progress-bar" data-slot="bar"></div></div>
+            </div>
+            <div class="tw-ml-auto tw-text-right">
+              <div class="num tw-font-semibold" data-slot="value"></div>
+              <div class="tw-text-ink-mute tw-text-[11px]" data-slot="share"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-pie-chart-fill"></i> Client Mix</h3>
+        <span class="card-sub">Contract value by segment</span>
+      </div>
+      <div class="card-body">
+        <div class="tw-relative tw-h-[260px]"><canvas data-fill="chart"></canvas></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-table"></i> Segment Breakdown</h3>
+      <span class="card-sub">Clients, projects and value per segment</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>

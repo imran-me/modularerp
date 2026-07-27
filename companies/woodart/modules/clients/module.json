@@ -1,0 +1,45 @@
+{
+  "key": "clients",
+  "company": "woodart",
+  "title": "Clients",
+  "icon": "person-hearts",
+  "desc": "Homeowners, developers, corporates.",
+  "route": "#/woodart/clients",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "directory",
+      "label": "Directory",
+      "route": "#/woodart/clients/directory",
+      "enabled": true
+    },
+    {
+      "id": "portfolio",
+      "label": "Portfolio",
+      "route": "#/woodart/clients/portfolio",
+      "enabled": true
+    },
+    {
+      "id": "segments",
+      "label": "Segments",
+      "route": "#/woodart/clients/segments",
+      "enabled": true
+    }
+  ],
+  "stores": [
+    "wa_clients"
+  ],
+  "reads": [
+    "wa_projects",
+    "wa_estimates"
+  ],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/clients.js",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — the presence of THIS file is what auto-discovery HEAD-probes (platform/discovery/discovery.js). A module registered built:true in the company manifest but missing this file is treated as deleted."
+}

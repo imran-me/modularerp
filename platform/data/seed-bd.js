@@ -240,6 +240,30 @@
         client: rnd() > 0.5 ? pick(CORPORATES) : pick(PEOPLE), items: ri(4, 28), value: ri(2, 60) * 100000,
         status: pick(['Draft','Sent','Sent','Approved','Approved','Rejected']), validTill: future(45), created: dt() };
     });
+    /* Woodart CLIENTS — DERIVED, not invented. Every client here is a name that
+     * actually appears on a Woodart project or estimate above, so the Clients
+     * module's portfolio join finds real work against real people. Seeding a
+     * fixed list instead would leave half the directory with zero projects and
+     * half the projects with no client record, which reads like a broken join.
+     * Classification is a stated rule, not a random pick: a corporate name
+     * carrying "Group"/"Holdings" is a Developer, any other corporate name is a
+     * Corporate, and an individual is a Homeowner. */
+    if (localStorage.getItem(S.namespace + 'wa_clients') === null) {
+      var waNames = {};
+      S.list('wa_projects').forEach(function (p) { if (p.client) waNames[p.client] = 1; });
+      S.list('wa_estimates').forEach(function (e) { if (e.client) waNames[e.client] = 1; });
+      var waClients = Object.keys(waNames).sort().map(function (nm, i) {
+        var corporate = CORPORATES.indexOf(nm) >= 0;
+        var type = corporate ? (/Group|Holdings/.test(nm) ? 'Developer' : 'Corporate') : 'Homeowner';
+        return { id: seq('CLI', i, 3), name: nm, type: type,
+          contact: corporate ? pick(PEOPLE) : nm,
+          phone: '+88017' + String(ri(10000000, 99999999)).slice(0, 8),
+          email: nm.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '') + (corporate ? '@corp.example.bd' : '@mail.example.bd'),
+          area: pick(AREAS), since: dt(ri(6, 30)), created: dt() };
+      });
+      S.set('wa_clients', waClients);
+    }
+
     gen('wa_materials', 22, function (i) {
       var mats = [['Marine Plywood 18mm','Board'],['Veneer Board','Board'],['MDF 12mm','Board'],['Formica Laminate','Laminate'],
         ['German Hinge (Hettich)','Hardware'],['Drawer Channel 18"','Hardware'],['SS Handle','Hardware'],['Wood Glue 5kg','Adhesive'],

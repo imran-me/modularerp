@@ -88,7 +88,8 @@
     party_txns:    'travels/vendor-agent/books/party-txns',
     tv_comm_paid:  'travels/vendor-agent/books/commissions',
     tv_portals:    'travels/vendor-agent/books/portals',
-    wa_materials:  'woodart/materials/stock'
+    wa_materials:  'woodart/materials/stock',
+    wa_clients:    'woodart/clients/directory'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -145,7 +146,9 @@
     perf_reviews: 'group/employees/reviews',
     // Woodart material register — plain master data (holding stock is not a
     // posting), so it is safely writable. See the module's backend/endpoints.md.
-    wa_materials: 'woodart/materials/stock'
+    wa_materials: 'woodart/materials/stock',
+    // Woodart client directory — plain master data, safely writable.
+    wa_clients:   'woodart/clients/directory'
   };
 
   /* Stores whose WRITE side depends on the server actually having their table.
