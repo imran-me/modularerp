@@ -309,8 +309,21 @@
     }).map(function (c) { return { id: c.id, name: c.name, short: c.short }; });
   }
 
+  /* GROUP HQ IS PART OF THE GROUP (fixed 2026-07-27).
+   * This used to cover the operating companies ONLY, which quietly broke the one
+   * invariant a trial balance exists to prove: Group HQ carries real postings —
+   * its own overheads, the cash it lends a concern (1300), the shared costs it
+   * pays in full — and leaving that column out meant the concern's half of those
+   * transactions sat INSIDE the consolidation while its counterpart sat outside.
+   * The group column then didn't balance: a group-funded Travels expense or a
+   * group-paid shared cost knocked it out by exactly the group-side legs
+   * (reproduced: ৳1,00,000 from a ৳40,000 funded + ৳60,000 shared posting).
+   * It now uses the SAME entity list as consolidatedPnl(), so the two statements
+   * can never disagree about who is in the group. Elimination is unchanged —
+   * 1300/2400 still net to zero, and now they genuinely CAN, because both sides
+   * of every inter-company pair are finally in the same table. */
   function consolidatedTrialBalance() {
-    var comps = presentCompanies();
+    var comps = consolidatedEntities();
     var coa = accounts(), rows = [];
     comps.forEach(function (c) { c._dr = 0; c._cr = 0; });
     var groupDr = 0, groupCr = 0;

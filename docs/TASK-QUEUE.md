@@ -7,6 +7,31 @@
 
 ## ⏳ OPEN
 
+### T-CONS-GROUPHQ — the consolidated TRIAL BALANCE now includes Group HQ (fixed 2026-07-27)
+Flagged earlier as "the owner's call" because it moves numbers on the Consolidation
+screen; closed now that the owner said finish what's left.
+**Was:** `consolidatedTrialBalance()` covered the operating companies only. Group HQ
+carries real postings — its own overheads, cash it lends a concern (1300), shared costs
+it pays in full — so the concern's half of those sat INSIDE the consolidation while the
+counterpart sat outside, and **the group column did not balance** (reproduced: out by
+৳1,00,000 from a ৳40,000 group-funded expense + a ৳60,000 group-paid shared cost).
+**Now:** it uses the SAME entity list as `consolidatedPnl()` (`consolidatedEntities()` =
+present concerns + Group HQ), so both statements always agree on who is in the group and
+both sides of every inter-company pair are in one table. Elimination is unchanged.
+**Visible change:** a **Group HQ column** on Consolidation; the KPI reads "Entities
+Consolidated · concerns + Group HQ"; `pnlEntities()` no longer appends Group HQ twice.
+**Verified:** out-by **0** with those same postings (dr = cr ৳23,55,39,498); bridge
+invariant still matches; sweep 228/228 × both themes 0 errors; trial balance balances.
+
+### T-DEPLOY-MIGRATE — deploy.sh now reports pending migrations (fixed 2026-07-27)
+The schema ships with the code but `deploy.sh` stopped at step 6, so a deploy could leave
+new columns unmigrated while the new code expected them — that is what made a working
+expense form answer **"Save failed"** on the live host (twice: `bank_transactions`, then
+`acc_entries`' payment-source columns). New **step 7/7** always REPORTS pending
+migrations and runs them only when asked: `./deploy.sh --migrate` (or `MIGRATE=1`). Not
+automatic on purpose — `migrate` alters a live financial database; that is a decision,
+not a side effect of copying files.
+
 ### T-BLANK-APP — 🩹 a hidden folder blanked the WHOLE app (found 2026-07-27, fixed)
 **Symptom:** every route rendered empty — shell fine, `#view` empty, **no console error**.
 Hit while the Woodart *materials* module was half-built (its parent manifest already said

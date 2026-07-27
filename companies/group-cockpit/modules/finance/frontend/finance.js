@@ -206,10 +206,10 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
   // consolidatedEntities), so the group statement and the consolidation screens
   // can never disagree about who is in the group.
   function pnlEntities() {
-    return LED().consolidatedEntities
-      ? LED().consolidatedEntities().map(function (c) { return { id: c.id, short: c.short }; })
-      : LED().consolidatedTrialBalance().companies.map(function (c) { return { id: c.id, short: c.short }; })
-          .concat([{ id: 'group', short: 'Group HQ' }]);
+    // consolidatedTrialBalance().companies now ALREADY includes Group HQ (both
+    // consolidations share one entity list), so never append it again.
+    var list = LED().consolidatedEntities ? LED().consolidatedEntities() : LED().consolidatedTrialBalance().companies;
+    return list.map(function (c) { return { id: c.id, short: c.short }; });
   }
   // natural P&L amount for one account at one entity (income credit-side +, expense debit-side +)
   function pnlAmt(code, eid) { return Math.round(LED().balance(code, { companyId: eid })); }
@@ -1874,8 +1874,8 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     var icCount = Object.keys(icRefs).length;
 
     page.appendChild(head('Consolidation — Group Trial Balance', 'diagram-3',
-      'Every account netted across ' + comps.length + ' operating concerns, with inter-company balances ' +
-      'eliminated so the group figure reflects only third-party positions. As at ' + ui.date(new Date(), 'long') + '.', [
+      'Every account netted across ' + comps.length + ' entities — the operating concerns plus Group HQ, ' +
+      'whose own postings are what let inter-company balances eliminate to zero. As at ' + ui.date(new Date(), 'long') + '.', [
       el('button.btn.btn-ghost', { html: ui.icon('download') + ' Export (CSV)',
         onclick: function () { exportConsolidated(data); } }),
       el('button.btn.btn-ghost', { html: ui.icon('file-earmark-text') + ' Consolidated Statement',
@@ -1887,7 +1887,7 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
 
     var scr = screen('consolidation');
     var kpis = scr.querySelector('[data-fill="kpis"]');
-    kpis.appendChild(kpi('Companies Consolidated', comps.length, 'diagram-3', null, 'operating concerns'));
+    kpis.appendChild(kpi('Entities Consolidated', comps.length, 'diagram-3', null, 'concerns + Group HQ'));
     kpis.appendChild(kpi('Eliminations', ui.money(elimGross, { compact: true }), 'x-circle', null, 'netted on consolidation'));
     kpis.appendChild(kpi('Consolidated Assets', ui.money(groupAssets, { compact: true }), 'safe2', null, 'group, post-elimination'));
     kpis.appendChild(kpi('IC Transactions', icCount, 'arrow-left-right', null, icRowCount + ' control accounts'));

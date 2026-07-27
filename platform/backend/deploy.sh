@@ -38,11 +38,15 @@
 #      route table at cache time, which would silently break live
 #      drop-in/drop-out until someone remembered to re-cache. Config caching
 #      is fine and IS run; route caching is not.
+#
+#   7. REPORTS pending migrations, and runs them only when you pass --migrate
+#      (or MIGRATE=1). Schema ships with the code; a silent mismatch is what
+#      made a working expense form answer "Save failed" on the live host.
 # ==============================================================================
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-echo "== 1/6  Frontend asset symlinks into public/ =="
+echo "== 1/7  Frontend asset symlinks into public/ =="
 REPO_ROOT="$(realpath ../..)"
 declare -A LINKS=(
   [companies]="$REPO_ROOT/companies"
@@ -71,7 +75,7 @@ for link in "${!LINKS[@]}"; do
   echo "  linked  public/$link -> $target"
 done
 
-echo "== 2/6  Hardening public/.htaccess (dotfiles + stray .php) =="
+echo "== 2/7  Hardening public/.htaccess (dotfiles + stray .php) =="
 GUARD_MARK="# EPAL-HARDENING (deploy.sh — do not remove)"
 if ! grep -q "$GUARD_MARK" public/.htaccess 2>/dev/null; then
   cat >> public/.htaccess <<'HTACCESS'
@@ -96,10 +100,10 @@ else
   echo "  already hardened"
 fi
 
-echo "== 3/6  composer install (production) =="
+echo "== 3/7  composer install (production) =="
 composer install --no-dev --optimize-autoloader --no-interaction
 
-echo "== 4/6  .env =="
+echo "== 4/7  .env =="
 if [ ! -f .env ]; then
   cp .env.example .env
   echo "  !! .env created from .env.example — EDIT DB_DATABASE / DB_USERNAME / DB_PASSWORD now, then re-run this script."
@@ -107,16 +111,49 @@ else
   echo "  .env already present — left untouched"
 fi
 
-echo "== 5/6  APP_KEY =="
+echo "== 5/7  APP_KEY =="
 if ! grep -q '^APP_KEY=base64' .env 2>/dev/null; then
   php artisan key:generate --force
 else
   echo "  APP_KEY already set"
 fi
 
-echo "== 6/6  config cache (route cache is deliberately skipped — see header) =="
+echo "== 6/7  config cache (route cache is deliberately skipped — see header) =="
 php artisan config:clear
 php artisan config:cache
+
+# ------------------------------------------------------------------------------
+# 7. MIGRATIONS — pending ones are REPORTED always, and run when you ask.
+#
+#    Why this step exists: the code and the schema ship in the same `git pull`,
+#    but this script used to stop at step 6 — so a deploy could leave new columns
+#    unmigrated while the new code expected them. That bit us twice (the
+#    bank_transactions log, then acc_entries' payment-source columns, where every
+#    expense save answered "Save failed" on a feature that worked fine locally).
+#    The app degrades gracefully now (it writes those columns only when they
+#    exist), but degraded is not the same as done.
+#
+#    Why it is not automatic: `migrate` alters a LIVE financial database. That is
+#    a decision, not a side effect of copying files. So the default only TELLS you
+#    what is pending; run it with the flag when you mean it:
+#
+#        ./deploy.sh --migrate        (or:  MIGRATE=1 ./deploy.sh)
+# ------------------------------------------------------------------------------
+echo "== 7/7  migrations =="
+WANT_MIGRATE="${MIGRATE:-}"
+case " $* " in *" --migrate "*) WANT_MIGRATE=1 ;; esac
+
+if [ -n "$WANT_MIGRATE" ]; then
+  php artisan migrate --force
+else
+  PENDING="$(php artisan migrate:status 2>/dev/null | grep -ci 'pending' || true)"
+  if [ "${PENDING:-0}" -gt 0 ]; then
+    echo "  !! $PENDING migration(s) PENDING — the DB is behind this code."
+    echo "     Run:  ./deploy.sh --migrate      (alters the live database — your call)"
+  else
+    echo "  nothing pending — schema is up to date"
+  fi
+fi
 
 echo
 echo "Done. Verify: curl -s https://THIS_DOMAIN/api/health  should print {\"ok\":true,\"service\":\"epal-kernel\"}"
