@@ -564,6 +564,31 @@
         return m;
       });
       S.set('wa_materials', mats);
+
+      /* The client directory is DERIVED from the projects that existed when it
+       * was built — which is before these three. A story project whose client
+       * was not already on a random project would therefore name a client that
+       * does not exist, and `books.mjs refs` caught exactly that
+       * (Bashundhara Group). Top the directory up so every project's client is
+       * a real record. */
+      var cl = S.list('wa_clients');
+      var have = {};
+      cl.forEach(function (c) { have[String(c.name).trim().toLowerCase()] = 1; });
+      var nextCl = cl.length;
+      S.list('wa_projects').forEach(function (p) {
+        var k = String(p.client || '').trim().toLowerCase();
+        if (!k || have[k]) return;
+        have[k] = 1;
+        var corporate = CORPORATES.indexOf(p.client) >= 0;
+        cl.push({ id: seq('CLI', nextCl++, 3), name: p.client,
+          type: corporate ? (/Group|Holdings/.test(p.client) ? 'Developer' : 'Corporate') : 'Homeowner',
+          contact: corporate ? pick(PEOPLE) : p.client,
+          phone: '+88017' + String(ri(10000000, 99999999)).slice(0, 8),
+          email: String(p.client).toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^.|.$/g, '') +
+                 (corporate ? '@corp.example.bd' : '@mail.example.bd'),
+          area: pick(AREAS), since: dt(ri(6, 30)), created: dt() });
+      });
+      S.set('wa_clients', cl);
     })();
 
     /* ========================================================================

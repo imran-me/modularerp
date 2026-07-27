@@ -12,6 +12,7 @@
  *   node tools/verify/books.mjs receipt   # woodart goods receipt: balance-sheet only, reverses
  *   node tools/verify/books.mjs story     # the 3 Woodart story projects thread every module
  *   node tools/verify/books.mjs stock     # stock == sum(movements), and a receipt moves both
+ *   node tools/verify/books.mjs refs      # every cross-store reference points at something real
  *
  * Exit 0 = the probe's invariant holds. Built for the 2026-07 bookkeeping audit;
  * keep it around — it is the fastest way to see whether a change moved the books.
@@ -310,6 +311,85 @@ if (PROBE === 'stock') {
     console.log('  invariant after  : ' + o.driftAfter + ' drift' + (o.driftAfter === 0 ? '  ✓ still provable' : '  ← BROKEN'));
   }
   console.log(ok ? '✓ stock is a ledger, not a number' : '✗ stock and its history disagree');
+}
+if (PROBE === 'refs') {
+  // WHY THIS EXISTS: on 2026-07-27 two separate seeding defects shipped, and
+  // BOTH were found by asking "which references point at nothing?" rather than
+  // by reading the seeders. Woodart's modules reference each other by id
+  // constantly — a job names a project, a movement names a project, a payment
+  // names a purchase order — and nothing checked that those ids resolved. A
+  // demo whose records point at each other correctly is the difference between
+  // sample data and noise, so the check is now permanent.
+  //
+  // A reference listed in EXPECTED is a deliberate orphan: it exists so an
+  // "orphan" badge has real data to render. Anything else is a defect.
+  const out = await evalJs(`(function(){
+    var db = EPAL.db, col = function(k){ return db.col(k); };
+    function ids(store, key){ var s = {}; col(store).forEach(function(r){ if (r[key]) s[r[key]] = 1; }); return s; }
+
+    var projects = ids('wa_projects','id');
+    var materials = ids('wa_materials','id');
+    var drawings = ids('wa_drawings','id');
+    var vendors  = {}; col('wa_vendors').forEach(function(v){ vendors[String(v.name).trim().toLowerCase()] = 1; });
+    var clients  = {}; col('wa_clients').forEach(function(c){ clients[String(c.name).trim().toLowerCase()] = 1; });
+    var locations = ids('wa_locations','id');
+    var orders   = ids('wa_purchases','id');
+
+    var bad = [];
+    function check(store, key, target, label, norm){
+      col(store).forEach(function(r){
+        var v = r[key];
+        if (v === undefined || v === null || v === '') return;
+        var k = norm ? String(v).trim().toLowerCase() : v;
+        if (!target[k]) bad.push({ store: store, field: key, value: String(v), points_at: label });
+      });
+    }
+
+    check('wa_production','project', projects,  'a project');
+    check('wa_installs','project',   projects,  'a project');
+    check('wa_drawings','project',   projects,  'a project');
+    check('wa_estimates','projectId',projects,  'a project');
+    check('wa_revisions','drawing',  drawings,  'a drawing');
+    check('wa_movements','material', materials, 'a material');
+    check('wa_movements','location', locations, 'a location');
+    check('wa_purchases','supplier', vendors,   'a vendor', true);
+    check('wa_projects','client',    clients,   'a client', true);
+
+    // BOQ lines quote material NAMES, not ids — the one place a name is the key
+    var names = {}; col('wa_materials').forEach(function(m){ names[m.name] = 1; });
+    col('wa_estimates').forEach(function(e){
+      (e.lines || []).forEach(function(l){
+        if (l.item && !names[l.item]) bad.push({ store:'wa_estimates', field:'lines[].item', value:l.item, points_at:'a material' });
+      });
+    });
+
+    return { bad: bad, counts: {
+      projects: col('wa_projects').length, materials: col('wa_materials').length,
+      movements: col('wa_movements').length, drawings: col('wa_drawings').length,
+      purchases: col('wa_purchases').length, clients: col('wa_clients').length } };
+  })()`);
+
+  // Deliberate orphans: each exists so an "orphan"/"unlisted" state has real data.
+  const EXPECTED = new Set(['WAP-999', 'Dhaka Glass Co']);
+  const bad = (out.bad || []).filter(b => !EXPECTED.has(b.value));
+  const expected = (out.bad || []).filter(b => EXPECTED.has(b.value));
+
+  ok = bad.length === 0;
+  console.log('CROSS-STORE REFERENCES  (woodart)');
+  console.log('  ' + Object.entries(out.counts).map(([k, v]) => k + ' ' + v).join(' · '));
+  if (expected.length) {
+    console.log('  deliberate orphans kept: ' +
+      [...new Set(expected.map(b => b.value))].join(', ') + '  ✓ (they give the orphan badge real data)');
+  }
+  if (bad.length) {
+    console.log('  ✗ ' + bad.length + ' reference(s) point at nothing:');
+    bad.slice(0, 12).forEach(b =>
+      console.log('      ' + b.store + '.' + b.field + ' = "' + b.value + '" → no such ' + b.points_at));
+  } else {
+    console.log('  ✓ every reference resolves');
+  }
+  console.log(ok ? '✓ the demo data cross-references correctly'
+                 : '✗ seed drift — records point at things that do not exist');
 }
 if (PROBE === 'salary') {
   const out = await evalJs(`(function(){
