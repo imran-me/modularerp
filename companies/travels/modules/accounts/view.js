@@ -520,8 +520,39 @@ function overview(page) {
 function incomeView(page) { kindRegister(page, 'Income', INCOME_HEADS, '#23c17e'); }
 function expenseView(page) { kindRegister(page, 'Expense', EXPENSE_HEADS, '#f0506e'); }
 
+/* SALES BELONG IN THE INCOME REGISTER (owner review 2026-07-27: "I do a sell in
+ * ticketing … is it recording everywhere, like in travels accounts?").
+ * They were not: this register reads `acc_entries` (money typed in by hand),
+ * while a ticket / visa / package sale lives in its own module and posts
+ * STRAIGHT to the ledger — so the desk that is supposed to show "every taka
+ * earned" showed only the hand-typed ones.
+ * Fixed on the READ side, never by copying rows: the sale journals (source
+ * 'sale') are folded in as register rows at display time. No second copy of the
+ * money exists, so nothing can double-count — delete the sale and its row goes
+ * with it. Each carries the module it came from, and its id links to the voucher.
+ * ==> LARAVEL: one query UNION-ing acc_entries with the sale journals. */
+function salesAsIncome() {
+  if (!(EPAL.ledger && EPAL.ledger.entries)) return [];
+  var out = [];
+  try {
+    EPAL.ledger.entries({ companyId: CID, source: 'sale' }).forEach(function (e) {
+      var amt = 0, head = '';
+      (e.lines || []).forEach(function (l) {
+        var a = EPAL.ledger.account ? EPAL.ledger.account(l.account) : null;
+        if (a && a.type === 'income') { amt += (+l.cr || 0) - (+l.dr || 0); head = head || a.name; }
+      });
+      if (amt <= 0.5) return;                       // the cost leg / a reversal
+      out.push({ id: e.ref || e.id, companyId: CID, kind: 'Income', amount: amt,
+        category: head || 'Sales Revenue', date: e.date, party: e.party || '',
+        ref: e.ref || '', desc: e.memo || '', method: 'Sale', fromSale: true });
+    });
+  } catch (x) {}
+  return out;
+}
+
 function kindRegister(page, kind, heads, color) {
   var list = entries().filter(function (e) { return e.kind === kind; });
+  if (kind === 'Income') list = list.concat(salesAsIncome());
   var total = list.reduce(function (a, e) { return a + (+e.amount || 0); }, 0);
   var thisMonth = monthSum(list, curYm(), kind);
   var heads2 = groupBy(list, 'category');
@@ -567,6 +598,13 @@ function kindRegister(page, kind, heads, color) {
   }
 }
 
+// True (and says so) when the row is a sale mirrored in from its own module.
+function fromSaleGuard(e, verb) {
+  if (!e || !e.fromSale) return false;
+  ui.toast('This is a sale from its own module — it must be ' + verb + ' there, not in the register', 'error');
+  return true;
+}
+
 // The entries datatable — chips by head, filter card, PDF, row-click rich detail,
 // canonical row actions (edit · delete │ print). Returns the table instance.
 function entriesTable(rows, kind) {
@@ -589,9 +627,14 @@ function entriesTable(rows, kind) {
     searchKeys: ['id', 'category', 'desc', 'method', 'bankName', 'party'],
     pageSize: 12, exportName: 'travels-' + (kind ? kind.toLowerCase() : 'accounts') + '.csv', pdfTitle: 'Travels ' + (kind || 'Accounts') + ' Register',
     onRow: function (e) { entryDetail(e); },
+    // A row folded in from a SALE is a mirror of the ticketing/visa module's
+    // record — it has no voucher of its own to edit or delete. Editing it here
+    // would silently diverge from the sale; deleting it would leave the sale
+    // posted with its register row gone. So those two actions send you to the
+    // module that owns it; printing the voucher still works.
     actions: ui.actions({
-      edit:  canCreate() ? function (e) { entryForm(e); } : null,
-      del:   canDelete() ? function (e) { deleteEntry(e); } : null,
+      edit:  canCreate() ? function (e) { if (fromSaleGuard(e, 'edited')) return; entryForm(e); } : null,
+      del:   canDelete() ? function (e) { if (fromSaleGuard(e, 'deleted')) return; deleteEntry(e); } : null,
       print: function (e) { printEntry(e); }
     }),
     empty: { icon: 'journal', title: 'No entries yet', hint: 'Record income or an expense to start the register.' }

@@ -205,6 +205,33 @@
         { entryId: rec.id, reversal: note === 'Reversal of:' });
     },
 
+    /**
+     * "Money is arriving / leaving — WHICH account?" One prompt, so every desk
+     * that moves money (a ticket receipt, a customer payment, a refund) asks the
+     * question the same way and books it the same way. Without this the GL says
+     * "bank went up" while Manage Banks shows the old balance and its history has
+     * no row — the exact drift this whole payment-source change exists to end.
+     *   ask({ title, owner, amount, label, onPick(src) })   src = resolve() shape
+     */
+    ask: function (opts) {
+      opts = opts || {};
+      var owner = opts.owner || 'group';
+      var options = Pay.options(owner);
+      EPAL.formModal({
+        title: opts.title || 'Which account?', icon: opts.icon || 'bank', size: 'sm',
+        record: { source: options.length ? options[0][0] : 'm:Bank' },
+        fields: [
+          { key: 'source', label: opts.label || 'Received into (bank / cash account)', type: 'select',
+            required: true, searchable: true, options: options, col2: true,
+            hint: opts.amount != null
+              ? ui.money(opts.amount) + ' lands here — its balance rises and the movement shows in its transaction history.'
+              : 'Its balance moves and the movement shows in its transaction history.' }
+        ],
+        saveLabel: opts.saveLabel || 'Confirm',
+        onSave: function (v) { opts.onPick(Pay.resolve(v.source)); return true; }
+      });
+    },
+
     /** Give the account its money back for a deleted voucher, and flag the
      *  original row so Manage Banks cannot reverse it a second time. `asOf`
      *  dates the reversal row (callers on the demo clock pass their own today). */

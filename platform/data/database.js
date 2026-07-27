@@ -609,8 +609,15 @@
      * (GL-SET-<ref>), and flipping back to Due removes that same entry — so the
      * record's payment status and the BOOKS can never drift apart.
      * ==> LARAVEL: a payments table row + posted journal, deleted on reversal. */
-    settleSale: function (companyId, ref, amount, party, paid) {
+    /* opts.bankId (2026-07-27) — WHICH account the customer's money landed in.
+     * Without it the receipt credits AR and debits 1010 in the abstract: the
+     * ledger is right but Manage Banks still shows the old balance and the
+     * account's history has no row, so "I got paid" is invisible everywhere the
+     * owner actually looks. With it, the GL hits that account's own side (a cash
+     * box IS 1000) and the register moves too — one receipt, both books. */
+    settleSale: function (companyId, ref, amount, party, paid, opts) {
       if (!EPAL.ledger || !EPAL.ledger.post) return;
+      opts = opts || {};
       var id = 'GL-SET-' + ref;
       if (paid) {
         // settle ONLY when this ref genuinely sits in AR (posted as a receivable
@@ -623,11 +630,23 @@
           });
         });
         if (!arAcct || cash || !(+amount > 0)) return;
+        // the account the money actually arrived in — its own GL side (a cash box
+        // IS hard cash 1000), falling back to the plain Bank account when the
+        // caller didn't name one (every legacy call site)
+        var bank = (opts.bankId && EPAL.pay && EPAL.pay.byId) ? EPAL.pay.byId(opts.bankId) : null;
+        var into = bank ? EPAL.pay.glAcctOf(bank) : '1010';
+        var when = new Date().toISOString().slice(0, 10);
         try {
-          EPAL.ledger.post({ id: id, date: new Date().toISOString().slice(0, 10), companyId: companyId,
-            ref: ref, memo: 'Customer payment received · ' + ref, source: 'payment', party: party || '',
-            lines: [ { account: '1010', dr: +amount, cr: 0 }, { account: arAcct, dr: 0, cr: +amount } ] });   // settle the SAME control account the sale debited
-        } catch (e) {}
+          EPAL.ledger.post({ id: id, date: when, companyId: companyId,
+            ref: ref, memo: 'Customer payment received · ' + ref + (bank ? ' · ' + bank.name : ''), source: 'payment', party: party || '',
+            lines: [ { account: into, dr: +amount, cr: 0 }, { account: arAcct, dr: 0, cr: +amount } ] });   // settle the SAME control account the sale debited
+        } catch (e) { return; }
+        // …and the account's OWN book: balance up + a row in its history
+        if (bank && EPAL.pay.syncRegister) {
+          EPAL.pay.syncRegister({ id: 'SET-' + ref, bankId: bank.id, kind: 'Income', amount: +amount,
+            category: 'Customer payment', party: party || '', ref: ref, date: when,
+            companyId: companyId, glId: id }, null);
+        }
       } else if (EPAL.ledger.remove) { try { EPAL.ledger.remove(id); } catch (e) {} }
     },
 

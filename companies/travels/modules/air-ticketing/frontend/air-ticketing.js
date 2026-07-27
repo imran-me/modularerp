@@ -1339,6 +1339,36 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     ui.toast('Sales exported','success');
   }
 
+  /* MARK PAID — a receipt, not a flag (owner review 2026-07-27: "I do a sell in
+   * ticketing … is it recording everywhere? bank manage, cash manage").
+   * The customer's money has to LAND somewhere, so we ask which account and then
+   * settle through it: the GL debits that account's own side (a cash box IS hard
+   * cash 1000, not Bank), its balance rises, and the receipt appears in its
+   * transaction history — instead of the money existing only as an abstract
+   * "1010 went up" that Manage Banks never sees.
+   * Marking a ticket back to Due reverses the receipt (db.settleSale paid=false
+   * removes the settlement entry), so this is not a one-way door. */
+  function markPaid(t, redraw, refresh) {
+    var done = function () { db.saveAirTicket(t); redraw(); refresh && refresh(); };
+    if (t.payStatus === 'Paid') {                      // un-paying: drop the receipt
+      t.payStatus = 'Due';
+      db.settleSale('travels', t.id, t.sale || 0, t.customer || t.passenger || '', false);
+      done(); ui.toast('Marked due — the receipt was reversed', 'success');
+      return;
+    }
+    var take = function (src) {
+      t.payStatus = 'Paid';
+      db.settleSale('travels', t.id, t.sale || 0, t.customer || t.passenger || '', true,
+        { bankId: src && src.bank ? src.bank.id : '' });
+      done();
+      ui.toast('Payment received' + (src && src.bank ? ' into ' + src.bank.name : ''), 'success');
+    };
+    if (EPAL.pay && EPAL.pay.ask) {
+      EPAL.pay.ask({ title: 'Payment received · ' + (t.passenger || t.id), icon: 'cash-coin',
+        owner: 'travels', amount: +t.sale || 0, saveLabel: 'Record receipt', onPick: take });
+    } else { take(null); }                             // kit absent → the old behaviour
+  }
+
   function ticketDetail(t, refresh) {
     var body = el('div');
     var m = ui.modal({ title:t.passenger+' · '+t.route, icon:'ticket-perforated', size:'lg', body:body, footer:false });
@@ -1383,7 +1413,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       STATUSES.forEach(function(s){ var o=el('option',{value:s.id,text:'Status → '+s.id}); if(s.id===t.status)o.selected=true; moveSel.appendChild(o); });
       body.appendChild(el('div.flex.gap-1.flex-wrap', null, [
         moveSel,
-        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(t.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ t.payStatus=t.payStatus==='Paid'?'Due':'Paid'; db.saveAirTicket(t); db.settleSale('travels', t.id, t.sale||0, t.customer||t.passenger||'', t.payStatus==='Paid'); redraw(); refresh&&refresh(); }}),
+        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(t.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ markPaid(t, redraw, refresh); }}),
         el('button.btn.btn-sm.btn-outline',{html:ui.icon('arrow-repeat')+' Reissue',onclick:function(){ m.close(); reissueTicket(t, refresh); }}),
         el('button.btn.btn-sm.btn-outline',{html:ui.icon('x-octagon')+' Void',onclick:function(){ m.close(); voidTicket(t, refresh); }}),
         el('button.btn.btn-sm.btn-outline',{html:ui.icon('arrow-counterclockwise')+' Refund',onclick:function(){ m.close(); refundFromTicket(t, refresh); }}),

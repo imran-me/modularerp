@@ -7,6 +7,40 @@
 
 ## ⏳ OPEN
 
+### T-SALE-CHAIN — "I sell a ticket: does it record EVERYWHERE?" (owner review 2026-07-27)
+Owner: *"i will review the accounting of travel, if works everywhere. like i do a sell
+in ticketing, if its recording or going everywhere automaticly … travels accounts,
+journals, ledgers, transection, bank manage, cash manage, pnl, then groups master
+accounts, finance."* Audited with a real posted sale
+(`scratchpad/audit-sale-chain.mjs`), then fixed what was missing.
+
+**Already worked:** sales store · journals (GL) · ledgers (TB + P&L) · group master
+accounts + Group Finance consolidated P&L · trial balance stayed balanced.
+
+**Was BROKEN — now fixed:**
+1. **Manage Banks / Manage Cash never moved.** A sale or a receipt debited "1010" in
+   the abstract: no named account, so no balance change and no row in any account's
+   history. `db.settleSale(…, opts.bankId)` now books to the CHOSEN account's own GL
+   side (a **cash box IS hard cash 1000**, not Bank) and moves its register through
+   `EPAL.pay.syncRegister`. Ticketing's **Mark Paid** now asks "received into which
+   account?" via the new shared `EPAL.pay.ask()` prompt; Mark Due reverses it.
+2. **Ticket sales were invisible in Travels ▸ Accounts ▸ Income.** That register read
+   only `acc_entries` (hand-typed money) while a ticket/visa sale posts straight to the
+   ledger. Now folded in on the READ side from the sale journals (no second copy → it
+   cannot double-count), tagged `Sale`, with edit/delete pointing back to the owning
+   module.
+
+**Verified:** unpaid ticket → Receivables; Mark Paid → GL `1010 DR / 1200 CR`, AR
+cleared, account balance ৳5,00,000 → ৳5,60,000, `deposit:60000` in its history, books
+still balance; a **cash box** receipt posts `1000 DR15000` and the box goes ৳20,000 →
+৳35,000; the Income desk lists the sales. Sweep 222/222 × both themes, 0 errors.
+
+**STILL OPEN (one gap left):** a sale created with `payStatus:'Paid'` **at the moment
+of sale** (the EMD form, and visa where it does the same) still books to an abstract
+1010 with no named account, so those skip the register. The fix is the same
+`EPAL.pay.ask()` prompt on those two forms — small, but it touches two more modules,
+so it is left for the next pass rather than rushed in unverified.
+
 ### T-EXP-CARDS — remove the Salary + Office Rent quick cards (owner screenshot)
 **Reported:** 2026-07-26, screenshot of the live Record Expense modal with
 **Staff · Salary & Wages (5100)** and **Office Rent (5200)** crossed out in red.
