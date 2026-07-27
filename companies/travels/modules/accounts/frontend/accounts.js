@@ -657,20 +657,78 @@ function entryDetail(e) {
   ]) ]));
 
   // the double-entry posting this quick entry mirrored into the GL
-  var gl = glFor(e);
-  if (gl) {
+  // EVERY leg this voucher posted — a sale has two (revenue + its cost), a funded
+  // expense has two (ours + the funder's). Each card says in words what happened to
+  // the money, because a debit/credit table alone does not answer "which bank?".
+  glsFor(e).forEach(function (gl, i) {
     var lt = EPAL.table({
       columns: [ { key: 'account', label: 'Account' }, { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true } ],
       rows: (gl.lines || []).map(function (l) { var a = EPAL.ledger.account ? EPAL.ledger.account(l.account) : null; return { account: l.account + (a ? ' · ' + a.name : ''), debit: +l.dr || 0, credit: +l.cr || 0 }; }),
       empty: { icon: 'journal', title: 'No ledger lines' }
     });
-    body.appendChild(el('div.card', null, [ el('div.card-head', null, [ el('h3', { html: ui.icon('journal-text') + ' Ledger Posting' }), el('span.card-sub', { text: gl.id }) ]), el('div.card-body', null, [ lt.el ]) ]));
-  }
+    var role = glRole(gl);
+    body.appendChild(el('div.card', null, [
+      el('div.card-head', null, [
+        el('h3', { html: ui.icon('journal-text') + ' Ledger Posting' + (i ? ' · leg ' + (i + 1) : '') }),
+        el('span.card-sub', { text: gl.id })
+      ]),
+      el('div.card-body', null, [
+        role ? el('div.text-mute.sm.mb-2', { html: ui.icon('arrow-left-right') + ' <b>' + esc(role) + '</b>' +
+          (e.bankName ? ' · <b>' + esc(e.bankName) + '</b>' : '') }) : null,
+        lt.el
+      ])
+    ]));
+  });
   if (EPAL.comments && EPAL.comments.widget) { body.appendChild(el('div.section-label', { text: 'Notes & Discussion' })); body.appendChild(EPAL.comments.widget('acc-entry', e.id)); }
 }
 function glFor(e) {
-  try { if (EPAL.ledger && EPAL.ledger.entries) return EPAL.ledger.entries({ companyId: CID }).filter(function (g) { return g.id === 'GL-ACC-' + e.id || g.ref === e.id; })[0]; } catch (x) {}
-  return null;
+  return glsFor(e)[0] || null;
+}
+
+/* EVERY journal this voucher produced, not just the first one (owner 2026-07-27:
+ * "in which bank is the money going?").
+ * A SALE posts TWO journals under one reference — the revenue leg (DR bank|receivable
+ * / CR the income head) and the cost leg (DR 5000 / CR the vendor payable) — and a
+ * FUNDED expense posts a second leg on the funder's books. The detail card used to
+ * take [0] and show whichever came first, which for a visa sale was the COST journal:
+ * so the card read "DR 5000 / CR 2000" and looked as though no money had moved
+ * anywhere. Show them all, revenue/expense head first, each labelled. */
+function glsFor(e) {
+  try {
+    if (!(EPAL.ledger && EPAL.ledger.entries)) return [];
+    var mine = EPAL.ledger.entries({ companyId: CID }).filter(function (g) {
+      return g.id === 'GL-ACC-' + e.id || g.id === 'GL-ACF-' + e.id ||
+             g.ref === e.id || (e.ref && g.ref === e.ref && g.source === 'sale');
+    });
+    // the leg that carries the income/expense head is the one a human wants first
+    return mine.sort(function (a, b) { return glRank(a) - glRank(b); });
+  } catch (x) { return []; }
+}
+function glRank(g) {
+  var has = function (pred) { return (g.lines || []).some(pred); };
+  if (has(function (l) { return String(l.account).charAt(0) === '4'; })) return 0;   // revenue
+  if (has(function (l) { return String(l.account) === '5000'; })) return 2;          // its direct cost
+  if (has(function (l) { return String(l.account).charAt(0) === '5'; })) return 1;   // an expense head
+  return 3;
+}
+// What a journal DID with the money, in one plain sentence — the question the
+// Ledger Posting table alone never answers.
+function glRole(g) {
+  var acct = function (code) { var a = EPAL.ledger.account ? EPAL.ledger.account(code) : null; return a ? a.name : code; };
+  var cash = null, ar = null, ap = null, ic = null, head = null;
+  (g.lines || []).forEach(function (l) {
+    var c = String(l.account), dr = +l.dr || 0;
+    if (c === '1000' || c === '1010') cash = { code: c, dr: dr };
+    else if (c === '1200' || c === '1150') ar = { code: c, dr: dr };
+    else if (c === '2000' || c === '2050') ap = { code: c };
+    else if (c === '1300' || c === '2400') ic = { code: c };
+    else if (c.charAt(0) === '4' || c.charAt(0) === '5') head = c;
+  });
+  if (cash) return (cash.dr > 0 ? 'Money IN → ' : 'Money OUT ← ') + cash.code + ' ' + acct(cash.code);
+  if (ar) return 'Not received yet → sits in ' + ar.code + ' ' + acct(ar.code);
+  if (ap) return 'Not paid yet → owed as ' + ap.code + ' ' + acct(ap.code);
+  if (ic) return 'Between concerns → ' + ic.code + ' ' + acct(ic.code);
+  return head ? 'Posted to ' + head + ' ' + acct(head) : '';
 }
 
 /* ==========================================================================
