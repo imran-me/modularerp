@@ -7,6 +7,52 @@
 
 ## ⏳ OPEN
 
+### T-BE-MONEY — the Laravel money chain (autonomous session, 2026-07-27) ✅
+Owner was out for 2h and asked for continuous work. Priority #2 is travels/accounts
+full-stack; the other session had just finished its FRONTEND, so the **backend half**
+was free and collides with nothing.
+
+**Built — kernel services** (`platform/backend/app/Services/`), so every concern posts
+money the same way and a company module never reaches into another's code:
+| Flow | Service | Endpoint |
+|------|---------|----------|
+| money out | `ExpensePostingService` (earlier) | `POST /api/travels/accounts/expenses` |
+| a sale | **`SalePostingService`** | `POST /api/travels/accounts/sales` |
+| customer paid | **`ReceiptPostingService`** | `POST /api/travels/accounts/receipts` |
+| still owed | ″ | `GET /api/travels/accounts/receivables` |
+| between concerns | **`InterCompanyService`** | `…/master-accounts/intercompany/{positions,invoice,settle,shared-cost}` |
+
+**THREE REAL BUGS FOUND BY WRITING THE TESTS** (all fixed, all pinned by a test):
+1. **Every void/refund was rejected by the API — 422.** `LedgerService` (and
+   `JournalController` before it) demanded `Dr > 0`, but a void negates BOTH sides:
+   balanced, and exactly what the SPA's `ledger.post()` accepts. So the browser showed
+   a sale reversed while the DB still carried the revenue and the payable. Now the rule
+   is balance-only, plus a refusal for an entry worth nothing.
+2. **`journal_entries` had no `party` column.** The SPA sent it on every posting; the
+   API dropped it on write and returned `'party' => ''` on read. That blanks the Party
+   Ledger, AR/AP-by-counterparty, and the **inter-company balances card** in Travels
+   Accounts — whose Settle button reads exactly that. Nullable indexed column added
+   (`2026_07_27_004000`), written hasColumn-guarded, returned by the controller.
+3. **The expense head mapper misfiled two everyday categories, on BOTH sides.**
+   "Tea / Coffee (Guest)" → **6000 BANK CHARGES** (unbounded `fee` matched "cof-FEE")
+   and "Facebook / Google Ads" → 5800 Misc (`ad\b` never matched the plural). Only the
+   free-text fallback is affected — capture forms pin their head — but the New Journal
+   Entry head IS free text. Both patterns word-bounded identically in `ledger.js` and
+   `LedgerService`, re-verified across all 46 real category strings: **0 mismatches**.
+
+**Tests: 12 → 65.** New `SaleAndReceiptPostingTest` (17) · `InterCompanyPostingTest`
+(12, asserting BOTH legs and that 1300 + 2400 still net to zero across the family after
+every flow) · `LedgerServiceTest` (11, the ledger's own invariants) · `TravelsMoneyApiTest`
+(13, over HTTP: routes, validation, clean 422s, JSON shapes) · shared
+`tests/Support/BuildsMoneySchema` so all posting tests reason about ONE definition of
+the books. Verified: **sweep 234/234 × both themes 0 errors** · trial balance balances ·
+`route:list` shows all 16 money routes. Commits 30ec511, c123072.
+
+**Note — the frontend still posts through the per-store endpoints** (`acc_entries`,
+`gl_entries`, `banks`), not these new ones. That is deliberate: wiring the SPA to them
+means async save paths, and it would double-write while both routes are live. These are
+the production posting API the Laravel rebuild targets, and they are now proven.
+
 ### T-CONS-GROUPHQ — the consolidated TRIAL BALANCE now includes Group HQ (fixed 2026-07-27)
 Flagged earlier as "the owner's call" because it moves numbers on the Consolidation
 screen; closed now that the owner said finish what's left.

@@ -139,6 +139,56 @@ read-only (with a `console.warn`) instead of looping on failed writes.
 (`…master-accounts/backend/migrations/2026_07_26_002000_add_payment_source_to_acc_entries.php`,
 `platform/backend/database/migrations/2026_07_26_003000_add_entry_trail_to_bank_transactions.php`.)
 
+## BUILT — the whole money chain in Laravel (2026-07-27)
+
+Expenses were done first (above). The income side and the inter-company side now
+exist too, so **every way money moves has a server-side twin of the SPA's posting**.
+The rules live in the kernel (`platform/backend/app/Services/`) — a company module
+must never reach into another company's code, so they meet there — and each module
+keeps only a thin HTTP surface.
+
+| Flow | Kernel service | Endpoint |
+|------|----------------|----------|
+| money OUT | `ExpensePostingService` | `POST /api/travels/accounts/expenses` |
+| a SALE | `SalePostingService` | `POST /api/travels/accounts/sales` |
+| the customer PAID | `ReceiptPostingService` | `POST /api/travels/accounts/receipts` |
+| what is still owed | ″ | `GET /api/travels/accounts/receivables` |
+| between CONCERNS | `InterCompanyService` | `…/group/master-accounts/intercompany/*` |
+
+```jsonc
+// sell a ticket on credit
+POST /api/travels/accounts/sales
+{ "ref":"TKT-1201", "amount":100000, "cost":70000, "category":"air",
+  "customer":"Mr Rahman", "vendor":"Emirates" }
+// → DR 1200 Receivable / CR 4010 Air Ticket Sales      (GL-STKT-1201)
+//   DR 5000 Cost of Sales / CR 2000 Payable            (GL-SCTKT-1201)
+
+// …then take the money, into a REAL account
+POST /api/travels/accounts/receipts
+{ "ref":"TKT-1201", "amount":100000, "bankId":"12" }
+// → DR 1010 (that account) / CR 1200                   (GL-SET-TKT-1201)
+//   …and account 12's balance rises, with a deposit row in its history.
+```
+Add `"paid":true, "bankId":"12"` to the sale instead and the revenue journal debits
+that account directly — no receivable is ever raised. `DELETE …/sales/{ref}` voids
+(REVERSES, never erases); `DELETE …/receipts/{ref}` un-pays and the debt returns.
+
+**Rules the API enforces** (each was a real bug once, so they are pinned by tests):
+VAT is a liability (2130), not revenue · a **sub-agent's** debt is 1150, not customer
+AR · a **negative** cost (a void) still posts · a **cash box IS hard cash 1000**, not
+Bank · a receipt settles the **same control account the sale raised** and cannot
+exceed what is outstanding · partial receipts each get their own journal · every
+posting is idempotent by its stable id.
+
+**Tests:** `platform/backend/tests/Feature/` — `SaleAndReceiptPostingTest` (17),
+`InterCompanyPostingTest` (12), `LedgerServiceTest` (11), `TravelsMoneyApiTest` (13,
+over HTTP), `ExpensePostingTest` (10). **65/65.** Run:
+`php -d extension=pdo_sqlite vendor/bin/phpunit`.
+
+**Migrations to run:** `php artisan migrate` — `2026_07_27_004000_add_party_to_journal_entries`
+(the SPA always sent `party`; the API had nowhere to put it, which blanked the Party
+Ledger, AR/AP-by-counterparty and the inter-company balances card after a reload).
+
 ## Routes (Laravel)
 ```
 GET    /travels/accounts                 -> overview (KPIs + cockpit + register)
