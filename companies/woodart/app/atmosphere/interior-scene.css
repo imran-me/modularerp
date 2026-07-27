@@ -199,10 +199,132 @@
 .iscene.on .i-reveal .steam{ animation: steam-rise 5s ease-in-out infinite; animation-delay: calc(var(--s,0) * -2.5s); }
 @keyframes steam-rise{ 0%{ transform: translateY(8px); opacity:0; } 30%,60%{ opacity:.5; } 100%{ transform: translateY(-26px); opacity:0; } }
 
+/* ============================================================================
+ * THE UPPER BAND — the strip that never gets covered.
+ * ----------------------------------------------------------------------------
+ * WHY THIS EXISTS (owner, 2026-07-27): the room below is drawn with
+ * `preserveAspectRatio="xMidYMax slice"`, i.e. anchored to the BOTTOM of the
+ * viewBox — so on a normal screen its ceiling (y 0..160) is cropped away
+ * entirely. Meanwhile the top of every page — behind the breadcrumb, the page
+ * head and the tab band — is the ONE strip that content never fully covers, and
+ * it was reading as dead space.
+ *
+ * So this is a SECOND, independent layer anchored to the TOP (`xMidYMin`),
+ * sized in vh so it always lands exactly in that strip whatever the viewport.
+ * It carries the interior motifs that read well small and repeat forever:
+ * a cornice + blueprint grid, a lighting rail of swaying pendants, a gallery
+ * of framed pieces, material swatch chips drifting past, a dimension line that
+ * re-measures itself, and a slow warm light sweep.
+ *
+ * It deliberately does NOT respond to `--p`: this strip is visible at every
+ * scroll position, so tying it to scroll progress would make it blink out
+ * exactly where it is most wanted.
+ *
+ * Same three laws as the room: background only (content paints on top at
+ * z-index 1), one brand hue for line-art with warmth reserved for lamps, and
+ * GPU-only transforms that pause when hidden and freeze under reduced motion.
+ * ========================================================================== */
+.i-band{
+  position:absolute; top:0; left:0; right:0;
+  height: clamp(190px, 27vh, 320px);
+  pointer-events:none;
+  /* Sits behind real text, so it stays line-art and low-contrast — but it has
+     to actually READ as a room, which the first pass did not. */
+  opacity: .9;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0%, #000 62%, transparent 100%);
+}
+/* Light theme starts from a much lower-contrast palette (navy line on pearl),
+   so the same numbers read as "nearly invisible" there. Lift the band a little
+   and firm up only its structural strokes — enough to be seen, still clearly
+   background. Scoped to .i-band so the room below is untouched. */
+[data-theme="light"] .i-band{ opacity: .85; }
+[data-theme="light"] .i-band .b-cornice,
+[data-theme="light"] .i-band .b-rail,
+[data-theme="light"] .i-band .b-solid,
+[data-theme="light"] .i-band .b-frame,
+[data-theme="light"] .i-band .b-shade{ stroke: rgba(26, 67, 191, .58); }
+.i-band-art{ position:absolute; inset:0; width:100%; height:100%; display:block; color: var(--ink); }
+.i-band-art line, .i-band-art path, .i-band-art rect, .i-band-art circle, .i-band-art ellipse{
+  vector-effect: non-scaling-stroke;
+}
+
+/* cornice + the faint blueprint grid that fades as it falls away from it */
+.b-cornice{ stroke: var(--line); stroke-width: 1.8; fill:none; }
+.b-cornice-s{ stroke: var(--ink-soft); stroke-width: 1.2; fill:none; }
+.b-grid{ stroke: var(--ink-soft); stroke-width: 1; opacity:.34; }
+
+/* the pieces that make it read as a ROOM at a glance, not just geometry */
+.b-solid{ stroke: var(--line); stroke-width: 1.7; fill:none; stroke-linejoin:round; stroke-linecap:round; }
+.b-soft { stroke: var(--ink-soft); stroke-width: 1.3; fill:none; stroke-linecap:round; }
+/* the potted palm breathes */
+.b-plant{ transform-box: fill-box; transform-origin: 50% 100%; }
+.iscene.on .b-plant{ animation: b-breathe 11s ease-in-out infinite; }
+@keyframes b-breathe{ 0%,100%{ transform: rotate(-1.1deg); } 50%{ transform: rotate(1.1deg); } }
+
+/* ---- lighting rail: pendants on a track, each swaying on its own phase --- */
+.b-rail{ stroke: var(--line); stroke-width: 1.8; fill:none; }
+.b-pend{ transform-box: fill-box; transform-origin: 50% 0%; }
+.iscene.on .b-pend{ animation: b-sway 9s ease-in-out infinite; animation-delay: calc(var(--i,0) * -1.35s); }
+@keyframes b-sway{ 0%,100%{ transform: rotate(-1.9deg); } 50%{ transform: rotate(1.9deg); } }
+.b-cord{ stroke: var(--ink-soft); stroke-width: 1.2; }
+.b-shade{ stroke: var(--line); stroke-width: 1.6; fill: color-mix(in srgb, var(--ink) 10%, transparent); }
+.b-bulb{ fill: var(--warm); stroke:none; opacity:.75; }
+.iscene.on .b-bulb{ animation: b-glow 6s ease-in-out infinite; animation-delay: calc(var(--i,0) * -0.9s); }
+@keyframes b-glow{ 0%,100%{ opacity:.42; } 50%{ opacity:.95; } }
+.b-pool{ fill: var(--warm); stroke:none; opacity:.10; filter: blur(7px); }
+.iscene.on .b-pool{ animation: b-pool 6s ease-in-out infinite; animation-delay: calc(var(--i,0) * -0.9s); }
+@keyframes b-pool{ 0%,100%{ opacity:.05; } 50%{ opacity:.16; } }
+
+/* ---- gallery wall: framed pieces, one slowly "levelling" itself ---------- */
+.b-frame{ stroke: var(--line); stroke-width: 1.5; fill:none; }
+.b-frame-in{ stroke: var(--ink-soft); stroke-width: 1; fill:none; }
+.b-tilt{ transform-box: fill-box; transform-origin: 50% 0%; }
+.iscene.on .b-tilt{ animation: b-level 13s ease-in-out infinite; }
+@keyframes b-level{ 0%,100%{ transform: rotate(-1.4deg); } 45%,62%{ transform: rotate(0deg); } }
+
+/* ---- material swatches drifting past, like samples on a bench ------------ */
+.b-chip rect{ stroke: var(--ink-soft); stroke-width: 1.1; fill: color-mix(in srgb, var(--ink) 7%, transparent); }
+.b-chip path{ stroke: var(--ink-soft); stroke-width: .9; fill:none; }   /* grain / weave */
+.iscene.on .b-chip{ animation: b-drift 46s linear infinite; animation-delay: calc(var(--i,0) * -9s); }
+@keyframes b-drift{ 0%{ transform: translateX(1660px); } 100%{ transform: translateX(-260px); } }
+
+/* ---- a dimension line that re-measures itself, forever ------------------- */
+.b-dim{ stroke: var(--ink-soft); stroke-width: 1.2; fill:none; }
+.b-dim-run{ stroke-dasharray: 340; }
+.iscene.on .b-dim-run{ animation: b-measure 11s ease-in-out infinite; }
+@keyframes b-measure{
+  0%{ stroke-dashoffset: 340; } 40%,60%{ stroke-dashoffset: 0; } 100%{ stroke-dashoffset: -340; }
+}
+.b-tick{ stroke: var(--ink-soft); stroke-width: 1.2; }
+
+/* ---- the slow warm sweep — a shaft of light crossing the room ------------ */
+.b-sweep{
+  fill: var(--warm); stroke:none; opacity:0;
+  transform-box: fill-box;
+}
+.iscene.on .b-sweep{ animation: b-sweep 26s ease-in-out infinite; }
+@keyframes b-sweep{
+  0%   { transform: translateX(-340px) skewX(-14deg); opacity:0; }
+  18%  { opacity:.10; }
+  50%  { opacity:.055; }
+  82%  { opacity:.10; }
+  100% { transform: translateX(1700px) skewX(-14deg); opacity:0; }
+}
+
 /* ------------------------------------------------ reduced motion → freeze */
 @media (prefers-reduced-motion: reduce){
   .iscene *{ animation: none !important; }
   .i-world{ transition: none; }
   /* land on a calm, fully-furnished, softly-lit room */
   .iscene{ --p: .72; }
+  /* the band still reads as a finished room, just still: park the drifting
+     swatches off-stage rather than leaving them stacked at their start point,
+     and hide the light sweep, which is only meaningful in motion. */
+  .b-chip{ opacity: 0; }
+  .b-sweep{ opacity: 0; }
 }
+
+/* On a short viewport the band would crowd the page head — shrink it rather
+   than let it compete with the title. */
+@media (max-height: 620px){ .i-band{ height: 150px; opacity:.45; } }

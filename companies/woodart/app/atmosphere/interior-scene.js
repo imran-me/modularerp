@@ -289,6 +289,141 @@
   }
 
   /* ---- assemble the whole stage ------------------------------------------ */
+  /* ==========================================================================
+   * THE UPPER BAND — the strip content never covers.
+   * --------------------------------------------------------------------------
+   * The room below is anchored to the BOTTOM of its viewBox (xMidYMax slice),
+   * so its ceiling is cropped off on a normal screen. The top of the page —
+   * behind the breadcrumb, page head and tab band — is the one strip that stays
+   * visible on every screen, and it was empty. This is its own top-anchored
+   * layer (xMidYMin), so it always lands exactly there.
+   *
+   * Everything in here loops forever and is deliberately independent of the
+   * scroll variable --p: this strip is on screen at every scroll position, so
+   * fading it with scroll would blank it exactly where it is most wanted.
+   * viewBox is 1600 x 260, matching the room's horizontal scale.
+   * ======================================================================== */
+
+  /* Cornice + a blueprint grid that fades as it falls away from the ceiling. */
+  function bandShell() {
+    var out = '<g class="b-grid">';
+    for (var x = 60; x < 1600; x += 76) {
+      out += '<line x1="' + x + '" y1="34" x2="' + x + '" y2="196"/>';
+    }
+    out += '<line x1="0" y1="112" x2="1600" y2="112"/><line x1="0" y1="160" x2="1600" y2="160"/></g>';
+    return '<line class="b-cornice"   x1="0" y1="14" x2="1600" y2="14"/>' +
+           '<line class="b-cornice-s" x1="0" y1="21" x2="1600" y2="21"/>' + out;
+  }
+
+  /* A lighting track with pendants at staggered drops. Each sways and glows on
+     its own phase (--i), so the row never pulses in lockstep. */
+  function bandRail() {
+    var drops = [[150, 66], [318, 92], [470, 54], [1046, 80], [1240, 58], [1436, 96]];
+    var out = '<line class="b-rail" x1="96" y1="34" x2="1504" y2="34"/>';
+    drops.forEach(function (d, i) {
+      var x = d[0], len = d[1], y = 34 + len;
+      out += '<g class="b-pend" style="--i:' + i + '">' +
+        '<line class="b-cord" x1="' + x + '" y1="34" x2="' + x + '" y2="' + y + '"/>' +
+        '<path class="b-shade" d="M' + (x - 19) + ' ' + (y + 22) + ' L' + (x - 7) + ' ' + y +
+          ' L' + (x + 7) + ' ' + y + ' L' + (x + 19) + ' ' + (y + 22) + ' Z"/>' +
+        '<ellipse class="b-pool" style="--i:' + i + '" cx="' + x + '" cy="' + (y + 40) + '" rx="34" ry="15"/>' +
+        '<circle class="b-bulb" style="--i:' + i + '" cx="' + x + '" cy="' + (y + 27) + '" r="4.4"/>' +
+        '</g>';
+    });
+    return '<g>' + out + '</g>';
+  }
+
+  /* A gallery wall. The middle piece is very slightly crooked and slowly
+     levels itself — the one detail that makes the strip feel inhabited. */
+  function bandGallery() {
+    function frame(x, y, w, h, tilt) {
+      var g = '<rect class="b-frame" x="0" y="0" width="' + w + '" height="' + h + '" rx="2"/>' +
+              '<rect class="b-frame-in" x="7" y="7" width="' + (w - 14) + '" height="' + (h - 14) + '" rx="1"/>';
+      return '<g transform="translate(' + x + ' ' + y + ')">' +
+               (tilt ? '<g class="b-tilt">' + g + '</g>' : g) + '</g>';
+    }
+    return '<g>' + frame(676, 120, 62, 46, false) +
+                   frame(752, 112, 46, 58, true) +
+                   frame(812, 126, 54, 40, false) + '</g>';
+  }
+
+  /* Material swatches drifting past — board, laminate, fabric weave, finish.
+     Each carries its own hatch so they read as different materials, not tiles. */
+  function bandSwatches() {
+    var kinds = [
+      'M4 6 Q12 10 20 6 M4 12 Q12 16 20 12 M4 18 Q12 22 20 18',   /* wood grain  */
+      'M5 5 L19 5 M5 11 L19 11 M5 17 L19 17',                      /* laminate    */
+      'M5 5 L19 19 M19 5 L5 19',                                   /* fabric weave*/
+      'M6 16 Q12 4 18 16'                                          /* finish arc  */
+    ];
+    var out = '';
+    for (var i = 0; i < 8; i++) {
+      var y = 176 + (i % 3) * 14;
+      out += '<g class="b-chip" style="--i:' + i + '" transform="translate(0 ' + y + ')">' +
+               '<g transform="translate(' + (i * 210) + ' 0)">' +
+                 '<rect x="0" y="0" width="24" height="24" rx="3"/>' +
+                 '<path d="' + kinds[i % kinds.length] + '"/>' +
+               '</g></g>';
+    }
+    return '<g>' + out + '</g>';
+  }
+
+  /* A dimension line that re-measures itself forever — the drafting motif that
+     ties the band back to the blueprint phase of the room below. */
+  function bandDimension() {
+    var x1 = 1052, x2 = 1392, y = 206;
+    return '<g class="b-dim">' +
+      '<line class="b-tick" x1="' + x1 + '" y1="' + (y - 7) + '" x2="' + x1 + '" y2="' + (y + 7) + '"/>' +
+      '<line class="b-tick" x1="' + x2 + '" y1="' + (y - 7) + '" x2="' + x2 + '" y2="' + (y + 7) + '"/>' +
+      '<line class="b-dim-run" x1="' + x1 + '" y1="' + y + '" x2="' + x2 + '" y2="' + y + '"/>' +
+      '</g>';
+  }
+
+  /* Three silhouettes that make the strip read as a ROOM at a glance rather
+     than as abstract geometry: an arched opening, a potted palm that breathes,
+     and a low console with a lamp. They sit in the lower half of the band,
+     behind the tab row, where the page has the most breathing space. */
+  function bandFurniture() {
+    var arch =
+      '<g class="b-solid" transform="translate(556 0)">' +
+        '<path d="M0 214 L0 150 A52 52 0 0 1 104 150 L104 214"/>' +
+        '<path class="b-soft" d="M12 214 L12 152 A40 40 0 0 1 92 152 L92 214"/>' +
+      '</g>';
+
+    var palm =
+      '<g class="b-plant" transform="translate(902 0)">' +
+        '<path class="b-solid" d="M-16 214 L-12 182 L12 182 L16 214 Z"/>' +
+        '<path class="b-soft" d="M0 182 L0 148"/>' +
+        '<path class="b-soft" d="M0 156 Q-26 138 -36 112"/>' +
+        '<path class="b-soft" d="M0 152 Q22 132 32 106"/>' +
+        '<path class="b-soft" d="M0 150 Q-8 120 -2 96"/>' +
+        '<path class="b-soft" d="M0 158 Q16 142 30 138"/>' +
+      '</g>';
+
+    var console =
+      '<g class="b-solid" transform="translate(1288 0)">' +
+        '<rect x="0" y="176" width="150" height="38" rx="3"/>' +
+        '<line x1="50" y1="176" x2="50" y2="214"/>' +
+        '<line x1="100" y1="176" x2="100" y2="214"/>' +
+        '<line x1="14" y1="214" x2="14" y2="224"/>' +
+        '<line x1="136" y1="214" x2="136" y2="224"/>' +
+        /* a table lamp on top */
+        '<path class="b-soft" d="M104 176 L104 162"/>' +
+        '<path d="M92 162 L98 146 L114 146 L120 162 Z"/>' +
+      '</g>';
+
+    return '<g>' + arch + palm + console + '</g>';
+  }
+
+  function bandHTML() {
+    return '<div class="i-band">' +
+      '<svg class="i-band-art" viewBox="0 0 1600 260" preserveAspectRatio="xMidYMin meet" aria-hidden="true">' +
+        '<rect class="b-sweep" x="-180" y="0" width="150" height="260"/>' +
+        bandShell() + bandRail() + bandGallery() + bandFurniture() +
+        bandSwatches() + bandDimension() +
+      '</svg></div>';
+  }
+
   function sceneHTML() {
     var svg =
       '<svg class="iscene-art" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMax slice" aria-hidden="true">' +
@@ -306,6 +441,7 @@
     return '<div class="iscene" aria-hidden="true">' +
              '<div class="i-haze"></div>' +
              svg +
+             bandHTML() +      /* the top strip — see bandHTML's header */
            '</div>';
   }
 
