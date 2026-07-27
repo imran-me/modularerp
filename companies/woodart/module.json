@@ -105,8 +105,27 @@
       "icon": "boxes",
       "desc": "Wood, laminates, hardware, finishes inventory.",
       "enabled": true,
-      "subs": [],
-      "built": false
+      "subs": [
+        {
+          "id": "stock",
+          "label": "Stock",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "reorder",
+          "label": "Reorder",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "valuation",
+          "label": "Valuation",
+          "icon": "dot",
+          "enabled": true
+        }
+      ],
+      "built": true
     },
     {
       "id": "production",

@@ -1,0 +1,41 @@
+{
+  "key": "materials",
+  "company": "woodart",
+  "title": "Materials",
+  "icon": "boxes",
+  "desc": "Wood, laminates, hardware, finishes inventory.",
+  "route": "#/woodart/materials",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "stock",
+      "label": "Stock",
+      "route": "#/woodart/materials/stock",
+      "enabled": true
+    },
+    {
+      "id": "reorder",
+      "label": "Reorder",
+      "route": "#/woodart/materials/reorder",
+      "enabled": true
+    },
+    {
+      "id": "valuation",
+      "label": "Valuation",
+      "route": "#/woodart/materials/valuation",
+      "enabled": true
+    }
+  ],
+  "stores": [
+    "wa_materials"
+  ],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/materials.js",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — the presence of THIS file is what auto-discovery HEAD-probes (platform/discovery/discovery.js). A module registered with built:true in the company manifest but missing this file is treated as deleted."
+}
