@@ -3,7 +3,11 @@
 namespace Epal\Modules\Woodart\Materials\Services;
 
 use Epal\Modules\Woodart\Materials\Models\Material;
+use Epal\Modules\Woodart\Materials\Models\Movement;
+use Epal\Modules\Woodart\Materials\Models\StockLocation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * MaterialService — ALL the business logic for Woodart materials lives here.
@@ -118,5 +122,196 @@ class MaterialService
             ->where('company_id', $this->companyId)
             ->where('ext_id', $extId)
             ->delete();
+    }
+
+    /* ======================================================================
+     * THE STOCK LEDGER  (server half, 2026-07-27)
+     * ----------------------------------------------------------------------
+     * Stock used to be a bare number here too. It now moves only through
+     * applyMovement(), which writes the movement row and updates the material's
+     * stock column inside ONE database transaction — atomicity the browser
+     * cannot offer, and the reason the server is the authority once it exists.
+     * ==================================================================== */
+
+    /** Every movement, newest first. */
+    public function movements(): Collection
+    {
+        return Movement::query()
+            ->where('company_id', $this->companyId)
+            ->orderByDesc('date')
+            ->orderByDesc('ext_id')
+            ->get();
+    }
+
+    /** One material's history — the answer to "why is it only 26?". */
+    public function historyOf(string $materialExtId): Collection
+    {
+        return Movement::query()
+            ->where('company_id', $this->companyId)
+            ->where('material', $materialExtId)
+            ->orderByDesc('date')->orderByDesc('ext_id')
+            ->get();
+    }
+
+    public function locations(): Collection
+    {
+        return StockLocation::query()
+            ->where('company_id', $this->companyId)
+            ->orderByDesc('primary')->orderBy('name')
+            ->get();
+    }
+
+    public function defaultLocation(): ?string
+    {
+        return $this->locations()->first()?->ext_id;
+    }
+
+    /**
+     * APPLY A MOVEMENT — the only sanctioned way stock changes.
+     *
+     * The row and the balance are written in ONE transaction: either both land
+     * or neither does. That is the guarantee the whole ledger rests on, and it
+     * is why reconcile() can be trusted rather than merely hoped for.
+     *
+     * The sign is derived from the KIND (Movement::signed), never taken from the
+     * caller. Returns null when the material is unknown or the quantity resolves
+     * to zero — a movement of nothing is not a movement.
+     */
+    public function applyMovement(array $data): ?Movement
+    {
+        $material = Material::query()
+            ->where('company_id', $this->companyId)
+            ->where('ext_id', $data['material'])
+            ->first();
+
+        if (! $material) {
+            return null;
+        }
+
+        $kind = $data['kind'];
+        $qty = Movement::signed($kind, $data['qty']);
+        if ($qty === 0) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($data, $material, $kind, $qty) {
+            $movement = Movement::create([
+                'company_id' => $this->companyId,
+                'ext_id'     => $data['id'] ?? $this->nextMovementId(),
+                'material'   => $material->ext_id,
+                'kind'       => $kind,
+                'qty'        => $qty,
+                'location'   => $data['location'] ?? $this->defaultLocation(),
+                'ref'        => $data['ref'] ?? null,
+                'note'       => $data['note'] ?? null,
+                'by'         => $data['by'] ?? 'System',
+                'date'       => $data['date'] ?? now()->toDateString(),
+            ]);
+
+            $material->stock = (int) $material->stock + $qty;
+            $material->save();
+
+            return $movement;
+        });
+    }
+
+    /** Stock per location for one material, derived from its movements. */
+    public function byLocation(string $materialExtId): Collection
+    {
+        return $this->historyOf($materialExtId)
+            ->groupBy(fn (Movement $m) => $m->location ?: 'unassigned')
+            ->map(fn (Collection $rows, string $loc) => [
+                'location' => $loc,
+                'qty'      => (int) $rows->sum('qty'),
+            ])
+            ->sortByDesc('qty')
+            ->values();
+    }
+
+    /** Every location with what it holds — the warehouse view. */
+    public function locationTotals(): Collection
+    {
+        $cost = $this->list()->mapWithKeys(fn (Material $m) => [$m->ext_id => (int) $m->unit_cost]);
+        $qty = [];
+        $val = [];
+
+        foreach ($this->movements() as $mv) {
+            $k = $mv->location ?: 'unassigned';
+            $qty[$k] = ($qty[$k] ?? 0) + (int) $mv->qty;
+            $val[$k] = ($val[$k] ?? 0) + (int) $mv->qty * ($cost[$mv->material] ?? 0);
+        }
+
+        return $this->locations()
+            ->map(fn (StockLocation $l) => [
+                'id'    => $l->ext_id,
+                'name'  => $l->name,
+                'kind'  => $l->kind,
+                'area'  => $l->area ?: '',
+                'qty'   => $qty[$l->ext_id] ?? 0,
+                'value' => $val[$l->ext_id] ?? 0,
+            ])
+            ->sortByDesc('value')
+            ->values();
+    }
+
+    /**
+     * THE INVARIANT: for every material, the sum of its movements equals its
+     * stored stock. Returns ONLY the rows that disagree — an empty collection is
+     * the healthy state. A balance you cannot prove is a balance you cannot
+     * trust, which is the entire reason this ledger exists.
+     *
+     * Degrades to empty when the movements table is not migrated, so a partially
+     * migrated host does not report false drift on every single material.
+     */
+    public function reconcile(): Collection
+    {
+        if (! Schema::hasTable('wa_movements')) {
+            return collect();
+        }
+
+        $net = Movement::query()
+            ->where('company_id', $this->companyId)
+            ->selectRaw('material, SUM(qty) AS moved')
+            ->groupBy('material')
+            ->pluck('moved', 'material');
+
+        return $this->list()
+            ->map(fn (Material $m) => [
+                'id'    => $m->ext_id,
+                'name'  => $m->name,
+                'stock' => (int) $m->stock,
+                'moved' => (int) ($net[$m->ext_id] ?? 0),
+                'drift' => (int) $m->stock - (int) ($net[$m->ext_id] ?? 0),
+            ])
+            ->filter(fn (array $r) => $r['drift'] !== 0)
+            ->values();
+    }
+
+    /** The movement screen's header figures. */
+    public function movementSummary(): array
+    {
+        $all = $this->movements();
+
+        return [
+            'movements' => $all->count(),
+            'received'  => (int) $all->where('kind', 'Receipt')->sum('qty'),
+            'issued'    => (int) abs($all->where('kind', 'Issue')->sum('qty')),
+            'wasted'    => (int) abs($all->where('kind', 'Wastage')->sum('qty')),
+            'adjusted'  => (int) $all->where('kind', 'Adjustment')->sum('qty'),
+            'locations' => $this->locations()->count(),
+            'lastDate'  => optional($all->first())->date?->toDateString(),
+        ];
+    }
+
+    private function nextMovementId(): string
+    {
+        $max = 0;
+        foreach (Movement::withTrashed()->where('company_id', $this->companyId)->pluck('ext_id') as $id) {
+            if (preg_match('/(\d+)$/', (string) $id, $m)) {
+                $max = max($max, (int) $m[1]);
+            }
+        }
+
+        return 'MOV-'.str_pad((string) ($max + 1), 4, '0', STR_PAD_LEFT);
     }
 }

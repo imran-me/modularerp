@@ -26,3 +26,19 @@ Route::delete('woodart/materials/stock/{id}', [MaterialController::class, 'destr
 // client, and so the reorder rule has ONE server-side definition to point at.
 Route::get('woodart/materials/reorder', [MaterialController::class, 'reorder']);
 Route::get('woodart/materials/valuation', [MaterialController::class, 'valuation']);
+
+/* ---------------------------------------------------------------------------
+ * THE STOCK LEDGER (2026-07-27) — stock is no longer a bare number.
+ *
+ * There is deliberately NO update and NO delete on a movement: a movement is a
+ * fact that happened, and correcting one is a new Adjustment, not a rewrite of
+ * history. If rows could be edited away, `reconcile` would only ever prove that
+ * somebody had tidied up.
+ * ------------------------------------------------------------------------- */
+Route::get('woodart/materials/movements', [MovementController::class, 'index']);
+Route::post('woodart/materials/movements', [MovementController::class, 'store']);
+Route::get('woodart/materials/reconcile', [MovementController::class, 'reconcile']);
+Route::get('woodart/materials/{id}/movements', [MovementController::class, 'forMaterial']);
+
+Route::get('woodart/materials/locations', [StockLocationController::class, 'index']);
+Route::get('woodart/materials/locations/holdings', [StockLocationController::class, 'holdings']);
