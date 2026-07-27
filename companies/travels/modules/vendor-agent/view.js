@@ -1106,41 +1106,67 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         { key: 'amount', label: 'Amount (BDT)', type: 'money', required: true, min: 1 },
         { key: 'desc', label: 'Description', type: 'text', col2: true,
           placeholder: isDebit ? 'e.g. Ticket invoice DAC-JED' : 'e.g. bKash payment' }
-      ],
+      ].concat(isDebit ? [] : [
+        /* A settlement MOVES CASH, so it has to name the account (owner 2026-07-27).
+         * It used to post to a hardcoded 1010 with no register movement: the ledger
+         * said the vendor was paid while Manage Banks showed the old balance and no
+         * account carried the payment in its history. An INVOICE moves no cash, so
+         * this field only appears on the payment side. */
+        { key: 'source', label: meta.partyType === 'agent' ? 'Received into (bank / cash account)' : 'Paid from (bank / cash account)',
+          type: 'select', required: true, searchable: true, col2: true,
+          options: (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options('travels') : [['m:Bank', 'Bank']],
+          hint: 'Its balance moves and the settlement lands in its transaction history.' }
+      ]),
       saveLabel: isDebit ? 'Post Invoice' : 'Post Payment',
       onSave: function (val) {
         var amount = +val.amount || 0;
         if (amount <= 0) { ui.toast('Enter a valid amount', 'error'); return false; }
         var kind = val.kind, date = val.date || '2026-07-05';
         var ref = refFor(kind, Date.now());
+        var src = (!isDebit && EPAL.pay && EPAL.pay.resolve) ? EPAL.pay.resolve(val.source) : null;
         var t = { id: ui.uid('PT'), party: meta.name, partyType: meta.partyType, companyId: 'travels',
           date: date, ref: ref, desc: (val.desc || '').trim() || descFor(kind, { type: meta.partyType }),
           kind: kind, debit: isDebit ? amount : 0, credit: isDebit ? 0 : amount,
+          bankId: src && src.bank ? src.bank.id : '', bankName: src && src.bank ? src.bank.name : '',
           due: isDebit ? addDays(date, 30) : '', created: Date.now() };
         db.save('party_txns', t);
-        postToLedger(meta, kind, amount, ref, isDebit, date);
-        ui.toast((isDebit ? 'Invoice' : 'Payment') + ' ' + ref + ' posted', 'success');
+        postToLedger(meta, kind, amount, ref, isDebit, date, src, t.id);
+        ui.toast((isDebit ? 'Invoice' : 'Payment') + ' ' + ref + ' posted' +
+          (src && src.bank ? ' · ' + src.bank.name : ''), 'success');
         if (done) done();
         return true;
       }
     });
   }
 
-  function postToLedger(meta, kind, amount, ref, isDebit, date) {
+  function postToLedger(meta, kind, amount, ref, isDebit, date, src, txnId) {
     if (!EPAL.ledger || !EPAL.ledger.post) return;
     var isAgent = meta.partyType === 'agent', lines;
+    // the cash side of a settlement is the account the user named — a cash box IS
+    // hard cash 1000, not Bank; no account named falls back to 1010 as before
+    var cashAcct = (src && src.gl) ? src.gl : '1010';
     if (isDebit) {
       // A charge raises what is owed.
       if (isAgent) lines = [ { account: '1150', dr: amount, cr: 0 }, { account: '4000', dr: 0, cr: amount } ];
       else         lines = [ { account: '5000', dr: amount, cr: 0 }, { account: '2000', dr: 0, cr: amount } ];
     } else {
       // A settlement clears what is owed.
-      if (isAgent) lines = [ { account: '1010', dr: amount, cr: 0 }, { account: '1150', dr: 0, cr: amount } ];
-      else         lines = [ { account: '2000', dr: amount, cr: 0 }, { account: '1010', dr: 0, cr: amount } ];
+      if (isAgent) lines = [ { account: cashAcct, dr: amount, cr: 0 }, { account: '1150', dr: 0, cr: amount } ];
+      else         lines = [ { account: '2000', dr: amount, cr: 0 }, { account: cashAcct, dr: 0, cr: amount } ];
     }
+    var glId = 'GL-PT-' + (txnId || ref);
     try {
-      EPAL.ledger.post({ date: date, companyId: 'travels', ref: ref,
-        memo: kind + ' · ' + meta.name, source: 'manual', party: meta.name, lines: lines });
+      EPAL.ledger.post({ id: glId, date: date, companyId: 'travels', ref: ref,
+        memo: kind + ' · ' + meta.name + (src && src.bank ? ' · ' + src.bank.name : ''),
+        source: isDebit ? 'manual' : 'payment', party: meta.name, lines: lines });
+      // …and the named account's OWN book. An agent settling PAYS US (money in);
+      // paying a vendor takes money OUT — same call, opposite direction.
+      if (!isDebit && src && src.bank && EPAL.pay.syncRegister) {
+        EPAL.pay.syncRegister({ id: txnId || ref, bankId: src.bank.id,
+          kind: isAgent ? 'Income' : 'Expense', amount: amount,
+          category: kind, party: meta.name, ref: ref, date: date,
+          companyId: 'travels', glId: glId }, null);
+      }
     } catch (e) { console.error('[vendor-agent] ledger post failed', e); }
   }
 
@@ -1189,7 +1215,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
 
   /* ======================================================= COMMISSION */
   // real PAYOUTS: what we've actually paid an agent (tv_comm_paid rows, each one
-  // posted to the books as DR 5350 Agent Commission / CR cash, party-tagged)
+  // posted to the books as DR 2000 Payable / CR the account it was paid from)
   function commissionPaid(agentKey) {
     return S.list('tv_comm_paid').filter(function (p) { return p.agent === agentKey; })
       .reduce(function (a, p) { return a + (+p.amount || 0); }, 0);
@@ -1200,7 +1226,12 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       title: 'Pay Commission — ' + r.name, icon: 'percent', size: 'sm', record: { amount: out, date: '2026-07-05', method: 'Bank' },
       fields: [
         { key: 'amount', label: 'Payout (৳)', type: 'money', required: true, min: 1, max: out, hint: 'Outstanding commission ' + ui.money(out) + '.' },
-        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Nagad', 'Cheque'], default: 'Bank' },
+        // WHICH account the payout leaves (owner 2026-07-27) — same shared list as
+        // every other money screen, so the agent's money visibly leaves a real
+        // account instead of an abstract "Bank"
+        { key: 'source', label: 'Paid from (bank / cash account)', type: 'select', required: true, searchable: true,
+          options: (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options('travels') : [['m:Bank', 'Bank']],
+          hint: 'Its balance drops and the payout lands in its transaction history.' },
         { key: 'date', label: 'Date', type: 'date', default: '2026-07-05' },
         { key: 'note', label: 'Note', type: 'text' }
       ],
@@ -1208,13 +1239,28 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       onSave: function (v) {
         var amt = Math.min(+v.amount || 0, out);
         if (amt <= 0) { ui.toast('Enter the payout amount', 'error'); return false; }
+        var src = (EPAL.pay && EPAL.pay.resolve) ? EPAL.pay.resolve(v.source) : { bank: null, method: 'Bank', gl: '1010' };
+        var glId = 'GL-COMM-' + ui.uid('').slice(-6);
         try {
+          /* DR 2000, NOT 5350 (fixed 2026-07-27). The sale already booked the
+           * expense — DR 5350 Agent Commission / CR 2000 owed to this agent — so
+           * debiting 5350 again at payout counted the SAME commission twice in the
+           * P&L and left the payable standing forever. Paying an agent is settling a
+           * debt, not incurring a new cost:
+           *     DR 2000 Accounts Payable  /  CR the account it was paid from
+           * (a cash box IS hard cash 1000). */
           if (EPAL.ledger && EPAL.ledger.post) EPAL.ledger.post({
-            id: 'GL-COMM-' + ui.uid('').slice(-6), date: v.date, companyId: 'travels', ref: 'COMM-' + (r.id || r.name),
-            memo: 'Agent commission payout · ' + r.name + (v.note ? ' · ' + v.note : ''), source: 'payment', party: r.name,
-            lines: [ { account: '5350', dr: amt, cr: 0 }, { account: v.method === 'Cash' ? '1000' : '1010', dr: 0, cr: amt } ] });
-          S.upsert('tv_comm_paid', { id: 'CP-' + ui.uid('').slice(-6), agent: r.id || r.name, name: r.name, amount: amt, date: v.date, method: v.method, note: v.note || '' });
-          ui.toast('Paid ' + ui.money(amt) + ' commission to ' + r.name, 'success'); EPAL.router.render(); return true;
+            id: glId, date: v.date, companyId: 'travels', ref: 'COMM-' + (r.id || r.name),
+            memo: 'Agent commission payout · ' + r.name + (src.bank ? ' · ' + src.bank.name : '') + (v.note ? ' · ' + v.note : ''),
+            source: 'payment', party: r.name,
+            lines: [ { account: '2000', dr: amt, cr: 0 }, { account: src.gl, dr: 0, cr: amt } ] });
+          S.upsert('tv_comm_paid', { id: 'CP-' + ui.uid('').slice(-6), agent: r.id || r.name, name: r.name, amount: amt, date: v.date, method: src.method, bankId: src.bank ? src.bank.id : '', bankName: src.bank ? src.bank.name : '', note: v.note || '' });
+          // …and the account's own book: balance down + a row in its history
+          if (src.bank && EPAL.pay.syncRegister) EPAL.pay.syncRegister({
+            id: 'COMM-' + (r.id || r.name) + '-' + glId.slice(-6), bankId: src.bank.id, kind: 'Expense', amount: amt,
+            category: 'Agent commission', party: r.name, ref: 'COMM-' + (r.id || r.name), date: v.date,
+            companyId: 'travels', glId: glId }, null);
+          ui.toast('Paid ' + ui.money(amt) + ' commission to ' + r.name + (src.bank ? ' from ' + src.bank.name : ''), 'success'); EPAL.router.render(); return true;
         } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; }
       }
     });

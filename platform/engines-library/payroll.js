@@ -333,7 +333,17 @@
     return run;
   }
 
-  // Pay a slip (full by default, or a partial `amount`). Recovers outstanding advance first.
+  /* Pay a slip (full by default, or a partial `amount`). Recovers outstanding advance first.
+   *
+   * `method` may now be a PAYMENT SOURCE as well as a plain label (owner 2026-07-27):
+   * pass 'bank:<id>' — the value the shared account pickers use — and the salary
+   * leaves THAT account: its own GL side (a cash box IS hard cash 1000), its balance,
+   * and a row in its transaction history. Passing 'Bank'/'Cash' as before still works
+   * and behaves exactly as it always did, so no existing caller changes.
+   *
+   * A PARTIAL payment leaves the rest where it belongs: 2100 Salary Payable keeps the
+   * unpaid balance — that is the company's debt to the employee — and the slip reads
+   * 'partial' until it is cleared. */
   function pay(empId, ym, amount, method) {
     var s = slip(empId, ym); if (!s) throw new Error('No payslip for ' + empId + ' ' + ym);
     var run = getRun(s.companyId, ym);
@@ -350,11 +360,25 @@
     var recover = clamp(advWant, 0, amt);                // agreed advance recovery out of this pay
     var emiRecover = clamp(emiWant, 0, amt - recover);   // agreed loan EMI installment
     var cash = amt - recover - emiRecover;
+    // WHICH account pays the salary. 'bank:<id>' names a real one; anything else
+    // keeps the old generic behaviour (Cash → 1000, everything else → 1010).
+    var src = (EPAL.pay && EPAL.pay.resolve && String(method || '').indexOf('bank:') === 0)
+      ? EPAL.pay.resolve(method) : null;
+    var cashAcct = src ? src.gl : (method === 'Cash' ? '1000' : '1010');
     var lines = [{ account: '2100', dr: amt, cr: 0 }];
     if (recover > 0) lines.push({ account: '1250', dr: 0, cr: recover });
     if (emiRecover > 0) lines.push({ account: '1260', dr: 0, cr: emiRecover });   // reduce the staff loan
-    lines.push({ account: '1010', dr: 0, cr: cash });
-    glPost('GL-PAYP-' + s.empId + '-' + ym + '-' + ((s.payCount || 0) + 1), today(), s.companyId, 'PAY-' + ym, 'Salary paid · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
+    lines.push({ account: cashAcct, dr: 0, cr: cash });
+    var glId = 'GL-PAYP-' + s.empId + '-' + ym + '-' + ((s.payCount || 0) + 1);
+    glPost(glId, today(), s.companyId, 'PAY-' + ym, 'Salary paid · ' + s.empName + ' · ' + ym +
+      (src && src.bank ? ' · ' + src.bank.name : ''), 'payroll', s.empId, lines);
+    // …and the account's own book, for the cash that actually left it (recoveries
+    // are book entries against the employee, not money out of the account)
+    if (src && src.bank && cash > 0 && EPAL.pay.syncRegister) {
+      EPAL.pay.syncRegister({ id: glId, bankId: src.bank.id, kind: 'Expense', amount: cash,
+        category: 'Salary · ' + mLabel(ym), party: s.empName || s.empId, ref: 'PAY-' + ym,
+        date: today(), companyId: s.companyId, glId: glId }, null);
+    }
     if (emiRecover > 0) txn({ type: 'loan-repay', empId: empId, empName: s.empName, companyId: s.companyId, date: today(), amount: emiRecover, memo: 'EMI auto-deducted from ' + mLabel(ym) + ' salary' });
     s.paid = (s.paid || 0) + amt; s.advanceRecovered = (s.advanceRecovered || 0) + recover; s.loanRecovered = (s.loanRecovered || 0) + emiRecover;
     s.payMethod = method || s.payMethod || 'Bank'; s.payCount = (s.payCount || 0) + 1; s.paidDate = today();
