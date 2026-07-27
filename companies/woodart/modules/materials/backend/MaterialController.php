@@ -31,13 +31,14 @@ class MaterialController
     public function index(): JsonResponse
     {
         if (! Schema::hasTable(self::TABLE)) {
-            return response()->json(['success' => true, 'count' => 0, 'data' => []]);
+            return response()->json(['success' => true, 'provisioned' => false, 'count' => 0, 'data' => []]);
         }
         $rows = $this->service->list();
 
         return response()->json([
-            'success' => true,
-            'count'   => $rows->count(),
+            'success'     => true,
+            'provisioned' => true,
+            'count'       => $rows->count(),
             'data'    => MaterialResource::collection($rows),
         ]);
     }

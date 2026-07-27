@@ -148,15 +148,9 @@
     tv_comm_paid: 'travels/vendor-agent/books/commissions',
     tv_portals:  'travels/vendor-agent/books/portals',
     perf_reviews: 'group/employees/reviews',
-    // Woodart material register — plain master data (holding stock is not a
-    // posting), so it is safely writable. See the module's backend/endpoints.md.
-    wa_materials: 'woodart/materials/stock',
-    // Woodart client directory — plain master data, safely writable.
-    wa_clients:   'woodart/clients/directory',
-    wa_purchases: 'woodart/procurement/orders',
-    wa_vendors:   'woodart/procurement/vendors',
-    wa_production:'woodart/production/jobs',
-    wa_installs:  'woodart/installation/installs'
+    // NOTE: the six Woodart stores are NOT here. Their tables ship as module
+    // migrations that no host has necessarily run yet, so they are CONDITIONAL
+    // (below) — writable only once the server says the table exists.
   };
 
   /* Stores whose WRITE side depends on the server actually having their table.
@@ -172,7 +166,20 @@
    *     that promotes it into WRITABLE below.
    * So the bank movement log starts persisting BY ITSELF the moment the table is
    * provisioned — no code change, no redeploy, and no loop if it never is. */
-  var CONDITIONAL = { bank_txns: 'group/master-accounts/bank-transactions' };
+  var CONDITIONAL = {
+    bank_txns:    'group/master-accounts/bank-transactions',
+    /* The Woodart modules (2026-07-27). Every one of their tables arrives as a
+     * module migration, so on a host that has pulled the code but not run
+     * `php artisan migrate` they are simply absent. Listing them here instead
+     * of in WRITABLE is what stops the exact failure the owner reported: a
+     * saved workshop job that vanishes on reload. */
+    wa_materials: 'woodart/materials/stock',
+    wa_clients:   'woodart/clients/directory',
+    wa_purchases: 'woodart/procurement/orders',
+    wa_vendors:   'woodart/procurement/vendors',
+    wa_production:'woodart/production/jobs',
+    wa_installs:  'woodart/installation/installs'
+  };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()
 
@@ -252,11 +259,18 @@
       var t0 = Date.now();
       return Promise.all(keys.map(function (key) {
         return call(HYDRATE[key]).then(function (j) {
-          S.set(key, j.data || []);
+          // A CONDITIONAL store whose table the server does NOT have is, for this
+          // host, a module with no backend at all — and this file's rule for
+          // those is that they keep their existing data rather than being
+          // emptied. Writing the endpoint's empty list over the top instead was
+          // the second half of the vanishing-data bug: hydration blanked the
+          // register on every boot, so even a save that HAD worked looked lost.
+          var unprovisioned = CONDITIONAL[key] && !j.provisioned;
+          if (!unprovisioned) S.set(key, j.data || []);
           // a CONDITIONAL store is promoted to writable only if the server says
           // its table is really there (see CONDITIONAL)
           if (CONDITIONAL[key] && j.provisioned) WRITABLE[key] = CONDITIONAL[key];
-          return { key: key, n: (j.data || []).length, writable: !!WRITABLE[key] };
+          return { key: key, n: unprovisioned ? 0 : (j.data || []).length, writable: !!WRITABLE[key] };
         }, function (err) {
           if (err.auth) throw err;                  // stale token — abort to login
           return { key: key, n: -1, err: String(err.message || err) };   // one endpoint down ≠ dead app
