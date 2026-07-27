@@ -6,6 +6,7 @@
 > developer, human or AI, can resume months later without losing any of it.
 >
 > **Read order:** this file → `MODULE-STANDARD.md` (how a module is built) →
+> `NAMING-AND-TERMINOLOGY.md` (what things are called) →
 > `platform/design-system/UI-CONTRACT.md` (how it must look) → the target
 > module's own `context.md`.
 >

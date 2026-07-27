@@ -311,7 +311,9 @@ per-module `module.json` first.
 
 ---
 
-**Related:** `platform/design-system/UI-CONTRACT.md` (the universal look) ·
+**Related:** `NAMING-AND-TERMINOLOGY.md` (identifiers, seam method names and the
+glossary — every convention this file assumes) ·
+`platform/design-system/UI-CONTRACT.md` (the universal look) ·
 `companies/woodart/CONTEXT.md` (state + roadmap) · `CLAUDE.md` (R1–R8) ·
 `docs/ADDING-A-FEATURE.md` (registration checklist) ·
 `docs/FOR-LARAVEL-DEVELOPERS.md`.
