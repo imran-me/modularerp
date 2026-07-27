@@ -30,18 +30,31 @@
 > EVERY element of EVERY screen — including the page-head bar, tab bar, switcher.)
 
 > 🎨 **STYLING METHOD — decided 2026-07-26 (owner: "custom effects/concepts in custom
-> CSS, rest universal CSS in Tailwind").** Owner wants generic utilities as Tailwind, but
-> a PILOT proved it's **currently unsafe**: adding any `tw-` class needs a regenerate of
-> the shared `platform/design-system/css/tailwind.built.css`, and `npm run tw:build` on
-> this repo does NOT losslessly reproduce it — it dropped arbitrary-value classes
-> (`tw-max-w-[320px]`…) that OTHER screens build **dynamically in JS**, silently breaking
-> untouched screens (cash/loans/payroll). So Tailwind conversion is **DEFERRED** behind a
-> prerequisite: harden the build (pin `tailwindcss@3.4.17`, add a `safelist` for the
-> dynamically-built classes, prove regeneration == committed byte-for-byte). Until then,
-> styling stays the **house design-system CSS** (`platform/design-system/css/*` — component
-> classes + utility classes), which already satisfies "HTML + CSS, JS only for data" and is
-> pixel-perfect. Tailwind config is `tw-` prefixed + seeded from tokens.css and READY when
-> the build is hardened. Do NOT run `tw:build` + commit its output without proving losslessness.
+> CSS, rest universal CSS in Tailwind") · ✅ TAILWIND UNBLOCKED 2026-07-27.**
+> The 2026-07-26 pilot deferred Tailwind because `npm run tw:build` appeared not to
+> reproduce the committed `platform/design-system/css/tailwind.built.css` — dropping
+> arbitrary-value classes (`tw-max-w-[320px]`…) believed to be built dynamically in JS
+> and silently breaking untouched screens (cash/loans/payroll).
+> **That block was re-tested on 2026-07-27 and is STALE.** Measured, not assumed:
+> a fresh build is **byte-identical** to the committed file (md5 `fa2b2623…`, 577 bytes)
+> on **both** `tailwindcss@3.4.17` and `@3.4.19`; all **17** `tw-` class literals in the
+> app are static; **zero** classes are composed in JS (the feared pattern does not occur —
+> the one `tw-bg-surface` hit is a comment in tailwind.config.js, which is deliberately
+> not scanned). All three prerequisites are now **DONE**: the version is pinned EXACTLY
+> (no caret) in `package.json` + `package-lock.json`; `safelist` is documented in the
+> config (intentionally EMPTY — an entry is a debt, not a feature); and losslessness is
+> no longer a promise but a **gate**: `npm run verify:tw` → `tools/verify/tailwind.mjs`
+> checks (A) a fresh build is byte-identical and (B) every `tw-` class used anywhere has
+> a rule in the committed CSS — the failure that actually ships broken pixels, since prod
+> is a static git-pull. Self-tested: it goes RED on an injected bad class and green again.
+> **Rules when writing `tw-`:** never compose a class name (`'tw-max-w-['+w+'px]'` is
+> invisible to the scanner — switch between whole literals); a genuinely computed value is
+> an inline style, not a utility; run `npm run tw:build` **and** `npm run verify:tw` and
+> commit the regenerated CSS with the screen. House component classes (`.card`, `.btn`,
+> `.kpi-card`) stay the vocabulary for *what a thing is*; Tailwind is *where it sits and
+> how it looks*. The legacy `layout.css`/`base.css` utilities still style every
+> unconverted screen — **do not delete them** until all screens are converted (R4).
+> Full detail: `platform/design-system/UI-CONTRACT.md` §6.
 
 > 📖 **DEVELOPER-READABILITY pass done (2026-07-26):** master-accounts + finance
 > `template.html` now open with a full conventions LEGEND (every `data-*` hook explained)
@@ -242,6 +255,61 @@ keeps touching), then reports · analytics · automation · crm · contract-file
 contract-flight · vendor-agent · hrm · visa-processing · air-ticketing (payroll backend
 already built via master-accounts). Then Group-cockpit modules, then
 woodart/it/shop/construction. Autonomous, push each.
+
+**🆕 2026-07-27 · WOODART INTERIORS — MASTER CONTEXT + THE UNIVERSAL UI CONTRACT.**
+Owner pivoted to interiors and locked the build language in writing. Three new
+authorities (docs only — no screen touched, sweep 222/222 × both themes):
+- **`platform/design-system/UI-CONTRACT.md`** — the UNIVERSAL look, for EVERY
+  company: who owns which layer, the canonical markup for nav bar · page head ·
+  tab band · KPI · card · empty state, the full shared class inventory, the
+  `data-*` hook grammar, where JS may make DOM, and the Tailwind gate. "Nav bar,
+  all same everywhere" is now a contract instead of a habit.
+- **`companies/woodart/MODULE-STANDARD.md`** — the frozen per-module recipe:
+  folder anatomy, the build language, the `frontend/api.js` seam, the split-out
+  `backend/endpoints.md`, `README.md` + `context.md` per module, **two commits
+  per module**, and the 8-gate definition of done.
+- **`companies/woodart/CONTEXT.md`** — the interiors master context: company
+  facts, honest state (only `projects` exists, as a 1,238-line legacy `el()`
+  view.js with no backend; the other 15 modules are placeholder scaffolds),
+  build order starting at `materials`, 10 LOCKED decisions, 4 open questions.
+- **`tools/build/build-module.mjs`** now compiles an OPTIONAL `frontend/api.js`
+  into the module IIFE **before** the logic — so a screen calls
+  `Materials.stock()` and never names a store key or a URL, and flipping a module
+  to Laravel is one line in one file. **Verified additive:** rebuilt all 20
+  existing modules → **zero git diff** (absent api.js emits nothing).
+- Woodart matters strategically: 15 of its 16 modules are greenfield, so it is
+  the FIRST company that can be built to the standard from the start rather than
+  retrofitted — it becomes the reference for IT · Shop · Construction.
+- **⭐ MODULE BUILT: `woodart/materials` — the reference module** (2026-07-27).
+  Three real-HTML screens (Stock · Reorder · Valuation) with **zero `<script>`
+  and zero `<template>`** — repetition uses a `[hidden][data-proto]` prototype
+  row. `frontend/api.js` is the data seam: the store key `wa_materials` appears
+  NOWHERE else in the module, so the Laravel switch is one line in one file.
+  9-file Laravel slice (thin controller → service → model → migration →
+  FormRequest → Resource → seeder) + a frozen versioned `backend/endpoints.md`
+  split out of the blueprint. `wa_materials` wired into api.js HYDRATE+WRITABLE.
+  Verified: PHP `-l` 8/8, tw gate green, **sweep 225/225 × both themes, 0 errors**
+  (222→225 = the 3 new sub-routes). ◻ MySQL CRUD test still owed.
+- **STYLING SHARPENED (owner mid-session): "core build in pure proper HTML,
+  styling only Tailwind CSS and JS."** Resolved as: **every UTILITY is Tailwind**
+  (`tw-flex-1`, `tw-font-semibold`, `tw-mt-[6px]`, `tw-text-ink-mute`), while the
+  house **COMPONENT** classes stay (`.card`, `.kpi-card`, `.btn`, `.page-head`)
+  because they are the universal vocabulary that keeps all six companies
+  identical — forking them per module is the opposite of "nav bar all same
+  everywhere". ⚠️ **Convert by VALUE, not by name:** house `.mt-1` is 6px but
+  Tailwind's `mt-1` is 4px, and `.xs` is 11px vs `text-xs` 12px — a blind rename
+  silently shifts pixels. Verified-exact mapping table in UI-CONTRACT §5.
+- 🐞 **TRAP FOUND (cost a debugging session, now documented):** a module
+  registered `built:true` **without its own `modules/<id>/module.json`** is read
+  by auto-discovery as DELETED (it HEAD-probes exactly that file), and the sweep
+  then fails with **every route empty and ZERO console errors** — looking like a
+  core break rather than one missing file. Isolated with a clean `git worktree`
+  at HEAD. Written up in `companies/woodart/MODULE-STANDARD.md` §8.
+- **Then (owner: "do whatever needed, but lock in my preference") the Tailwind
+  block was cleared** — see the STYLING METHOD note at the top of this file.
+  `tools/verify/tailwind.mjs` + `npm run verify:tw` is the new permanent gate;
+  `tailwind.built.css` is UNCHANGED (nothing needed regenerating). Woodart's
+  open questions #2–#4 now carry defaults instead of blocking.
 
 > Also still open from the ACCOUNTING build order (independent of the HTML work):
 > **step 5 part 2 = Group consolidated P&L** (sum every concern's `pnl()` with
