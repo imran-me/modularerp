@@ -832,8 +832,15 @@
     if (/rent|lease/.test(c)) return '5200';
     if (/salary|payroll|wage|staff/.test(c)) return '5100';
     if (/utility|electric|internet|wifi|gas|water|phone|bill/.test(c)) return '5300';
-    if (/market|ad\b|promo|campaign|boost|sms|design/.test(c)) return '5400';
-    if (/bank|charge|fee|license|iata|software/.test(c)) return '6000';
+    // WORD-BOUNDED on purpose (fixed 2026-07-27). `fee` unbounded matched
+    // "cof-FEE", so "Tea / Coffee (Guest)" classified as BANK CHARGES; `ad\b`
+    // never matched the plural "Ads", so "Facebook / Google Ads" fell through to
+    // Miscellaneous. Both only bite the FALLBACK path — every capture form pins
+    // its head — but the New Journal Entry head is free text, so a typed
+    // "Coffee for guests" really did land in 6000. Keep these two patterns
+    // byte-identical to LedgerService::expenseAccountFor() in the Laravel kernel.
+    if (/market|\bads?\b|promo|campaign|boost|sms|design/.test(c)) return '5400';
+    if (/bank|charge|\bfees?\b|license|iata|software/.test(c)) return '6000';
     if (/adm|penalt|fine/.test(c)) return '5900';
     if (/food|lunch|tea|snack|entertain|canteen/.test(c)) return '5550';
     if (/office|stationer|clean|repair|furniture/.test(c)) return '5500';

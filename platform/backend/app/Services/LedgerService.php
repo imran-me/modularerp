@@ -49,15 +49,27 @@ class LedgerService
             throw new LedgerException('A journal needs at least two lines.');
         }
 
-        // balance check (debits must equal credits, and there must be a debit)
+        // THE balance check: debits must equal credits. Nothing else.
+        //
+        // It used to also demand `$dr > 0`, which quietly rejected the one case that
+        // matters most: a VOID or REFUND. Those post the original entry with both
+        // sides NEGATED (Dr −50,000 / Cr −50,000) — perfectly balanced, and exactly
+        // how the SPA's ledger.post() has always accepted them (it checks
+        // |dr − cr| only). So every void the client mirrored came back 422 and never
+        // persisted: the browser showed the sale reversed while the database still
+        // carried the revenue and the payable. Reject an imbalance, and reject an
+        // entry worth nothing at all — but never a legitimate reversal.
         $dr = 0.0;
         $cr = 0.0;
         foreach ($lines as $ln) {
             $dr += (float) ($ln['dr'] ?? 0);
             $cr += (float) ($ln['cr'] ?? 0);
         }
-        if ($dr <= 0 || abs($dr - $cr) > 0.01) {
+        if (abs($dr - $cr) > 0.01) {
             throw new LedgerException('Entry does not balance (Dr ' . $dr . ' ≠ Cr ' . $cr . ').');
+        }
+        if (abs($dr) < 0.01 && abs($cr) < 0.01) {
+            throw new LedgerException('Entry has no value to post (every line is zero).');
         }
 
         // company: a company-scoped user is forced to their own company
@@ -186,8 +198,12 @@ class LedgerService
         if ($is('rent|lease')) return '5200';
         if ($is('salary|payroll|wage|staff')) return '5100';
         if ($is('utility|electric|internet|wifi|gas|water|phone|bill')) return '5300';
-        if ($is('market|ad\b|promo|campaign|boost|sms|design')) return '5400';
-        if ($is('bank|charge|fee|license|iata|software')) return '6000';
+        // WORD-BOUNDED on purpose (fixed 2026-07-27) — see the same two lines in
+        // ledger.js: unbounded `fee` matched "cof-FEE" so "Tea / Coffee (Guest)"
+        // classified as BANK CHARGES, and `ad\b` never matched the plural "Ads".
+        // These two patterns must stay byte-identical to the SPA's.
+        if ($is('market|\bads?\b|promo|campaign|boost|sms|design')) return '5400';
+        if ($is('bank|charge|\bfees?\b|license|iata|software')) return '6000';
         if ($is('adm|penalt|fine')) return '5900';
         if ($is('food|lunch|tea|snack|entertain|canteen')) return '5550';
         if ($is('office|stationer|clean|repair|furniture')) return '5500';

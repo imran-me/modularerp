@@ -12,6 +12,7 @@
 
 use Epal\Modules\Travels\Accounts\AccountsBookController;
 use Epal\Modules\Travels\Accounts\ExpenseController;
+use Epal\Modules\Travels\Accounts\SaleController;
 use Illuminate\Support\Facades\Route;
 
 // Travels Accounts books — {store} = recurring | cheques | petty.
@@ -28,3 +29,13 @@ Route::get('travels/accounts/expenses', [ExpenseController::class, 'index']);
 Route::get('travels/accounts/expenses/form', [ExpenseController::class, 'formData']);
 Route::post('travels/accounts/expenses', [ExpenseController::class, 'store']);
 Route::delete('travels/accounts/expenses/{voucher}', [ExpenseController::class, 'destroy']);
+
+// The INCOME half — every Travels module that sells posts through here, so a
+// ticket and a visa are accounted for identically (App\Services\SalePostingService).
+// A receipt settles the SAME control account the sale raised and lands the money in
+// a NAMED account (App\Services\ReceiptPostingService).
+Route::post('travels/accounts/sales', [SaleController::class, 'store']);
+Route::delete('travels/accounts/sales/{ref}', [SaleController::class, 'destroy'])->where('ref', '.*');
+Route::post('travels/accounts/receipts', [SaleController::class, 'receipt']);
+Route::delete('travels/accounts/receipts/{ref}', [SaleController::class, 'unreceipt'])->where('ref', '.*');
+Route::get('travels/accounts/receivables', [SaleController::class, 'receivables']);
