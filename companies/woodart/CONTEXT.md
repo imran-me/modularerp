@@ -5,7 +5,8 @@
 > build language, the module roadmap, the decisions and the state — so any
 > developer, human or AI, can resume months later without losing any of it.
 >
-> **Read order:** this file → `MODULE-STANDARD.md` (how a module is built) →
+> **Read order:** this file → `ROOT-MAP.md` (the module map + phase model) →
+> `MODULE-STANDARD.md` (how a module is built) →
 > `NAMING-AND-TERMINOLOGY.md` (what things are called) →
 > `platform/design-system/UI-CONTRACT.md` (how it must look) → the target
 > module's own `context.md`.
@@ -128,7 +129,18 @@ implementation for IT, Shop and Construction.
 
 ---
 
-## 4 · Build order (proposed — §7 has the open question)
+## 4 · Build order — ⚠️ SUPERSEDED by `ROOT-MAP.md` §6
+
+> The owner answered the architecture question on 2026-07-27: **architecture /
+> 3D modelling is a PHASE of a project, not a service module.** That produced
+> the real map (`ROOT-MAP.md`), which reorders what follows: **`design` is now
+> #6** (the phase with no home — the biggest structural gap in the company), and
+> **`projects` moves later**, because rebuilding it before `design` and
+> `estimates` exist would mean rebuilding it twice.
+>
+> The table below is kept for the reasoning behind items 1–5, which is unchanged.
+
+### (superseded) the original order
 
 Simplest → hardest, each one full-stack and 100% done before the next.
 
@@ -201,7 +213,9 @@ none is blocking.
    pinned, gated. See §6 above and UI-CONTRACT §6.
 2. **Build order** — §4 stands: start at `materials`, finish at `settings`.
    *Default: proceed.* Change it if a desk is needed sooner for business reasons.
-3. **Ownership of the `estimates` screens.** Registered inside `projects/view.js`
+3. ~~**Ownership of the `estimates` screens.**~~ → **RESOLVED by `ROOT-MAP.md`**:
+   `estimates` becomes its own module at #8, between design and production.
+   Original note: registered inside `projects/view.js`
    today, but `estimates` is its own menu module. *Default: split it into
    `modules/estimates/` when module #7 comes up* — not before, because it moves
    working routes and must be done with a parity proof, not casually.
