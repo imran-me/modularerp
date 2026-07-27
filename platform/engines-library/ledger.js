@@ -47,6 +47,8 @@
  *   pnl(companyId?,{from,to}) -> {revenue,cogs,gross,expenses,net,lines}
  *   balanceSheet(companyId?) -> {assets,liabilities,equity,totals{balanced}}
  *   consolidatedTrialBalance() -> per-company + elimination + group columns
+ *   consolidatedPnl({from,to}) -> the GROUP income statement: every present
+ *       concern + Group HQ, with inter-company revenue/expense eliminated
  *   postIntercompany(fromCo,toCo,amount,opts) -> two mirrored balanced entries
  *
  * ==> LARAVEL / PHP MAPPING: `coa` -> Account model (migration accounts) and
@@ -71,6 +73,8 @@
   var GL_KEY  = 'gl_entries';
 
   var TOL = 0.5;                       // float tolerance for balance check
+  var COGS_ACCOUNT = '5000';           // direct cost of sales — the one head that
+                                       // sits above gross margin, not in opex
   var TODAY = new Date(2026, 6, 5);    // demo "today" = 2026-07-05 (for aging)
 
   var _seq = 0;                        // runtime entry-id counter
@@ -294,13 +298,19 @@
    * elimination column (inter-company accounts net out), and the group total.
    *   { companies:[{id,name}], rows:[{code,name,type,intercompany,per:{co:net},
    *     elimination, group}], totals:{per:{co:{debit,credit}}, group:{debit,credit}} } */
-  function consolidatedTrialBalance() {
-    var comps = (EPAL.config.companies || []).filter(function (c) {
-      // Phase 3b: a deleted-folder company also drops out of the consolidation
-      // (folder-presence only; identical when all present — see database.js present()).
+  // The operating companies a consolidation covers. Phase 3b: a deleted-folder
+  // company also drops out (folder-presence only; identical when all present —
+  // see database.js present()). ONE list, so the consolidated trial balance and
+  // the consolidated P&L can never disagree about who is in the group.
+  function presentCompanies() {
+    return (EPAL.config.companies || []).filter(function (c) {
       var present = !EPAL.discovery || EPAL.discovery.presentFor(c.id);
       return c.type === 'company' && c.enabled !== false && present;
     }).map(function (c) { return { id: c.id, name: c.name, short: c.short }; });
+  }
+
+  function consolidatedTrialBalance() {
+    var comps = presentCompanies();
     var coa = accounts(), rows = [];
     comps.forEach(function (c) { c._dr = 0; c._cr = 0; });
     var groupDr = 0, groupCr = 0;
@@ -493,13 +503,133 @@
         if (Math.abs(inc) > 0.5) lines.push({ code: a.code, name: a.name, amount: inc });
       } else if (a.type === 'expense') {
         var ex = valueOnNormal(a, q);
-        if (a.code === '5000') cogs += ex; else expenses += ex;
+        if (a.code === COGS_ACCOUNT) cogs += ex; else expenses += ex;
         if (Math.abs(ex) > 0.5) lines.push({ code: a.code, name: a.name, amount: ex });
       }
     }
     var gross = revenue - cogs;
     return { revenue: revenue, cogs: cogs, gross: gross, expenses: expenses,
       net: gross - expenses, lines: lines };
+  }
+
+  /* ==========================================================================
+   * CONSOLIDATED P&L  (accounting build-order step 5, part 2 — owner 2026-07-26)
+   * --------------------------------------------------------------------------
+   * The GROUP's income statement: every present concern PLUS Group HQ, with
+   * inter-company revenue and expense ELIMINATED.
+   *
+   * WHY THE ELIMINATION MATTERS: when Travels invoices Woodart, Travels books
+   * revenue and Woodart books an expense. Add the concerns up naively and the
+   * group looks like it earned AND spent money that never left the building —
+   * both totals inflate while the net stays right, so every margin, every
+   * revenue KPI and every "expense as % of revenue" reads wrong. At group level
+   * that trade simply did not happen. (The consolidated TRIAL BALANCE already
+   * eliminates the balance-sheet side of it, 1300 against 2400; this is the
+   * income-statement half — the two are the same principle on the two books.)
+   *
+   * WHAT IS *NOT* ELIMINATED — the distinction the whole thing turns on:
+   *   · an internal SALE (postIntercompany) → one `ref`, revenue on the seller
+   *     AND an expense on the buyer  → internal, ELIMINATED.
+   *   · a FUNDED expense (concern X's purse pays a Travels bill) or a SHARED
+   *     cost (rent split across concerns) → an expense, but NO matching internal
+   *     revenue: that money genuinely left the group to a landlord or a vendor.
+   *     It is a real group cost and STAYS. Only the 1300/2400 legs eliminate.
+   * So a `ref` is treated as internal only when it carries BOTH sides.
+   *
+   * opts: { from, to } — same period contract as pnl().
+   * Returns { entities:[{id,short}],
+   *           rows:[{code,name,type,per:{entityId:amount},elimination,group}],
+   *           elimination:{ byAccount, revenue, expense, refs },
+   *           totals:{ per:{id:{revenue,cogs,expense,net}},
+   *                    elimination:{revenue,expense},
+   *                    group:{revenue,cogs,gross,expense,net} } }
+   * ==> LARAVEL: a ConsolidationService@pnl doing the same two passes.
+   * ========================================================================*/
+  function consolidatedEntities() {
+    // Group HQ carries its own income and costs (shared services, HQ overhead),
+    // so the group statement is the concerns PLUS Group HQ — not the concerns alone.
+    return presentCompanies().map(function (c) { return { id: c.id, name: c.name, short: c.short }; })
+      .concat([{ id: 'group', name: 'Epal Group (HQ)', short: 'Group HQ' }]);
+  }
+
+  // Spread one eliminated value across the accounts that made it up, pro rata.
+  function spreadElimination(map, total, amount, into) {
+    if (total <= 0) return;
+    Object.keys(map).forEach(function (code) {
+      into[code] = (into[code] || 0) + (map[code] * amount / total);
+    });
+  }
+
+  /* How much revenue/expense is internal, per account. Groups the intercompany
+   * journals by their pair `ref` and only counts a group that has BOTH an income
+   * credit and an expense debit (see the note above). */
+  function intercompanyPnlElimination(opts) {
+    opts = opts || {};
+    var live = {}; consolidatedEntities().forEach(function (e) { live[e.id] = true; });
+    var byRef = {};
+    entries({ source: 'intercompany', from: opts.from, to: opts.to }).forEach(function (e) {
+      if (!live[e.companyId]) return;             // a departed company is not in the group
+      var key = e.ref || e.id;
+      var g = byRef[key] || (byRef[key] = { inc: {}, exp: {}, incTotal: 0, expTotal: 0 });
+      (e.lines || []).forEach(function (l) {
+        var a = account(l.account); if (!a) return;
+        if (a.type === 'income') {
+          var c = (+l.cr || 0) - (+l.dr || 0);
+          if (c > 0) { g.inc[l.account] = (g.inc[l.account] || 0) + c; g.incTotal += c; }
+        } else if (a.type === 'expense') {
+          var d = (+l.dr || 0) - (+l.cr || 0);
+          if (d > 0) { g.exp[l.account] = (g.exp[l.account] || 0) + d; g.expTotal += d; }
+        }
+      });
+    });
+    var out = { byAccount: {}, revenue: 0, expense: 0, refs: 0 };
+    Object.keys(byRef).forEach(function (k) {
+      var g = byRef[k];
+      if (g.incTotal < 0.5 || g.expTotal < 0.5) return;    // one-sided → a real outside cost
+      var amt = Math.min(g.incTotal, g.expTotal);          // equal by construction; min is the safe read
+      spreadElimination(g.inc, g.incTotal, amt, out.byAccount);
+      spreadElimination(g.exp, g.expTotal, amt, out.byAccount);
+      out.revenue += amt; out.expense += amt; out.refs++;
+    });
+    return out;
+  }
+
+  function consolidatedPnl(opts) {
+    opts = opts || {};
+    var ents = consolidatedEntities();
+    var elim = intercompanyPnlElimination(opts);
+    var coa = accounts(), rows = [];
+    var totals = { per: {}, elimination: { revenue: 0, expense: 0 },
+      group: { revenue: 0, cogs: 0, gross: 0, expense: 0, net: 0 } };
+    ents.forEach(function (e) { totals.per[e.id] = { revenue: 0, cogs: 0, expense: 0, net: 0 }; });
+
+    for (var i = 0; i < coa.length; i++) {
+      var a = coa[i];
+      if (a.type !== 'income' && a.type !== 'expense') continue;
+      var per = {}, summed = 0, touched = false;
+      for (var k = 0; k < ents.length; k++) {
+        var v = valueOnNormal(a, { companyId: ents[k].id, from: opts.from, to: opts.to });
+        per[ents[k].id] = v; summed += v;
+        if (Math.abs(v) >= 0.5) touched = true;
+        var t = totals.per[ents[k].id];
+        if (a.type === 'income') t.revenue += v;
+        else if (a.code === COGS_ACCOUNT) t.cogs += v;
+        else t.expense += v;
+      }
+      var eAmt = elim.byAccount[a.code] || 0;
+      if (!touched && eAmt < 0.5) continue;                // account nobody touched
+      var grp = summed - eAmt;
+      rows.push({ code: a.code, name: a.name, type: a.type, per: per, elimination: eAmt, group: grp });
+      if (a.type === 'income') { totals.elimination.revenue += eAmt; totals.group.revenue += grp; }
+      else {
+        totals.elimination.expense += eAmt;
+        if (a.code === COGS_ACCOUNT) totals.group.cogs += grp; else totals.group.expense += grp;
+      }
+    }
+    ents.forEach(function (e) { var t = totals.per[e.id]; t.net = t.revenue - t.cogs - t.expense; });
+    totals.group.gross = totals.group.revenue - totals.group.cogs;
+    totals.group.net = totals.group.gross - totals.group.expense;
+    return { entities: ents, rows: rows, elimination: elim, totals: totals };
   }
 
   /* Product label for a revenue account — the sale's income head IS its product
@@ -624,6 +754,8 @@
     productForAccount: productForAccount,
     balanceSheet: balanceSheet,
     consolidatedTrialBalance: consolidatedTrialBalance,
+    consolidatedPnl: consolidatedPnl,                 // group income statement, inter-co eliminated
+    consolidatedEntities: consolidatedEntities,       // present concerns + Group HQ
     postIntercompany: postIntercompany,
     expenseAccountFor: expenseAccountFor, isAgentParty: isAgentParty,
     incomeAccountFor: function (rec) { return incomeAccountFor(rec || {}); },   // P3 reclass tool

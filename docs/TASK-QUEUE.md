@@ -7,6 +7,31 @@
 
 ## ⏳ OPEN
 
+### T-EXP-CARDS — remove the Salary + Office Rent quick cards (owner screenshot)
+**Reported:** 2026-07-26, screenshot of the live Record Expense modal with
+**Staff · Salary & Wages (5100)** and **Office Rent (5200)** crossed out in red.
+**DONE (this commit):** both are gone from the card grid (`card:false` in
+`TV_EXPENSE_CATS`) — salary belongs to the **Payroll** desk and rent is entered once
+at **Group HQ › Shared Cost** and split, so a card here invited double-booking. They
+are still reachable in the whole-account search (`5100 · Staff · Salary & Wages`,
+`5200 · Office Rent`, plus their items) and picking one now shows a warning naming the
+desk that owns it — nothing became unpostable, only the shortcut is gone. 8 cards left.
+Verified by a headless drive: 20/20.
+
+### T-EXP-LIVE — "the expense is not working yet as I have wanted" ❓NEEDS DETAIL
+**Reported:** 2026-07-26, same message as T-EXP-CARDS, no specifics yet.
+**Found + fixed while investigating (this commit):** a real deployment hazard —
+`AccEntryService` and `ExpensePostingService` wrote the NEW `bank_id` / `bank_name` /
+`pay_acct` columns unconditionally. On a host that pulled the code but has **not run
+`php artisan migrate`** (which is the live host today) every save would hit "unknown
+column", the client would roll its optimistic row back and the user would see
+**"Save failed"** — a working feature looking broken. Both now write those columns
+only when they exist (`Schema::hasColumn`, instance-cached), so the expense records
+either way and starts carrying the account the moment the migration runs. New test:
+`test_it_still_records_on_a_database_missing_the_payment_columns` (12/12 suite).
+**Still open:** ask the owner exactly what "not working" looked like — no accounts in
+the "Paid from" list, a save error, or the numbers not moving.
+
 ### T-EXP-SOURCE — Record Expense: real accounts + whole-chart search + full propagation
 **Reported:** 2026-07-26, screenshot of `#/travels/accounts/expenses` with the
 **Record Expense** modal open and the **“Payment method” select circled in red**

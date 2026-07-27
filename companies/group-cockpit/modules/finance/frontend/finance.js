@@ -202,9 +202,14 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
    * Group flow made visible.
    * ========================================================================*/
   // the P&L entities: each present sister concern + the Group HQ (companyId:'group')
+  // present concerns + Group HQ — the engine owns the list (ledger.js
+  // consolidatedEntities), so the group statement and the consolidation screens
+  // can never disagree about who is in the group.
   function pnlEntities() {
-    var comps = LED().consolidatedTrialBalance().companies.map(function (c) { return { id: c.id, short: c.short }; });
-    return comps.concat([{ id: 'group', short: 'Group HQ' }]);
+    return LED().consolidatedEntities
+      ? LED().consolidatedEntities().map(function (c) { return { id: c.id, short: c.short }; })
+      : LED().consolidatedTrialBalance().companies.map(function (c) { return { id: c.id, short: c.short }; })
+          .concat([{ id: 'group', short: 'Group HQ' }]);
   }
   // natural P&L amount for one account at one entity (income credit-side +, expense debit-side +)
   function pnlAmt(code, eid) { return Math.round(LED().balance(code, { companyId: eid })); }
@@ -234,23 +239,30 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
   }
   function perCompanySeriesLedger() { return activeCompanies().map(function (c) { return { co: c, series: ledgerSeries(c.id) }; }); }
 
+  /* THE GROUP INCOME STATEMENT (accounting build-order step 5, part 2).
+   * Driven by `ledger.consolidatedPnl()` — the same engine call a Laravel
+   * ConsolidationService would make — so this screen shows a REAL consolidation,
+   * not a sum: an Elimination column strips out what the concerns sold to each
+   * other, and the Group column is what the group earned from the OUTSIDE world.
+   * Sell a ticket from Travels to Woodart and the concerns both show it, but the
+   * group does not — no revenue was created by moving money between pockets. */
   function renderConcernPnl(page) {
     page.appendChild(head('P&L by Concern', 'diagram-3',
-      'Consolidated income statement — every category across each sister concern plus Group HQ. Driven by the general ledger.',
+      'Consolidated income statement — every category across each sister concern plus Group HQ, with inter-company sales eliminated. Driven by the general ledger.',
       [ can('export') ? el('button.btn.btn-ghost', { html: ui.icon('download') + ' Export CSV', onclick: exportConcernCsv }) : null ].filter(Boolean)));
     page.appendChild(pills('concern-pnl'));
-    if (!hasLedger()) { page.appendChild(el('div.card', null, [ el('div.card-body', { text: 'Ledger engine unavailable.' }) ])); return; }
+    if (!hasLedger() || !LED().consolidatedPnl) { page.appendChild(el('div.card', null, [ el('div.card-body', { text: 'Ledger engine unavailable.' }) ])); return; }
 
-    var ents = pnlEntities();
-    var accts = LED().accounts();
-    function vals(a) { return ents.map(function (e) { return pnlAmt(a.code, e.id); }); }
-    function nonzero(a) { return vals(a).some(function (v) { return Math.abs(v) >= 1; }); }
-    var income = accts.filter(function (a) { return a.type === 'income'; }).sort(byCode).filter(nonzero);
-    var expense = accts.filter(function (a) { return a.type === 'expense'; }).sort(byCode).filter(nonzero);
-    var revByEnt = ents.map(function (e) { return income.reduce(function (s, a) { return s + pnlAmt(a.code, e.id); }, 0); });
-    var expByEnt = ents.map(function (e) { return expense.reduce(function (s, a) { return s + pnlAmt(a.code, e.id); }, 0); });
-    function tot(arr) { return arr.reduce(function (x, y) { return x + y; }, 0); }
-    var revTotal = tot(revByEnt), expTotal = tot(expByEnt), netTotal = revTotal - expTotal;
+    var c = LED().consolidatedPnl();
+    var ents = c.entities;
+    var elim = c.totals.elimination, grp = c.totals.group;
+    var income = c.rows.filter(function (r) { return r.type === 'income'; }).sort(byCode);
+    var expense = c.rows.filter(function (r) { return r.type === 'expense'; }).sort(byCode);
+    var revTotal = grp.revenue, expTotal = grp.cogs + grp.expense, netTotal = grp.net;
+    var perEnt = function (key) { return ents.map(function (e) { return c.totals.per[e.id][key]; }); };
+    var revByEnt = perEnt('revenue');
+    var expByEnt = ents.map(function (e) { return c.totals.per[e.id].cogs + c.totals.per[e.id].expense; });
+    var hasElim = elim.revenue >= 1 || elim.expense >= 1;
 
     var scr = screen('concern-pnl');
     var kpis = scr.querySelector('[data-fill="kpis"]');
@@ -258,45 +270,62 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     kpis.appendChild(kpi('Group Expense', ui.money(expTotal, { compact: true }), 'graph-down-arrow'));
     kpis.appendChild(kpi('Group Net', ui.money(netTotal, { compact: true }), 'wallet2'));
     kpis.appendChild(kpi('Group Margin', (revTotal ? (netTotal / revTotal * 100).toFixed(1) : '0.0') + '%', 'percent'));
-    kpis.appendChild(kpi('Entities', String(ents.length), 'diagram-3'));
+    kpis.appendChild(kpi('Inter-company', ui.money(elim.revenue, { compact: true }), 'arrow-left-right', hasElim ? 'text-warn' : ''));
 
-    // ---- the pivot table (Category | each entity | Total) ----
+    // ---- the pivot (Category | each entity | Elimination | Group) ----
     var thr = el('tr'); thr.appendChild(el('th', { text: 'Category' }));
     ents.forEach(function (e) { thr.appendChild(el('th.num', { text: e.short })); });
-    thr.appendChild(el('th.num', { text: 'Total' }));
+    if (hasElim) thr.appendChild(el('th.num', { text: 'Elimination' }));
+    thr.appendChild(el('th.num', { text: 'Group' }));
+    var cols = ents.length + (hasElim ? 3 : 2);
     var tbody = el('tbody');
     function money(v) { return v ? ui.money(v) : '—'; }
-    function sectionRow(label) { var tr = el('tr', { style: { background: 'var(--surface-2)' } }); var td = el('td.strong', { text: label }); td.setAttribute('colspan', String(ents.length + 2)); tr.appendChild(td); tbody.appendChild(tr); }
-    function acctRow(name, rowVals, rowTot, strong) {
+    function sectionRow(label) { var tr = el('tr', { style: { background: 'var(--surface-2)' } }); var td = el('td.strong', { text: label }); td.setAttribute('colspan', String(cols)); tr.appendChild(td); tbody.appendChild(tr); }
+    // an eliminated amount is shown as what it is: a deduction, in brackets
+    function elimCell(v) { return el('td.num.text-mute', { text: v >= 1 ? '(' + ui.money(v) + ')' : '—' }); }
+    function acctRow(name, rowVals, elimVal, rowTot, strong) {
       var tr = el('tr'); tr.appendChild(el('td' + (strong ? '.strong' : ''), { text: name }));
       rowVals.forEach(function (v) { tr.appendChild(el('td.num' + (strong ? '.strong' : ''), { text: money(v) })); });
+      if (hasElim) tr.appendChild(elimCell(elimVal));
       tr.appendChild(el('td.num.strong', { text: money(rowTot) })); tbody.appendChild(tr);
     }
     sectionRow('Revenue');
-    income.forEach(function (a) { var v = vals(a); acctRow(a.name, v, tot(v)); });
-    acctRow('Total Revenue', revByEnt, revTotal, true);
+    income.forEach(function (r) { acctRow(r.name, ents.map(function (e) { return Math.round(r.per[e.id]); }), Math.round(r.elimination), Math.round(r.group)); });
+    acctRow('Total Revenue', revByEnt, elim.revenue, revTotal, true);
     sectionRow('Expenses');
-    expense.forEach(function (a) { var v = vals(a); acctRow(a.name, v, tot(v)); });
-    acctRow('Total Expenses', expByEnt, expTotal, true);
+    expense.forEach(function (r) { acctRow(r.name, ents.map(function (e) { return Math.round(r.per[e.id]); }), Math.round(r.elimination), Math.round(r.group)); });
+    acctRow('Total Expenses', expByEnt, elim.expense, expTotal, true);
     var netTr = el('tr', { style: { borderTop: '2px solid var(--border-strong, var(--border))' } });
     netTr.appendChild(el('td.strong', { text: 'Net Profit' }));
     ents.forEach(function (e, i) { var n = revByEnt[i] - expByEnt[i]; netTr.appendChild(el('td.num.strong' + (n >= 0 ? '.text-good' : '.text-bad'), { text: money(n) })); });
+    // an internal sale removes the SAME amount from revenue and from cost, so it
+    // never moves the group's profit — that is the proof the elimination is right
+    if (hasElim) netTr.appendChild(el('td.num.text-mute', { text: '—' }));
     netTr.appendChild(el('td.num.strong' + (netTotal >= 0 ? '.text-good' : '.text-bad'), { text: money(netTotal) }));
     tbody.appendChild(netTr);
 
     var table = el('table.tbl', null, [ el('thead', null, [thr]), tbody ]);
-    scr.querySelector('[data-fill="pivot-sub"]').textContent = ents.length + ' entities · concerns + Group HQ';
+    scr.querySelector('[data-fill="pivot-sub"]').textContent = ents.length + ' entities · concerns + Group HQ' +
+      (hasElim ? ' · ' + ui.money(elim.revenue) + ' inter-company eliminated' : '');
     scr.querySelector('[data-fill="pivot-table"]').appendChild(table);
+    if (hasElim) {
+      scr.querySelector('[data-fill="pivot-table"]').appendChild(el('div.text-mute.xs.mt-2', {
+        html: ui.icon('info-circle') + ' <b>Elimination</b> = what the concerns sold to each other (' +
+          elim.refs + ' inter-company ' + (elim.refs === 1 ? 'invoice' : 'invoices') + '). Removed from revenue AND from cost, ' +
+          'so the group shows only outside trade and the net profit is unaffected. Shared costs and expenses one concern funded for another are NOT eliminated — that money did leave the group.' }));
+    }
 
-    // ---- expense mix by entity (stacked) ----
-    var expHeads = expense.filter(function (a) { return tot(vals(a)) > 0; });
+    // ---- expense mix by entity (stacked) — per-entity bars, so it shows what
+    // each concern SPENT (the elimination is a group-level adjustment, not an
+    // entity's cost, and has no bar of its own) ----
+    var expHeads = expense.filter(function (r) { return ents.some(function (e) { return r.per[e.id] > 0; }); });
     if (expHeads.length) {
       var chartId = ui.uid('cpnl');
       scr.querySelector('[data-fill="chart"]').replaceWith(chartCard('Expense by Entity', 'bar-chart', chartId, 'each expense head across the entities', 280));
       requestAnimationFrame(function () {
-        var c = document.getElementById(chartId); if (!c) return;
-        EPAL.charts.bar(c, { labels: ents.map(function (e) { return e.short; }), stacked: true, legend: true,
-          datasets: expHeads.map(function (a, i) { return { label: a.name, data: ents.map(function (e) { return pnlAmt(a.code, e.id); }), color: ['#1A43BF', '#23c17e', '#f4b740', '#e2721b', '#f0506e', '#7b5cff', '#12b5c9', '#a0522d'][i % 8] }; }) });
+        var cv = document.getElementById(chartId); if (!cv) return;
+        EPAL.charts.bar(cv, { labels: ents.map(function (e) { return e.short; }), stacked: true, legend: true,
+          datasets: expHeads.map(function (r, i) { return { label: r.name, data: ents.map(function (e) { return Math.round(r.per[e.id]); }), color: ['#1A43BF', '#23c17e', '#f4b740', '#e2721b', '#f0506e', '#7b5cff', '#12b5c9', '#a0522d'][i % 8] }; }) });
       });
     } else {
       scr.querySelector('[data-fill="chart"]').remove();
@@ -304,13 +333,20 @@ function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(f
     mountScreen(page, scr);
   }
   function byCode(a, b) { return String(a.code) < String(b.code) ? -1 : 1; }
+  // the CSV is the SAME consolidation the screen shows — elimination column and
+  // all — so an exported statement can never disagree with the one on screen
   function exportConcernCsv() {
-    var ents = pnlEntities(), accts = LED().accounts();
-    var header = ['Category'].concat(ents.map(function (e) { return e.short; })).concat(['Total']);
+    var c = LED().consolidatedPnl(), ents = c.entities;
+    var header = ['Category'].concat(ents.map(function (e) { return e.short; })).concat(['Elimination', 'Group']);
     var lines = [header];
-    function push(a) { var v = ents.map(function (e) { return pnlAmt(a.code, e.id); }); lines.push([a.name].concat(v).concat([v.reduce(function (x, y) { return x + y; }, 0)])); }
-    lines.push(['REVENUE']); accts.filter(function (a) { return a.type === 'income'; }).sort(byCode).forEach(push);
-    lines.push(['EXPENSES']); accts.filter(function (a) { return a.type === 'expense'; }).sort(byCode).forEach(push);
+    function push(r) {
+      lines.push([r.name].concat(ents.map(function (e) { return Math.round(r.per[e.id]); }))
+        .concat([Math.round(r.elimination), Math.round(r.group)]));
+    }
+    lines.push(['REVENUE']); c.rows.filter(function (r) { return r.type === 'income'; }).sort(byCode).forEach(push);
+    lines.push(['EXPENSES']); c.rows.filter(function (r) { return r.type === 'expense'; }).sort(byCode).forEach(push);
+    var per = ents.map(function (e) { return Math.round(c.totals.per[e.id].net); });
+    lines.push(['NET PROFIT'].concat(per).concat([0, Math.round(c.totals.group.net)]));
     dl('group-pnl-by-concern.csv', lines.map(function (l) { return l.join(','); }).join('\n'));
   }
 

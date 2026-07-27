@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\LedgerException;
 use App\Support\CompanySlugs;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -198,6 +199,21 @@ class ExpensePostingService
         });
     }
 
+    /** Does `acc_entries` have this column on THIS host? The payment-source
+     *  columns arrived in a later migration. Cached on the INSTANCE (not static)
+     *  so a queue worker or a test that migrates mid-process still sees truth. */
+    private array $columnCache = [];
+
+    private function hasColumn(string $col): bool
+    {
+        if (! array_key_exists($col, $this->columnCache)) {
+            try { $this->columnCache[$col] = Schema::hasColumn('acc_entries', $col); }
+            catch (\Throwable $e) { $this->columnCache[$col] = false; }
+        }
+
+        return $this->columnCache[$col];
+    }
+
     /** What this spend WAS, in one line — the memo, the register description and
      *  the bank-history row all read the same sentence. */
     private function describe(array $in): string
@@ -235,11 +251,19 @@ class ExpensePostingService
             'description'  => $in['desc'] ?? null,
             'funded_by'    => $funder !== '' ? $funder : null,
             'created'      => $in['created'] ?? $now->toDateString(),
-            'bank_id'      => $bank ? (string) $bank->id : null,
-            'bank_name'    => $bank ? $bank->name : null,
-            'pay_acct'     => $payAccount,
             'updated_at'   => $now,
         ];
+        // The payment-source columns land only on a database that HAS them
+        // (migration 2026_07_26_002000). A host running the new code before
+        // `php artisan migrate` still records the expense — it just can't say
+        // which account paid yet — instead of failing the whole posting.
+        foreach (['bank_id' => $bank ? (string) $bank->id : null,
+                  'bank_name' => $bank ? $bank->name : null,
+                  'pay_acct' => $payAccount] as $col => $val) {
+            if ($this->hasColumn($col)) {
+                $row[$col] = $val;
+            }
+        }
 
         $existing = DB::table('acc_entries')->where('ext_id', $extId)->value('id');
         if ($existing) {
@@ -257,9 +281,12 @@ class ExpensePostingService
             'subCategory' => $row['sub_category'],
             'head'        => $head,
             'method'      => $row['method'],
+            // reported from what actually happened, not from the row we wrote —
+            // on an un-migrated host those columns are absent but the account
+            // still moved, and the caller deserves to be told which one
             'payAcct'     => $payAccount,
-            'bankId'      => $row['bank_id'] ?: '',
-            'bankName'    => $row['bank_name'] ?: '',
+            'bankId'      => $bank ? (string) $bank->id : '',
+            'bankName'    => $bank ? $bank->name : '',
             'date'        => $date,
             'party'       => $row['party'],
             'ref'         => $row['ref'],

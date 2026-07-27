@@ -207,6 +207,35 @@ class ExpensePostingTest extends TestCase
         $this->expenses->record(['companyId' => 'travels', 'amount' => 0, 'head' => '5550', 'category' => 'Guest']);
     }
 
+    /**
+     * A host that pulled the new code but has NOT run `php artisan migrate` yet
+     * has no bank_id / bank_name / pay_acct columns. Recording an expense must
+     * still work there — it just can't record WHICH account paid. Writing those
+     * columns blindly would throw "unknown column" on every save, the client
+     * would roll its optimistic row back, and a working feature would look
+     * broken to the user.
+     */
+    public function test_it_still_records_on_a_database_missing_the_payment_columns(): void
+    {
+        Schema::table('acc_entries', function ($t) {
+            $t->dropColumn(['bank_id', 'bank_name', 'pay_acct']);
+        });
+        $service = $this->app->make(ExpensePostingService::class);   // fresh column cache
+
+        $out = $service->record([
+            'id' => 'JV-OLD001', 'companyId' => 'travels', 'amount' => 900,
+            'head' => '5550', 'category' => 'Guest & Entertainment', 'bankId' => '1',
+        ]);
+
+        // the register row and the journal are there…
+        $this->assertSame(1, DB::table('acc_entries')->where('ext_id', 'JV-OLD001')->count());
+        $this->assertSame(900.0, $this->lineOn('GL-ACC-JV-OLD001', '5550', 'debit'));
+        $this->assertSame(900.0, $this->lineOn('GL-ACC-JV-OLD001', '1010', 'credit'));
+        // …the account still moved, and the response still reports it
+        $this->assertEquals(900000 - 900, $this->balanceOf(1));
+        $this->assertSame('1', $out['entry']['bankId']);
+    }
+
     /* ---------------------------------------------------------------- helpers */
 
     private function entry(string $reference): object

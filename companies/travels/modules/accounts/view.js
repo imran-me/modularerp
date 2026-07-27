@@ -109,10 +109,16 @@ var EXPENSE_HEADS = ['Office Rent', 'Staff Salary', 'Utilities', 'Marketing', 'A
 // pins the CoA head the journal debits, so posting is always correct regardless
 // of wording; `shared` flags a cost that is normally split across concerns
 // (rent, subscriptions) → Group Finance › Allocate Costs.
+//
+// `card:false` = NOT offered as a quick card (owner 2026-07-26, screenshot):
+// salary belongs to the PAYROLL desk and rent is entered ONCE at Group HQ and
+// split across the concerns — putting them a click away here invites the same
+// cost being booked twice. They stay searchable in the whole-account list, so a
+// one-off correction is still possible; only the shortcut is gone.
 var TV_EXPENSE_CATS = [
-  { key: 'staff-pay',   name: 'Staff · Salary & Wages', icon: 'people-fill',        head: '5100', tone: '#1A43BF', subs: ['Salary', 'Wages', 'Overtime', 'Bonus', 'Festival Bonus'] },
+  { key: 'staff-pay',   name: 'Staff · Salary & Wages', icon: 'people-fill',        head: '5100', tone: '#1A43BF', subs: ['Salary', 'Wages', 'Overtime', 'Bonus', 'Festival Bonus'], card: false, via: 'Payroll' },
   { key: 'staff-welf',  name: 'Staff · Welfare',        icon: 'cup-hot-fill',       head: '5550', tone: '#0A9396', subs: ['Staff Lunch', 'Snacks', 'Tea & Coffee'] },
-  { key: 'rent',        name: 'Office Rent',            icon: 'building-fill',       head: '5200', tone: '#8338EC', subs: ['Office Rent'], shared: true },
+  { key: 'rent',        name: 'Office Rent',            icon: 'building-fill',       head: '5200', tone: '#8338EC', subs: ['Office Rent'], shared: true, card: false, via: 'Group Finance › Shared Cost' },
   { key: 'utilities',   name: 'Utilities & Internet',   icon: 'lightning-charge-fill', head: '5300', tone: '#F4A261', subs: ['Electricity', 'Water', 'Gas', 'Internet', 'Phone'] },
   { key: 'office',      name: 'Office & Admin',         icon: 'printer-fill',        head: '5500', tone: '#3A5A96', subs: ['Office Supplies', 'Stationery', 'Printing', 'Cleaning', 'Housekeeping', 'Security', 'Repair & Maintenance', 'Software / Dev'] },
   { key: 'marketing',   name: 'Marketing',              icon: 'megaphone-fill',      head: '5400', tone: '#E76F51', subs: ['Facebook / Google Ads', 'Boosting', 'Design', 'Print / SMS', 'Subscriptions (AI / SaaS)'], sharedSubs: ['Subscriptions (AI / SaaS)'] },
@@ -812,6 +818,7 @@ function expenseEntry() {
   var subHost = el('div.tv-exp-subhost');
   var catBtns = {};
   TV_EXPENSE_CATS.forEach(function (c) {
+    if (c.card === false) return;                 // entered on its own desk — see TV_EXPENSE_CATS
     var b = el('button.tv-exp-cat', { type: 'button', title: 'Posts to account ' + c.head, onclick: function () { pickCat(c); } }, [
       el('span.tv-exp-cat-ico', { html: ui.icon(c.icon) }),
       el('span.tv-exp-cat-name', { text: c.name }),
@@ -905,7 +912,11 @@ function expenseEntry() {
       oninput: function () { sel.sub = this.value; Array.prototype.forEach.call(chips.children, function (x) { x.classList.remove('sel'); }); syncPicker(pickerVal(c, '')); refreshLive(); } });
     if (sel.sub && !known) subInput.value = sel.sub;
     subHost.appendChild(subInput);
-    if (c.shared) subHost.appendChild(el('div.tv-exp-note', { html: ui.icon('diagram-3') + ' <b>Shared cost.</b> Record it here, then split it across concerns in <a class="text-accent" href="#/group/finance">Group Finance › Allocate Costs</a>.' }));
+    // a head whose own desk owns it (salary → Payroll, rent → the Group's shared
+    // cost split): reachable from the search list, but say plainly where it
+    // belongs so the same cost doesn't get booked twice
+    if (c.via) subHost.appendChild(el('div.tv-exp-note', { html: ui.icon('exclamation-triangle') + ' <b>' + esc(c.name) + '</b> is normally recorded in <b>' + esc(c.via) + '</b> — booking it here as well would double-count it. Continue only if this is a one-off correction.' }));
+    else if (c.shared) subHost.appendChild(el('div.tv-exp-note', { html: ui.icon('diagram-3') + ' <b>Shared cost.</b> Record it here, then split it across concerns in <a class="text-accent" href="#/group/finance">Group Finance › Allocate Costs</a>.' }));
     // a head that is not an expense account (a capitalised buy, a prepayment)
     // is legal but worth saying out loud — it lands on the balance sheet, not the P&L.
     if (c.coa && c.acctType && c.acctType !== 'expense') {

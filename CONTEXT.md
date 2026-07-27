@@ -326,6 +326,64 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-27 · GROUP CONSOLIDATED P&L (accounting step 5, part 2 — the plan's LAST step)
+
+**Step 5 part 2 is DONE — the accounting build order is now complete.**
+
+**Engine (`platform/engines-library/ledger.js`, directly loaded, no build):**
+- **`consolidatedPnl({from,to})`** — the group income statement: every PRESENT
+  concern plus **Group HQ**, per-entity columns, an **Elimination** column and the
+  group total. Returns rows + `totals.per / .elimination / .group`.
+- **The elimination rule (the whole point).** When Travels invoices Woodart, Travels
+  books revenue and Woodart books an expense; summing the concerns naively inflates
+  BOTH group totals while the net stays right — so every margin and every "expense as
+  % of revenue" reads wrong. `intercompanyPnlElimination()` groups the
+  `source:'intercompany'` journals by their pair `ref` and eliminates a ref **only
+  when it has BOTH an income credit and an expense debit** (a real internal sale).
+  A **funded expense** or a **shared cost** has an expense but no matching internal
+  revenue — that money genuinely left the group to a landlord or vendor, so it STAYS.
+  This is the income-statement half of what `consolidatedTrialBalance()` already does
+  for 1300/2400 on the balance sheet.
+- Also extracted `presentCompanies()` (one list for both consolidations, so they can
+  never disagree about who is in the group), `consolidatedEntities()` (+ Group HQ) and
+  a named `COGS_ACCOUNT`.
+
+**UI — Group Finance › P&L by Concern** now renders that call instead of a naive sum:
+an **Elimination** column (deductions in brackets), a **Group** column that is the real
+consolidated figure, an **Inter-company** KPI, and a footnote saying what was removed
+and what deliberately was not. The CSV export is the same consolidation, so screen and
+export can never disagree. On today's demo data it strips **৳26,00,000** of internal
+sales — the group revenue KPI was overstated by exactly that until now.
+
+**Verified:** 17/17 engine probe — ties to the per-entity sum; an internal sale moves
+the concerns but leaves group revenue, cost AND net untouched; a funded expense and a
+shared cost are NOT eliminated; periods scope; empty period is empty; and the BASELINE
+consolidated TB still balances (no regression). Sweep 222/222 × both themes, 0 errors.
+
+> **⚠️ Pre-existing gap this surfaced (NOT introduced here, worth a decision):**
+> `consolidatedTrialBalance()` covers the operating companies only — **Group HQ's own
+> books are omitted**. So a group-FUNDED expense or a group-paid SHARED cost leaves the
+> concern's leg inside the consolidation while its counterpart sits outside, and the
+> consolidated TB goes out by that amount (the probe reproduced it exactly: ৳1,00,000
+> from ৳40,000 funded + ৳60,000 shared). The new consolidated **P&L does not have this
+> gap** — it includes Group HQ. Fixing the TB would change numbers on the Consolidation
+> screen, so it is left for the owner to call.
+
+**Also this session (owner screenshot, live site):**
+- **Removed the Salary + Office Rent quick cards** from Record Expense — salary belongs
+  to Payroll, rent is entered once at Group HQ and split, so a card here invited
+  double-booking. Both remain in the whole-account search (nothing became unpostable)
+  and picking one now warns which desk owns it.
+- **Fixed a real deployment hazard:** `AccEntryService` / `ExpensePostingService` wrote
+  the new `bank_id` / `bank_name` / `pay_acct` columns unconditionally. On a host that
+  pulled the code but had not run `php artisan migrate` — **which is the live host** —
+  every save would hit "unknown column", the client would roll back its optimistic row
+  and the user would see **"Save failed"** on a feature that works. Both now write those
+  columns only when they exist (`Schema::hasColumn`, instance-cached). New test:
+  `test_it_still_records_on_a_database_missing_the_payment_columns`. PHP 12/12.
+
+---
+
 ## 🆕 SESSION — 2026-07-26 (cont'd) · RECORD EXPENSE: REAL ACCOUNTS, WHOLE-CHART SEARCH, FULL PROPAGATION + REAL LARAVEL
 
 Owner screenshot of `#/travels/accounts/expenses` with the **Record Expense** modal
