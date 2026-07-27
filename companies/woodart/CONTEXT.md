@@ -28,7 +28,7 @@ snagging → handover → billing.
 | Icon | `tree-fill` |
 | Atmosphere scene | `app/atmosphere/interior-scene.{css,js}` (bound via `data-atmos="woodart"`) |
 | Modules declared | 16 (`module.json`) |
-| Modules actually built | **2** — `materials` (✅ to the standard) and `projects` (legacy, also registers `estimates`) |
+| Modules actually built | **3** — `materials` + `clients` (✅ to the standard) and `projects` (legacy, also registers `estimates`) |
 
 **Group rollup (`bridge.map` — already declared, wired in `platform/bridge/bridge.js`):**
 
@@ -85,6 +85,7 @@ Restated here because it is the reason this document exists. Full detail in
 ### Built
 | Module | Routes | Frontend | Backend | Standard |
 |---|---|---|---|---|
+| **`clients`** | `#/woodart/clients/{directory,portfolio,segments}` | ✅ real HTML, `[data-proto]` repetition, all utilities Tailwind, `frontend/api.js` seam owning the **name join** to projects/estimates | ✅ 9-file Laravel slice + frozen `endpoints.md` · **37/37 vs MySQL** (both join branches) | ✅ to the standard |
 | **`materials`** ⭐ | `#/woodart/materials/{stock,reorder,valuation}` | ✅ real HTML, zero `<script>`/`<template>`, `[data-proto]` repetition, **all utilities Tailwind**, `frontend/api.js` seam | ✅ 9-file Laravel slice + frozen `endpoints.md` · **26/26 CRUD+rules vs MySQL** | ⭐ **THE REFERENCE MODULE** — copy its shape |
 | `projects` | `#/woodart/projects/{active,design,milestones,gallery}` and `#/woodart/estimates/{quotations,boq,costing}` | **legacy** — one 1,238-line hand-written `view.js`, 100% `el()` script-DOM, no `frontend/` sources | **none** — only `backend/LARAVEL-BLUEPRINT.md` | ❌ fails every gate |
 
@@ -97,7 +98,7 @@ kept.** The rebuild is structure + styling only, pixel-identical (R1/R2).
 
 ### Not built — render the generic placeholder scaffold today
 `dashboard` · `crm` · `estimates` (menu entry; its screen is registered from
-inside `projects/view.js`) · `clients` · `production` · `installation` ·
+inside `projects/view.js`) · `production` · `installation` ·
 `procurement` · `accounts` · `ledgers` · `hrm` · `reports` · `analytics` ·
 `tasks` · `settings`.
 
@@ -130,7 +131,7 @@ Simplest → hardest, each one full-stack and 100% done before the next.
 | # | Module | Why here | Owns |
 |---|---|---|---|
 | 1 | ✅ **materials** | smallest real CRUD, data already seeded — proves the whole standard end to end | `wa_materials` |
-| 2 | **clients** | simple master with a real relationship to projects | `wa_clients` (new) |
+| 2 | ✅ **clients** | simple master with a real relationship to projects | `wa_clients` |
 | 3 | **procurement** | vendors · POs · GRN; data seeded; emits `material.purchased` | `wa_purchases`, `wa_vendors` (new) |
 | 4 | **production** | workshop jobs — lifts them out of the project drawer into their own desk | `wa_production` |
 | 5 | **installation** | site, teams, snag checklists | `wa_installs` |
@@ -211,5 +212,6 @@ none is blocking.
 | Date | What | Commit |
 |---|---|---|
 | 2026-07-27 | Master context created. Build language locked (D1–D10). `MODULE-STANDARD.md` + platform `UI-CONTRACT.md` written. `build-module.mjs` extended with the optional `frontend/api.js` data seam — verified: all 20 existing modules rebuild **byte-identical** (zero git diff). | — |
+| 2026-07-27 | **MODULE #2 `clients` BUILT full-stack** — 3 real-HTML screens (Directory · Portfolio · Segments), `api.js` seam owning the client→work NAME join, 9-file Laravel slice, frozen `endpoints.md` v1. `wa_clients` seeded DERIVED from real project/estimate client names + wired into api.js HYDRATE/WRITABLE. PHP 8/8, tw gate green (no new classes), **sweep 228/228 both themes**, backend **37/37 vs MySQL** proving BOTH join branches (absent work table → graceful zero; present → case/whitespace-insensitive roll-up that ignores unknown clients). | — |
 | 2026-07-27 | **MODULE #1 `materials` BUILT full-stack** — the reference module. 3 real-HTML screens (Stock · Reorder · Valuation), `frontend/api.js` seam (the store key appears nowhere else), 9-file Laravel slice, frozen `endpoints.md`, README + context. Wired `wa_materials` into api.js HYDRATE + WRITABLE. All utilities converted to Tailwind (7 new classes, value-exact, purely additive 17→24 rules). PHP 8/8 lint clean. **Sweep 225/225 × both themes, 0 errors.** Backend MySQL test still owed. | — |
 | 2026-07-27 | **Tailwind UNBLOCKED (D11)** — the recorded block was stale. Proved a fresh build is byte-identical to the committed CSS (md5 `fa2b2623…`, 577 bytes) on **both** 3.4.17 and 3.4.19; all 17 `tw-` literals are static; zero classes composed in JS. Pinned the version exactly (no caret) in `package.json` + `package-lock.json`; documented `safelist` (intentionally empty) in the config; added **`tools/verify/tailwind.mjs`** (`npm run verify:tw`) enforcing REPRODUCIBLE + NO-ORPHANS, self-tested red-then-green. Built CSS unchanged. | — |

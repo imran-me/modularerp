@@ -290,6 +290,18 @@ authorities (docs only — no screen touched, sweep 222/222 × both themes):
   split out of the blueprint. `wa_materials` wired into api.js HYDRATE+WRITABLE.
   Verified: PHP `-l` 8/8, tw gate green, **sweep 225/225 × both themes, 0 errors**
   (222→225 = the 3 new sub-routes). ◻ MySQL CRUD test still owed.
+- **⭐ MODULE BUILT: `woodart/clients`** (2026-07-27) — module #2. Directory ·
+  Portfolio · Segments, same standard as materials. Its `frontend/api.js` seam
+  owns the first **cross-module read**: Woodart's projects and estimates
+  reference a client by NAME, not id (that is how those stores were built, R2),
+  so the join is a normalised name match defined in exactly two mirrored places.
+  New store `wa_clients` seeded DERIVED from the client names that actually
+  appear on projects/estimates — an invented list would have left half the
+  directory with no work and half the work with no client, which reads like a
+  broken join. Verified: sweep **228/228 × both themes**, backend **37/37 vs
+  MySQL** proving both branches of the join (absent `wa_projects` → graceful
+  zero-value directory; present → case/whitespace-insensitive roll-up that
+  ignores work for an unknown client rather than inventing one).
 - **STYLING SHARPENED (owner mid-session): "core build in pure proper HTML,
   styling only Tailwind CSS and JS."** Resolved as: **every UTILITY is Tailwind**
   (`tw-flex-1`, `tw-font-semibold`, `tw-mt-[6px]`, `tw-text-ink-mute`), while the
