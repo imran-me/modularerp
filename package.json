@@ -7,9 +7,11 @@
     "tw:watch": "tailwindcss -c platform/design-system/tailwind.config.js -i platform/design-system/tailwind.src.css -o platform/design-system/css/tailwind.built.css --watch",
     "build:modules": "node tools/build/build-module.mjs --all",
     "verify": "node tools/verify/sweep.mjs both",
-    "verify:books": "node tools/verify/books.mjs trial"
+    "verify:tw": "node tools/verify/tailwind.mjs",
+    "verify:books": "node tools/verify/books.mjs trial",
+    "verify:all": "npm run verify:tw && npm run verify && npm run verify:books"
   },
   "devDependencies": {
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "3.4.19"
   }
 }

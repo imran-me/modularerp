@@ -21,9 +21,19 @@
  *    them literally today.
  *
  * BUILD (dev machine only — the OUTPUT is committed, the site stays no-build):
- *   npx tailwindcss@3.4.17 -c platform/design-system/tailwind.config.js \
- *     -i platform/design-system/tailwind.src.css \
- *     -o assets/css/tailwind.built.css --minify
+ *   npm run tw:build          # regenerate platform/design-system/css/tailwind.built.css
+ *   npm run verify:tw         # PROVE it is safe — run this before committing
+ *
+ * ⚠️ THE COMMITTED CSS IS THE DEPLOYED CSS. Production is a static git-pull and
+ * node never runs there, so a class that is missing from the built file renders
+ * unstyled on the live site. `npm run verify:tw` (tools/verify/tailwind.mjs) is
+ * the gate that makes this impossible to get wrong. It checks two things:
+ *   A. REPRODUCIBLE — a fresh build is byte-identical to the committed file.
+ *   B. NO ORPHANS   — every `tw-` class used anywhere in the app has a rule in
+ *                     the committed file.
+ * Both pass as of 2026-07-27 (17 classes used, 577 bytes, md5 matched on both
+ * tailwindcss 3.4.17 and 3.4.19). The version is now pinned EXACTLY (no caret)
+ * in package.json so the output cannot drift underneath us.
  * ==========================================================================*/
 
 /** @type {import('tailwindcss').Config} */
@@ -37,7 +47,29 @@ module.exports = {
     // NOTE: platform/design-system/ is deliberately NOT scanned — utility names
     // in these config comments would otherwise generate themselves. Add
     // './platform/<area>/**' globs as real shell files appear in Phase 2.
+    // KEEP IN SYNC with the SCAN list in tools/verify/tailwind.mjs — a folder
+    // scanned by one and not the other is exactly how an orphan class hides.
   ],
+
+  /* ---- SAFELIST — classes the scanner provably CANNOT see ----------------
+   * Tailwind finds classes by scanning source text for literals. A class that
+   * JS ASSEMBLES at runtime — `'tw-max-w-[' + w + 'px]'` — never appears as a
+   * literal, so it is never generated, and the element ships unstyled.
+   *
+   * THE RULE, in order of preference:
+   *   1. DON'T compose class names. Write the literal and switch between whole
+   *      literals: `wide ? 'tw-max-w-[320px]' : 'tw-max-w-[180px]'`. Both are
+   *      visible to the scanner and nothing needs to be listed here.
+   *   2. If a value is genuinely computed (a percentage width, a derived hue),
+   *      it is NOT a utility — set it as an inline style. That is the sanctioned
+   *      carve-out in the UI contract for computed values.
+   *   3. Only if neither works, add the class here — with a comment naming the
+   *      file that builds it, so the entry can be removed when that code changes.
+   *
+   * EMPTY IS THE HEALTHY STATE. Today the app composes no class names at all
+   * (verified 2026-07-27: all 17 `tw-` literals are static), so this list is
+   * empty on purpose — an entry here is a small debt, not a feature. */
+  safelist: [],
   theme: {
     extend: {
       /* ---- colors: literal brand values (tokens.css:22-42, verbatim) ---- */
