@@ -195,19 +195,38 @@ class SalePostingService
         });
     }
 
-    /** The income head this sale credits: an explicit code wins, else the category. */
+    /**
+     * The income head this sale credits — a BYTE-FOR-BYTE port of ledger.js's
+     * incomeAccountFor(), keyword list and ORDER included. Revenue must land on the
+     * same product line whichever side recorded the sale, or the per-product P&L and
+     * every revenue-mix chart disagree with themselves.
+     *
+     * The order is load-bearing, not arbitrary: `air` is tested LAST because its
+     * keyword list is the widest (it has to catch emd / reissue / void / bsp /
+     * sector / pnr), so testing it first would swallow "air ticket for an Umrah
+     * PACKAGE" into 4010 instead of 4030. My first draft did exactly that, and also
+     * dropped emd/reissue/void — which would have posted every EMD and every void
+     * reversal to 4000 Other Sales instead of 4010 Air Ticket Sales.
+     *
+     * One deliberate difference from the SPA: an explicitly-passed `incomeAccount`
+     * that does not exist on the chart is REFUSED by record() rather than quietly
+     * falling back to keyword-guessing. Silently ignoring an explicit instruction is
+     * the worse failure for an API — the caller gets a clear 422 instead.
+     */
     private function incomeAccountFor(array $in): string
     {
         $code = trim((string) ($in['incomeAccount'] ?? ''));
         if ($code !== '') {
             return $code;
         }
-        $c = mb_strtolower((string) ($in['category'] ?? '') . ' ' . (string) ($in['desc'] ?? ''));
-        if (preg_match('/air|ticket|gds|pnr/u', $c)) return '4010';
-        if (preg_match('/visa/u', $c)) return '4020';
-        if (preg_match('/package|tour|umrah|hajj/u', $c)) return '4030';
-        if (preg_match('/hotel|room/u', $c)) return '4040';
-        if (preg_match('/contract|charter|seat/u', $c)) return '4050';
+        $s = mb_strtolower((string) ($in['category'] ?? '') . ' ' . (string) ($in['desc'] ?? ''));
+        $is = fn (string $re) => (bool) preg_match('/' . $re . '/u', $s);
+
+        if ($is('visa')) return '4020';
+        if ($is('package|tour|umrah|hajj|holiday')) return '4030';
+        if ($is('hotel|room')) return '4040';
+        if ($is('contract')) return '4050';          // contract flights & files — own P&L line
+        if ($is('air|ticket|emd|reissue|re-issue|void|flight|bsp|sector|pnr')) return '4010';
 
         return '4000';
     }

@@ -118,6 +118,40 @@ class SaleAndReceiptPostingTest extends TestCase
         $this->assertTrue($this->booksBalance());
     }
 
+    /**
+     * The income head is chosen by the SAME mapper as the SPA's ledger.js, ORDER
+     * included — revenue has to land on the same product line whichever side
+     * recorded the sale, or the per-product P&L disagrees with itself.
+     *
+     * Every case here failed before the mapper was ported faithfully (2026-07-27):
+     * `air` was being tested FIRST and emd/reissue/void/flight/bsp/sector were
+     * missing, so every EMD and every void reversal credited 4000 Other Sales
+     * instead of 4010 Air Ticket Sales, and an air ticket sold as part of an Umrah
+     * PACKAGE was booked as a ticket rather than a package.
+     */
+    public function test_the_income_head_matches_the_frontend_mapper(): void
+    {
+        $cases = [
+            'EMD-1'  => ['desc' => 'EMD Excess baggage · Mr Rahman', 'category' => 'emd',      'head' => '4010'],
+            'VOID-1' => ['desc' => 'Void reversal DAC → DXB (EK)',   'category' => 'air',      'head' => '4010'],
+            'REIS-1' => ['desc' => 'Reissue DAC → JED (SV)',         'category' => 'air',      'head' => '4010'],
+            'BSP-1'  => ['desc' => 'BSP settlement adjustment',      'category' => '',         'head' => '4010'],
+            'PKG-1'  => ['desc' => 'Air ticket for Umrah package',   'category' => 'air',      'head' => '4030'],
+            'VISA-1' => ['desc' => 'Visa air ticket bundle',         'category' => 'visa',     'head' => '4020'],
+            'HOT-1'  => ['desc' => 'Hotel booking Radisson',         'category' => '',         'head' => '4040'],
+            'CON-1'  => ['desc' => 'Contract seats DAC → DXB (12×)', 'category' => 'contract', 'head' => '4050'],
+            'OTH-1'  => ['desc' => 'Consultancy fee',                'category' => '',         'head' => '4000'],
+        ];
+
+        foreach ($cases as $ref => $c) {
+            $this->sales->record(['ref' => $ref, 'companyId' => 'travels', 'amount' => 1000,
+                'cost' => 0, 'category' => $c['category'], 'desc' => $c['desc']]);
+            $this->assertSame(1000.0, $this->lineOn('GL-S' . $ref, $c['head'], 'credit'),
+                $c['desc'] . ' should credit ' . $c['head']);
+        }
+        $this->assertTrue($this->booksBalance());
+    }
+
     public function test_re_posting_a_sale_does_not_double_count(): void
     {
         $p = ['ref' => 'TKT-6', 'companyId' => 'travels', 'amount' => 10000, 'cost' => 6000, 'category' => 'air'];
