@@ -290,6 +290,20 @@ authorities (docs only — no screen touched, sweep 222/222 × both themes):
   split out of the blueprint. `wa_materials` wired into api.js HYDRATE+WRITABLE.
   Verified: PHP `-l` 8/8, tw gate green, **sweep 225/225 × both themes, 0 errors**
   (222→225 = the 3 new sub-routes). ◻ MySQL CRUD test still owed.
+- **⭐ MODULE BUILT: `woodart/procurement`** (2026-07-27) — module #3, and the
+  first owning TWO entities: two thin controllers over ONE shared service,
+  because the rules that matter span both. **⚠️ It deliberately does NOT post to
+  the ledger.** `bridge.map` declares `material.purchased → group.expense 5002`,
+  but three accounting questions are unanswered — does the expense hit on ORDER
+  or on RECEIPT; is bought stock an EXPENSE or an INVENTORY ASSET until consumed
+  (booking straight to 5002 double-counts against the project cost `projects`
+  already records); and does a Net-30 vendor credit a PAYABLE rather than a bank
+  withdrawal. Guessing any of them corrupts the group books, so it ships as a
+  complete honest register and the posting is an OPEN OWNER DECISION.
+  Verified: sweep **231/231 × both themes**, backend **40/40 vs MySQL** — incl.
+  the rule that an order on a supplier with NO vendor record is COUNTED under
+  `Unlisted` and never dropped (money that left the business must appear in the
+  totals even when the vendor paperwork is behind).
 - **⭐ MODULE BUILT: `woodart/clients`** (2026-07-27) — module #2. Directory ·
   Portfolio · Segments, same standard as materials. Its `frontend/api.js` seam
   owns the first **cross-module read**: Woodart's projects and estimates
