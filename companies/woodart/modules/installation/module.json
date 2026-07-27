@@ -1,0 +1,25 @@
+{
+  "key": "installation",
+  "company": "woodart",
+  "title": "Site & Install",
+  "icon": "truck",
+  "desc": "Delivery, installation, site handover & snags.",
+  "route": "#/woodart/installation",
+  "enabled": true,
+  "menu": [
+    { "id": "schedule", "label": "Schedule", "route": "#/woodart/installation/schedule", "enabled": true },
+    { "id": "snags", "label": "Snag List", "route": "#/woodart/installation/snags", "enabled": true },
+    { "id": "teams", "label": "Teams", "route": "#/woodart/installation/teams", "enabled": true }
+  ],
+  "stores": ["wa_installs"],
+  "reads": ["wa_projects"],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/installation.js",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — the presence of THIS file is what auto-discovery HEAD-probes (platform/discovery/discovery.js). A module registered built:true in the company manifest but missing this file is treated as deleted."
+}

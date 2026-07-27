@@ -180,8 +180,27 @@
       "icon": "truck",
       "desc": "Delivery, installation, site handover & snags.",
       "enabled": true,
-      "subs": [],
-      "built": false
+      "subs": [
+        {
+          "id": "schedule",
+          "label": "Schedule",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "snags",
+          "label": "Snag List",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "teams",
+          "label": "Teams",
+          "icon": "dot",
+          "enabled": true
+        }
+      ],
+      "built": true
     },
     {
       "id": "procurement",
