@@ -357,6 +357,215 @@
       S.set('wa_vendors', waVendors);
     }
 
+    /* ========================================================================
+     * WOODART — THREE REAL PROJECT STORIES (owner, 2026-07-27)
+     * ------------------------------------------------------------------------
+     * The generated data above is deliberately random: it fills every screen,
+     * but no single project THREADS through the whole business, so you cannot
+     * follow one job from the drawing board to the client's signature.
+     *
+     * These three do. Each sits at a different phase, so every module shows
+     * something real at once, and every record cross-references the others by
+     * the ids the modules actually join on:
+     *
+     *   WAP-101  Gulshan Penthouse   · DESIGN      — drawings out for approval,
+     *            ৳48L                              BOQ quoted, first PO placed
+     *   WAP-102  Square Pharma HQ    · PRODUCTION  — design signed off, goods
+     *            ৳92L                              received, workshop running
+     *   WAP-103  Dhanmondi Duplex    · HANDOVER    — everything done, snags
+     *            ৳36.5L                            being closed out
+     *
+     * The BOQ lines quote the SAME material names the register carries, and the
+     * purchase orders are raised on the SAME vendors — so Materials, Estimates
+     * and Procurement agree with each other instead of each telling its own
+     * random story. The budget for each project IS its BOQ: unit cost against
+     * unit sale, line by line.
+     *
+     * Idempotent by design: guarded on WAP-101 already existing, and it APPENDS
+     * to the generated lists rather than replacing them.
+     * ====================================================================== */
+    (function seedWoodartStories() {
+      var projects = S.list('wa_projects');
+      if (projects.some(function (p) { return p.id === 'WAP-101'; })) return;
+
+      function add(store, rows) { S.set(store, S.list(store).concat(rows)); }
+
+      /* ---- the three projects, each at a different phase ------------------ */
+      add('wa_projects', [
+        { id:'WAP-101', name:'Full Interior · Gulshan Penthouse', client:'Bashundhara Group',
+          type:'Residential', area:4200, value:4800000, cost:3120000, stage:'Design',
+          progress:18, start:'2026-06-08', deadline:'2026-11-20', designer:'Nasrin Sultana',
+          created:'2026-06-08' },
+        { id:'WAP-102', name:'Office Fit-out · Square Pharma HQ', client:'Square Pharmaceuticals',
+          type:'Office', area:9800, value:9200000, cost:5980000, stage:'Production',
+          progress:56, start:'2026-04-14', deadline:'2026-09-30', designer:'Touhidul Alam',
+          created:'2026-04-14' },
+        { id:'WAP-103', name:'Duplex Interior · Dhanmondi 27', client:'Ashraful Karim',
+          type:'Residential', area:3100, value:3650000, cost:2372500, stage:'Handover',
+          progress:96, start:'2026-02-02', deadline:'2026-07-18', designer:'Sharmin Jahan',
+          created:'2026-02-02' }
+      ]);
+
+      /* ---- DESIGN & 3D — the architecture phase --------------------------
+       * 101 is mid-approval (that is what a design-phase project looks like);
+       * 102 and 103 are fully approved, so the phase gate has real examples of
+       * "complete" as well as "still open". */
+      add('wa_drawings', [
+        { id:'DWG-101', project:'WAP-101', title:'Ground floor plan', kind:'Plan',
+          rev:'B', status:'Approved', designer:'Nasrin Sultana', issued:'2026-06-16', approved:'2026-06-24', created:'2026-06-10' },
+        { id:'DWG-102', project:'WAP-101', title:'Living room 3D model', kind:'3D Model',
+          rev:'C', status:'Commented', designer:'Nasrin Sultana', issued:'2026-06-28', approved:null, created:'2026-06-12' },
+        { id:'DWG-103', project:'WAP-101', title:'Master bedroom render', kind:'Render',
+          rev:'A', status:'Issued', designer:'Farzana Yasmin', issued:'2026-06-22', approved:null, created:'2026-06-18' },
+        { id:'DWG-104', project:'WAP-101', title:'Kitchen joinery detail', kind:'Detail',
+          rev:'A', status:'Draft', designer:'Nasrin Sultana', issued:null, approved:null, created:'2026-07-01' },
+
+        { id:'DWG-105', project:'WAP-102', title:'Floor plate layout', kind:'Plan',
+          rev:'B', status:'Approved', designer:'Touhidul Alam', issued:'2026-04-22', approved:'2026-05-02', created:'2026-04-16' },
+        { id:'DWG-106', project:'WAP-102', title:'Reception elevation', kind:'Elevation',
+          rev:'A', status:'Approved', designer:'Touhidul Alam', issued:'2026-04-25', approved:'2026-05-02', created:'2026-04-18' },
+        { id:'DWG-107', project:'WAP-102', title:'Boardroom 3D model', kind:'3D Model',
+          rev:'B', status:'Approved', designer:'Farzana Yasmin', issued:'2026-05-04', approved:'2026-05-14', created:'2026-04-20' },
+
+        { id:'DWG-108', project:'WAP-103', title:'Duplex plan — both levels', kind:'Plan',
+          rev:'A', status:'Approved', designer:'Sharmin Jahan', issued:'2026-02-10', approved:'2026-02-18', created:'2026-02-04' },
+        { id:'DWG-109', project:'WAP-103', title:'Staircase section', kind:'Section',
+          rev:'B', status:'Approved', designer:'Sharmin Jahan', issued:'2026-02-24', approved:'2026-03-04', created:'2026-02-08' }
+      ]);
+      add('wa_revisions', [
+        { id:'RVN-101', drawing:'DWG-101', rev:'A', action:'Revised',   by:'Nasrin Sultana', note:'Client wanted the study moved', date:'2026-06-14' },
+        { id:'RVN-102', drawing:'DWG-101', rev:'B', action:'Approved',  by:'Nasrin Sultana', note:'', date:'2026-06-24' },
+        { id:'RVN-103', drawing:'DWG-102', rev:'A', action:'Revised',   by:'Nasrin Sultana', note:'Ceiling height corrected', date:'2026-06-18' },
+        { id:'RVN-104', drawing:'DWG-102', rev:'B', action:'Revised',   by:'Nasrin Sultana', note:'Veneer tone changed to walnut', date:'2026-06-25' },
+        { id:'RVN-105', drawing:'DWG-102', rev:'C', action:'Commented', by:'Nasrin Sultana', note:'Client wants the TV wall reworked', date:'2026-07-02' },
+        { id:'RVN-106', drawing:'DWG-103', rev:'A', action:'Issued',    by:'Farzana Yasmin', note:'', date:'2026-06-22' },
+        { id:'RVN-107', drawing:'DWG-104', rev:'A', action:'Drafted',   by:'Nasrin Sultana', note:'', date:'2026-07-01' },
+        { id:'RVN-108', drawing:'DWG-105', rev:'A', action:'Revised',   by:'Touhidul Alam',  note:'Extra workstation bay added', date:'2026-04-28' },
+        { id:'RVN-109', drawing:'DWG-105', rev:'B', action:'Approved',  by:'Touhidul Alam',  note:'', date:'2026-05-02' },
+        { id:'RVN-110', drawing:'DWG-106', rev:'A', action:'Approved',  by:'Touhidul Alam',  note:'', date:'2026-05-02' },
+        { id:'RVN-111', drawing:'DWG-107', rev:'B', action:'Approved',  by:'Farzana Yasmin', note:'', date:'2026-05-14' },
+        { id:'RVN-112', drawing:'DWG-108', rev:'A', action:'Approved',  by:'Sharmin Jahan',  note:'', date:'2026-02-18' },
+        { id:'RVN-113', drawing:'DWG-109', rev:'B', action:'Approved',  by:'Sharmin Jahan',  note:'', date:'2026-03-04' }
+      ]);
+
+      /* ---- ESTIMATES / BOQ — this IS each project's budget -----------------
+       * Every line quotes a material the register actually stocks, so the BOQ,
+       * the purchase orders and the stock levels describe one business. */
+      add('wa_estimates', [
+        { id:'EST-101', title:'Full Interior — Gulshan Penthouse', client:'Bashundhara Group',
+          projectId:'WAP-101', status:'Sent', validTill:'2026-08-15', created:'2026-06-12',
+          lines:[
+            { item:'Marine Plywood 18mm', qty:180, unitCost:3400, unitSale:4600 },
+            { item:'Veneer Board',        qty:90,  unitCost:4200, unitSale:5900 },
+            { item:'German Hinge (Hettich)', qty:320, unitCost:310, unitSale:480 },
+            { item:'PU Polish',           qty:70,  unitCost:1420, unitSale:2050 },
+            { item:'Fabric — Velvet',     qty:140, unitCost:420,  unitSale:690 }
+          ] },
+        { id:'EST-102', title:'Office Fit-out — Square Pharma HQ', client:'Square Pharmaceuticals',
+          projectId:'WAP-102', status:'Approved', validTill:'2026-06-30', created:'2026-04-18',
+          lines:[
+            { item:'Marine Plywood 18mm', qty:420, unitCost:3400, unitSale:4500 },
+            { item:'Formica Laminate',    qty:360, unitCost:1250, unitSale:1850 },
+            { item:'MDF 12mm',            qty:210, unitCost:1850, unitSale:2600 },
+            { item:'Drawer Channel 18"',  qty:260, unitCost:540,  unitSale:820 },
+            { item:'SS Handle',           qty:480, unitCost:185,  unitSale:310 },
+            { item:'NC Lacquer',          qty:120, unitCost:980,  unitSale:1480 }
+          ] },
+        { id:'EST-103', title:'Duplex Interior — Dhanmondi 27', client:'Ashraful Karim',
+          projectId:'WAP-103', status:'Approved', validTill:'2026-03-31', created:'2026-02-06',
+          lines:[
+            { item:'Marine Plywood 18mm', qty:150, unitCost:3400, unitSale:4550 },
+            { item:'Veneer Board',        qty:70,  unitCost:4200, unitSale:5800 },
+            { item:'Wood Glue 5kg',       qty:40,  unitCost:760,  unitSale:1120 },
+            { item:'Foam 4"',             qty:120, unitCost:260,  unitSale:430 }
+          ] }
+      ]);
+
+      /* ---- PROCUREMENT — the buying that those BOQs required ---------------
+       * 101 has one order placed and nothing delivered (design phase).
+       * 102 has most of it received, one part-delivered.
+       * 103 is fully received — the project is at handover. */
+      add('wa_purchases', [
+        { id:'WPO-101', supplier:'Timber World BD', items:5, amount:612000, status:'Ordered',  date:'2026-06-30', created:'2026-06-30' },
+        { id:'WPO-102', supplier:'Akij Board',      items:6, amount:1428000, status:'Received', date:'2026-04-28', created:'2026-04-28' },
+        { id:'WPO-103', supplier:'RFL Hardware',    items:4, amount:229000, status:'Received', date:'2026-05-12', created:'2026-05-12' },
+        { id:'WPO-104', supplier:'Partex Star',     items:3, amount:388500, status:'Partial',  date:'2026-06-16', created:'2026-06-16' },
+        { id:'WPO-105', supplier:'Timber World BD', items:4, amount:510000, status:'Received', date:'2026-02-20', created:'2026-02-20' },
+        { id:'WPO-106', supplier:'Hatil Trade',     items:2, amount:31200,  status:'Received', date:'2026-03-08', created:'2026-03-08' }
+      ]);
+
+      /* ---- WORKSHOP — 102 is the project actually on the floor ------------- */
+      add('wa_production', [
+        { id:'JOB-101', job:'Reception desk carcass', project:'WAP-102', station:'CNC',
+          assignedTo:'Omar Faruk',     due:'2026-07-10', status:'Running', created:'2026-06-20' },
+        { id:'JOB-102', job:'Workstation tops',       project:'WAP-102', station:'Cutting',
+          assignedTo:'Delwar Mia',     due:'2026-07-14', status:'Running', created:'2026-06-22' },
+        { id:'JOB-103', job:'Storage unit shutters',  project:'WAP-102', station:'Edge Banding',
+          assignedTo:'Kamrul Islam',   due:'2026-06-30', status:'Blocked', created:'2026-06-18' },
+        { id:'JOB-104', job:'Boardroom table',        project:'WAP-102', station:'Assembly',
+          assignedTo:'Mahmudul Hasan', due:'2026-06-24', status:'Done',    created:'2026-06-02' },
+        { id:'JOB-105', job:'Panelling — lobby',      project:'WAP-102', station:'Finishing',
+          assignedTo:'Jashim Uddin',   due:'2026-07-22', status:'Queued',  created:'2026-06-26' },
+        { id:'JOB-106', job:'Wardrobe shutters',      project:'WAP-103', station:'Finishing',
+          assignedTo:'Kamrul Islam',   due:'2026-06-20', status:'Done',    created:'2026-05-28' },
+        { id:'JOB-107', job:'Staircase handrail',     project:'WAP-103', station:'Assembly',
+          assignedTo:'Omar Faruk',     due:'2026-06-26', status:'Done',    created:'2026-06-01' }
+      ]);
+
+      /* ---- SITE & INSTALL — 103 is being handed over ----------------------- */
+      add('wa_installs', [
+        { id:'INS-101', project:'WAP-102', site:'Tejgaon I/A', team:'Team Alpha',
+          date:'2026-08-04', status:'Scheduled', snags:0, created:'2026-06-28' },
+        { id:'INS-102', project:'WAP-103', site:'Dhanmondi 27', team:'Team Bravo',
+          date:'2026-06-28', status:'Snagging', snags:2, created:'2026-06-10',
+          snagList:[
+            { text:'Wardrobe shutter alignment — master bedroom', done:false },
+            { text:'Polish touch-up on staircase handrail',       done:false },
+            { text:'Skirting gap in the living room',             done:true },
+            { text:'Drawer channel replaced — kitchen unit 3',    done:true }
+          ] },
+        { id:'INS-103', project:'WAP-103', site:'Dhanmondi 27', team:'Team Bravo',
+          date:'2026-05-30', status:'Handover', snags:0, created:'2026-05-20' }
+      ]);
+
+      /* ---- WOODART OPERATING EXPENSES — what the phases actually cost ------
+       * Booked in the same `acc_entries` register Master Accounts reads, so
+       * these show up in the Woodart books rather than only in this story. */
+      add('acc_entries', [
+        { id:'JV-WA101', companyId:'woodart', kind:'Expense', category:'Fuel & Transport',
+          desc:'Site survey — Gulshan (WAP-101)', amount:14500, method:'Cash', date:'2026-06-10', created:'2026-06-10' },
+        { id:'JV-WA102', companyId:'woodart', kind:'Expense', category:'Salaries',
+          desc:'Design team — June', amount:385000, method:'Bank', date:'2026-06-30', created:'2026-06-30' },
+        { id:'JV-WA103', companyId:'woodart', kind:'Expense', category:'Vendor Payment',
+          desc:'Akij Board — against WPO-102', amount:1428000, method:'Bank', date:'2026-05-06', created:'2026-05-06' },
+        { id:'JV-WA104', companyId:'woodart', kind:'Expense', category:'Fuel & Transport',
+          desc:'Delivery to site — WAP-103', amount:26800, method:'Cash', date:'2026-06-12', created:'2026-06-12' },
+        { id:'JV-WA105', companyId:'woodart', kind:'Expense', category:'Office Rent',
+          desc:'Workshop — Tejgaon, June', amount:180000, method:'Bank', date:'2026-06-05', created:'2026-06-05' },
+        { id:'JV-WA106', companyId:'woodart', kind:'Expense', category:'Utilities',
+          desc:'Workshop power — June', amount:64200, method:'Bank', date:'2026-07-02', created:'2026-07-02' },
+        { id:'JV-WA107', companyId:'woodart', kind:'Income', category:'Design Fee',
+          desc:'Concept + 3D — Bashundhara Group (WAP-101)', amount:320000, method:'Bank', date:'2026-06-26', created:'2026-06-26' },
+        { id:'JV-WA108', companyId:'woodart', kind:'Income', category:'Project Billing',
+          desc:'Stage 2 — Square Pharmaceuticals (WAP-102)', amount:3600000, method:'Bank', date:'2026-06-18', created:'2026-06-18' }
+      ]);
+
+      /* ---- STOCK, made consistent with the story --------------------------
+       * WPO-102/103/105/106 were RECEIVED and WAP-102/103 consumed most of it,
+       * so the items those BOQs lean on are the ones running low. This is what
+       * puts real entries on the Materials → Reorder tab instead of leaving it
+       * an empty state nobody has seen. */
+      var lowAfterUse = { 'Marine Plywood 18mm':26, 'Formica Laminate':18, 'MDF 12mm':9,
+                          'Drawer Channel 18"':34, 'NC Lacquer':11 };
+      var mats = S.list('wa_materials').map(function (m) {
+        if (Object.prototype.hasOwnProperty.call(lowAfterUse, m.name)) {
+          m = Object.assign({}, m, { stock: lowAfterUse[m.name] });
+        }
+        return m;
+      });
+      S.set('wa_materials', mats);
+    })();
+
     /* ============================ IT SOLUTIONS ==============================*/
     gen('it_projects', 14, function (i) {
       var value = ri(3, 80) * 100000;

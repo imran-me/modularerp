@@ -10,6 +10,7 @@
  *   node tools/verify/books.mjs paid      # prove paid → Cash, due → Receivable
  *   node tools/verify/books.mjs salary    # salary charged per month (double-book check)
  *   node tools/verify/books.mjs receipt   # woodart goods receipt: balance-sheet only, reverses
+ *   node tools/verify/books.mjs story     # the 3 Woodart story projects thread every module
  *
  * Exit 0 = the probe's invariant holds. Built for the 2026-07 bookkeeping audit;
  * keep it around — it is the fastest way to see whether a change moved the books.
@@ -194,6 +195,52 @@ if (PROBE === 'receipt') {
     console.log('  trial balance still balances: ' + (Math.abs(o.tb1 - o.tb0) < 1 ? '✓' : '✗ out by ' + fmt(o.tb1 - o.tb0)));
   }
   console.log(ok ? '✓ goods receipt books correctly' : '✗ goods receipt is wrong');
+}
+if (PROBE === 'story') {
+  // Three hand-authored Woodart projects are supposed to thread through every
+  // module at a DIFFERENT phase. A demo that does not cross-reference is just
+  // more random data, so assert the joins rather than eyeball them.
+  const out = await evalJs(`(function(){
+    var db = EPAL.db, col = function(k){ return db.col(k); };
+    function of(store, key, id){ return col(store).filter(function(r){ return r[key]===id; }); }
+    return ['WAP-101','WAP-102','WAP-103'].map(function(id){
+      var p = col('wa_projects').filter(function(x){ return x.id===id; })[0];
+      var dw = of('wa_drawings','project',id);
+      var est = of('wa_estimates','projectId',id)[0];
+      var boq = (est && est.lines) || [];
+      var names = col('wa_materials').map(function(m){ return m.name; });
+      return {
+        id:id, found:!!p, stage:p&&p.stage, value:p&&p.value,
+        drawings:dw.length,
+        approved:dw.filter(function(d){ return d.status==='Approved'; }).length,
+        trail: col('wa_revisions').filter(function(r){ return dw.some(function(d){ return d.id===r.drawing; }); }).length,
+        boqLines:boq.length,
+        boqValue:boq.reduce(function(s,l){ return s+l.qty*l.unitSale; },0),
+        boqCost:boq.reduce(function(s,l){ return s+l.qty*l.unitCost; },0),
+        boqUnknown:boq.filter(function(l){ return names.indexOf(l.item)<0; }).map(function(l){ return l.item; }),
+        jobs:of('wa_production','project',id).length,
+        installs:of('wa_installs','project',id).length
+      };
+    });
+  })()`);
+  const [a,b,c] = out;
+  const money = n => '৳' + Math.round(n).toLocaleString('en-IN');
+  ok = out.every(r => r.found)
+    && a.stage==='Design' && b.stage==='Production' && c.stage==='Handover'
+    && out.every(r => r.drawings>0 && r.trail>0 && r.boqLines>0)
+    && out.every(r => r.boqUnknown.length===0)
+    && out.every(r => r.boqValue > r.boqCost)
+    && b.jobs>0 && c.installs>0 && a.jobs===0;
+  console.log('WOODART STORY PROJECTS');
+  out.forEach(r => {
+    console.log('  ' + r.id + '  ' + String(r.stage).padEnd(11) + ' ' + money(r.value).padStart(12));
+    console.log('     design ' + r.approved + '/' + r.drawings + ' approved · ' + r.trail + ' trail rows' +
+                ' · BOQ ' + r.boqLines + ' lines ' + money(r.boqValue) + ' (cost ' + money(r.boqCost) + ')');
+    console.log('     workshop ' + r.jobs + ' jobs · site ' + r.installs + ' visit(s)' +
+                (r.boqUnknown.length ? '   ← BOQ quotes unstocked: ' + r.boqUnknown.join(', ') : '   ✓ every BOQ item is a real material'));
+  });
+  console.log(ok ? '✓ each story sits at its own phase and every join resolves'
+                 : '✗ a story does not thread');
 }
 if (PROBE === 'salary') {
   const out = await evalJs(`(function(){
