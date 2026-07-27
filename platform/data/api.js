@@ -91,7 +91,8 @@
     wa_materials:  'woodart/materials/stock',
     wa_clients:    'woodart/clients/directory',
     wa_purchases:  'woodart/procurement/orders',
-    wa_vendors:    'woodart/procurement/vendors'
+    wa_vendors:    'woodart/procurement/vendors',
+    wa_production: 'woodart/production/jobs'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -152,7 +153,8 @@
     // Woodart client directory — plain master data, safely writable.
     wa_clients:   'woodart/clients/directory',
     wa_purchases: 'woodart/procurement/orders',
-    wa_vendors:   'woodart/procurement/vendors'
+    wa_vendors:   'woodart/procurement/vendors',
+    wa_production:'woodart/production/jobs'
   };
 
   /* Stores whose WRITE side depends on the server actually having their table.

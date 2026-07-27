@@ -152,8 +152,27 @@
       "icon": "hammer",
       "desc": "Fabrication jobs, machine & labour scheduling.",
       "enabled": true,
-      "subs": [],
-      "built": false
+      "subs": [
+        {
+          "id": "jobs",
+          "label": "Job Register",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "board",
+          "label": "Workshop Board",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "load",
+          "label": "Station Load",
+          "icon": "dot",
+          "enabled": true
+        }
+      ],
+      "built": true
     },
     {
       "id": "installation",

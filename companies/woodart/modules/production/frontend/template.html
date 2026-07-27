@@ -1,0 +1,260 @@
+<!-- ============================================================================
+  WOODART · WORKSHOP (production) · MARKUP
+  ----------------------------------------------------------------------------
+  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.
+  Nothing here is built by JavaScript. No <script> tag, no <template> tag —
+  standing owner rule (companies/woodart/MODULE-STANDARD.md §2.1).
+
+  THE HOOKS the logic uses:
+    [data-shell]  reusable chrome (head bar, tab band)   → shell('x')
+    [data-screen] a whole screen                          → screen('x')
+    [data-fill]   a slot a built widget drops into
+    [data-k]      a live scalar slot (a KPI number)       → fillK(node,'x',v)
+    [data-tab]    a tab button (logic marks .active, wires, strips the hook)
+    [data-act]    a button the logic wires an action onto
+    [data-when]   a block the logic REMOVES when the condition is false
+    [data-proto]  a hidden prototype cloned once per record
+    [data-slot]   a fill point inside a cloned [data-proto] node
+    [data-col]    a board column, keyed by job status
+
+  NOTE ON THE BOARD (screen 2): the four columns are FIXED — they are the
+  workshop's four states — so they are written out here as HTML, one <div> each.
+  Only the CARDS inside them are cloned, because the number of cards is data.
+  That is the line the build law draws: fixed structure is markup, 0..N records
+  are a [data-proto] clone.
+
+  STYLING: every UTILITY is Tailwind (tw-). The house COMPONENT classes stay
+  (card · kpi-card · btn · page-head · badge · kanban · kb-* · progress · num).
+  The only inline styles are computed bar widths and the per-column accent,
+  which are values, not utilities (UI-CONTRACT §4.3).
+  ============================================================================ -->
+
+
+<!-- ============================================================================
+     SHARED CHROME — page-head bar (mirrors EPAL.pageHead) + the 3-tab band.
+     The <h1> inner run stays on ONE line: a newline between those inline tags
+     clones as a real space and shifts pixels.
+     ============================================================================ -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow" data-fill="eyebrow"></span><i class="bi bi-hammer"></i></h1>
+    <p class="page-sub" data-fill="sub"></p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="#/woodart/projects/active"><i class="bi bi-easel2-fill"></i> Projects</a>
+    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> New Job</button>
+  </div>
+</div>
+
+<div data-shell="tabs" class="tab-underline mb-3">
+  <button data-tab="jobs">Job Register</button>
+  <button data-tab="board">Workshop Board</button>
+  <button data-tab="load">Station Load</button>
+</div>
+
+
+<!-- ============================================================================
+     SCREEN 1 · JOB REGISTER — every fabrication job, searchable.
+     ============================================================================ -->
+<section data-screen="jobs">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Jobs</span><span class="kpi-ico"><i class="bi bi-hammer"></i></span></div>
+      <div class="kpi-value" data-k="jobs">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Running</span><span class="kpi-ico"><i class="bi bi-gear-wide-connected"></i></span></div>
+      <div class="kpi-value" data-k="running">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Blocked</span><span class="kpi-ico"><i class="bi bi-exclamation-octagon"></i></span></div>
+      <div class="kpi-value" data-k="blocked">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Overdue</span><span class="kpi-ico"><i class="bi bi-alarm-fill"></i></span></div>
+      <div class="kpi-value" data-k="overdue">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Completion</span><span class="kpi-ico"><i class="bi bi-check2-circle"></i></span></div>
+      <div class="kpi-value" data-k="done">—</div>
+    </div>
+  </div>
+
+  <!-- Shown only when something is blocked or late. Removed otherwise. -->
+  <div class="build-banner" data-when="attention">
+    <i class="bi bi-exclamation-diamond"></i>
+    <div><strong data-k="attentionInline">0</strong> job(s) need attention —
+      blocked, or past their due date and not done.
+      <button class="link-btn" data-act="goBoard">Open the workshop board</button>.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-list-check"></i> Fabrication Jobs</h3>
+      <span class="card-sub">Every job on the shop floor — station, owner, due date and status</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 2 · WORKSHOP BOARD — the four workshop states, side by side.
+     The COLUMNS are fixed markup (they are the workshop's states, not data).
+     Only the cards inside them are cloned.
+     ============================================================================ -->
+<section data-screen="board">
+
+  <div class="build-banner">
+    <i class="bi bi-info-circle"></i>
+    <div>Every job on the floor, grouped by state. Click a card to open the job —
+      change its status there and it moves column.</div>
+  </div>
+
+  <div class="kanban">
+
+    <div class="kb-col" data-col="Queued">
+      <div class="kb-col-head">
+        <span class="kb-col-dot"></span>
+        <span class="kb-col-title">Queued</span>
+        <span class="kb-count" data-slot="count">0</span>
+      </div>
+      <div class="kb-list" data-fill="list">
+        <div class="empty-state" data-when="empty"><i class="bi bi-inbox"></i><p class="tw-text-ink-dim">Nothing queued</p></div>
+      </div>
+    </div>
+
+    <div class="kb-col" data-col="Running">
+      <div class="kb-col-head">
+        <span class="kb-col-dot"></span>
+        <span class="kb-col-title">Running</span>
+        <span class="kb-count" data-slot="count">0</span>
+      </div>
+      <div class="kb-list" data-fill="list">
+        <div class="empty-state" data-when="empty"><i class="bi bi-inbox"></i><p class="tw-text-ink-dim">Nothing running</p></div>
+      </div>
+    </div>
+
+    <div class="kb-col" data-col="Blocked">
+      <div class="kb-col-head">
+        <span class="kb-col-dot"></span>
+        <span class="kb-col-title">Blocked</span>
+        <span class="kb-count" data-slot="count">0</span>
+      </div>
+      <div class="kb-list" data-fill="list">
+        <div class="empty-state" data-when="empty"><i class="bi bi-check2-circle"></i><p class="tw-text-ink-dim">Nothing blocked</p></div>
+      </div>
+    </div>
+
+    <div class="kb-col" data-col="Done">
+      <div class="kb-col-head">
+        <span class="kb-col-dot"></span>
+        <span class="kb-col-title">Done</span>
+        <span class="kb-count" data-slot="count">0</span>
+      </div>
+      <div class="kb-list" data-fill="list">
+        <div class="empty-state" data-when="empty"><i class="bi bi-inbox"></i><p class="tw-text-ink-dim">Nothing finished yet</p></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- PROTOTYPE CARD — cloned once per job into the column its status names.
+       Lives outside the columns so it is cloned from one place, and is removed
+       from the shipped DOM once the real cards are in. -->
+  <div data-proto="job" class="kb-card" hidden>
+    <div class="kb-card-title" data-slot="job"></div>
+    <div class="tw-text-ink-mute tw-text-[11px]" data-slot="meta"></div>
+    <div class="kb-card-foot">
+      <span class="badge" data-slot="station"></span>
+      <span data-slot="due"></span>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 3 · STATION LOAD — where the workshop is busy.
+     Two mutually exclusive states, BOTH authored here; the logic removes one.
+     ============================================================================ -->
+<section data-screen="load">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Stations in Use</span><span class="kpi-ico"><i class="bi bi-diagram-3-fill"></i></span></div>
+      <div class="kpi-value" data-k="stations">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Busiest Station</span><span class="kpi-ico"><i class="bi bi-fire"></i></span></div>
+      <div class="kpi-value" data-k="top">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Open Jobs</span><span class="kpi-ico"><i class="bi bi-hourglass-split"></i></span></div>
+      <div class="kpi-value" data-k="open">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Crew Assigned</span><span class="kpi-ico"><i class="bi bi-people-fill"></i></span></div>
+      <div class="kpi-value" data-k="crew">—</div>
+    </div>
+  </div>
+
+  <!-- STATE A · no jobs at all -->
+  <div class="empty-state" data-when="none">
+    <i class="bi bi-hammer"></i>
+    <h3>No jobs on the floor</h3>
+    <p class="tw-text-ink-dim">Break a project into workshop jobs and the load analysis fills in.</p>
+  </div>
+
+  <!-- STATE B · there is work to analyse -->
+  <div data-when="some">
+
+    <div class="two-col">
+
+      <div class="card">
+        <div class="card-head">
+          <h3><i class="bi bi-bar-chart-fill"></i> Open Jobs by Station</h3>
+          <span class="card-sub">What is still to do at each machine</span>
+        </div>
+        <div class="card-body">
+          <div class="data-list" data-fill="stations">
+            <!-- PROTOTYPE ROW — one per station; the count is DATA, not layout. -->
+            <div class="data-row" data-proto="station" hidden>
+              <div class="tw-flex-1">
+                <div class="tw-font-semibold" data-slot="name"></div>
+                <div class="progress tw-mt-[6px]"><div class="progress-bar" data-slot="bar"></div></div>
+              </div>
+              <div class="tw-ml-auto tw-text-right">
+                <div class="num tw-font-semibold" data-slot="open"></div>
+                <div class="tw-text-ink-mute tw-text-[11px]" data-slot="detail"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3><i class="bi bi-pie-chart-fill"></i> Workload Split</h3>
+          <span class="card-sub">Open jobs by station</span>
+        </div>
+        <div class="card-body">
+          <div class="tw-relative tw-h-[260px]"><canvas data-fill="chart"></canvas></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-table"></i> Station Breakdown</h3>
+        <span class="card-sub">Total, open, blocked and overdue jobs per station</span>
+      </div>
+      <div class="card-body" data-fill="register"></div>
+    </div>
+
+  </div>
+
+</section>

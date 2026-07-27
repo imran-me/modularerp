@@ -1,0 +1,45 @@
+{
+  "key": "production",
+  "company": "woodart",
+  "title": "Workshop",
+  "icon": "hammer",
+  "desc": "Fabrication jobs, machine & labour scheduling.",
+  "route": "#/woodart/production",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "jobs",
+      "label": "Job Register",
+      "route": "#/woodart/production/jobs",
+      "enabled": true
+    },
+    {
+      "id": "board",
+      "label": "Workshop Board",
+      "route": "#/woodart/production/board",
+      "enabled": true
+    },
+    {
+      "id": "load",
+      "label": "Station Load",
+      "route": "#/woodart/production/load",
+      "enabled": true
+    }
+  ],
+  "stores": [
+    "wa_production"
+  ],
+  "reads": [
+    "wa_projects",
+    "employees"
+  ],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/production.js",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — the presence of THIS file is what auto-discovery HEAD-probes (platform/discovery/discovery.js). A module registered built:true in the company manifest but missing this file is treated as deleted."
+}
