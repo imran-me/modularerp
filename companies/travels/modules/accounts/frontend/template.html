@@ -45,6 +45,60 @@
   <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
 </section>
 
+<!-- JOURNALS — the double-entry poster card (its FORM is the shared EPAL.form
+     engine, inserted before the balance row) over the recent-GL card. The Dr/Cr
+     badges are recomputed on every keystroke, so the logic fills them. -->
+<section data-screen="journals">
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-journal-plus"></i> New Double-Entry Journal</h3><span class="card-sub">Debits must equal credits</span></div>
+    <div class="card-body" data-fill="poster">
+      <div class="flex justify-between items-center mt-2">
+        <div class="flex gap-2 items-center" data-fill="balance"></div>
+        <button class="btn btn-primary" data-act="post" disabled><i class="bi bi-journal-plus"></i> Post Journal</button>
+      </div>
+    </div>
+  </div>
+  <div class="section-label">Recent Ledger Entries</div>
+  <div class="card">
+    <div class="card-body" data-fill="gl-table"></div>
+  </div>
+</section>
+
+<!-- PAYMENT SCHEDULES — the "upcoming 15 days" banner comes FIRST by owner
+     decision (checklist 06: "shobar age/upore"), then the KPI strip, then the
+     overdue banner (only when something IS overdue), then the tracker card. -->
+<section data-screen="schedules">
+  <div class="build-banner mb-3">
+    <i class="bi bi-calendar-week"></i>
+    <div class="flex-1" data-fill="next15"></div>
+  </div>
+  <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
+  <div class="build-banner mb-3" data-fill="overdue-banner">
+    <i class="bi bi-exclamation-octagon-fill"></i>
+    <div data-fill="overdue-text"></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-calendar2-week"></i> Payment Schedules</h3><span class="card-sub" data-k="count"></span></div>
+    <div class="card-body" data-fill="table"></div>
+  </div>
+</section>
+
+<!-- RECURRING EXPENSES — KPI strip, the "due this month" banner (shown only when
+     something is due; the logic fills its sentence + wires Generate All) and the
+     table card. Only the data grid itself is JS (sort/search/pagination). -->
+<section data-screen="recurring">
+  <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
+  <div class="build-banner mb-3" data-fill="due-banner">
+    <i class="bi bi-calendar-check"></i>
+    <div class="flex-1" data-fill="due-text"></div>
+    <button class="btn btn-sm btn-primary" data-act="generate"><i class="bi bi-play-circle"></i> Generate All</button>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3><i class="bi bi-arrow-repeat"></i> Recurring Expenses</h3><span class="card-sub">auto-created monthly on their day</span></div>
+    <div class="card-body" data-fill="table"></div>
+  </div>
+</section>
+
 <section data-screen="banks">
   <div class="kpi-grid kpi-compact stagger" data-fill="kpis"></div>
   <div class="text-mute sm mb-2" data-fill="note"></div>

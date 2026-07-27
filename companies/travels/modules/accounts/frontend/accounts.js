@@ -1117,12 +1117,17 @@ function expenseAccountFor(cat) {
 }
 
 /* ======================================================= JOURNALS (GL) */
+// REAL-HTML screen: <section data-screen="journals"> in template.html holds the
+// poster card + the recent-GL card. The journal FORM itself is the shared
+// EPAL.form engine (line-item repeater) and the GL grid is EPAL.table — both
+// stay JS by design; everything around them is markup.
 function journalsView(page) {
   var accts = (EPAL.ledger && EPAL.ledger.accounts) ? EPAL.ledger.accounts() : [];
   var acctOpts = accts.filter(function (a) { return a.active !== false; }).map(function (a) { return [a.code, a.code + ' · ' + a.name]; });
 
-  var balStrip = el('div.flex.gap-2.items-center');
-  var postBtn = el('button.btn.btn-primary', { disabled: true, html: ui.icon('journal-plus') + ' Post Journal' });
+  var jv = screen('journals');
+  var balStrip = jv.querySelector('[data-fill="balance"]');
+  var postBtn = jv.querySelector('[data-act="post"]');
 
   function tally(rows) { var dr = 0, cr = 0; (rows || []).forEach(function (r) { dr += +r.debit || 0; cr += +r.credit || 0; }); return { dr: dr, cr: cr, diff: dr - cr }; }
   function refreshBalance(rows) {
@@ -1164,9 +1169,9 @@ function journalsView(page) {
   });
   refreshBalance([]);
 
-  var jc = titledCard(ui.icon('journal-plus') + ' New Double-Entry Journal', 'Debits must equal credits', form.el);
-  slot(jc, 'body').appendChild(el('div.flex.justify-between.items-center.mt-2', null, [ balStrip, postBtn ]));
-  page.appendChild(jc);
+  // the form goes above the balance row that is already in the markup
+  var poster = jv.querySelector('[data-fill="poster"]');
+  poster.insertBefore(form.el, poster.firstElementChild);
 
   // recent GL entries for Travels (newest first)
   var glRows = (EPAL.ledger && EPAL.ledger.entries) ? EPAL.ledger.entries({ companyId: CID }).slice().reverse() : [];
@@ -1184,8 +1189,8 @@ function journalsView(page) {
     onRow: function (e) { showEntry(e); },
     empty: { icon: 'journal-text', title: 'No ledger entries yet — post one above' }
   });
-  page.appendChild(sectionLabel('Recent Ledger Entries'));
-  page.appendChild(bodyCard(glTable.el));
+  jv.querySelector('[data-fill="gl-table"]').appendChild(glTable.el);
+  mountScreen(page, jv);
 
   function showEntry(e) {
     var lines = (e.lines || []).map(function (l) { var a = EPAL.ledger.account(l.account); return { account: l.account + ' · ' + (a ? a.name : ''), debit: +l.dr || 0, credit: +l.cr || 0 }; });
@@ -1207,24 +1212,28 @@ function schedulesView(page) {
   var overdue = overdueSchedules();
   var soon = dueSoon(7);
 
+  // REAL-HTML screen: <section data-screen="schedules"> in template.html.
   // Upcoming 15 days — FIRST, above everything (checklist 06: "shobar age/upore")
+  var sc = screen('schedules');
   var in15 = dueSoon(15);
   var sum15 = in15.reduce(function (a, s) { return a + (+s.amount || 0); }, 0);
-  page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('calendar-week')),
-    el('div.flex-1', { html: '<strong>Upcoming 15 days: ' + in15.length + ' settlement' + (in15.length === 1 ? '' : 's') + ' · ' + ui.money(sum15) + '.</strong> ' +
-      (in15.length ? in15.slice(0, 6).map(function (s) { return esc(s.party) + ' (' + ui.money(s.amount) + ' · ' + ui.date(s.due) + ')'; }).join(', ') + (in15.length > 6 ? ' …' : '') : 'Nothing due.') }) ]));
+  sc.querySelector('[data-fill="next15"]').innerHTML = '<strong>Upcoming 15 days: ' + in15.length + ' settlement' + (in15.length === 1 ? '' : 's') + ' · ' + ui.money(sum15) + '.</strong> ' +
+    (in15.length ? in15.slice(0, 6).map(function (s) { return esc(s.party) + ' (' + ui.money(s.amount) + ' · ' + ui.date(s.due) + ')'; }).join(', ') + (in15.length > 6 ? ' …' : '') : 'Nothing due.');
 
-  var kg = frag('kpi-grid');
+  var kg = sc.querySelector('[data-fill="kpis"]');
   kg.appendChild(kpi('Payable', ui.money(payable, { compact: true }), 'arrow-up-right-circle', payable ? 'text-bad' : ''));
   kg.appendChild(kpi('Receivable', ui.money(receivable, { compact: true }), 'arrow-down-left-circle', receivable ? 'text-good' : ''));
   kg.appendChild(kpi('Overdue', String(overdue.length), 'exclamation-triangle', overdue.length ? 'text-bad' : ''));
   kg.appendChild(kpi('Due ≤7 days', String(soon.length), 'clock-history', soon.length ? 'text-warn' : ''));
   kg.appendChild(kpi('Open Items', String(openSchedules().length), 'calendar2-week'));
-  page.appendChild(kg);
 
-  if (overdue.length) page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('exclamation-octagon-fill')),
-    el('div', { html: '<strong>' + overdue.length + ' overdue settlement' + (overdue.length === 1 ? '' : 's') + '.</strong> ' +
-      overdue.slice(0, 6).map(function (s) { return esc(s.party) + ' (' + ui.money(s.amount) + ')'; }).join(', ') + (overdue.length > 6 ? ' …' : '') }) ]));
+  // the overdue banner belongs on screen only when something IS overdue
+  var ob = sc.querySelector('[data-fill="overdue-banner"]');
+  if (!overdue.length) { ob.parentNode.removeChild(ob); }
+  else {
+    sc.querySelector('[data-fill="overdue-text"]').innerHTML = '<strong>' + overdue.length + ' overdue settlement' + (overdue.length === 1 ? '' : 's') + '.</strong> ' +
+      overdue.slice(0, 6).map(function (s) { return esc(s.party) + ' (' + ui.money(s.amount) + ')'; }).join(', ') + (overdue.length > 6 ? ' …' : '');
+  }
 
   var t = EPAL.table({
     columns: [
@@ -1250,7 +1259,9 @@ function schedulesView(page) {
     }),
     empty: { icon: 'calendar2-week', title: 'No schedules yet', hint: 'Add a payable or receivable to track it.' }
   });
-  page.appendChild(titledCard(ui.icon('calendar2-week') + ' Payment Schedules', list.length + ' items · click for detail', t.el));
+  fillK(sc, 'count', list.length + ' items · click for detail');
+  sc.querySelector('[data-fill="table"]').appendChild(t.el);
+  mountScreen(page, sc);
 }
 
 function scheduleDetail(s) {
@@ -1338,18 +1349,29 @@ function generateRecurring(r) {
   r.lastGenerated = ym; db.save('tv_recurring', r);
   return e;
 }
+// REAL-HTML screen: the shell is <section data-screen="recurring"> in
+// template.html — this fills the KPI values, the due-banner sentence and the
+// table, then mounts it. The data grid stays JS (sort/search/pagination).
 function recurringView(page) {
   var list = recurring(), due = recurringDue();
   var monthly = list.filter(function (r) { return r.active !== false; }).reduce(function (a, r) { return a + (+r.amount || 0); }, 0);
-  var kg = frag('kpi-grid');
+  var s = screen('recurring');
+  var kg = s.querySelector('[data-fill="kpis"]');
   kg.appendChild(kpi('Recurring Heads', String(list.length), 'arrow-repeat'));
   kg.appendChild(kpi('Monthly Total', ui.money(monthly, { compact: true }), 'cash-stack'));
   kg.appendChild(kpi('Due This Month', String(due.length), 'calendar-check', due.length ? 'text-warn' : 'text-good'));
   kg.appendChild(kpi('Active', String(list.filter(function (r) { return r.active !== false; }).length), 'toggle-on', 'text-good'));
-  page.appendChild(kg);
-  if (due.length) page.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('calendar-check')),
-    el('div.flex-1', { html: '<strong>' + due.length + ' recurring expense' + (due.length > 1 ? 's' : '') + ' due this month.</strong> ' + due.map(function (r) { return esc(r.category) + ' (' + ui.money(r.amount) + ')'; }).join(', ') }),
-    canCreate() ? el('button.btn.btn-sm.btn-primary', { html: ui.icon('play-circle') + ' Generate All', onclick: function () { due.forEach(generateRecurring); ui.toast(due.length + ' expenses posted', 'success'); EPAL.router.render(); } }) : null ]));
+  // the banner exists in the markup but only belongs on screen when something
+  // is actually due; Generate All is a create action, so it obeys the permission
+  var banner = s.querySelector('[data-fill="due-banner"]');
+  if (!due.length) { banner.parentNode.removeChild(banner); }
+  else {
+    s.querySelector('[data-fill="due-text"]').innerHTML = '<strong>' + due.length + ' recurring expense' + (due.length > 1 ? 's' : '') + ' due this month.</strong> ' +
+      due.map(function (r) { return esc(r.category) + ' (' + ui.money(r.amount) + ')'; }).join(', ');
+    var gen = banner.querySelector('[data-act="generate"]');
+    if (!canCreate()) gen.parentNode.removeChild(gen);
+    else gen.addEventListener('click', function () { due.forEach(generateRecurring); ui.toast(due.length + ' expenses posted', 'success'); EPAL.router.render(); });
+  }
   var tbl = EPAL.table({
     columns: [
       { key: 'category', label: 'Head', render: function (r) { return '<span class="strong">' + esc(r.category) + '</span>'; } },
@@ -1367,7 +1389,8 @@ function recurringView(page) {
     }),
     empty: { icon: 'arrow-repeat', title: 'No recurring expenses', hint: 'Add rent, internet or other monthly costs to auto-generate.' }
   });
-  page.appendChild(titledCard(ui.icon('arrow-repeat') + ' Recurring Expenses', 'auto-created monthly on their day', tbl.el));
+  s.querySelector('[data-fill="table"]').appendChild(tbl.el);
+  mountScreen(page, s);
 }
 function recurringForm(rec) {
   var isNew = !rec;
