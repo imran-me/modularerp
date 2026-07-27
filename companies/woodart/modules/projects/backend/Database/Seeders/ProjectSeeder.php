@@ -83,6 +83,27 @@ class ProjectSeeder extends Seeder
                 ['item' => 'Marine Plywood 18mm',     'qty' => 240, 'unitCost' => 3400, 'unitSale' => 4520],
                 ['item' => 'Formica Laminate',        'qty' => 190, 'unitCost' => 1250, 'unitSale' => 1820],
             ]],
+            ['EST-002', 'Penthouse Remodel — Wari', 'Ashraful Karim', 'WAP-002', 'Approved', '2026-03-31', [
+                ['item' => 'Marine Plywood 18mm', 'qty' => 170, 'unitCost' => 3400, 'unitSale' => 4560],
+                ['item' => 'Veneer Board',        'qty' => 80,  'unitCost' => 4200, 'unitSale' => 5850],
+                ['item' => 'PU Polish',           'qty' => 55,  'unitCost' => 1420, 'unitSale' => 2050],
+            ]],
+            ['EST-003', 'Penthouse Remodel — Tejgaon I/A', 'Square Pharmaceuticals', 'WAP-003', 'Approved', '2026-05-15', [
+                ['item' => 'Marine Plywood 18mm', 'qty' => 260, 'unitCost' => 3400, 'unitSale' => 4540],
+                ['item' => 'Formica Laminate',    'qty' => 150, 'unitCost' => 1250, 'unitSale' => 1830],
+                ['item' => 'SS Handle',           'qty' => 260, 'unitCost' => 185,  'unitSale' => 305],
+            ]],
+            ['EST-004', 'Showroom Design — Uttara Sector 7', 'Rahimafrooz', 'WAP-004', 'Sent', '2026-08-31', [
+                ['item' => 'MDF 12mm',            'qty' => 140, 'unitCost' => 1850, 'unitSale' => 2610],
+                ['item' => 'Formica Laminate',    'qty' => 120, 'unitCost' => 1250, 'unitSale' => 1840],
+                ['item' => 'NC Lacquer',          'qty' => 45,  'unitCost' => 980,  'unitSale' => 1470],
+            ]],
+            ['EST-005', 'Bank Branch Fit-out — Motijheel C/A', 'Akij Group', 'WAP-005', 'Approved', '2026-06-30', [
+                ['item' => 'Marine Plywood 18mm', 'qty' => 310, 'unitCost' => 3400, 'unitSale' => 4530],
+                ['item' => 'Veneer Board',        'qty' => 110, 'unitCost' => 4200, 'unitSale' => 5820],
+                ['item' => 'Drawer Channel 18"',  'qty' => 180, 'unitCost' => 540,  'unitSale' => 815],
+                ['item' => 'German Hinge (Hettich)', 'qty' => 240, 'unitCost' => 310, 'unitSale' => 475],
+            ]],
         ];
 
         foreach ($estimates as [$extId, $title, $client, $project, $status, $validTill, $lines]) {

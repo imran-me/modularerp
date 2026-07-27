@@ -102,6 +102,17 @@ class WoodartMoneySeeder extends Seeder
             ['JV-WA111', 'Expense', 'Vendor Payment',   'Timber World BD — settles WPO-001 in full',        340000,  'Bank', '2026-02-26', 'WPO-001'],
             ['JV-WA113', 'Expense', 'Vendor Payment',   'Hatil Trade — settles WPO-005 in full',            212000,  'Bank', '2026-06-10', 'WPO-005'],
             ['JV-WA112', 'Income',  'Project Billing',  'Final — Ashraful Karim (WAP-103)',                 1850000, 'Bank', '2026-07-02', 'WAP-103'],
+            // WAP-001..005 had drawings, jobs and installs but not a single
+            // rupee recorded against them. Work that costs nothing and earns
+            // nothing is not work — every project now shows in the books.
+            ['JV-WA120', 'Income',  'Project Billing',  'Stage 1 — ACI Limited (WAP-001)',                  1620000, 'Bank', '2026-04-12', 'WAP-001'],
+            ['JV-WA121', 'Expense', 'Fuel & Transport', 'Delivery to site — WAP-001',                       31500,   'Cash', '2026-05-20', 'WAP-001'],
+            ['JV-WA122', 'Income',  'Project Billing',  'Final — Ashraful Karim (WAP-002)',                 4100000, 'Bank', '2026-07-01', 'WAP-002'],
+            ['JV-WA123', 'Expense', 'Fuel & Transport', 'Site handover run — WAP-002',                      18200,   'Cash', '2026-06-30', 'WAP-002'],
+            ['JV-WA124', 'Income',  'Project Billing',  'Stage 2 — Square Pharmaceuticals (WAP-003)',       2480000, 'Bank', '2026-06-08', 'WAP-003'],
+            ['JV-WA125', 'Income',  'Design Fee',       'Concept — Rahimafrooz (WAP-004)',                  185000,  'Bank', '2026-06-14', 'WAP-004'],
+            ['JV-WA126', 'Income',  'Project Billing',  'Mobilisation — Akij Group (WAP-005)',              2130000, 'Bank', '2026-04-20', 'WAP-005'],
+            ['JV-WA127', 'Expense', 'Salaries',         'Site crew — June',                                 268000,  'Bank', '2026-06-30', ''],
         ];
 
         foreach ($rows as [$extId, $kind, $category, $desc, $amount, $method, $date, $ref]) {

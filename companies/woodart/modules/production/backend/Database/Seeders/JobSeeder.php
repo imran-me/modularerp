@@ -34,6 +34,15 @@ class JobSeeder extends Seeder
             // Deliberately points at a project that does not exist, so the
             // "orphan" path is exercised. The job is real work and is KEPT.
             ['JOB-011', 'Salvaged door trim', 'WAP-999', 'Cutting',      'Omar Faruk',     'Queued',  '2026-07-30'],
+            // WAP-102 is the project in PRODUCTION — it must have a live floor.
+            ['JOB-101', 'Reception desk carcass', 'WAP-102', 'CNC',          'Omar Faruk',     'Running', '2026-07-10'],
+            ['JOB-102', 'Workstation tops',       'WAP-102', 'Cutting',      'Delwar Mia',     'Running', '2026-07-14'],
+            ['JOB-103', 'Storage unit shutters',  'WAP-102', 'Edge Banding', 'Kamrul Islam',   'Blocked', '2026-06-30'],
+            ['JOB-104', 'Boardroom table',        'WAP-102', 'Assembly',     'Mahmudul Hasan', 'Done',    '2026-06-24'],
+            ['JOB-105', 'Panelling — lobby',      'WAP-102', 'Finishing',    'Jashim Uddin',   'Queued',  '2026-07-22'],
+            // WAP-103 is at handover, so its jobs are finished.
+            ['JOB-106', 'Wardrobe shutters',      'WAP-103', 'Finishing',    'Kamrul Islam',   'Done',    '2026-06-20'],
+            ['JOB-107', 'Staircase handrail',     'WAP-103', 'Assembly',     'Omar Faruk',     'Done',    '2026-06-26'],
         ];
 
         foreach ($rows as [$extId, $job, $project, $station, $assigned, $status, $due]) {

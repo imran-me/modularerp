@@ -37,6 +37,16 @@ class InstallSeeder extends Seeder
             ['INS-006', 'WAP-001', 'Mirpur DOHS',      'Team Delta',   'Handover',    '2026-05-30', 0, null],
             // Deliberately orphaned: the project does not exist. Kept + flagged.
             ['INS-007', 'WAP-999', 'Wari',             'Team Charlie', 'Scheduled',   null,         0, null],
+            // WAP-102 is in production — its fit-out is scheduled, not started.
+            ['INS-101', 'WAP-102', 'Tejgaon I/A',  'Team Alpha', 'Scheduled', '2026-08-04', 0, null],
+            // WAP-103 is AT handover: one visit closed out, one still snagging.
+            ['INS-102', 'WAP-103', 'Dhanmondi 27', 'Team Bravo', 'Snagging',  '2026-06-28', 2, [
+                ['text' => 'Wardrobe shutter alignment — master bedroom', 'done' => false],
+                ['text' => 'Polish touch-up on staircase handrail',       'done' => false],
+                ['text' => 'Skirting gap in the living room',             'done' => true],
+                ['text' => 'Drawer channel replaced — kitchen unit 3',    'done' => true],
+            ]],
+            ['INS-103', 'WAP-103', 'Dhanmondi 27', 'Team Bravo', 'Handover',  '2026-05-30', 0, null],
         ];
 
         foreach ($rows as [$extId, $project, $site, $team, $status, $date, $snags, $list]) {
