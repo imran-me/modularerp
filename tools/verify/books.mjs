@@ -9,6 +9,7 @@
  *   node tools/verify/books.mjs void      # prove a void fully reverses (no phantom)
  *   node tools/verify/books.mjs paid      # prove paid → Cash, due → Receivable
  *   node tools/verify/books.mjs salary    # salary charged per month (double-book check)
+ *   node tools/verify/books.mjs receipt   # woodart goods receipt: balance-sheet only, reverses
  *
  * Exit 0 = the probe's invariant holds. Built for the 2026-07 bookkeeping audit;
  * keep it around — it is the fastest way to see whether a change moved the books.
@@ -142,6 +143,57 @@ if (PROBE === 'paid') {
   console.log('  paid → Cash 1010: ' + fmt(out.cashPaid) + ' , AR 1200: ' + fmt(out.arPaid));
   console.log('  due  → AR 1200  : ' + fmt(out.arDue));
   console.log(ok ? '✓ paid → cash, due → receivable' : '✗ routing wrong');
+}
+if (PROBE === 'receipt') {
+  // Woodart procurement: a goods receipt must land on the BALANCE SHEET
+  // (DR 1400 Inventory / CR 2000 Payable), never on the P&L — that is what
+  // makes it impossible to double-count against the project cost the projects
+  // module posts to 5000 at sale. Also proves un-receiving reverses cleanly.
+  const out = await evalJs(`(function(){
+    var L = EPAL.ledger, db = EPAL.db, bal = function(c){ return L.balance(c); };
+    var id = 'WPO-PROBE-' + EPAL.ui.uid('x');
+    var inv0 = bal('1400'), ap0 = bal('2000'), cogs0 = bal('5000'), cash0 = bal('1010');
+    var tb0 = L.trialBalance().reduce(function(s,r){ return s+(r.debit||0)-(r.credit||0); },0);
+
+    function save(rec){ EPAL.views && 0; return null; }
+    // drive the module's own seam by rendering its view first
+    EPAL.router.navigate('woodart/procurement');
+    var P = EPAL.diag && EPAL.diag.woodartProcurement;   // the module's documented probe hook
+    if (!P) return { err: 'seam not exposed' };
+
+    // 1. an ORDERED purchase posts NOTHING
+    P.saveOrder({ id:id, supplier:'Akij Board', items:3, amount:120000, status:'Ordered', date:'2026-07-01' });
+    var afterOrder = { inv: bal('1400')-inv0, ap: bal('2000')-ap0 };
+
+    // 2. receiving it posts DR 1400 / CR 2000
+    P.saveOrder({ id:id, supplier:'Akij Board', items:3, amount:120000, status:'Received', date:'2026-07-01' });
+    var afterRecv = { inv: bal('1400')-inv0, ap: bal('2000')-ap0, cogs: bal('5000')-cogs0, cash: bal('1010')-cash0 };
+
+    // 3. un-receiving reverses it back to zero
+    P.saveOrder({ id:id, supplier:'Akij Board', items:3, amount:120000, status:'Partial', date:'2026-07-01' });
+    var afterUn = { inv: bal('1400')-inv0, ap: bal('2000')-ap0 };
+
+    var tb1 = L.trialBalance().reduce(function(s,r){ return s+(r.debit||0)-(r.credit||0); },0);
+    P.removeOrder(id);
+    return { afterOrder:afterOrder, afterRecv:afterRecv, afterUn:afterUn, tb0:tb0, tb1:tb1 };
+  })()`);
+  const o = out || {};
+  ok = !o.err
+    && o.afterOrder.inv === 0 && o.afterOrder.ap === 0
+    && o.afterRecv.inv === 120000 && o.afterRecv.ap === 120000
+    && o.afterRecv.cogs === 0 && o.afterRecv.cash === 0
+    && o.afterUn.inv === 0 && o.afterUn.ap === 0
+    && Math.abs(o.tb1 - o.tb0) < 1;
+  console.log('WOODART GOODS RECEIPT');
+  if (o.err) { console.log('  ' + o.err); }
+  else {
+    console.log('  Ordered      → inventory ' + fmt(o.afterOrder.inv) + ' , payable ' + fmt(o.afterOrder.ap) + (o.afterOrder.inv === 0 && o.afterOrder.ap === 0 ? '  ✓ a PO posts nothing' : '  ← a PO must not post'));
+    console.log('  Received     → inventory ' + fmt(o.afterRecv.inv) + ' , payable ' + fmt(o.afterRecv.ap));
+    console.log('  ...and P&L   → COGS 5000 ' + fmt(o.afterRecv.cogs) + ' , cash 1010 ' + fmt(o.afterRecv.cash) + (o.afterRecv.cogs === 0 ? '  ✓ balance sheet only, cannot double-count' : '  ← LEAKED TO THE P&L'));
+    console.log('  Un-received  → inventory ' + fmt(o.afterUn.inv) + ' , payable ' + fmt(o.afterUn.ap) + (o.afterUn.inv === 0 ? '  ✓ fully reversed' : '  ← phantom stock'));
+    console.log('  trial balance still balances: ' + (Math.abs(o.tb1 - o.tb0) < 1 ? '✓' : '✗ out by ' + fmt(o.tb1 - o.tb0)));
+  }
+  console.log(ok ? '✓ goods receipt books correctly' : '✗ goods receipt is wrong');
 }
 if (PROBE === 'salary') {
   const out = await evalJs(`(function(){

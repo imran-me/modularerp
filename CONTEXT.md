@@ -290,6 +290,30 @@ authorities (docs only — no screen touched, sweep 222/222 × both themes):
   split out of the blueprint. `wa_materials` wired into api.js HYDRATE+WRITABLE.
   Verified: PHP `-l` 8/8, tw gate green, **sweep 225/225 × both themes, 0 errors**
   (222→225 = the 3 new sub-routes). ◻ MySQL CRUD test still owed.
+- **✅ THE PROCUREMENT LEDGER POSTING IS RESOLVED AND SHIPPED** (2026-07-27).
+  It was flagged as needing an owner call; it turned out the chart of accounts
+  already answers it — and it exposed an error in my own blueprint: I had
+  written "arguably inventory (1200)", but **1200 is Accounts Receivable**. The
+  COA has a real **1400 Inventory** and **2000 Accounts Payable**.
+  A goods receipt now posts **DR 1400 / CR 2000** on `Received` ONLY (a PO is a
+  commitment, and `Partial` has no part-received amount to post honestly).
+  Because that lands on the BALANCE SHEET while `projects` posts `5000 Cost of
+  Sales` on the P&L at sale, the double-count that blocked the decision is
+  structurally impossible. Paying the vendor is deliberately still out — the
+  payable is real and visible, and settling it needs a bank/cash account the
+  accounts desk owns. Reversals are real reversals (AUDIT P2): un-receiving,
+  re-valuing or deleting posts the opposite entry, a re-receipt uses a fresh
+  `…-R2` id, and `glAttempt` — bookkeeping metadata the edit form does not carry
+  — is preserved across saves so a routine edit can never orphan a journal.
+  **`bridge.map` corrected**: `material.purchased` was mapped to
+  `group.expense (5002)`, which is wrong twice (5002 is not in the COA, and
+  buying stock is not an expense) → now `group.inventory (1400)`. Flagged but
+  NOT touched: `shop`'s `stock.adjusted → group.inventory (1200)` has the same
+  confusion. **New probe** `node tools/verify/books.mjs receipt` drives the REAL
+  seam (through a documented `EPAL.diag` hook — a test that re-implements the
+  rule proves nothing) and asserts: Ordered posts nothing · Received posts
+  ৳1.2L to 1400 and 2000 with ZERO movement on 5000/1010 · un-receiving
+  reverses to zero · trial balance still balances. Sweep 237/237 both themes.
 - **⭐ MODULE BUILT: `woodart/installation` (Site & Install)** (2026-07-27) —
   module #5, closing the physical chain Materials → Procurement → Workshop →
   Install. Its hard rule is the **DUAL-SHAPE SNAG COUNT**: the seeded store

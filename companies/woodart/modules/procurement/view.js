@@ -53,7 +53,9 @@
  * ==========================================================================*/
 
 /* Emitted FIRST inside the module IIFE (build-module.mjs), so this file owns the
- * shared bindings; frontend/procurement.js adds only its view-layer ones. */
+ * shared bindings; frontend/procurement.js adds only its view-layer ones.
+ * The seam stays module-private apart from ONE documented diagnostics hook at
+ * the bottom of this file — see the note there for why that earns its keep. */
 var EPAL = window.EPAL, db = EPAL.db;
 
 var ORDERS = 'wa_purchases';   /* ← the one place these collections are named */
@@ -180,11 +182,172 @@ var Procurement = {
   nextOrderId: function () { return nextId(ORDERS, 'WPO'); },
   nextVendorId: function () { return nextId(VENDORS, 'VEN'); },
 
-  saveOrder: function (rec) { return db.save(ORDERS, rec); },
-  removeOrder: function (id) { return db.remove(ORDERS, id); },
+  /* ---- WRITES (and the accounting that goes with them) ------------------ */
+
+  /** Save an order AND keep the books in step. See THE ACCOUNTING below.
+   *
+   *  `glAttempt` is bookkeeping metadata, not a form field, so the edit modal's
+   *  values object does not carry it. Carrying it forward here is what stops a
+   *  routine edit from orphaning a live journal entry — without this line the
+   *  record would forget which posting belongs to it and a later reversal would
+   *  target the wrong id (or nothing at all). */
+  saveOrder: function (rec) {
+    var before = Procurement.order(rec.id);
+    if (before && before.glAttempt && !rec.glAttempt) rec.glAttempt = before.glAttempt;
+    var saved = db.save(ORDERS, rec) || rec;
+    syncReceiptPosting(before, saved);
+    return saved;
+  },
+
+  /** Delete an order and reverse its receipt posting if it had one. */
+  removeOrder: function (id) {
+    var before = Procurement.order(id);
+    if (before && isPosted(before)) reverseReceipt(before, 'order deleted');
+    return db.remove(ORDERS, id);
+  },
+
   saveVendor: function (rec) { return db.save(VENDORS, rec); },
-  removeVendor: function (id) { return db.remove(VENDORS, id); }
+  removeVendor: function (id) { return db.remove(VENDORS, id); },
+
+  /* Exposed for the UI's "what will this do to the books" note + the tests. */
+  glRefFor: glRefFor,
+  isPosted: isPosted,
+  receiptLines: receiptLines
 };
+
+/* ============================================================================
+ * THE ACCOUNTING  —  goods receipt
+ * ----------------------------------------------------------------------------
+ * THE DECISION (2026-07-27), and why it is not a guess. The three questions
+ * that blocked this are answered by the chart of accounts that already exists
+ * in platform/engines-library/ledger.js:
+ *
+ *  1. WHEN?  On RECEIPT, never on order. A purchase order is a commitment, not
+ *     a transaction — there is nothing to journalise until goods arrive. This
+ *     is also why `Partial` does not post: the store has no part-received
+ *     amount (rule P2), so posting the FULL value for partly-delivered goods
+ *     would overstate inventory. Only `Received` posts.
+ *
+ *  2. EXPENSE OR ASSET?  ASSET — `1400 Inventory`, which is already in the
+ *     standard COA. Board sitting in the workshop is stock, not a cost; it
+ *     becomes cost when it is consumed on a project, exactly as Travels'
+ *     COGS-at-sale posts `5000 Cost of Sales` at the moment of the sale.
+ *     THIS IS WHAT DISSOLVES THE DOUBLE-COUNT RISK: a receipt touches the
+ *     BALANCE SHEET (1400) while `projects` touches the P&L (5000) at sale, so
+ *     the two can never count the same money twice.
+ *
+ *  3. WHAT PAYS IT?  Nothing, yet — receipt raises the liability:
+ *     `CR 2000 Accounts Payable`. Goods receipt and payment are two different
+ *     events, and settling a vendor needs a bank/cash account this module has
+ *     no business choosing. That is the Accounts desk's job (it owns EPAL.pay)
+ *     and is recorded as the next step in backend/LARAVEL-BLUEPRINT.md.
+ *
+ * So one receipt = DR 1400 Inventory / CR 2000 Accounts Payable, for the order
+ * value, dated the order date, against the vendor as the party.
+ *
+ * REVERSALS ARE REAL REVERSALS (AUDIT P2): un-receiving an order or deleting a
+ * received one posts an equal-and-opposite entry rather than erasing history.
+ * Re-receiving afterwards posts under a FRESH id (…-R2, -R3) so a corrected
+ * delivery never collides with the reversed one and the trail stays readable.
+ * ==========================================================================*/
+
+var INVENTORY = '1400';      // asset  — stock on hand
+var PAYABLE = '2000';        // liability — owed to the vendor
+
+/** The journal id for an order's Nth receipt posting. */
+function glRefFor(order, attempt) {
+  var n = attempt || 1;
+  return 'GL-WPO-' + order.id + (n > 1 ? '-R' + n : '');
+}
+
+/** Has this order got a live (un-reversed) receipt posting on the books? */
+function isPosted(order) {
+  if (!EPAL.ledger || !order) return false;
+  var id = glRefFor(order, order.glAttempt || 1);
+  return EPAL.ledger.entries().some(function (e) {
+    return e.id === id && !e.reversedBy;
+  });
+}
+
+/** The two lines a receipt posts. Pulled out so the UI can preview them and
+ *  the tests can assert them without re-deriving the rule. */
+function receiptLines(order) {
+  var amt = +order.amount || 0;
+  return [
+    { account: INVENTORY, dr: amt, cr: 0 },
+    { account: PAYABLE, dr: 0, cr: amt }
+  ];
+}
+
+/** Post the goods receipt. Returns the entry, or null when it cannot/should not. */
+function postReceipt(order) {
+  if (!EPAL.ledger || (+order.amount || 0) <= 0) return null;
+  var attempt = (order.glAttempt || 0) + 1;
+  var entry = EPAL.ledger.post({
+    id: glRefFor(order, attempt),
+    companyId: 'woodart',
+    date: order.date || undefined,
+    ref: order.id,
+    memo: 'Goods received · ' + (order.supplier || 'vendor') + ' · ' + order.items + ' line(s)',
+    source: 'procurement',
+    party: order.supplier || '',
+    lines: receiptLines(order)
+  });
+  // Remember which attempt is live, so a later reversal targets the right one.
+  order.glAttempt = attempt;
+  db.save(ORDERS, order);
+  // Tell the Group a purchase landed (bridge.map: material.purchased).
+  if (EPAL.bridge && EPAL.bridge.emit) {
+    EPAL.bridge.emit('woodart', 'material.purchased', { amount: +order.amount || 0, ref: order.id });
+  }
+  return entry;
+}
+
+/** Reverse a live receipt posting — an equal-and-opposite entry, not a delete. */
+function reverseReceipt(order, reason) {
+  if (!EPAL.ledger || !EPAL.ledger.reverse) return null;
+  return EPAL.ledger.reverse(glRefFor(order, order.glAttempt || 1), { reason: reason || '' });
+}
+
+/**
+ * Keep the books in step with a saved order.
+ *   not received → Received      post the receipt
+ *   Received     → not received  reverse it (a correction, fully audited)
+ *   Received     → Received      value changed? reverse and re-post the new value
+ */
+function syncReceiptPosting(before, after) {
+  var wasReceived = !!before && before.status === 'Received';
+  var isReceived = after.status === 'Received';
+
+  if (!wasReceived && isReceived) { postReceipt(after); return; }
+
+  if (wasReceived && !isReceived) {
+    if (isPosted(before)) reverseReceipt(before, 'delivery un-received');
+    return;
+  }
+
+  if (wasReceived && isReceived) {
+    var moved = (+before.amount || 0) !== (+after.amount || 0);
+    if (moved && isPosted(before)) {
+      reverseReceipt(before, 'order value corrected');
+      after.glAttempt = before.glAttempt;   // next post gets a fresh -Rn id
+      postReceipt(after);
+    }
+  }
+}
+
+/* ----------------------------------------------------------------------------
+ * DIAGNOSTICS HOOK — the ONE thing this module puts on a global.
+ *
+ * `tools/verify/books.mjs receipt` drives the REAL seam through this: it saves
+ * an order, receives it, un-receives it, and asserts what the ledger did. The
+ * alternative was a test that re-implements the posting rule, which proves
+ * nothing — it would pass even if the shipped rule were wrong.
+ *
+ * Read-only surface, no behaviour of its own, namespaced under EPAL.diag so it
+ * cannot collide with anything. Sanctioned by MODULE-STANDARD.md §3.
+ * --------------------------------------------------------------------------*/
+(EPAL.diag = EPAL.diag || {}).woodartProcurement = Procurement;
 
 /** Next free id in a seeded PREFIX-000 series. Shared by both stores so the two
  *  numbering schemes can never drift apart in style. */

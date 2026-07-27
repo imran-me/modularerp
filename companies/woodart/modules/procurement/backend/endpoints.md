@@ -147,6 +147,22 @@ Totals, by category and by vendor. Everything the Spend tab shows.
 7. **Every action is `Schema::hasTable`-guarded.**
 8. **`GET /vendors` is ordered case-insensitively by name**, matching MySQL's
    `_ci` collation and the frontend's `localeCompare`.
+9. **A goods receipt is an accounting event, and it is a BALANCE-SHEET one.**
+   Moving an order to `Received` posts, for the order value:
+
+   ```
+   DR 1400  Inventory
+   CR 2000  Accounts Payable
+   ```
+
+   id `GL-WPO-<po>`, dated the order date, `ref` = the PO number, party = the
+   vendor, `source: 'procurement'`. `Ordered` and `Partial` post **nothing** —
+   a PO is a commitment, and there is no part-received amount to post (inv. 2).
+   It must never touch `5000 Cost of Sales`: stock becomes cost when a project
+   consumes it, and `projects` already posts that at sale. Un-receiving,
+   re-valuing or deleting a received order posts an equal-and-opposite REVERSAL
+   (AUDIT P2), never a delete; a later re-receipt uses a fresh id (`…-R2`).
+   Proven by `node tools/verify/books.mjs receipt`.
 
 ## Change log
 

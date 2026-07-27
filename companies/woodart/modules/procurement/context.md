@@ -23,7 +23,29 @@ will need.
 | P6 | 2026-07-27 | **Deleting a vendor never deletes their orders** — they become "unlisted" | The orders are real history. The UI states exactly how many and what they are worth before the delete. |
 | P7 | 2026-07-27 | The demo seed includes **one deliberately unlisted supplier** (`WPO-008`, Dhaka Glass Co) | So the P1 path has real data on screen and in the tests, instead of being a branch nobody ever sees. |
 
-## ⚠️ Open decision — the ledger posting (owner call required)
+## ✅ RESOLVED — the ledger posting (2026-07-27)
+
+**Decided and implemented.** It needed no judgement call in the end: the chart
+of accounts already answers it. **Correction to my own earlier note below — I
+wrote "inventory (1200)"; `1200` is Accounts Receivable.** The COA has a real
+`1400 Inventory` and `2000 Accounts Payable`.
+
+- **On receipt only.** A PO is a commitment. `Partial` does not post either —
+  there is no part-received amount (P2), so posting the full value would
+  overstate stock.
+- **`DR 1400 Inventory / CR 2000 Accounts Payable`.** Stock is an ASSET; it
+  becomes cost (`5000`) when a project consumes it. **This is what removes the
+  double-count risk** — the receipt is on the balance sheet, `projects` posts
+  `5000` on the P&L at sale, and the two can never overlap.
+- **Paying the vendor is NOT here.** The payable is real and visible; settling
+  it needs a bank/cash account that belongs to the accounts desk.
+- Reversals are real reversals; a re-receipt posts under a fresh `…-R2` id;
+  `glAttempt` (carried across edits by `saveOrder`) records which is live.
+- **`bridge.map` corrected** from `group.expense (5002)` — not an account in the
+  COA, and buying stock is not an expense — to `group.inventory (1400)`.
+- **Proven:** `node tools/verify/books.mjs receipt` drives the real seam.
+
+### (superseded) the original open question
 
 `bridge.map` declares `material.purchased -> group.expense (5002)` and the
 Materials blueprint says the spend is booked "when Procurement records the

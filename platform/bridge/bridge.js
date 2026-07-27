@@ -33,7 +33,7 @@
   // the human/declarative copy). event -> { bucket, account }.
   var MAPS = {
     travels: { 'ticket.sold': ['group.revenue', '4001'], 'visa.approved': ['group.revenue', '4002'], 'payment.received': ['group.cash', '1001'], 'expense.recorded': ['group.expense', '5001'] },
-    woodart: { 'project.invoiced': ['group.revenue', '4001'], 'milestone.billed': ['group.revenue', '4002'], 'material.purchased': ['group.expense', '5002'], 'expense.recorded': ['group.expense', '5001'] },
+    woodart: { 'project.invoiced': ['group.revenue', '4001'], 'milestone.billed': ['group.revenue', '4002'], 'material.purchased': ['group.inventory', '1400'], 'expense.recorded': ['group.expense', '5001'] },
     it: { 'subscription.billed': ['group.revenue', '4001'], 'project.invoiced': ['group.revenue', '4002'], 'expense.recorded': ['group.expense', '5001'] },
     shop: { 'pos.sale': ['group.revenue', '4001'], 'purchase.recorded': ['group.expense', '5002'], 'stock.adjusted': ['group.inventory', '1200'], 'expense.recorded': ['group.expense', '5001'] },
     construction: { 'tender.won': ['group.revenue', '4003'], 'progress.billed': ['group.revenue', '4001'], 'procurement.spent': ['group.expense', '5002'], 'labor.paid': ['group.expense', '5003'] }

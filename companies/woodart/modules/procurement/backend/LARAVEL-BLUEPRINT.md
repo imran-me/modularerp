@@ -9,7 +9,7 @@
 Buying. Who Woodart buys board, laminate, hardware, finishes and fabric from,
 what has been ordered, what has arrived, and what is still owed. It sits
 downstream of Materials (which says what is running low) and upstream of the
-books (which is where the spend is eventually recorded — see the open decision).
+books: a goods receipt posts DR 1400 Inventory / CR 2000 Accounts Payable.
 
 ## Entities
 
@@ -45,9 +45,9 @@ Both carry `ext_id` (the frontend id, the upsert key, unique per company),
 
 ## What this module does NOT do (deliberately)
 
-- **It does not post to the ledger.** See the open decision below — this is the
-  one place in the Woodart build where a real accounting choice is owed, and
-  guessing it would corrupt the group books.
+- **It does not post on ORDER, and does not pay the vendor.** A receipt raises
+  inventory and a payable; settling that payable needs a bank/cash account this
+  module has no business choosing. See the RESOLVED section below and Known gaps.
 - **It does not receive stock into `wa_materials`.** Marking an order `Received`
   does not increment material quantities. Doing so needs the stock-movement
   table that Materials does not have yet (its own § Known gaps), and a
@@ -56,33 +56,68 @@ Both carry `ext_id` (the frontend id, the upsert key, unique per company),
   seeded store never had them and inventing them would be a feature, not a
   rebuild (R3).
 
-## ⚠️ OPEN DECISION — the ledger posting (owner call required)
+## ✅ RESOLVED — the ledger posting (2026-07-27)
 
-`companies/woodart/bridge.map` already declares:
+This was flagged as an open owner decision. It is now **decided and
+implemented**, and it turned out not to need a judgement call at all — the
+chart of accounts already in `platform/engines-library/ledger.js` answers all
+three questions.
+
+> **Correction to an earlier draft of this document:** it said bought stock was
+> "arguably inventory (1200)". **`1200` is Accounts Receivable.** The COA has a
+> real **`1400` Inventory** account, and **`2000` Accounts Payable**. The
+> mistake mattered, because it made the decision look like a trade-off when the
+> accounts make it obvious.
+
+**1 · When?** On **receipt**, never on order. A purchase order is a commitment,
+not a transaction; there is nothing to journalise until goods arrive. `Partial`
+does **not** post either — the store has no part-received amount (rule 2), so
+posting the full value for a partial delivery would overstate inventory. Only
+`Received` posts.
+
+**2 · Expense or asset?** **Asset — `1400 Inventory`.** Board sitting in the
+workshop is stock, not a cost. It becomes cost (`5000 Cost of Sales`) when it is
+consumed on a project, exactly as Travels' COGS-at-sale works.
+**This is what dissolves the double-count risk that blocked the decision:** a
+receipt touches the BALANCE SHEET while `projects` posts `5000` on the P&L at
+sale, so the same money can never be counted twice.
+
+**3 · What pays it?** Nothing yet — the receipt raises the liability,
+`CR 2000 Accounts Payable`. Goods receipt and payment are two events, and
+settling a vendor needs a bank or cash account this module has no business
+choosing. That belongs to the Accounts desk, which owns `EPAL.pay`. See
+Known gaps.
+
+### The entry
 
 ```
-material.purchased -> group.expense (5002)
+DR 1400  Inventory           order value
+CR 2000  Accounts Payable    order value
 ```
 
-and the Materials blueprint states that the spend is booked "when Procurement
-records the purchase". **That posting is NOT implemented here, on purpose.**
-Wiring it changes real money in the group books, and three things must be
-decided first — by the owner, not by me:
+dated the order date, `ref` = the PO number, party = the vendor,
+`source: 'procurement'`, id `GL-WPO-<po>`.
 
-1. **When does the expense hit?** On the order being raised (accrual, matches
-   the PO date) or on receipt (matches when the goods arrived)? These give
-   different month-end numbers.
-2. **Is it an expense or an asset?** Buying board that sits in the workshop is
-   arguably inventory (a balance-sheet asset, 1200) until it is consumed on a
-   project — which is how COGS-at-sale already works for Travels. Booking it
-   straight to expense 5002 double-counts against the project cost the
-   `projects` module already records.
-3. **What pays it?** The existing `EPAL.pay` kit expects a bank or cash account
-   and posts a real withdrawal; a Net-30 vendor should instead credit a payable.
+**Reversals are real reversals (AUDIT P2).** Un-receiving an order, correcting
+the value of a received one, or deleting it posts an equal-and-opposite entry
+rather than erasing history. A later re-receipt posts under a fresh id
+(`…-R2`, `-R3`) so a corrected delivery never collides with the reversed one.
+`glAttempt` on the order records which posting is live — it is bookkeeping
+metadata, not a form field, and `saveOrder` carries it across an edit so a
+routine save can never orphan a journal entry.
 
-Until that is settled, Procurement is a complete, honest **register** — every
-figure on screen is real and reconciles to the orders — and nothing it does can
-distort the group's books.
+**`bridge.map` was corrected too.** It declared
+`material.purchased -> group.expense (5002)`, which is wrong twice over: `5002`
+is not in the standard COA, and buying stock is not a group expense. It now
+reads `group.inventory (1400)`. (Note for later: `shop`'s
+`stock.adjusted -> group.inventory (1200)` in `platform/bridge/bridge.js` has
+the same 1200/1400 confusion. Left alone — it is another company's mapping and
+not this module's to change.)
+
+**Proven, not asserted:** `node tools/verify/books.mjs receipt` drives the real
+seam and asserts that an `Ordered` PO posts nothing, a `Received` one posts
+৳120,000 to 1400 and 2000 with **zero** movement on 5000 or 1010, un-receiving
+reverses it to zero, and the trial balance still balances.
 
 ## Known gaps
 
@@ -95,13 +130,25 @@ distort the group's books.
 - **No approval workflow.** A large order should arguably route through
   `EPAL.approvals` (the maker-checker engine already exists). Not wired,
   because the threshold is a business policy nobody has stated.
+- **Paying the vendor is not built.** The receipt leaves a `2000 Accounts
+  Payable` balance per vendor; nothing here settles it. That is the next real
+  step and it belongs to the Woodart **accounts** module, which will own
+  `EPAL.pay` and the bank/cash accounts: `DR 2000 / CR 1000|1010`, one payment
+  document per settlement. Until then the payable is honest and visible.
+- **The server does not post yet.** The posting lives in the frontend seam,
+  which is where the live app runs today. `platform/backend` already has a real
+  `LedgerService::post()`, so the server-side mirror is a small, well-defined
+  slice — but it must be written against the SAME entry shape, which is now
+  frozen in `endpoints.md`.
 
 ## Dependencies
 
 - `platform/backend` `ModuleServiceProvider` — route, migration and class
   auto-discovery.
 - Namespace `Epal\Modules\Woodart\Procurement\…` resolves to this folder.
-- No engine or kit dependency, because of the open decision above.
+- `EPAL.ledger` (frontend seam) for the goods-receipt posting, and
+  `EPAL.bridge` for the `material.purchased` rollup. No cash-kit dependency —
+  paying the vendor is the Accounts desk's job.
 
 ## Files
 

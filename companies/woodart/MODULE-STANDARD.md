@@ -177,6 +177,12 @@ var Materials = {
 
 Rules:
 - **One `STORE` constant per collection**, declared once, at the top.
+- **The seam is module-private — with ONE sanctioned exception.** A module may
+  expose its seam read-only as `EPAL.diag.<company><Module>` so the verification
+  harness can drive the REAL code. A test that re-implements a rule proves
+  nothing: it passes even when the shipped rule is wrong. `woodart/procurement`
+  does this so `node tools/verify/books.mjs receipt` exercises the actual
+  posting path. Nothing else goes on a global.
 - Every derived query the screen needs is a **named method here**, not an inline
   `.filter()` in the screen. `belowReorder()` reads; `.filter(m => m.qty <= m.reorder)`
   scattered across four screens rots.

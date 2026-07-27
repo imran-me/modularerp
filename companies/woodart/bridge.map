@@ -8,5 +8,10 @@
 #
 project.invoiced     -> group.revenue    (4001)
 milestone.billed     -> group.revenue    (4002)
-material.purchased   -> group.expense    (5002)
+# CORRECTED 2026-07-27 (the reconciliation this file's header asks for):
+# buying stock is NOT an expense and 5002 is not in the standard chart of
+# accounts. A goods receipt is DR 1400 Inventory / CR 2000 Accounts Payable;
+# it becomes an expense (5000 Cost of Sales) when the material is consumed on
+# a project. See companies/woodart/modules/procurement/backend/endpoints.md.
+material.purchased   -> group.inventory  (1400)
 expense.recorded     -> group.expense    (5001)
