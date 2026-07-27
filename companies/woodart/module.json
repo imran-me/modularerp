@@ -63,6 +63,34 @@
       "built": true
     },
     {
+      "id": "design",
+      "label": "Design & 3D",
+      "icon": "vector-pen",
+      "desc": "Drawings, 3D models, revisions and client approval — the architecture phase.",
+      "enabled": true,
+      "subs": [
+        {
+          "id": "register",
+          "label": "Drawing Register",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "approvals",
+          "label": "Approvals",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "load",
+          "label": "Design Load",
+          "icon": "dot",
+          "enabled": true
+        }
+      ],
+      "built": true
+    },
+    {
       "id": "estimates",
       "label": "Estimates & BOQ",
       "icon": "calculator-fill",

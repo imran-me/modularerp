@@ -264,6 +264,48 @@
       S.set('wa_clients', waClients);
     }
 
+    /* Woodart DESIGN DELIVERABLES — the architecture & 3D phase (owner, 2026-07-27:
+     * "a project may have several phases, architecture or 3d modeling is one of
+     * them"). DERIVED from real projects, like wa_clients and wa_vendors above,
+     * so every drawing hangs off a project that exists and the register's join
+     * finds real work. One project is deliberately left with no drawings at all
+     * (the "not started" state has to be visible), and the last drawing points
+     * at a project id that does not exist so the orphan path has real data. */
+    if (localStorage.getItem(S.namespace + 'wa_drawings') === null) {
+      var KINDS = ['Plan', 'Elevation', 'Section', 'Detail', '3D Model', 'Render'];
+      var STATES = ['Approved', 'Issued', 'Commented', 'Draft', 'Approved', 'Issued'];
+      var waProjects = S.list('wa_projects');
+      var dwgs = [], rvns = [], n = 0, r = 0;
+      waProjects.slice(0, 9).forEach(function (p, pi) {
+        var count = 2 + (pi % 3);                       // 2..4 deliverables each
+        for (var k = 0; k < count; k++) {
+          var kind = KINDS[(pi + k) % KINDS.length];
+          var status = STATES[(pi + k) % STATES.length];
+          var revIdx = (pi + k) % 3;                    // A / B / C
+          var rev = String.fromCharCode(65 + revIdx);
+          var id = seq('DWG', n++, 3);
+          dwgs.push({ id: id, project: p.id, title: kind + ' — ' + (p.name || '').split(' · ')[0],
+            kind: kind, rev: rev, status: status, designer: p.designer || pick(PEOPLE),
+            issued: status === 'Draft' ? null : dt(1),
+            approved: status === 'Approved' ? dt() : null, created: dt(1) });
+          /* the trail: one row per revision letter up to the current one */
+          for (var q = 0; q <= revIdx; q++) {
+            rvns.push({ id: seq('RVN', r++, 3), drawing: id, rev: String.fromCharCode(65 + q),
+              action: q < revIdx ? 'Revised' : (status === 'Draft' ? 'Drafted' : status),
+              by: p.designer || pick(PEOPLE),
+              note: q < revIdx ? 'Client comments incorporated' : '',
+              date: dt(1) });
+          }
+        }
+      });
+      /* an orphan — its project no longer exists. Kept and flagged, never hidden. */
+      dwgs.push({ id: seq('DWG', n++, 3), project: 'WAP-999', title: '3D Model — Salvaged concept',
+        kind: '3D Model', rev: 'A', status: 'Issued', designer: pick(PEOPLE),
+        issued: dt(2), approved: null, created: dt(2) });
+      S.set('wa_drawings', dwgs);
+      S.set('wa_revisions', rvns);
+    }
+
     gen('wa_materials', 22, function (i) {
       var mats = [['Marine Plywood 18mm','Board'],['Veneer Board','Board'],['MDF 12mm','Board'],['Formica Laminate','Laminate'],
         ['German Hinge (Hettich)','Hardware'],['Drawer Channel 18"','Hardware'],['SS Handle','Hardware'],['Wood Glue 5kg','Adhesive'],

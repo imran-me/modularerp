@@ -1,0 +1,25 @@
+{
+  "key": "design",
+  "company": "woodart",
+  "title": "Design & 3D",
+  "icon": "vector-pen",
+  "desc": "Drawings, 3D models, revisions and client approval — the architecture phase.",
+  "route": "#/woodart/design",
+  "enabled": true,
+  "menu": [
+    { "id": "register", "label": "Drawing Register", "route": "#/woodart/design/register", "enabled": true },
+    { "id": "approvals", "label": "Approvals", "route": "#/woodart/design/approvals", "enabled": true },
+    { "id": "load", "label": "Design Load", "route": "#/woodart/design/load", "enabled": true }
+  ],
+  "stores": ["wa_drawings", "wa_revisions"],
+  "reads": ["wa_projects", "employees"],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/design.js",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — auto-discovery HEAD-probes THIS file. A module marked built:true in the company manifest but missing this file is treated as deleted."
+}

@@ -1,0 +1,222 @@
+<!-- ============================================================================
+  WOODART · DESIGN & 3D · MARKUP
+  ----------------------------------------------------------------------------
+  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.
+  No <script> tag, no <template> tag — standing owner rule
+  (companies/woodart/MODULE-STANDARD.md §2.1).
+
+  WHAT THIS MODULE IS (companies/woodart/ROOT-MAP.md §1): a project moves
+  through PHASES, and each delivery phase has ONE module owning the work
+  records produced during it. Production owns fabrication jobs, Installation
+  owns site visits — and this owns the ARCHITECTURE & 3D phase: drawings, 3D
+  models, their revisions, and the client approval that is the gate out of it.
+
+  THE HOOKS: [data-shell] chrome · [data-screen] a screen · [data-fill] a slot ·
+  [data-k] a live value · [data-tab] a tab button · [data-act] an action ·
+  [data-when] a block removed when false · [data-proto] a cloned row ·
+  [data-slot] a fill point inside a cloned row.
+
+  STYLING: every UTILITY is Tailwind (tw-); house COMPONENT classes stay.
+  The only inline styles are computed bar widths — values, not utilities.
+  ============================================================================ -->
+
+
+<!-- ================================================== SHARED CHROME ======= -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow" data-fill="eyebrow"></span><i class="bi bi-vector-pen"></i></h1>
+    <p class="page-sub" data-fill="sub"></p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="#/woodart/projects/active"><i class="bi bi-easel2-fill"></i> Projects</a>
+    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> New Drawing</button>
+  </div>
+</div>
+
+<div data-shell="tabs" class="tab-underline mb-3">
+  <button data-tab="register">Drawing Register</button>
+  <button data-tab="approvals">Approvals</button>
+  <button data-tab="load">Design Load</button>
+</div>
+
+
+<!-- ============================================================================
+     SCREEN 1 · DRAWING REGISTER — every deliverable of the design phase.
+     ============================================================================ -->
+<section data-screen="register">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Deliverables</span><span class="kpi-ico"><i class="bi bi-vector-pen"></i></span></div>
+      <div class="kpi-value" data-k="drawings">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">With Client</span><span class="kpi-ico"><i class="bi bi-send"></i></span></div>
+      <div class="kpi-value" data-k="issued">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Needs Revising</span><span class="kpi-ico"><i class="bi bi-arrow-counterclockwise"></i></span></div>
+      <div class="kpi-value" data-k="commented">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Approved</span><span class="kpi-ico"><i class="bi bi-patch-check-fill"></i></span></div>
+      <div class="kpi-value" data-k="approved">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Designers</span><span class="kpi-ico"><i class="bi bi-people-fill"></i></span></div>
+      <div class="kpi-value" data-k="designers">—</div>
+    </div>
+  </div>
+
+  <!-- Shown only while something is waiting on the client or needs revising. -->
+  <div class="build-banner" data-when="attention">
+    <i class="bi bi-hourglass-split"></i>
+    <div><strong data-k="attentionInline">0</strong> deliverable(s) are sitting with the client
+      or waiting to be revised — the design phase cannot close until they are approved.
+      <button class="link-btn" data-act="goApprovals">Open the approval queue</button>.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-collection"></i> Drawing &amp; Model Register</h3>
+      <span class="card-sub">Plans, elevations, sections, details, 3D models and renders — with their current revision</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 2 · APPROVALS — the gate out of the design phase.
+     Two mutually exclusive states, BOTH authored here.
+     ============================================================================ -->
+<section data-screen="approvals">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Awaiting Client</span><span class="kpi-ico"><i class="bi bi-hourglass-split"></i></span></div>
+      <div class="kpi-value" data-k="waiting">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Longest Wait</span><span class="kpi-ico"><i class="bi bi-alarm-fill"></i></span></div>
+      <div class="kpi-value" data-k="oldest">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Projects Design-Complete</span><span class="kpi-ico"><i class="bi bi-patch-check-fill"></i></span></div>
+      <div class="kpi-value" data-k="complete">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Avg Revisions</span><span class="kpi-ico"><i class="bi bi-arrow-repeat"></i></span></div>
+      <div class="kpi-value" data-k="avgRev">—</div>
+    </div>
+  </div>
+
+  <!-- STATE A · nothing outstanding -->
+  <div class="empty-state" data-when="clear">
+    <i class="bi bi-check2-circle"></i>
+    <h3>Nothing waiting on the client</h3>
+    <p class="tw-text-ink-dim">Every issued drawing has been approved. No project is blocked by design.</p>
+  </div>
+
+  <!-- STATE B · there is a queue -->
+  <div data-when="some">
+    <div class="build-banner">
+      <i class="bi bi-info-circle"></i>
+      <div>A project's design phase is complete only when every one of its deliverables is
+        <strong>Approved</strong>. Issued work is with the client; commented work is back
+        with the designer.</div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-hourglass-split"></i> Approval Queue</h3>
+        <span class="card-sub">Longest wait first — this is what is holding the phase open</span>
+      </div>
+      <div class="card-body" data-fill="register"></div>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 3 · DESIGN LOAD — who is carrying the design work.
+     ============================================================================ -->
+<section data-screen="load">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Designers</span><span class="kpi-ico"><i class="bi bi-people-fill"></i></span></div>
+      <div class="kpi-value" data-k="designers">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Busiest</span><span class="kpi-ico"><i class="bi bi-fire"></i></span></div>
+      <div class="kpi-value" data-k="top">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Open Deliverables</span><span class="kpi-ico"><i class="bi bi-vector-pen"></i></span></div>
+      <div class="kpi-value" data-k="open">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Approval Rate</span><span class="kpi-ico"><i class="bi bi-percent"></i></span></div>
+      <div class="kpi-value" data-k="rate">—</div>
+    </div>
+  </div>
+
+  <!-- STATE A · nothing drawn yet -->
+  <div class="empty-state" data-when="none">
+    <i class="bi bi-vector-pen"></i>
+    <h3>No design work yet</h3>
+    <p class="tw-text-ink-dim">Add a drawing or a 3D model and the load analysis fills in.</p>
+  </div>
+
+  <!-- STATE B · there is work to analyse -->
+  <div data-when="some">
+
+    <div class="two-col">
+
+      <div class="card">
+        <div class="card-head">
+          <h3><i class="bi bi-bar-chart-fill"></i> Open Work by Designer</h3>
+          <span class="card-sub">What each designer still has to get approved</span>
+        </div>
+        <div class="card-body">
+          <div class="data-list" data-fill="designers">
+            <!-- PROTOTYPE ROW — one per designer; the count is DATA, not layout. -->
+            <div class="data-row" data-proto="designer" hidden>
+              <div class="tw-flex-1">
+                <div class="tw-font-semibold" data-slot="name"></div>
+                <div class="progress tw-mt-[6px]"><div class="progress-bar" data-slot="bar"></div></div>
+              </div>
+              <div class="tw-ml-auto tw-text-right">
+                <div class="num tw-font-semibold" data-slot="open"></div>
+                <div class="tw-text-ink-mute tw-text-[11px]" data-slot="detail"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3><i class="bi bi-pie-chart-fill"></i> Deliverable Mix</h3>
+          <span class="card-sub">By kind — drawings vs 3D work</span>
+        </div>
+        <div class="card-body">
+          <div class="tw-relative tw-h-[260px]"><canvas data-fill="chart"></canvas></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-table"></i> Designer Breakdown</h3>
+        <span class="card-sub">Deliverables, open work, revisions carried and approvals</span>
+      </div>
+      <div class="card-body" data-fill="register"></div>
+    </div>
+
+  </div>
+
+</section>

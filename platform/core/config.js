@@ -155,6 +155,8 @@
     m('crm',          'Leads & CRM',      'person-lines-fill', { desc:'Design enquiries → site visits → deals.' }),
     m('projects',     'Projects',         'easel2-fill', { desc:'Design-build projects, phases & milestones.',
         subs:[['active','Active Projects'],['design','Design Studio'],['milestones','Milestones'],['gallery','Gallery']] }),
+    m('design',       'Design & 3D',      'vector-pen', { desc:'Drawings, 3D models, revisions and client approval — the architecture phase.',
+        subs:[['register','Drawing Register'],['approvals','Approvals'],['load','Design Load']] }),
     m('estimates',    'Estimates & BOQ',  'calculator-fill', { desc:'Quotations, bill of materials, costing.',
         subs:[['quotations','Quotations'],['boq','Bill of Materials'],['costing','Costing']] }),
     m('clients',      'Clients',          'person-hearts', { desc:'Homeowners, developers, corporates.',
