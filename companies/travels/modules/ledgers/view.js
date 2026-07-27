@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\r\n  TRAVELS · LEDGERS · MARKUP\r\n  ----------------------------------------------------------------------------\r\n  The screen's HTML, separated from its logic (frontend/ledgers.js). Cloned +\r\n  filled at runtime via [data-tpl] / [data-slot] hooks. Tabs are driven by the\r\n  ?tab= query param.\r\n\r\n  The drill-down MODALS (account ledger, party statement, journal, receive-\r\n  payment form) and every branded PDF (EPAL.doc.open) keep their legacy el()-\r\n  built DOM in the logic file. The income-statement rows (pnlLine) also stay a\r\n  legacy el() helper — a compound inline style (padding + an rgba divider) that\r\n  is impractical to express as a utility. STYLING = the house design system;\r\n  tw- utils only where a captured screen used a static inline style:\r\n    tw-max-w-[360px] == style=\"max-width:360px\"  (General-Ledger account select)\r\n    tw-relative      == style=\"position:relative\"  (chart box; height runtime)\r\n\r\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\r\n  the DOM the old ui.el() calls produced.\r\n  ============================================================================ -->\r\n\r\n<!-- page shell + section band ----------------------------------------------->\r\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\r\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\r\n<template data-tpl=\"nav-btn\"><button></button></template>\r\n\r\n<!-- KPI grids + plain + drill KPI card -------------------------------------->\r\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\r\n<template data-tpl=\"kpi-grid-plain\"><div class=\"kpi-grid kpi-compact\"></div></template>\r\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\r\n<template data-tpl=\"kpi-drill\"><div class=\"kpi-card drill\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div><div class=\"kpi-foot\" data-slot=\"foot\"></div></div></template>\r\n\r\n<!-- generic layout bits ----------------------------------------------------->\r\n<template data-tpl=\"section-label\"><div class=\"section-label\"></div></template>\r\n<template data-tpl=\"grid-auto\"><div class=\"grid-auto\"></div></template>\r\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n<template data-tpl=\"head-btn-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span data-slot=\"action\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n<template data-tpl=\"build-banner\"><div class=\"build-banner mb-3\"><i class=\"bi\" data-slot=\"ico\"></i><div data-slot=\"msg\"></div></div></template>\r\n\r\n<!-- overview Action Center row (cursor + tone in logic; chevron static) ----->\r\n<template data-tpl=\"action-row\"><div class=\"data-row tw-cursor-pointer\"><span class=\"notif-ico\" data-slot=\"ico\"></span><div class=\"flex-1\" data-slot=\"text\"></div><span class=\"text-mute\"><i class=\"bi bi-chevron-right\"></i></span></div></template>\r\n\r\n<!-- chart card (relative box + canvas; height set in logic) ---------------->\r\n<template data-tpl=\"chart-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\"><div class=\"tw-relative\" data-slot=\"box\"><canvas data-slot=\"canvas\"></canvas></div></div></div></template>\r\n\r\n<!-- General Ledger: the account picker card -------------------------------->\r\n<template data-tpl=\"select-card\"><div class=\"card\"><div class=\"card-body\"><div class=\"section-label mt-0\">Select account</div><select class=\"select tw-max-w-[360px]\" data-slot=\"sel\"></select></div></div></template>\r\n\r\n<!-- Party ledger empty state ----------------------------------------------->\r\n<template data-tpl=\"party-empty\"><div class=\"empty-state\"><i class=\"bi bi-people\"></i><h3>No party movement yet</h3><p class=\"text-muted\">Party postings (sales, payments) will appear here.</p></div></template>\r\n\r\n<!-- Balance-sheet Print row (right-aligned button) ------------------------->\r\n<template data-tpl=\"print-row\"><div class=\"flex justify-end mb-2\"><button class=\"btn btn-sm btn-primary\" data-slot=\"btn\"></button></div></template>\r\n\r\n<!-- ============================================================================\r\n     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup) and the\r\n     8-tab section band, as real HTML. head()/navBand() clone + fill these.\r\n     NOTE: the <h1> inner run stays ONE line — a newline between those inline\r\n     tags clones as a real space.\r\n     ============================================================================ -->\r\n<div data-shell=\"head\" class=\"page-head\">\r\n  <div>\r\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-journal-text\"></i></h1>\r\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\r\n  </div>\r\n  <div class=\"page-actions\"><a class=\"btn btn-ghost\" href=\"#/travels/accounts\"><i class=\"bi bi-cash-stack\"></i> Accounts</a></div>\r\n</div>\r\n\r\n<div data-shell=\"nav\" class=\"tab-underline mb-3\">\r\n  <button data-tab=\"overview\">Overview</button>\r\n  <button data-tab=\"general\">General Ledger</button>\r\n  <button data-tab=\"trial\">Trial Balance</button>\r\n  <button data-tab=\"party\">Party Ledger</button>\r\n  <button data-tab=\"ar\">AR Ageing</button>\r\n  <button data-tab=\"ap\">AP Ageing</button>\r\n  <button data-tab=\"bs\">Balance Sheet</button>\r\n  <button data-tab=\"pnl\">P&amp;L</button>\r\n</div>\r\n\r\n<!-- ============================================================================\r\n     REAL SCREEN HTML (the foundation) — each <section data-screen=\"…\"> is a whole\r\n     Ledgers tab written as plain HTML. ledgers.js fills the live values and drops\r\n     the data grids / chart canvases in, then mountScreen() moves the block onto\r\n     the page. Converted one screen at a time, pixel-verified.\r\n     ============================================================================ -->\r\n\r\n<!-- OVERVIEW (cockpit) — KPI strip · Action Center (its ROWS come from live data,\r\n     so they stay the action-row fragment) or the all-clean banner · the income\r\n     statement snapshot beside the assets/claims doughnut. -->\r\n<section data-screen=\"overview\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"section-label\">Action Center — needs attention</div>\r\n  <div class=\"card\" data-fill=\"action-card\">\r\n    <div class=\"card-body\" data-fill=\"actions\"></div>\r\n  </div>\r\n  <div class=\"build-banner mb-3\" data-fill=\"clean\">\r\n    <i class=\"bi bi-check-circle-fill\"></i>\r\n    <div><strong>Books are clean.</strong> Trial balance and balance sheet both balance; nothing seriously overdue.</div>\r\n  </div>\r\n  <div class=\"section-label\">Financial Snapshot</div>\r\n  <div class=\"grid-auto\">\r\n    <div class=\"card\">\r\n      <div class=\"card-head\"><h3><i class=\"bi bi-graph-up-arrow\"></i> Income Statement</h3><span class=\"card-sub\">live ledger P&amp;L</span></div>\r\n      <div class=\"card-body\" data-fill=\"pnl-lines\"></div>\r\n    </div>\r\n    <div class=\"card\">\r\n      <div class=\"card-head\"><h3><i class=\"bi bi-pie-chart\"></i> Assets vs Claims</h3><span class=\"card-sub\">A = L + E</span></div>\r\n      <div class=\"card-body\"><div class=\"tw-relative\" style=\"height: 240px;\"><canvas data-canvas=\"bsmix\"></canvas></div></div>\r\n    </div>\r\n  </div>\r\n</section>\r\n\r\n<!-- PARTY LEDGER — one card; the empty state is its own shell. -->\r\n<section data-screen=\"party\">\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-people-fill\"></i> Party Ledger</h3><span class=\"card-sub\" data-k=\"count\"></span></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- AR / AP AGEING — one shell serves both; the logic fills the words. -->\r\n<section data-screen=\"ageing\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3 data-fill=\"title\"></h3><button class=\"btn btn-sm btn-primary\" data-act=\"print\"><i class=\"bi bi-printer\"></i> Print</button></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\r\n  TRAVELS · LEDGERS · MARKUP\r\n  ----------------------------------------------------------------------------\r\n  The screen's HTML, separated from its logic (frontend/ledgers.js). Cloned +\r\n  filled at runtime via [data-tpl] / [data-slot] hooks. Tabs are driven by the\r\n  ?tab= query param.\r\n\r\n  The drill-down MODALS (account ledger, party statement, journal, receive-\r\n  payment form) and every branded PDF (EPAL.doc.open) keep their legacy el()-\r\n  built DOM in the logic file. The income-statement rows (pnlLine) also stay a\r\n  legacy el() helper — a compound inline style (padding + an rgba divider) that\r\n  is impractical to express as a utility. STYLING = the house design system;\r\n  tw- utils only where a captured screen used a static inline style:\r\n    tw-max-w-[360px] == style=\"max-width:360px\"  (General-Ledger account select)\r\n    tw-relative      == style=\"position:relative\"  (chart box; height runtime)\r\n\r\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\r\n  the DOM the old ui.el() calls produced.\r\n  ============================================================================ -->\r\n\r\n<!-- The page wrapper the router mounts into ---------------------------------->\r\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\r\n\r\n<!-- REPEATED CARDS the logic emits 0..N of — these stay fragments because the\r\n     COUNT is data, not layout: a KPI per figure, an Action-Center row per alert,\r\n     a balance-sheet section card per account group. Everything that is a fixed\r\n     part of a screen is real HTML in the sections below. -->\r\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\r\n<template data-tpl=\"kpi-drill\"><div class=\"kpi-card drill\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div><div class=\"kpi-foot\" data-slot=\"foot\"></div></div></template>\r\n<template data-tpl=\"action-row\"><div class=\"data-row tw-cursor-pointer\"><span class=\"notif-ico\" data-slot=\"ico\"></span><div class=\"flex-1\" data-slot=\"text\"></div><span class=\"text-mute\"><i class=\"bi bi-chevron-right\"></i></span></div></template>\r\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\r\n\r\n<!-- Party ledger empty state (a whole screen state, so a shell) ------------->\r\n<div data-shell=\"party-empty\" class=\"empty-state\"><i class=\"bi bi-people\"></i><h3>No party movement yet</h3><p class=\"text-muted\">Party postings (sales, payments) will appear here.</p></div>\r\n\r\n<!-- ============================================================================\r\n     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup) and the\r\n     8-tab section band, as real HTML. head()/navBand() clone + fill these.\r\n     NOTE: the <h1> inner run stays ONE line — a newline between those inline\r\n     tags clones as a real space.\r\n     ============================================================================ -->\r\n<div data-shell=\"head\" class=\"page-head\">\r\n  <div>\r\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-journal-text\"></i></h1>\r\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\r\n  </div>\r\n  <div class=\"page-actions\"><a class=\"btn btn-ghost\" href=\"#/travels/accounts\"><i class=\"bi bi-cash-stack\"></i> Accounts</a></div>\r\n</div>\r\n\r\n<div data-shell=\"nav\" class=\"tab-underline mb-3\">\r\n  <button data-tab=\"overview\">Overview</button>\r\n  <button data-tab=\"general\">General Ledger</button>\r\n  <button data-tab=\"trial\">Trial Balance</button>\r\n  <button data-tab=\"party\">Party Ledger</button>\r\n  <button data-tab=\"ar\">AR Ageing</button>\r\n  <button data-tab=\"ap\">AP Ageing</button>\r\n  <button data-tab=\"bs\">Balance Sheet</button>\r\n  <button data-tab=\"pnl\">P&amp;L</button>\r\n</div>\r\n\r\n<!-- ============================================================================\r\n     REAL SCREEN HTML (the foundation) — each <section data-screen=\"…\"> is a whole\r\n     Ledgers tab written as plain HTML. ledgers.js fills the live values and drops\r\n     the data grids / chart canvases in, then mountScreen() moves the block onto\r\n     the page. Converted one screen at a time, pixel-verified.\r\n     ============================================================================ -->\r\n\r\n<!-- OVERVIEW (cockpit) — KPI strip · Action Center (its ROWS come from live data,\r\n     so they stay the action-row fragment) or the all-clean banner · the income\r\n     statement snapshot beside the assets/claims doughnut. -->\r\n<section data-screen=\"overview\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"section-label\">Action Center — needs attention</div>\r\n  <div class=\"card\" data-fill=\"action-card\">\r\n    <div class=\"card-body\" data-fill=\"actions\"></div>\r\n  </div>\r\n  <div class=\"build-banner mb-3\" data-fill=\"clean\">\r\n    <i class=\"bi bi-check-circle-fill\"></i>\r\n    <div><strong>Books are clean.</strong> Trial balance and balance sheet both balance; nothing seriously overdue.</div>\r\n  </div>\r\n  <div class=\"section-label\">Financial Snapshot</div>\r\n  <div class=\"grid-auto\">\r\n    <div class=\"card\">\r\n      <div class=\"card-head\"><h3><i class=\"bi bi-graph-up-arrow\"></i> Income Statement</h3><span class=\"card-sub\">live ledger P&amp;L</span></div>\r\n      <div class=\"card-body\" data-fill=\"pnl-lines\"></div>\r\n    </div>\r\n    <div class=\"card\">\r\n      <div class=\"card-head\"><h3><i class=\"bi bi-pie-chart\"></i> Assets vs Claims</h3><span class=\"card-sub\">A = L + E</span></div>\r\n      <div class=\"card-body\"><div class=\"tw-relative\" style=\"height: 240px;\"><canvas data-canvas=\"bsmix\"></canvas></div></div>\r\n    </div>\r\n  </div>\r\n</section>\r\n\r\n<!-- PARTY LEDGER — one card; the empty state is its own shell. -->\r\n<section data-screen=\"party\">\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3><i class=\"bi bi-people-fill\"></i> Party Ledger</h3><span class=\"card-sub\" data-k=\"count\"></span></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- GENERAL LEDGER — the account picker, then the picked account's ledger. The\r\n     inner block is repainted whenever the select changes, so it is its own\r\n     screen the logic clones per draw. -->\r\n<section data-screen=\"general\">\r\n  <div class=\"card\">\r\n    <div class=\"card-body\">\r\n      <div class=\"section-label mt-0\">Select account</div>\r\n      <select class=\"select tw-max-w-[360px]\" data-fill=\"account\"></select>\r\n    </div>\r\n  </div>\r\n  <div class=\"mt-3\" data-fill=\"body\"></div>\r\n</section>\r\n<section data-screen=\"general-body\">\r\n  <div class=\"kpi-grid kpi-compact\" data-fill=\"kpis\"></div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3 data-fill=\"title\"></h3><button class=\"btn btn-sm btn-primary\" data-act=\"print\"><i class=\"bi bi-printer\"></i> Statement</button></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- TRIAL BALANCE — repainted on every As-of change (the date control itself is\r\n     a JS widget). The out-of-balance banner is dropped when the books balance. -->\r\n<section data-screen=\"trial\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"build-banner mb-3\" data-fill=\"out-banner\">\r\n    <i class=\"bi bi-exclamation-triangle-fill\"></i>\r\n    <div data-fill=\"out-text\"></div>\r\n  </div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3 data-fill=\"title\"></h3><button class=\"btn btn-sm btn-primary\" data-act=\"print\"><i class=\"bi bi-printer\"></i> Print</button></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- BALANCE SHEET — Assets in the left column; Liabilities over Equity in the\r\n     right one. The three section cards are the shared reg-card (a table each),\r\n     so the logic drops them into these slots. -->\r\n<section data-screen=\"bs\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"flex justify-end mb-2\"><button class=\"btn btn-sm btn-primary\" data-act=\"print\"></button></div>\r\n  <div class=\"grid-auto\" data-fill=\"cols\">\r\n    <div data-fill=\"claims\"><div class=\"mt-3\" data-fill=\"equity\"></div></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- P&L — repainted on every period change (the range picker is a JS widget). -->\r\n<section data-screen=\"pnl\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3 data-fill=\"title\"></h3><button class=\"btn btn-sm btn-primary\" data-act=\"print\"><i class=\"bi bi-printer\"></i> Print</button></div>\r\n    <div class=\"card-body\" data-fill=\"lines\"></div>\r\n  </div>\r\n  <div class=\"section-label\">Detail by Account</div>\r\n  <div class=\"card\">\r\n    <div class=\"card-body\" data-fill=\"detail\"></div>\r\n  </div>\r\n</section>\r\n\r\n<!-- AR / AP AGEING — one shell serves both; the logic fills the words. -->\r\n<section data-screen=\"ageing\">\r\n  <div class=\"kpi-grid kpi-compact stagger\" data-fill=\"kpis\"></div>\r\n  <div class=\"card\">\r\n    <div class=\"card-head\"><h3 data-fill=\"title\"></h3><button class=\"btn btn-sm btn-primary\" data-act=\"print\"><i class=\"bi bi-printer\"></i> Print</button></div>\r\n    <div class=\"card-body\" data-fill=\"table\"></div>\r\n  </div>\r\n</section>\r\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="travels/ledgers"]')) {
     var st = document.createElement('style');
@@ -83,12 +83,8 @@ function kpiDrill(label, value, icon, tab, foot) {
   slot(n, 'label').textContent = label; slot(n, 'ico').innerHTML = '<i class="bi bi-' + icon + '"></i>'; slot(n, 'value').textContent = String(value);
   var f = slot(n, 'foot'); if (foot) f.appendChild(el('span.text-muted', { text: foot })); else f.remove(); return n;
 }
-function chartCard(title, icon, canvasId, subLabel, height) {
-  var c = frag('chart-card'); slot(c, 'title').innerHTML = ui.icon(icon) + ' ' + title;
-  var sub = slot(c, 'sub'); if (subLabel) sub.textContent = subLabel; else sub.remove();
-  slot(c, 'box').style.height = (height || 260) + 'px'; slot(c, 'canvas').id = canvasId; return c;
-}
-function buildBanner(icon, html) { var b = frag('build-banner'); slot(b, 'ico').classList.add('bi-' + icon); slot(b, 'msg').innerHTML = html; return b; }
+// (chartCard / buildBanner are gone — the chart card and both banners are now
+//  real HTML inside their <section data-screen>, so the builders had no callers.)
 
 // the 8-tab band is real HTML ([data-shell="nav"]); this only lights the active
 // one and wires the clicks, then strips the data-tab hook off the shipped DOM
@@ -240,15 +236,14 @@ function generalView(page, L, ctx) {
   L.entries({ companyId: CID }).forEach(function (e) { (e.lines || []).forEach(function (l) { used[l.account] = true; }); });
   var gAccts = L.accounts().filter(function (a) { return used[a.code]; });
   if (!gAccts.length) gAccts = L.accounts();
-  var scard = frag('select-card');
-  var sel = slot(scard, 'sel');
+  var gv = screen('general');
+  var sel = fill(gv, 'account');
   gAccts.forEach(function (a) { sel.appendChild(el('option', { value: a.code, text: a.code + ' · ' + a.name })); });
   var code = (ctx.params && ctx.params.code) || gAccts[0].code;
   sel.value = code;
-  var body = el('div.mt-3');
+  var body = fill(gv, 'body');
   sel.addEventListener('change', function () { draw(sel.value); });
-  page.appendChild(scard);
-  page.appendChild(body);
+  mountScreen(page, gv);
   draw(code);
 
   function draw(code) {
@@ -256,12 +251,12 @@ function generalView(page, L, ctx) {
     var acc = L.account(code), rows = L.ledgerFor(code, { companyId: CID });
     var td = 0, tc = 0; rows.forEach(function (r) { td += r.debit; tc += r.credit; });
     var closing = rows.length ? rows[rows.length - 1].balance : 0;
-    var grid = frag('kpi-grid-plain');
+    var gb = screen('general-body');
+    var grid = fill(gb, 'kpis');
     grid.appendChild(kpi('Total Debit', ui.money(td, { compact: true }), 'arrow-up-right-circle'));
     grid.appendChild(kpi('Total Credit', ui.money(tc, { compact: true }), 'arrow-down-left-circle'));
     grid.appendChild(kpi('Closing Balance', ui.money(closing, { compact: true }), 'wallet2'));
     grid.appendChild(kpi('Entries', String(rows.length), 'list-ol'));
-    body.appendChild(grid);
     var t = EPAL.table({
       columns: [
         { key: 'date', label: 'Date', date: true }, { key: 'ref', label: 'Reference' }, { key: 'memo', label: 'Narration' }, { key: 'party', label: 'Party' },
@@ -274,11 +269,12 @@ function generalView(page, L, ctx) {
       onRow: function (r) { journalByRef(L, r.ref); },
       empty: { icon: 'journal-text', title: 'No movement on this account' }
     });
-    var card = frag('head-btn-card');
-    slot(card, 'title').innerHTML = ui.icon('journal-text') + ' ' + (acc ? acc.code + ' · ' + acc.name : code);
-    slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement', onclick: function () { printAccountStatement(acc, rows.slice().reverse(), closing); } }));
-    slot(card, 'body').appendChild(t.el);
-    body.appendChild(card);
+    fill(gb, 'title').innerHTML = ui.icon('journal-text') + ' ' + (acc ? acc.code + ' · ' + acc.name : code);
+    var pb = gb.querySelector('[data-act="print"]');
+    pb.removeAttribute('data-act');
+    pb.addEventListener('click', function () { printAccountStatement(acc, rows.slice().reverse(), closing); });
+    fill(gb, 'table').appendChild(t.el);
+    mountScreen(body, gb);
   }
 }
 
@@ -292,13 +288,15 @@ function trialView(page, L) {
     var balanced = Math.abs(Td - Tc) < 1;
     var periodTag = (asOf ? ' · ' + lbl : '');
     host.innerHTML = '';
-    var grid = frag('kpi-grid');
+    var tv = screen('trial');
+    var grid = fill(tv, 'kpis');
     grid.appendChild(kpi('Total Debit', ui.money(Td, { compact: true }), 'arrow-up-right-circle'));
     grid.appendChild(kpi('Total Credit', ui.money(Tc, { compact: true }), 'arrow-down-left-circle'));
     grid.appendChild(kpi('Accounts', String(rows.length), 'list-ol'));
     grid.appendChild(kpi('Balance Check', balanced ? 'Balanced' : 'Out by ' + ui.money(Math.abs(Td - Tc)), balanced ? 'check2-circle' : 'exclamation-triangle', balanced ? 'text-good' : 'text-bad'));
-    host.appendChild(grid);
-    if (!balanced) host.appendChild(buildBanner('exclamation-triangle-fill', '<strong>Trial balance is out by ' + ui.money(Math.abs(Td - Tc)) + '.</strong> A posting is unbalanced — review recent journals.'));
+    // the banner is in the markup; it only belongs on screen when the books are out
+    if (balanced) drop(fill(tv, 'out-banner'));
+    else fill(tv, 'out-text').innerHTML = '<strong>Trial balance is out by ' + ui.money(Math.abs(Td - Tc)) + '.</strong> A posting is unbalanced — review recent journals.';
     var t = EPAL.table({
       columns: [
         { key: 'code', label: 'Code', render: function (r) { return '<span class="mono xs text-mute">' + esc(r.code) + '</span>'; } },
@@ -311,11 +309,12 @@ function trialView(page, L) {
       onRow: function (r) { accountLedgerModal(L, r.code); },
       empty: { icon: 'journal-check', title: asOf ? 'No postings as of this date' : 'No postings yet' }
     });
-    var card = frag('head-btn-card');
-    slot(card, 'title').innerHTML = ui.icon('journal-check') + ' Trial Balance' + esc(periodTag);
-    slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printTrial(rows, Td, Tc, balanced, lbl); } }));
-    slot(card, 'body').appendChild(t.el);
-    host.appendChild(card);
+    fill(tv, 'title').innerHTML = ui.icon('journal-check') + ' Trial Balance' + esc(periodTag);
+    var pb = tv.querySelector('[data-act="print"]');
+    pb.removeAttribute('data-act');
+    pb.addEventListener('click', function () { printTrial(rows, Td, Tc, balanced, lbl); });
+    fill(tv, 'table').appendChild(t.el);
+    mountScreen(host, tv);
   }
   paint(undefined, 'latest position');
 }
@@ -325,7 +324,7 @@ function partyView(page, L) {
   var parties = {};
   L.entries({ companyId: CID }).forEach(function (e) { if (e.party) parties[e.party] = true; });
   var names = Object.keys(parties).sort();
-  if (!names.length) { page.appendChild(frag('party-empty')); return; }
+  if (!names.length) { page.appendChild(shell('party-empty')); return; }
   var rows = names.map(function (p) { var led = L.partyLedger(p, { companyId: CID }); var closing = led.length ? led[led.length - 1].balance : 0;
     return { party: p, txns: led.length, balance: closing, side: closing >= 0 ? 'Receivable' : 'Payable' }; });
   var t = EPAL.table({
@@ -386,22 +385,23 @@ function bsView(page, L) {
   function paint(asOf, lbl) {
     var bs = L.balanceSheet(CID, { asOf: asOf });
     host.innerHTML = '';
-    var grid = frag('kpi-grid');
+    var bv = screen('bs');
+    var grid = fill(bv, 'kpis');
     grid.appendChild(kpi('Total Assets', ui.money(bs.totals.assets, { compact: true }), 'building'));
     grid.appendChild(kpi('Liabilities', ui.money(bs.totals.liabilities, { compact: true }), 'file-earmark-minus'));
     grid.appendChild(kpi('Equity', ui.money(bs.totals.equity, { compact: true }), 'piggy-bank'));
     grid.appendChild(kpi('Balance Check', bs.totals.balanced ? 'A = L + E' : 'Out of balance', bs.totals.balanced ? 'check2-circle' : 'exclamation-triangle', bs.totals.balanced ? 'text-good' : 'text-bad'));
-    host.appendChild(grid);
-    var prow = frag('print-row');
-    var pbtn = slot(prow, 'btn'); pbtn.innerHTML = ui.icon('printer') + ' Print Balance Sheet' + (asOf ? ' · ' + lbl : ''); pbtn.addEventListener('click', function () { printBalanceSheet(bs, lbl); });
-    host.appendChild(prow);
-    var wrap = frag('grid-auto');
-    wrap.appendChild(sectionTable('Assets', 'building', bs.assets, bs.totals.assets));
-    var right = el('div');
-    right.appendChild(sectionTable('Liabilities', 'file-earmark-minus', bs.liabilities, bs.totals.liabilities));
-    right.appendChild(el('div.mt-3', null, [ sectionTable('Equity', 'piggy-bank', bs.equity, bs.totals.equity) ]));
-    wrap.appendChild(right);
-    host.appendChild(wrap);
+    var pbtn = bv.querySelector('[data-act="print"]');
+    pbtn.removeAttribute('data-act');
+    pbtn.innerHTML = ui.icon('printer') + ' Print Balance Sheet' + (asOf ? ' · ' + lbl : '');
+    pbtn.addEventListener('click', function () { printBalanceSheet(bs, lbl); });
+    // Assets is the LEFT column, so it goes before the claims column already in
+    // the markup; Liabilities sits above the Equity slot inside that column.
+    var cols = fill(bv, 'cols'), claims = fill(bv, 'claims'), equity = fill(bv, 'equity');
+    cols.insertBefore(sectionTable('Assets', 'building', bs.assets, bs.totals.assets), claims);
+    claims.insertBefore(sectionTable('Liabilities', 'file-earmark-minus', bs.liabilities, bs.totals.liabilities), equity);
+    equity.appendChild(sectionTable('Equity', 'piggy-bank', bs.equity, bs.totals.equity));
+    mountScreen(host, bv);
   }
   paint(undefined, 'latest position');
 }
@@ -416,29 +416,29 @@ function pnlView(page, L) {
     var pl = L.pnl(CID, range);
     var periodTag = (lbl && lbl !== 'All time') ? ' · ' + lbl : '';
     host.innerHTML = '';
-    var grid = frag('kpi-grid');
+    var pv = screen('pnl');
+    var grid = fill(pv, 'kpis');
     grid.appendChild(kpi('Revenue', ui.money(pl.revenue, { compact: true }), 'cash-coin'));
     grid.appendChild(kpi('Gross Profit', ui.money(pl.gross, { compact: true }), 'graph-up', 'text-good'));
     grid.appendChild(kpi('Expenses', ui.money(pl.expenses, { compact: true }), 'wallet2'));
     grid.appendChild(kpi('Net Profit', ui.money(pl.net, { compact: true }), pl.net >= 0 ? 'trophy' : 'exclamation-triangle', pl.net >= 0 ? 'text-good' : 'text-bad'));
-    host.appendChild(grid);
-    var card = frag('head-btn-card');
-    slot(card, 'title').innerHTML = ui.icon('graph-up-arrow') + ' Income Statement' + esc(periodTag);
-    slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printPnl(pl, lbl); } }));
-    var pbody = slot(card, 'body');
+    fill(pv, 'title').innerHTML = ui.icon('graph-up-arrow') + ' Income Statement' + esc(periodTag);
+    var pb = pv.querySelector('[data-act="print"]');
+    pb.removeAttribute('data-act');
+    pb.addEventListener('click', function () { printPnl(pl, lbl); });
+    var pbody = fill(pv, 'lines');
     pbody.appendChild(pnlLine('Revenue', pl.revenue, false));
     pbody.appendChild(pnlLine('Cost of Sales', -pl.cogs, false));
     pbody.appendChild(pnlLine('Gross Profit', pl.gross, true));
     pbody.appendChild(pnlLine('Operating Expenses', -pl.expenses, false));
     pbody.appendChild(pnlLine('Net Profit', pl.net, true));
-    host.appendChild(card);
     var t = EPAL.table({
       columns: [ { key: 'code', label: 'Code' }, { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'amount', label: 'Amount', num: true, money: true } ],
       rows: pl.lines, exportName: 'travels-pnl.csv', pdfTitle: 'P&L Detail — Epal Travels', searchKeys: ['code', 'name'],
       empty: { icon: 'graph-up', title: 'No income or expense postings in this period' }
     });
-    var secLbl = frag('section-label'); secLbl.textContent = 'Detail by Account'; host.appendChild(secLbl);
-    var dcard = frag('card-body-card'); slot(dcard, 'body').appendChild(t.el); host.appendChild(dcard);
+    fill(pv, 'detail').appendChild(t.el);
+    mountScreen(host, pv);
   }
   paint({}, 'All time');
 }

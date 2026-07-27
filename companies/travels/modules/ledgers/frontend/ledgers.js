@@ -64,12 +64,8 @@ function kpiDrill(label, value, icon, tab, foot) {
   slot(n, 'label').textContent = label; slot(n, 'ico').innerHTML = '<i class="bi bi-' + icon + '"></i>'; slot(n, 'value').textContent = String(value);
   var f = slot(n, 'foot'); if (foot) f.appendChild(el('span.text-muted', { text: foot })); else f.remove(); return n;
 }
-function chartCard(title, icon, canvasId, subLabel, height) {
-  var c = frag('chart-card'); slot(c, 'title').innerHTML = ui.icon(icon) + ' ' + title;
-  var sub = slot(c, 'sub'); if (subLabel) sub.textContent = subLabel; else sub.remove();
-  slot(c, 'box').style.height = (height || 260) + 'px'; slot(c, 'canvas').id = canvasId; return c;
-}
-function buildBanner(icon, html) { var b = frag('build-banner'); slot(b, 'ico').classList.add('bi-' + icon); slot(b, 'msg').innerHTML = html; return b; }
+// (chartCard / buildBanner are gone — the chart card and both banners are now
+//  real HTML inside their <section data-screen>, so the builders had no callers.)
 
 // the 8-tab band is real HTML ([data-shell="nav"]); this only lights the active
 // one and wires the clicks, then strips the data-tab hook off the shipped DOM
@@ -221,15 +217,14 @@ function generalView(page, L, ctx) {
   L.entries({ companyId: CID }).forEach(function (e) { (e.lines || []).forEach(function (l) { used[l.account] = true; }); });
   var gAccts = L.accounts().filter(function (a) { return used[a.code]; });
   if (!gAccts.length) gAccts = L.accounts();
-  var scard = frag('select-card');
-  var sel = slot(scard, 'sel');
+  var gv = screen('general');
+  var sel = fill(gv, 'account');
   gAccts.forEach(function (a) { sel.appendChild(el('option', { value: a.code, text: a.code + ' · ' + a.name })); });
   var code = (ctx.params && ctx.params.code) || gAccts[0].code;
   sel.value = code;
-  var body = el('div.mt-3');
+  var body = fill(gv, 'body');
   sel.addEventListener('change', function () { draw(sel.value); });
-  page.appendChild(scard);
-  page.appendChild(body);
+  mountScreen(page, gv);
   draw(code);
 
   function draw(code) {
@@ -237,12 +232,12 @@ function generalView(page, L, ctx) {
     var acc = L.account(code), rows = L.ledgerFor(code, { companyId: CID });
     var td = 0, tc = 0; rows.forEach(function (r) { td += r.debit; tc += r.credit; });
     var closing = rows.length ? rows[rows.length - 1].balance : 0;
-    var grid = frag('kpi-grid-plain');
+    var gb = screen('general-body');
+    var grid = fill(gb, 'kpis');
     grid.appendChild(kpi('Total Debit', ui.money(td, { compact: true }), 'arrow-up-right-circle'));
     grid.appendChild(kpi('Total Credit', ui.money(tc, { compact: true }), 'arrow-down-left-circle'));
     grid.appendChild(kpi('Closing Balance', ui.money(closing, { compact: true }), 'wallet2'));
     grid.appendChild(kpi('Entries', String(rows.length), 'list-ol'));
-    body.appendChild(grid);
     var t = EPAL.table({
       columns: [
         { key: 'date', label: 'Date', date: true }, { key: 'ref', label: 'Reference' }, { key: 'memo', label: 'Narration' }, { key: 'party', label: 'Party' },
@@ -255,11 +250,12 @@ function generalView(page, L, ctx) {
       onRow: function (r) { journalByRef(L, r.ref); },
       empty: { icon: 'journal-text', title: 'No movement on this account' }
     });
-    var card = frag('head-btn-card');
-    slot(card, 'title').innerHTML = ui.icon('journal-text') + ' ' + (acc ? acc.code + ' · ' + acc.name : code);
-    slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Statement', onclick: function () { printAccountStatement(acc, rows.slice().reverse(), closing); } }));
-    slot(card, 'body').appendChild(t.el);
-    body.appendChild(card);
+    fill(gb, 'title').innerHTML = ui.icon('journal-text') + ' ' + (acc ? acc.code + ' · ' + acc.name : code);
+    var pb = gb.querySelector('[data-act="print"]');
+    pb.removeAttribute('data-act');
+    pb.addEventListener('click', function () { printAccountStatement(acc, rows.slice().reverse(), closing); });
+    fill(gb, 'table').appendChild(t.el);
+    mountScreen(body, gb);
   }
 }
 
@@ -273,13 +269,15 @@ function trialView(page, L) {
     var balanced = Math.abs(Td - Tc) < 1;
     var periodTag = (asOf ? ' · ' + lbl : '');
     host.innerHTML = '';
-    var grid = frag('kpi-grid');
+    var tv = screen('trial');
+    var grid = fill(tv, 'kpis');
     grid.appendChild(kpi('Total Debit', ui.money(Td, { compact: true }), 'arrow-up-right-circle'));
     grid.appendChild(kpi('Total Credit', ui.money(Tc, { compact: true }), 'arrow-down-left-circle'));
     grid.appendChild(kpi('Accounts', String(rows.length), 'list-ol'));
     grid.appendChild(kpi('Balance Check', balanced ? 'Balanced' : 'Out by ' + ui.money(Math.abs(Td - Tc)), balanced ? 'check2-circle' : 'exclamation-triangle', balanced ? 'text-good' : 'text-bad'));
-    host.appendChild(grid);
-    if (!balanced) host.appendChild(buildBanner('exclamation-triangle-fill', '<strong>Trial balance is out by ' + ui.money(Math.abs(Td - Tc)) + '.</strong> A posting is unbalanced — review recent journals.'));
+    // the banner is in the markup; it only belongs on screen when the books are out
+    if (balanced) drop(fill(tv, 'out-banner'));
+    else fill(tv, 'out-text').innerHTML = '<strong>Trial balance is out by ' + ui.money(Math.abs(Td - Tc)) + '.</strong> A posting is unbalanced — review recent journals.';
     var t = EPAL.table({
       columns: [
         { key: 'code', label: 'Code', render: function (r) { return '<span class="mono xs text-mute">' + esc(r.code) + '</span>'; } },
@@ -292,11 +290,12 @@ function trialView(page, L) {
       onRow: function (r) { accountLedgerModal(L, r.code); },
       empty: { icon: 'journal-check', title: asOf ? 'No postings as of this date' : 'No postings yet' }
     });
-    var card = frag('head-btn-card');
-    slot(card, 'title').innerHTML = ui.icon('journal-check') + ' Trial Balance' + esc(periodTag);
-    slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printTrial(rows, Td, Tc, balanced, lbl); } }));
-    slot(card, 'body').appendChild(t.el);
-    host.appendChild(card);
+    fill(tv, 'title').innerHTML = ui.icon('journal-check') + ' Trial Balance' + esc(periodTag);
+    var pb = tv.querySelector('[data-act="print"]');
+    pb.removeAttribute('data-act');
+    pb.addEventListener('click', function () { printTrial(rows, Td, Tc, balanced, lbl); });
+    fill(tv, 'table').appendChild(t.el);
+    mountScreen(host, tv);
   }
   paint(undefined, 'latest position');
 }
@@ -306,7 +305,7 @@ function partyView(page, L) {
   var parties = {};
   L.entries({ companyId: CID }).forEach(function (e) { if (e.party) parties[e.party] = true; });
   var names = Object.keys(parties).sort();
-  if (!names.length) { page.appendChild(frag('party-empty')); return; }
+  if (!names.length) { page.appendChild(shell('party-empty')); return; }
   var rows = names.map(function (p) { var led = L.partyLedger(p, { companyId: CID }); var closing = led.length ? led[led.length - 1].balance : 0;
     return { party: p, txns: led.length, balance: closing, side: closing >= 0 ? 'Receivable' : 'Payable' }; });
   var t = EPAL.table({
@@ -367,22 +366,23 @@ function bsView(page, L) {
   function paint(asOf, lbl) {
     var bs = L.balanceSheet(CID, { asOf: asOf });
     host.innerHTML = '';
-    var grid = frag('kpi-grid');
+    var bv = screen('bs');
+    var grid = fill(bv, 'kpis');
     grid.appendChild(kpi('Total Assets', ui.money(bs.totals.assets, { compact: true }), 'building'));
     grid.appendChild(kpi('Liabilities', ui.money(bs.totals.liabilities, { compact: true }), 'file-earmark-minus'));
     grid.appendChild(kpi('Equity', ui.money(bs.totals.equity, { compact: true }), 'piggy-bank'));
     grid.appendChild(kpi('Balance Check', bs.totals.balanced ? 'A = L + E' : 'Out of balance', bs.totals.balanced ? 'check2-circle' : 'exclamation-triangle', bs.totals.balanced ? 'text-good' : 'text-bad'));
-    host.appendChild(grid);
-    var prow = frag('print-row');
-    var pbtn = slot(prow, 'btn'); pbtn.innerHTML = ui.icon('printer') + ' Print Balance Sheet' + (asOf ? ' · ' + lbl : ''); pbtn.addEventListener('click', function () { printBalanceSheet(bs, lbl); });
-    host.appendChild(prow);
-    var wrap = frag('grid-auto');
-    wrap.appendChild(sectionTable('Assets', 'building', bs.assets, bs.totals.assets));
-    var right = el('div');
-    right.appendChild(sectionTable('Liabilities', 'file-earmark-minus', bs.liabilities, bs.totals.liabilities));
-    right.appendChild(el('div.mt-3', null, [ sectionTable('Equity', 'piggy-bank', bs.equity, bs.totals.equity) ]));
-    wrap.appendChild(right);
-    host.appendChild(wrap);
+    var pbtn = bv.querySelector('[data-act="print"]');
+    pbtn.removeAttribute('data-act');
+    pbtn.innerHTML = ui.icon('printer') + ' Print Balance Sheet' + (asOf ? ' · ' + lbl : '');
+    pbtn.addEventListener('click', function () { printBalanceSheet(bs, lbl); });
+    // Assets is the LEFT column, so it goes before the claims column already in
+    // the markup; Liabilities sits above the Equity slot inside that column.
+    var cols = fill(bv, 'cols'), claims = fill(bv, 'claims'), equity = fill(bv, 'equity');
+    cols.insertBefore(sectionTable('Assets', 'building', bs.assets, bs.totals.assets), claims);
+    claims.insertBefore(sectionTable('Liabilities', 'file-earmark-minus', bs.liabilities, bs.totals.liabilities), equity);
+    equity.appendChild(sectionTable('Equity', 'piggy-bank', bs.equity, bs.totals.equity));
+    mountScreen(host, bv);
   }
   paint(undefined, 'latest position');
 }
@@ -397,29 +397,29 @@ function pnlView(page, L) {
     var pl = L.pnl(CID, range);
     var periodTag = (lbl && lbl !== 'All time') ? ' · ' + lbl : '';
     host.innerHTML = '';
-    var grid = frag('kpi-grid');
+    var pv = screen('pnl');
+    var grid = fill(pv, 'kpis');
     grid.appendChild(kpi('Revenue', ui.money(pl.revenue, { compact: true }), 'cash-coin'));
     grid.appendChild(kpi('Gross Profit', ui.money(pl.gross, { compact: true }), 'graph-up', 'text-good'));
     grid.appendChild(kpi('Expenses', ui.money(pl.expenses, { compact: true }), 'wallet2'));
     grid.appendChild(kpi('Net Profit', ui.money(pl.net, { compact: true }), pl.net >= 0 ? 'trophy' : 'exclamation-triangle', pl.net >= 0 ? 'text-good' : 'text-bad'));
-    host.appendChild(grid);
-    var card = frag('head-btn-card');
-    slot(card, 'title').innerHTML = ui.icon('graph-up-arrow') + ' Income Statement' + esc(periodTag);
-    slot(card, 'action').replaceWith(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printPnl(pl, lbl); } }));
-    var pbody = slot(card, 'body');
+    fill(pv, 'title').innerHTML = ui.icon('graph-up-arrow') + ' Income Statement' + esc(periodTag);
+    var pb = pv.querySelector('[data-act="print"]');
+    pb.removeAttribute('data-act');
+    pb.addEventListener('click', function () { printPnl(pl, lbl); });
+    var pbody = fill(pv, 'lines');
     pbody.appendChild(pnlLine('Revenue', pl.revenue, false));
     pbody.appendChild(pnlLine('Cost of Sales', -pl.cogs, false));
     pbody.appendChild(pnlLine('Gross Profit', pl.gross, true));
     pbody.appendChild(pnlLine('Operating Expenses', -pl.expenses, false));
     pbody.appendChild(pnlLine('Net Profit', pl.net, true));
-    host.appendChild(card);
     var t = EPAL.table({
       columns: [ { key: 'code', label: 'Code' }, { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'amount', label: 'Amount', num: true, money: true } ],
       rows: pl.lines, exportName: 'travels-pnl.csv', pdfTitle: 'P&L Detail — Epal Travels', searchKeys: ['code', 'name'],
       empty: { icon: 'graph-up', title: 'No income or expense postings in this period' }
     });
-    var secLbl = frag('section-label'); secLbl.textContent = 'Detail by Account'; host.appendChild(secLbl);
-    var dcard = frag('card-body-card'); slot(dcard, 'body').appendChild(t.el); host.appendChild(dcard);
+    fill(pv, 'detail').appendChild(t.el);
+    mountScreen(host, pv);
   }
   paint({}, 'All time');
 }
