@@ -288,6 +288,33 @@
         items: ri(2, 12), amount: ri(20, 400) * 1000, status: pick(['Ordered','Received','Received','Partial']), date: dt(), created: dt() };
     });
 
+    /* Woodart VENDORS — DERIVED, exactly like wa_clients above. Every vendor
+     * here is a supplier name that actually appears on a Woodart purchase order
+     * or material line, so Procurement's spend roll-up finds real orders against
+     * real vendors. A fixed invented list would leave half the directory with
+     * zero spend and half the orders with no vendor record — which reads like a
+     * broken join, not seed data. Category is taken from what they actually
+     * supply (the material lines), falling back to General for a vendor who only
+     * appears on purchase orders. */
+    if (localStorage.getItem(S.namespace + 'wa_vendors') === null) {
+      var vendorCat = {};
+      S.list('wa_materials').forEach(function (m) {
+        if (m.supplier && !vendorCat[m.supplier]) vendorCat[m.supplier] = m.category || 'General';
+      });
+      var vendorNames = {};
+      S.list('wa_purchases').forEach(function (p) { if (p.supplier) vendorNames[p.supplier] = 1; });
+      Object.keys(vendorCat).forEach(function (n) { vendorNames[n] = 1; });
+      var waVendors = Object.keys(vendorNames).sort().map(function (nm, i) {
+        return { id: seq('VEN', i, 3), name: nm, category: vendorCat[nm] || 'General',
+          contact: pick(PEOPLE),
+          phone: '+88018' + String(ri(10000000, 99999999)).slice(0, 8),
+          email: nm.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '') + '@supply.example.bd',
+          area: pick(AREAS), terms: pick(['Advance', 'Net 15', 'Net 30', 'Net 30', 'Net 45']),
+          since: dt(ri(6, 30)), created: dt() };
+      });
+      S.set('wa_vendors', waVendors);
+    }
+
     /* ============================ IT SOLUTIONS ==============================*/
     gen('it_projects', 14, function (i) {
       var value = ri(3, 80) * 100000;

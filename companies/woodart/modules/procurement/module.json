@@ -1,0 +1,42 @@
+{
+  "key": "procurement",
+  "company": "woodart",
+  "title": "Procurement",
+  "icon": "cart-fill",
+  "desc": "Vendors, purchase orders, GRN.",
+  "route": "#/woodart/procurement",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "orders",
+      "label": "Purchase Orders",
+      "route": "#/woodart/procurement/orders",
+      "enabled": true
+    },
+    {
+      "id": "vendors",
+      "label": "Vendors",
+      "route": "#/woodart/procurement/vendors",
+      "enabled": true
+    },
+    {
+      "id": "spend",
+      "label": "Spend",
+      "route": "#/woodart/procurement/spend",
+      "enabled": true
+    }
+  ],
+  "stores": [
+    "wa_purchases",
+    "wa_vendors"
+  ],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/procurement.js",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — the presence of THIS file is what auto-discovery HEAD-probes (platform/discovery/discovery.js). A module registered built:true in the company manifest but missing this file is treated as deleted."
+}

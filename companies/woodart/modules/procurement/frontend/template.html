@@ -1,0 +1,213 @@
+<!-- ============================================================================
+  WOODART · PROCUREMENT · MARKUP
+  ----------------------------------------------------------------------------
+  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.
+  Nothing here is built by JavaScript. No <script> tag, no <template> tag —
+  standing owner rule (companies/woodart/MODULE-STANDARD.md §2.1).
+
+  THE HOOKS the logic uses:
+    [data-shell]  reusable chrome (head bar, tab band)   → shell('x')
+    [data-screen] a whole screen                          → screen('x')
+    [data-fill]   a slot a built widget drops into
+    [data-k]      a live scalar slot (a KPI number)       → fillK(node,'x',v)
+    [data-tab]    a tab button (logic marks .active, wires, strips the hook)
+    [data-act]    a button the logic wires an action onto
+    [data-when]   a block the logic REMOVES when the condition is false
+    [data-proto]  a hidden prototype row cloned once per record
+    [data-slot]   a fill point inside a cloned [data-proto] row
+
+  STYLING: every UTILITY is Tailwind (tw-). The house COMPONENT classes stay
+  (card · kpi-card · btn · page-head · badge · data-row · progress · num) —
+  the universal vocabulary that keeps all six companies identical. The only
+  inline styles are computed bar widths, which are values, not utilities.
+  ============================================================================ -->
+
+
+<!-- ============================================================================
+     SHARED CHROME — page-head bar (mirrors EPAL.pageHead) + the 3-tab band.
+     The <h1> inner run stays on ONE line: a newline between those inline tags
+     clones as a real space and shifts pixels.
+     ============================================================================ -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow" data-fill="eyebrow"></span><i class="bi bi-cart-fill"></i></h1>
+    <p class="page-sub" data-fill="sub"></p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="#/woodart/materials"><i class="bi bi-boxes"></i> Materials</a>
+    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> New Purchase Order</button>
+  </div>
+</div>
+
+<div data-shell="tabs" class="tab-underline mb-3">
+  <button data-tab="orders">Purchase Orders</button>
+  <button data-tab="vendors">Vendors</button>
+  <button data-tab="spend">Spend</button>
+</div>
+
+
+<!-- ============================================================================
+     SCREEN 1 · PURCHASE ORDERS — what has been ordered and what is still owed.
+     ============================================================================ -->
+<section data-screen="orders">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Purchase Orders</span><span class="kpi-ico"><i class="bi bi-receipt"></i></span></div>
+      <div class="kpi-value" data-k="orders">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Ordered Value</span><span class="kpi-ico"><i class="bi bi-cash-stack"></i></span></div>
+      <div class="kpi-value" data-k="value">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Received</span><span class="kpi-ico"><i class="bi bi-box-seam"></i></span></div>
+      <div class="kpi-value" data-k="received">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Awaiting Delivery</span><span class="kpi-ico"><i class="bi bi-truck"></i></span></div>
+      <div class="kpi-value" data-k="open">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Vendors Used</span><span class="kpi-ico"><i class="bi bi-shop"></i></span></div>
+      <div class="kpi-value" data-k="vendors">—</div>
+    </div>
+  </div>
+
+  <!-- Shown only while something is still outstanding. Removed otherwise. -->
+  <div class="build-banner" data-when="open">
+    <i class="bi bi-truck"></i>
+    <div><strong data-k="openInline">0</strong> order(s) worth <strong data-k="openValue">—</strong>
+      have not been fully received. Mark a delivery in from the order row.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-receipt-cutoff"></i> Purchase Order Register</h3>
+      <span class="card-sub">Every order raised on a vendor, newest first</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 2 · VENDORS — who Woodart buys from, with their spend rolled up.
+     ============================================================================ -->
+<section data-screen="vendors">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Vendors</span><span class="kpi-ico"><i class="bi bi-shop"></i></span></div>
+      <div class="kpi-value" data-k="vendors">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Spend</span><span class="kpi-ico"><i class="bi bi-cash-coin"></i></span></div>
+      <div class="kpi-value" data-k="spend">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Top Vendor</span><span class="kpi-ico"><i class="bi bi-trophy"></i></span></div>
+      <div class="kpi-value" data-k="top">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Never Ordered From</span><span class="kpi-ico"><i class="bi bi-slash-circle"></i></span></div>
+      <div class="kpi-value" data-k="idle">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-shop-window"></i> Vendor Directory</h3>
+      <span class="card-sub">Suppliers of board, laminate, hardware, finishes and fabric</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 3 · SPEND — where the procurement money goes.
+     Two mutually exclusive states, BOTH authored here; the logic removes one.
+     ============================================================================ -->
+<section data-screen="spend">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Spend</span><span class="kpi-ico"><i class="bi bi-cash-coin"></i></span></div>
+      <div class="kpi-value" data-k="spend">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Avg Order Value</span><span class="kpi-ico"><i class="bi bi-calculator"></i></span></div>
+      <div class="kpi-value" data-k="avg">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Largest Category</span><span class="kpi-ico"><i class="bi bi-tags"></i></span></div>
+      <div class="kpi-value" data-k="top">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Outstanding</span><span class="kpi-ico"><i class="bi bi-hourglass-split"></i></span></div>
+      <div class="kpi-value" data-k="outstanding">—</div>
+    </div>
+  </div>
+
+  <!-- STATE A · nothing bought yet -->
+  <div class="empty-state" data-when="none">
+    <i class="bi bi-cart"></i>
+    <h3>No purchase orders yet</h3>
+    <p class="tw-text-ink-dim">Raise an order on a vendor and the spend analysis fills in.</p>
+  </div>
+
+  <!-- STATE B · there is spend to analyse -->
+  <div data-when="some">
+
+    <div class="two-col">
+
+      <div class="card">
+        <div class="card-head">
+          <h3><i class="bi bi-bar-chart-fill"></i> Spend by Category</h3>
+          <span class="card-sub">What the money was spent on, by vendor category</span>
+        </div>
+        <div class="card-body">
+          <div class="data-list" data-fill="cats">
+            <!-- PROTOTYPE ROW — cloned once per category; the number of
+                 categories is DATA, not layout. The bar width is computed, so
+                 the logic sets it as an inline style (UI-CONTRACT §4.3). -->
+            <div class="data-row" data-proto="cat" hidden>
+              <div class="tw-flex-1">
+                <div class="tw-font-semibold" data-slot="name"></div>
+                <div class="progress tw-mt-[6px]"><div class="progress-bar" data-slot="bar"></div></div>
+              </div>
+              <div class="tw-ml-auto tw-text-right">
+                <div class="num tw-font-semibold" data-slot="value"></div>
+                <div class="tw-text-ink-mute tw-text-[11px]" data-slot="share"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3><i class="bi bi-pie-chart-fill"></i> Spend Split</h3>
+          <span class="card-sub">Order value by vendor category</span>
+        </div>
+        <div class="card-body">
+          <div class="tw-relative tw-h-[260px]"><canvas data-fill="chart"></canvas></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-table"></i> Spend by Vendor</h3>
+        <span class="card-sub">Orders, value and what is still outstanding — highest spend first</span>
+      </div>
+      <div class="card-body" data-fill="register"></div>
+    </div>
+
+  </div>
+
+</section>
