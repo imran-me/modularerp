@@ -14,6 +14,12 @@
       "enabled": true
     },
     {
+      "id": "movements",
+      "label": "Movements",
+      "route": "#/woodart/materials/movements",
+      "enabled": true
+    },
+    {
       "id": "reorder",
       "label": "Reorder",
       "route": "#/woodart/materials/reorder",
@@ -27,7 +33,9 @@
     }
   ],
   "stores": [
-    "wa_materials"
+    "wa_materials",
+    "wa_movements",
+    "wa_locations"
   ],
   "files": {
     "template": "frontend/template.html",

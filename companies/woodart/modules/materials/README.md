@@ -11,7 +11,8 @@ adding another Woodart module, copy the shape of this one.
 
 | Route | Tab | What it shows |
 |---|---|---|
-| `#/woodart/materials` | Stock | The register — 5 KPIs, a low-stock banner, and a searchable/exportable grid of every item |
+| `#/woodart/materials` | Stock | The register — 5 KPIs, a low-stock banner, and a searchable/exportable grid. Row actions: **Receive · Issue · History** |
+| `#/woodart/materials/movements` | Movements | **The stock ledger** — every receipt, issue, adjustment and wastage, where stock sits by location, and a drift banner if any number stops matching its history |
 | `#/woodart/materials/reorder` | Reorder | Everything at or below its reorder level, with refill quantity and estimated cost. Shows an "all clear" state when nothing is low |
 | `#/woodart/materials/valuation` | Valuation | Where the money sits — value by category (bars + doughnut) and a highest-value-first register |
 
@@ -24,6 +25,29 @@ Delete is the row action on the Stock grid. Both respect
 | Frontend store | Table | Endpoint |
 |---|---|---|
 | `wa_materials` | `wa_materials` | `/api/woodart/materials/stock` |
+| `wa_movements` | ⬜ owed | `/api/woodart/materials/movements` |
+| `wa_locations` | ⬜ owed | `/api/woodart/materials/locations` |
+
+## ⚠️ Stock is a LEDGER, not a number
+
+Added 2026-07-27. Every other balance in this system refuses to move without a
+row explaining it — a bank balance goes through `EPAL.bankTxnApply` — and stock
+now works the same way:
+
+- **`Materials.apply()` is the only sanctioned way stock changes.** It writes the
+  movement row and the number together. `Materials.save()` saves the *record*
+  and must never be used to edit `stock`.
+- **The sign belongs to the KIND, not the caller.** A caller passing a positive
+  `Issue` would otherwise double the stock it meant to consume, so `apply()`
+  derives it.
+- **`Materials.reconcile()` proves the invariant**: for every material, the sum
+  of its movements equals its stored stock. It returns the rows that disagree —
+  an empty array is health, the Movements tab shows a drift banner if it is not,
+  and `node tools/verify/books.mjs stock` asserts it.
+- **A goods receipt in Procurement moves both.** A PO carries an optional
+  `lines` array; receiving it posts `DR 1400 / CR 2000` **and** applies a
+  Receipt movement per line. An order with no lines books correctly and moves no
+  stock — it genuinely does not say what arrived, and guessing would be worse.
 
 Wired into `platform/data/api.js` **HYDRATE** (reads) and **WRITABLE** (writes),
 so in API mode the register is real MySQL data and edits persist.

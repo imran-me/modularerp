@@ -160,6 +160,12 @@
           "enabled": true
         },
         {
+          "id": "movements",
+          "label": "Movements",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
           "id": "reorder",
           "label": "Reorder",
           "icon": "dot",

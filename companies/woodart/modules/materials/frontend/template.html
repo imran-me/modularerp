@@ -45,6 +45,7 @@
 
 <div data-shell="tabs" class="tab-underline mb-3">
   <button data-tab="stock">Stock</button>
+  <button data-tab="movements">Movements</button>
   <button data-tab="reorder">Reorder</button>
   <button data-tab="valuation">Valuation</button>
 </div>
@@ -98,7 +99,93 @@
 
 
 <!-- ============================================================================
-     SCREEN 2 · REORDER — what to buy, and roughly what it will cost.
+     SCREEN 2 · MOVEMENTS — the stock ledger: why every number is what it is.
+     Added 2026-07-27. Stock used to be a bare number; every other balance in
+     this system carries its history, and now so does this one.
+     ============================================================================ -->
+<section data-screen="movements">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Movements</span><span class="kpi-ico"><i class="bi bi-arrow-left-right"></i></span></div>
+      <div class="kpi-value" data-k="movements">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Received In</span><span class="kpi-ico"><i class="bi bi-box-arrow-in-down"></i></span></div>
+      <div class="kpi-value" data-k="received">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Issued Out</span><span class="kpi-ico"><i class="bi bi-box-arrow-up"></i></span></div>
+      <div class="kpi-value" data-k="issued">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Wastage</span><span class="kpi-ico"><i class="bi bi-trash3"></i></span></div>
+      <div class="kpi-value" data-k="wasted">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Locations</span><span class="kpi-ico"><i class="bi bi-house-gear"></i></span></div>
+      <div class="kpi-value" data-k="locations">—</div>
+    </div>
+  </div>
+
+  <!-- Shown ONLY when a stored stock level disagrees with its movements. The
+       healthy state is that this block is removed and never seen. -->
+  <div class="build-banner" data-when="drift">
+    <i class="bi bi-exclamation-octagon"></i>
+    <div><strong data-k="driftInline">0</strong> material(s) have a stock level that does
+      not match their movement history. A balance that cannot be explained by its ledger
+      is a balance nobody should trust — <button class="link-btn" data-act="showDrift">show which</button>.</div>
+  </div>
+
+  <div class="two-col">
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-house-gear"></i> Where the Stock Sits</h3>
+        <span class="card-sub">Quantity and value held at each location</span>
+      </div>
+      <div class="card-body">
+        <div class="data-list" data-fill="locations">
+          <!-- PROTOTYPE ROW — one per location; the count is DATA, not layout. -->
+          <div class="data-row" data-proto="loc" hidden>
+            <div class="tw-flex-1">
+              <div class="tw-font-semibold" data-slot="name"></div>
+              <div class="progress tw-mt-[6px]"><div class="progress-bar" data-slot="bar"></div></div>
+            </div>
+            <div class="tw-ml-auto tw-text-right">
+              <div class="num tw-font-semibold" data-slot="value"></div>
+              <div class="tw-text-ink-mute tw-text-[11px]" data-slot="detail"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-pie-chart-fill"></i> Movement Mix</h3>
+        <span class="card-sub">What moved, by kind</span>
+      </div>
+      <div class="card-body">
+        <div class="tw-relative tw-h-[260px]"><canvas data-fill="chart"></canvas></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-list-columns-reverse"></i> Stock Ledger</h3>
+      <span class="card-sub">Every receipt, issue, adjustment and wastage — newest first</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 3 · REORDER — what to buy, and roughly what it will cost.
      Two mutually exclusive states, BOTH written here as HTML. The logic removes
      the one that does not apply; neither is ever assembled in JS.
      ============================================================================ -->
@@ -150,7 +237,7 @@
 
 
 <!-- ============================================================================
-     SCREEN 3 · VALUATION — where the money is sitting.
+     SCREEN 4 · VALUATION — where the money is sitting.
      ============================================================================ -->
 <section data-screen="valuation">
 

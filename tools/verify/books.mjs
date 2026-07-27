@@ -11,6 +11,7 @@
  *   node tools/verify/books.mjs salary    # salary charged per month (double-book check)
  *   node tools/verify/books.mjs receipt   # woodart goods receipt: balance-sheet only, reverses
  *   node tools/verify/books.mjs story     # the 3 Woodart story projects thread every module
+ *   node tools/verify/books.mjs stock     # stock == sum(movements), and a receipt moves both
  *
  * Exit 0 = the probe's invariant holds. Built for the 2026-07 bookkeeping audit;
  * keep it around — it is the fastest way to see whether a change moved the books.
@@ -241,6 +242,74 @@ if (PROBE === 'story') {
   });
   console.log(ok ? '✓ each story sits at its own phase and every join resolves'
                  : '✗ a story does not thread');
+}
+if (PROBE === 'stock') {
+  // THE INVARIANT: a material's stored stock must equal the sum of its
+  // movements. A balance you cannot prove is a balance you cannot trust — that
+  // is the whole reason the ledger exists. Also proves a goods receipt moves
+  // the books AND the stock, and that un-receiving puts both back.
+  const out = await evalJs(`(function(){
+    var M = EPAL.diag && EPAL.diag.woodartMaterials;
+    var P = EPAL.diag && EPAL.diag.woodartProcurement;
+    if (!M || !P) return { err:'seam not exposed' };
+    var L = EPAL.ledger, bal = function(c){ return L.balance(c); };
+
+    var driftBefore = M.reconcile();
+    var mat = M.all()[0];
+    var s0 = mat.stock, moves0 = M.movements().length;
+
+    // 1. a manual issue moves the number AND writes a row
+    M.apply({ material: mat.id, kind:'Issue', qty: 5, ref:'PROBE', by:'probe' });
+    var afterIssue = { stock: M.find(mat.id).stock, rows: M.movements().length };
+
+    // 2. the sign belongs to the KIND — a positive Issue must still reduce
+    M.apply({ material: mat.id, kind:'Issue', qty: 3, ref:'PROBE', by:'probe' });
+    var afterSigned = M.find(mat.id).stock;
+
+    // 3. a goods receipt with LINES moves stock and the books together
+    var id = 'WPO-STK-' + EPAL.ui.uid('x');
+    var inv0 = bal('1400'), ap0 = bal('2000');
+    P.saveOrder({ id:id, supplier:'Akij Board', items:1, amount:50000, status:'Ordered',
+                  date:'2026-07-01', lines:[{ material: mat.id, qty: 20 }] });
+    var onOrder = M.find(mat.id).stock;
+    P.saveOrder({ id:id, supplier:'Akij Board', items:1, amount:50000, status:'Received',
+                  date:'2026-07-01', lines:[{ material: mat.id, qty: 20 }] });
+    var onReceipt = { stock: M.find(mat.id).stock, inv: bal('1400')-inv0, ap: bal('2000')-ap0 };
+
+    // 4. un-receiving puts the stock back too
+    P.saveOrder({ id:id, supplier:'Akij Board', items:1, amount:50000, status:'Partial',
+                  date:'2026-07-01', lines:[{ material: mat.id, qty: 20 }] });
+    var onUndo = M.find(mat.id).stock;
+
+    var driftAfter = M.reconcile();
+    P.removeOrder(id);
+    return { err:null, name: mat.name, s0:s0, moves0:moves0,
+             afterIssue:afterIssue, afterSigned:afterSigned,
+             onOrder:onOrder, onReceipt:onReceipt, onUndo:onUndo,
+             driftBefore: driftBefore.length, driftAfter: driftAfter.length,
+             total: M.all().length };
+  })()`);
+  const o = out || {};
+  ok = !o.err
+    && o.driftBefore === 0 && o.driftAfter === 0
+    && o.afterIssue.stock === o.s0 - 5 && o.afterIssue.rows === o.moves0 + 1
+    && o.afterSigned === o.s0 - 8
+    && o.onOrder === o.s0 - 8
+    && o.onReceipt.stock === o.s0 + 12
+    && o.onReceipt.inv === 50000 && o.onReceipt.ap === 50000
+    && o.onUndo === o.s0 - 8;
+  console.log('WOODART STOCK LEDGER  (' + (o.name || '?') + ')');
+  if (o.err) console.log('  ' + o.err);
+  else {
+    console.log('  seeded invariant : ' + o.driftBefore + ' of ' + o.total + ' materials drift' + (o.driftBefore === 0 ? '  ✓ stock == sum(movements)' : '  ← UNEXPLAINED'));
+    console.log('  issue 5          : ' + o.s0 + ' → ' + o.afterIssue.stock + ' , rows ' + o.moves0 + ' → ' + o.afterIssue.rows + (o.afterIssue.rows === o.moves0 + 1 ? '  ✓ number and row together' : '  ← no row'));
+    console.log('  issue +3 (signed): ' + o.afterSigned + (o.afterSigned === o.s0 - 8 ? '  ✓ a positive Issue still REDUCES' : '  ← sign trusted from caller'));
+    console.log('  PO ordered       : ' + o.onOrder + (o.onOrder === o.s0 - 8 ? '  ✓ an order alone moves nothing' : '  ← moved on order'));
+    console.log('  PO received      : ' + o.onReceipt.stock + '  · 1400 +' + o.onReceipt.inv + ' · 2000 +' + o.onReceipt.ap + (o.onReceipt.stock === o.s0 + 12 ? '  ✓ books AND stock' : '  ← out of step'));
+    console.log('  un-received      : ' + o.onUndo + (o.onUndo === o.s0 - 8 ? '  ✓ stock put back' : '  ← stock stranded'));
+    console.log('  invariant after  : ' + o.driftAfter + ' drift' + (o.driftAfter === 0 ? '  ✓ still provable' : '  ← BROKEN'));
+  }
+  console.log(ok ? '✓ stock is a ledger, not a number' : '✗ stock and its history disagree');
 }
 if (PROBE === 'salary') {
   const out = await evalJs(`(function(){

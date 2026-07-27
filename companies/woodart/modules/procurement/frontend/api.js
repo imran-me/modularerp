@@ -234,6 +234,60 @@ var Procurement = {
 var INVENTORY = '1400';      // asset  — stock on hand
 var PAYABLE = '2000';        // liability — owed to the vendor
 
+/* ----------------------------------------------------------------------------
+ * AND THE STOCK, not just the books.
+ * ----------------------------------------------------------------------------
+ * A goods receipt is two facts at once: money is now owed (DR 1400 / CR 2000)
+ * AND there is physically more material in the workshop. Posting only the first
+ * is what left the material register a number nobody could explain.
+ *
+ * A purchase order carries an OPTIONAL `lines` array — [{ material, qty }] —
+ * exactly like an estimate's BOQ. When it has them, receiving the order applies
+ * a Receipt movement per line through Materials.apply(), so stock and its
+ * ledger move together. When it has none (every order seeded before today), the
+ * receipt still books correctly and simply moves no stock: an order without
+ * lines genuinely does not say WHAT arrived, and inventing a guess would be
+ * worse than recording nothing.
+ *
+ * Un-receiving reverses the same lines, so the ledger cannot drift from the
+ * order's status.
+ * --------------------------------------------------------------------------*/
+
+/** The lines an order delivers, or [] when it was raised without any. */
+function receiptLinesOf(order) {
+  return (order && order.lines && order.lines.length) ? order.lines : [];
+}
+
+/** Does the Materials module exist on this deployment? It owns the ledger, and
+ *  a company that dropped that folder must not break procurement. */
+function stockLedger() {
+  return (EPAL.diag && EPAL.diag.woodartMaterials) || null;
+}
+
+function receiveIntoStock(order) {
+  var M = stockLedger(), lines = receiptLinesOf(order);
+  if (!M || !lines.length) return 0;
+  var n = 0;
+  lines.forEach(function (l) {
+    if (M.apply({ material: l.material, kind: 'Receipt', qty: l.qty,
+                  ref: order.id, note: 'Goods received · ' + (order.supplier || ''),
+                  by: 'Procurement', date: order.date })) n++;
+  });
+  return n;
+}
+
+function reverseIntoStock(order) {
+  var M = stockLedger(), lines = receiptLinesOf(order);
+  if (!M || !lines.length) return 0;
+  var n = 0;
+  lines.forEach(function (l) {
+    if (M.apply({ material: l.material, kind: 'Adjustment', qty: -Math.abs(+l.qty || 0),
+                  ref: order.id, note: 'Delivery un-received · ' + (order.supplier || ''),
+                  by: 'Procurement' })) n++;
+  });
+  return n;
+}
+
 /** The journal id for an order's Nth receipt posting. */
 function glRefFor(order, attempt) {
   var n = attempt || 1;
@@ -299,10 +353,11 @@ function syncReceiptPosting(before, after) {
   var wasReceived = !!before && before.status === 'Received';
   var isReceived = after.status === 'Received';
 
-  if (!wasReceived && isReceived) { postReceipt(after); return; }
+  if (!wasReceived && isReceived) { postReceipt(after); receiveIntoStock(after); return; }
 
   if (wasReceived && !isReceived) {
     if (isPosted(before)) reverseReceipt(before, 'delivery un-received');
+    reverseIntoStock(before);
     return;
   }
 

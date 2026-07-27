@@ -95,7 +95,9 @@
     wa_production: 'woodart/production/jobs',
     wa_installs:   'woodart/installation/installs',
     wa_drawings:   'woodart/design/drawings',
-    wa_revisions:  'woodart/design/revisions'
+    wa_revisions:  'woodart/design/revisions',
+    wa_movements:  'woodart/materials/movements',
+    wa_locations:  'woodart/materials/locations'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -182,7 +184,9 @@
     wa_production:'woodart/production/jobs',
     wa_installs:  'woodart/installation/installs',
     wa_drawings:  'woodart/design/drawings',
-    wa_revisions: 'woodart/design/revisions'
+    wa_revisions: 'woodart/design/revisions',
+    wa_movements: 'woodart/materials/movements',
+    wa_locations: 'woodart/materials/locations'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()

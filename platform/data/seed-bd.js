@@ -566,6 +566,70 @@
       S.set('wa_materials', mats);
     })();
 
+    /* ========================================================================
+     * WOODART — STOCK LOCATIONS + THE MOVEMENT LEDGER (owner, 2026-07-27)
+     * ------------------------------------------------------------------------
+     * Until now a material's `stock` was a bare number: you could see that only
+     * 26 sheets of marine ply were left, but nothing anywhere said WHY. That is
+     * the one thing every other balance in this system refuses to do — a bank
+     * balance never moves without a row in its transaction log (EPAL.bankTxnApply),
+     * and stock is now held to the same standard.
+     *
+     *   wa_locations  where stock sits — workshop, site store, finishing bay
+     *   wa_movements  every change: receipt · issue · adjustment · wastage
+     *
+     * THE INVARIANT, which the seed below establishes and Materials.reconcile()
+     * proves at any time: for every material, the sum of its movements EQUALS
+     * its stored stock. The number and its history can never disagree.
+     *
+     * The movements are generated BACKWARDS from the stock each material already
+     * carries — an opening receipt, then the real issues the three story
+     * projects consumed — so the ledger explains the numbers already on screen
+     * rather than contradicting them.
+     * ====================================================================== */
+    if (localStorage.getItem(S.namespace + 'wa_locations') === null) {
+      S.set('wa_locations', [
+        { id:'LOC-001', name:'Main Workshop',  kind:'Workshop', area:'Tejgaon I/A',  primary:true,  created:dt(6) },
+        { id:'LOC-002', name:'Finishing Bay',  kind:'Workshop', area:'Tejgaon I/A',  primary:false, created:dt(6) },
+        { id:'LOC-003', name:'Site Store',     kind:'Site',     area:'Gulshan-2',    primary:false, created:dt(3) }
+      ]);
+    }
+    if (localStorage.getItem(S.namespace + 'wa_movements') === null) {
+      var moves = [], mv = 0;
+      /* the issues the story projects actually consumed, by material name */
+      var CONSUMED = {
+        'Marine Plywood 18mm': [['WAP-102', 210, '2026-05-06'], ['WAP-103', 96, '2026-03-12']],
+        'Formica Laminate':    [['WAP-102', 188, '2026-05-18']],
+        'MDF 12mm':            [['WAP-102', 104, '2026-05-22']],
+        'Drawer Channel 18"':  [['WAP-102', 142, '2026-06-02']],
+        'NC Lacquer':          [['WAP-102', 58,  '2026-06-14']],
+        'Veneer Board':        [['WAP-103', 44,  '2026-03-20']],
+        'Wood Glue 5kg':       [['WAP-103', 18,  '2026-03-26']]
+      };
+      S.list('wa_materials').forEach(function (m) {
+        var used = CONSUMED[m.name] || [];
+        var out = used.reduce(function (s, u) { return s + u[1]; }, 0);
+        var wastage = out ? Math.max(1, Math.round(out * 0.02)) : 0;
+        /* opening receipt = whatever is left, plus everything that left again,
+           so the ledger nets EXACTLY to the stock already on the record */
+        var opening = (+m.stock || 0) + out + wastage;
+        moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Receipt',
+          qty: opening, location: 'LOC-001', ref: 'OPENING',
+          note: 'Opening stock on hand', by: 'System', date: dt(5), created: dt(5) });
+        used.forEach(function (u) {
+          moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Issue',
+            qty: -u[1], location: 'LOC-001', ref: u[0],
+            note: 'Issued to ' + u[0], by: pick(PEOPLE), date: u[2], created: u[2] });
+        });
+        if (wastage) {
+          moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Wastage',
+            qty: -wastage, location: 'LOC-001', ref: '',
+            note: 'Offcuts and damage', by: pick(PEOPLE), date: dt(1), created: dt(1) });
+        }
+      });
+      S.set('wa_movements', moves);
+    }
+
     /* ============================ IT SOLUTIONS ==============================*/
     gen('it_projects', 14, function (i) {
       var value = ri(3, 80) * 100000;

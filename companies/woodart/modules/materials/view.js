@@ -9,7 +9,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  WOODART · MATERIALS · MARKUP\n  ----------------------------------------------------------------------------\n  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.\n  Nothing here is built by JavaScript. There is no <script> tag and no <template>\n  tag in this file, by standing owner rule (companies/woodart/MODULE-STANDARD.md).\n\n  WHAT THE LOGIC FILE (frontend/materials.js) IS ALLOWED TO DO WITH THIS MARKUP\n  ---------------------------------------------------------------------------\n    [data-shell=\"x\"]   reusable chrome (head bar, tab band)  → shell('x') clones it\n    [data-screen=\"x\"]  a whole screen                        → screen('x') clones it\n    [data-fill=\"x\"]    a slot a built widget drops into (a data grid, a text run)\n    [data-k=\"x\"]       a live scalar slot (a KPI number)     → fillK(node,'x',v)\n    [data-tab=\"x\"]     a tab button — the logic marks .active, wires the click,\n                       then STRIPS the hook so it never ships to the DOM\n    [data-act=\"x\"]     a button the logic wires an action onto\n    [data-when=\"x\"]    a block the logic REMOVES when the condition is false\n    [data-proto=\"x\"]   a hidden prototype row — cloned once per record, because\n                       the COUNT is data. This replaces <template> cloning.\n    [data-slot=\"x\"]    a fill point INSIDE a cloned [data-proto] row\n\n  STYLING = house component classes (what a thing IS: card, kpi-card, btn) +\n  Tailwind tw- utilities (where it sits / how it looks). Never a hard-coded\n  colour — tokens only. The ONE inline style below is a computed bar width,\n  which is a value, not a utility (UI-CONTRACT §4.3).\n  ============================================================================ -->\n\n\n<!-- ============================================================================\n     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup exactly)\n     and the 3-tab section band. Authored once, used by all three screens.\n     NOTE: the <h1> inner run stays on ONE line — a newline between those inline\n     tags clones as a real space and shifts pixels.\n     ============================================================================ -->\n<div data-shell=\"head\" class=\"page-head\">\n  <div>\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-boxes\"></i></h1>\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\n  </div>\n  <div class=\"page-actions\">\n    <a class=\"btn btn-ghost\" href=\"#/woodart/procurement\"><i class=\"bi bi-cart-fill\"></i> Procurement</a>\n    <button class=\"btn btn-primary\" data-act=\"new\"><i class=\"bi bi-plus-lg\"></i> New Material</button>\n  </div>\n</div>\n\n<div data-shell=\"tabs\" class=\"tab-underline mb-3\">\n  <button data-tab=\"stock\">Stock</button>\n  <button data-tab=\"reorder\">Reorder</button>\n  <button data-tab=\"valuation\">Valuation</button>\n</div>\n\n\n<!-- ============================================================================\n     SCREEN 1 · STOCK — the material register.\n     ============================================================================ -->\n<section data-screen=\"stock\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Items Tracked</span><span class=\"kpi-ico\"><i class=\"bi bi-boxes\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"items\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Stock Value</span><span class=\"kpi-ico\"><i class=\"bi bi-wallet2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"value\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Below Reorder</span><span class=\"kpi-ico\"><i class=\"bi bi-exclamation-diamond\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"low\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Categories</span><span class=\"kpi-ico\"><i class=\"bi bi-tags\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cats\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Suppliers</span><span class=\"kpi-ico\"><i class=\"bi bi-truck\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"suppliers\">—</div>\n    </div>\n  </div>\n\n  <!-- Shown only when something is at or below its reorder level. The logic\n       REMOVES this block when the count is zero — it is never built on demand. -->\n  <div class=\"build-banner\" data-when=\"low\">\n    <i class=\"bi bi-exclamation-diamond\"></i>\n    <div><strong data-k=\"lowInline\">0</strong> item(s) are at or below their reorder level.\n      <button class=\"link-btn\" data-act=\"goReorder\">Open the reorder list</button>.</div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-list-columns-reverse\"></i> Material Register</h3>\n      <span class=\"card-sub\">Every item, live stock, reorder level and supplier</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 2 · REORDER — what to buy, and roughly what it will cost.\n     Two mutually exclusive states, BOTH written here as HTML. The logic removes\n     the one that does not apply; neither is ever assembled in JS.\n     ============================================================================ -->\n<section data-screen=\"reorder\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Items to Reorder</span><span class=\"kpi-ico\"><i class=\"bi bi-cart-plus\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"count\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Units Short</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-down-short\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"short\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Est. Refill Cost</span><span class=\"kpi-ico\"><i class=\"bi bi-cash-coin\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cost\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Suppliers to Contact</span><span class=\"kpi-ico\"><i class=\"bi bi-truck\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"suppliers\">—</div>\n    </div>\n  </div>\n\n  <!-- STATE A · nothing to do -->\n  <div class=\"empty-state\" data-when=\"clear\">\n    <i class=\"bi bi-check2-circle\"></i>\n    <h3>Every item is above its reorder level</h3>\n    <p class=\"tw-text-ink-dim\">Nothing needs buying today. Stock levels are healthy across all categories.</p>\n  </div>\n\n  <!-- STATE B · there is a shortfall -->\n  <div data-when=\"short\">\n    <div class=\"build-banner\">\n      <i class=\"bi bi-info-circle\"></i>\n      <div>Refill quantity is the gap back up to the reorder level. Estimated cost uses each\n        item's current unit cost — raise the actual order in <a href=\"#/woodart/procurement\">Procurement</a>.</div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-cart-plus\"></i> Reorder List</h3>\n        <span class=\"card-sub\">Sorted by how far below the line each item has fallen</span>\n      </div>\n      <div class=\"card-body\" data-fill=\"register\"></div>\n    </div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 3 · VALUATION — where the money is sitting.\n     ============================================================================ -->\n<section data-screen=\"valuation\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Total Stock Value</span><span class=\"kpi-ico\"><i class=\"bi bi-safe2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"total\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Largest Category</span><span class=\"kpi-ico\"><i class=\"bi bi-tags\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"top\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Avg Item Value</span><span class=\"kpi-ico\"><i class=\"bi bi-calculator\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"avg\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Dead Stock (0 units)</span><span class=\"kpi-ico\"><i class=\"bi bi-slash-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"dead\">—</div>\n    </div>\n  </div>\n\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-bar-chart-fill\"></i> Value by Category</h3>\n        <span class=\"card-sub\">Share of total stock value</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"data-list\" data-fill=\"cats\">\n          <!-- PROTOTYPE ROW — cloned once per category, because the number of\n               categories is DATA, not layout. The bar's width is a computed\n               value, so the logic sets it as an inline style (UI-CONTRACT §4.3). -->\n          <div class=\"data-row\" data-proto=\"cat\" hidden>\n            <div class=\"tw-flex-1\">\n              <div class=\"tw-font-semibold\" data-slot=\"name\"></div>\n              <div class=\"progress tw-mt-[6px]\"><div class=\"progress-bar\" data-slot=\"bar\"></div></div>\n            </div>\n            <div class=\"tw-ml-auto tw-text-right\">\n              <div class=\"num tw-font-semibold\" data-slot=\"value\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"share\"></div>\n            </div>\n          </div>\n        </div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-pie-chart-fill\"></i> Value Split</h3>\n        <span class=\"card-sub\">Stock value by category</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"tw-relative tw-h-[260px]\"><canvas data-fill=\"chart\"></canvas></div>\n      </div>\n    </div>\n\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-table\"></i> Valuation Register</h3>\n      <span class=\"card-sub\">Stock × unit cost, highest value first</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  WOODART · MATERIALS · MARKUP\n  ----------------------------------------------------------------------------\n  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.\n  Nothing here is built by JavaScript. There is no <script> tag and no <template>\n  tag in this file, by standing owner rule (companies/woodart/MODULE-STANDARD.md).\n\n  WHAT THE LOGIC FILE (frontend/materials.js) IS ALLOWED TO DO WITH THIS MARKUP\n  ---------------------------------------------------------------------------\n    [data-shell=\"x\"]   reusable chrome (head bar, tab band)  → shell('x') clones it\n    [data-screen=\"x\"]  a whole screen                        → screen('x') clones it\n    [data-fill=\"x\"]    a slot a built widget drops into (a data grid, a text run)\n    [data-k=\"x\"]       a live scalar slot (a KPI number)     → fillK(node,'x',v)\n    [data-tab=\"x\"]     a tab button — the logic marks .active, wires the click,\n                       then STRIPS the hook so it never ships to the DOM\n    [data-act=\"x\"]     a button the logic wires an action onto\n    [data-when=\"x\"]    a block the logic REMOVES when the condition is false\n    [data-proto=\"x\"]   a hidden prototype row — cloned once per record, because\n                       the COUNT is data. This replaces <template> cloning.\n    [data-slot=\"x\"]    a fill point INSIDE a cloned [data-proto] row\n\n  STYLING = house component classes (what a thing IS: card, kpi-card, btn) +\n  Tailwind tw- utilities (where it sits / how it looks). Never a hard-coded\n  colour — tokens only. The ONE inline style below is a computed bar width,\n  which is a value, not a utility (UI-CONTRACT §4.3).\n  ============================================================================ -->\n\n\n<!-- ============================================================================\n     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup exactly)\n     and the 3-tab section band. Authored once, used by all three screens.\n     NOTE: the <h1> inner run stays on ONE line — a newline between those inline\n     tags clones as a real space and shifts pixels.\n     ============================================================================ -->\n<div data-shell=\"head\" class=\"page-head\">\n  <div>\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-boxes\"></i></h1>\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\n  </div>\n  <div class=\"page-actions\">\n    <a class=\"btn btn-ghost\" href=\"#/woodart/procurement\"><i class=\"bi bi-cart-fill\"></i> Procurement</a>\n    <button class=\"btn btn-primary\" data-act=\"new\"><i class=\"bi bi-plus-lg\"></i> New Material</button>\n  </div>\n</div>\n\n<div data-shell=\"tabs\" class=\"tab-underline mb-3\">\n  <button data-tab=\"stock\">Stock</button>\n  <button data-tab=\"movements\">Movements</button>\n  <button data-tab=\"reorder\">Reorder</button>\n  <button data-tab=\"valuation\">Valuation</button>\n</div>\n\n\n<!-- ============================================================================\n     SCREEN 1 · STOCK — the material register.\n     ============================================================================ -->\n<section data-screen=\"stock\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Items Tracked</span><span class=\"kpi-ico\"><i class=\"bi bi-boxes\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"items\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Stock Value</span><span class=\"kpi-ico\"><i class=\"bi bi-wallet2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"value\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Below Reorder</span><span class=\"kpi-ico\"><i class=\"bi bi-exclamation-diamond\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"low\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Categories</span><span class=\"kpi-ico\"><i class=\"bi bi-tags\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cats\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Suppliers</span><span class=\"kpi-ico\"><i class=\"bi bi-truck\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"suppliers\">—</div>\n    </div>\n  </div>\n\n  <!-- Shown only when something is at or below its reorder level. The logic\n       REMOVES this block when the count is zero — it is never built on demand. -->\n  <div class=\"build-banner\" data-when=\"low\">\n    <i class=\"bi bi-exclamation-diamond\"></i>\n    <div><strong data-k=\"lowInline\">0</strong> item(s) are at or below their reorder level.\n      <button class=\"link-btn\" data-act=\"goReorder\">Open the reorder list</button>.</div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-list-columns-reverse\"></i> Material Register</h3>\n      <span class=\"card-sub\">Every item, live stock, reorder level and supplier</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 2 · MOVEMENTS — the stock ledger: why every number is what it is.\n     Added 2026-07-27. Stock used to be a bare number; every other balance in\n     this system carries its history, and now so does this one.\n     ============================================================================ -->\n<section data-screen=\"movements\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Movements</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-left-right\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"movements\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Received In</span><span class=\"kpi-ico\"><i class=\"bi bi-box-arrow-in-down\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"received\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Issued Out</span><span class=\"kpi-ico\"><i class=\"bi bi-box-arrow-up\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"issued\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Wastage</span><span class=\"kpi-ico\"><i class=\"bi bi-trash3\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"wasted\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Locations</span><span class=\"kpi-ico\"><i class=\"bi bi-house-gear\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"locations\">—</div>\n    </div>\n  </div>\n\n  <!-- Shown ONLY when a stored stock level disagrees with its movements. The\n       healthy state is that this block is removed and never seen. -->\n  <div class=\"build-banner\" data-when=\"drift\">\n    <i class=\"bi bi-exclamation-octagon\"></i>\n    <div><strong data-k=\"driftInline\">0</strong> material(s) have a stock level that does\n      not match their movement history. A balance that cannot be explained by its ledger\n      is a balance nobody should trust — <button class=\"link-btn\" data-act=\"showDrift\">show which</button>.</div>\n  </div>\n\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-house-gear\"></i> Where the Stock Sits</h3>\n        <span class=\"card-sub\">Quantity and value held at each location</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"data-list\" data-fill=\"locations\">\n          <!-- PROTOTYPE ROW — one per location; the count is DATA, not layout. -->\n          <div class=\"data-row\" data-proto=\"loc\" hidden>\n            <div class=\"tw-flex-1\">\n              <div class=\"tw-font-semibold\" data-slot=\"name\"></div>\n              <div class=\"progress tw-mt-[6px]\"><div class=\"progress-bar\" data-slot=\"bar\"></div></div>\n            </div>\n            <div class=\"tw-ml-auto tw-text-right\">\n              <div class=\"num tw-font-semibold\" data-slot=\"value\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"detail\"></div>\n            </div>\n          </div>\n        </div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-pie-chart-fill\"></i> Movement Mix</h3>\n        <span class=\"card-sub\">What moved, by kind</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"tw-relative tw-h-[260px]\"><canvas data-fill=\"chart\"></canvas></div>\n      </div>\n    </div>\n\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-list-columns-reverse\"></i> Stock Ledger</h3>\n      <span class=\"card-sub\">Every receipt, issue, adjustment and wastage — newest first</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 3 · REORDER — what to buy, and roughly what it will cost.\n     Two mutually exclusive states, BOTH written here as HTML. The logic removes\n     the one that does not apply; neither is ever assembled in JS.\n     ============================================================================ -->\n<section data-screen=\"reorder\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Items to Reorder</span><span class=\"kpi-ico\"><i class=\"bi bi-cart-plus\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"count\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Units Short</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-down-short\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"short\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Est. Refill Cost</span><span class=\"kpi-ico\"><i class=\"bi bi-cash-coin\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cost\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Suppliers to Contact</span><span class=\"kpi-ico\"><i class=\"bi bi-truck\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"suppliers\">—</div>\n    </div>\n  </div>\n\n  <!-- STATE A · nothing to do -->\n  <div class=\"empty-state\" data-when=\"clear\">\n    <i class=\"bi bi-check2-circle\"></i>\n    <h3>Every item is above its reorder level</h3>\n    <p class=\"tw-text-ink-dim\">Nothing needs buying today. Stock levels are healthy across all categories.</p>\n  </div>\n\n  <!-- STATE B · there is a shortfall -->\n  <div data-when=\"short\">\n    <div class=\"build-banner\">\n      <i class=\"bi bi-info-circle\"></i>\n      <div>Refill quantity is the gap back up to the reorder level. Estimated cost uses each\n        item's current unit cost — raise the actual order in <a href=\"#/woodart/procurement\">Procurement</a>.</div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-cart-plus\"></i> Reorder List</h3>\n        <span class=\"card-sub\">Sorted by how far below the line each item has fallen</span>\n      </div>\n      <div class=\"card-body\" data-fill=\"register\"></div>\n    </div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 4 · VALUATION — where the money is sitting.\n     ============================================================================ -->\n<section data-screen=\"valuation\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Total Stock Value</span><span class=\"kpi-ico\"><i class=\"bi bi-safe2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"total\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Largest Category</span><span class=\"kpi-ico\"><i class=\"bi bi-tags\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"top\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Avg Item Value</span><span class=\"kpi-ico\"><i class=\"bi bi-calculator\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"avg\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Dead Stock (0 units)</span><span class=\"kpi-ico\"><i class=\"bi bi-slash-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"dead\">—</div>\n    </div>\n  </div>\n\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-bar-chart-fill\"></i> Value by Category</h3>\n        <span class=\"card-sub\">Share of total stock value</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"data-list\" data-fill=\"cats\">\n          <!-- PROTOTYPE ROW — cloned once per category, because the number of\n               categories is DATA, not layout. The bar's width is a computed\n               value, so the logic sets it as an inline style (UI-CONTRACT §4.3). -->\n          <div class=\"data-row\" data-proto=\"cat\" hidden>\n            <div class=\"tw-flex-1\">\n              <div class=\"tw-font-semibold\" data-slot=\"name\"></div>\n              <div class=\"progress tw-mt-[6px]\"><div class=\"progress-bar\" data-slot=\"bar\"></div></div>\n            </div>\n            <div class=\"tw-ml-auto tw-text-right\">\n              <div class=\"num tw-font-semibold\" data-slot=\"value\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"share\"></div>\n            </div>\n          </div>\n        </div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-pie-chart-fill\"></i> Value Split</h3>\n        <span class=\"card-sub\">Stock value by category</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"tw-relative tw-h-[260px]\"><canvas data-fill=\"chart\"></canvas></div>\n      </div>\n    </div>\n\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-table\"></i> Valuation Register</h3>\n      <span class=\"card-sub\">Stock × unit cost, highest value first</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="woodart/materials"]')) {
     var st = document.createElement('style');
@@ -58,11 +58,16 @@
 var EPAL = window.EPAL, db = EPAL.db;
 
 var STORE = 'wa_materials';      /* ← the one place this collection is named */
+var MOVEMENTS = 'wa_movements';  /* the stock ledger — see THE MOVEMENT LEDGER */
+var LOCATIONS = 'wa_locations';  /* where stock sits: workshop, bay, site store */
+
+var TODAY = '2026-07-05';        /* the demo clock — same anchor as every module */
 
 /* The taxonomy the seed data uses. Kept here (not in the screen) because the
  * backend validates against the same list — they are two halves of one contract. */
 var CATEGORIES = ['Board', 'Laminate', 'Hardware', 'Adhesive', 'Finish', 'Fabric'];
 var UNITS = ['pcs', 'sheet', 'kg', 'litre', 'sft'];
+var KINDS = ['Receipt', 'Issue', 'Adjustment', 'Wastage'];
 
 var Materials = {
 
@@ -150,12 +155,180 @@ var Materials = {
     return 'MAT-' + String(max + 1).replace(/^(\d)$/, '00$1').replace(/^(\d\d)$/, '0$1');
   },
 
-  /** Create or update. db.save emits data:changed, so open screens repaint. */
+  /** Create or update. db.save emits data:changed, so open screens repaint.
+   *  NOTE: this saves the RECORD. It must not be used to change `stock` —
+   *  that is what apply() is for, so the number always has a row behind it. */
   save: function (rec) { return db.save(STORE, rec); },
 
-  /** Delete by id. */
-  remove: function (id) { return db.remove(STORE, id); }
+  /** Delete by id, taking its movement history with it — a ledger for a
+   *  material nobody can look at is orphaned evidence. */
+  remove: function (id) {
+    db.col(MOVEMENTS).filter(function (v) { return v.material === id; })
+      .forEach(function (v) { db.remove(MOVEMENTS, v.id); });
+    return db.remove(STORE, id);
+  },
+
+  /* ======================================================================
+   * THE MOVEMENT LEDGER
+   * ----------------------------------------------------------------------
+   * Until 2026-07-27 `stock` was a bare number: you could see that only 26
+   * sheets were left, but nothing said WHY. Every other balance in this
+   * system refuses to behave that way — a bank balance never moves without a
+   * row in its log (EPAL.bankTxnApply) — and stock is now held to the same
+   * standard: apply() writes the row and the number together.
+   * ==================================================================== */
+
+  kinds: function () { return KINDS.slice(); },
+  locations: function () { return db.col(LOCATIONS).slice(); },
+  location: function (id) {
+    return db.col(LOCATIONS).filter(function (l) { return l.id === id; })[0] || null;
+  },
+  locationName: function (id) {
+    var l = Materials.location(id);
+    return l ? l.name : (id || '—');
+  },
+  locationOptions: function () {
+    return Materials.locations().map(function (l) { return [l.id, l.name + ' · ' + l.kind]; });
+  },
+  defaultLocation: function () {
+    var all = Materials.locations();
+    var p = all.filter(function (l) { return l.primary; })[0];
+    return (p || all[0] || {}).id || null;
+  },
+
+  /** Every movement, newest first. */
+  movements: function () {
+    return db.col(MOVEMENTS).slice().sort(function (a, b) {
+      var x = String(a.date || ''), y = String(b.date || '');
+      if (x === y) return String(b.id).localeCompare(String(a.id));
+      return x < y ? 1 : -1;
+    });
+  },
+
+  /** One material's history — the answer to "why is it only 26?". */
+  historyOf: function (materialId) {
+    return Materials.movements().filter(function (v) { return v.material === materialId; });
+  },
+
+  /**
+   * APPLY A MOVEMENT — the ONLY sanctioned way stock changes.
+   *
+   *   apply({ material, kind, qty, location, ref, note, by, date })
+   *
+   * The SIGN belongs to the KIND, not to the caller: a caller that passed a
+   * positive Issue would otherwise double the stock it meant to consume, so
+   * signedQty() derives it. Returns the movement row, or null if the material
+   * is unknown or the quantity is zero.
+   */
+  apply: function (spec) {
+    spec = spec || {};
+    var m = Materials.find(spec.material);
+    if (!m) return null;
+
+    var kind = KINDS.indexOf(spec.kind) >= 0 ? spec.kind : 'Adjustment';
+    var qty = signedQty(kind, spec.qty);
+    if (!qty) return null;
+
+    var row = {
+      id: nextMovementId(), material: m.id, kind: kind, qty: qty,
+      location: spec.location || Materials.defaultLocation(),
+      ref: spec.ref || '', note: spec.note || '', by: spec.by || 'System',
+      date: spec.date || TODAY, created: spec.date || TODAY
+    };
+    db.save(MOVEMENTS, row);
+
+    // ...and the balance, in the same breath.
+    m.stock = (+m.stock || 0) + qty;
+    db.save(STORE, m);
+
+    return row;
+  },
+
+  /** Stock per location for one material, derived from its movements. */
+  byLocation: function (materialId) {
+    var acc = {};
+    Materials.historyOf(materialId).forEach(function (v) {
+      var k = v.location || 'unassigned';
+      acc[k] = (acc[k] || 0) + (+v.qty || 0);
+    });
+    return Object.keys(acc).map(function (k) {
+      return { location: k, name: Materials.locationName(k), qty: acc[k] };
+    }).sort(function (a, b) { return b.qty - a.qty; });
+  },
+
+  /** Every location with what it currently holds — the warehouse view. */
+  locationTotals: function () {
+    var qty = {}, val = {};
+    Materials.movements().forEach(function (v) {
+      var k = v.location || 'unassigned';
+      var m = Materials.find(v.material);
+      qty[k] = (qty[k] || 0) + (+v.qty || 0);
+      val[k] = (val[k] || 0) + (+v.qty || 0) * ((m && +m.unitCost) || 0);
+    });
+    return Materials.locations().map(function (l) {
+      return { id: l.id, name: l.name, kind: l.kind, area: l.area,
+        qty: qty[l.id] || 0, value: val[l.id] || 0 };
+    }).sort(function (a, b) { return b.value - a.value; });
+  },
+
+  /** The movement screen's header figures. */
+  movementSummary: function () {
+    var vs = Materials.movements();
+    var received = 0, issued = 0, wasted = 0, adjusted = 0;
+    vs.forEach(function (v) {
+      var q = +v.qty || 0;
+      if (v.kind === 'Receipt') received += q;
+      else if (v.kind === 'Issue') issued += -q;
+      else if (v.kind === 'Wastage') wasted += -q;
+      else adjusted += q;
+    });
+    return { movements: vs.length, received: received, issued: issued,
+      wasted: wasted, adjusted: adjusted,
+      locations: Materials.locations().length,
+      lastDate: vs.length ? vs[0].date : null };
+  },
+
+  /**
+   * THE INVARIANT: for every material, the sum of its movements equals its
+   * stored stock. Returns the rows that DISAGREE — an empty array is health,
+   * and `node tools/verify/books.mjs stock` asserts exactly that.
+   * A balance you cannot prove is a balance you cannot trust, which is the
+   * entire reason this ledger exists.
+   */
+  reconcile: function () {
+    var net = {};
+    db.col(MOVEMENTS).forEach(function (v) {
+      net[v.material] = (net[v.material] || 0) + (+v.qty || 0);
+    });
+    return Materials.all().map(function (m) {
+      var moved = net[m.id] || 0;
+      return { id: m.id, name: m.name, stock: +m.stock || 0, moved: moved,
+        drift: (+m.stock || 0) - moved };
+    }).filter(function (r) { return r.drift !== 0; });
+  }
 };
+
+/** The sign belongs to the KIND, not the caller. */
+function signedQty(kind, qty) {
+  var n = Math.abs(+qty || 0);
+  if (!n) return 0;
+  if (kind === 'Receipt') return n;
+  if (kind === 'Issue' || kind === 'Wastage') return -n;
+  return (+qty || 0);                     // Adjustment keeps the caller's sign
+}
+
+function nextMovementId() {
+  var max = 0;
+  db.col(MOVEMENTS).forEach(function (v) {
+    var n = parseInt(String(v.id || '').replace(/^MOV-?/, ''), 10);
+    if (!isNaN(n) && n > max) max = n;
+  });
+  return 'MOV-' + String(max + 1).padStart(4, '0');
+}
+
+/* Exposed for the verification harness — see MODULE-STANDARD §3: a test that
+ * re-implements the rule proves nothing, so books.mjs drives the real seam. */
+(EPAL.diag = EPAL.diag || {}).woodartMaterials = Materials;
 
   /* ---- frontend/materials.js ---------------------------------------- */
 /* ============================================================================
@@ -229,9 +402,9 @@ function dropProtos(host) {
 
 /* ---- shared chrome -------------------------------------------------------- */
 
-var TABS = [['stock', 'Stock'], ['reorder', 'Reorder'], ['valuation', 'Valuation']];
 var TAB_COPY = {
   stock:     ['Stock', 'Wood, laminates, hardware and finishes — live quantities and what each is worth.'],
+  movements: ['Movements', 'The stock ledger — every receipt, issue, adjustment and wastage, and where it sits.'],
   reorder:   ['Reorder', 'Everything at or below its reorder level, with the refill quantity and cost.'],
   valuation: ['Valuation', 'Where the money is sitting — stock value by category and by item.']
 };
@@ -250,8 +423,15 @@ function head(sub) {
   // The New Material button is in the markup and is REMOVED without the
   // permission — the same grammar as a [data-when] block, never built on demand.
   var add = h.querySelector('[data-act="new"]');
-  if (!canCreate()) add.parentNode.removeChild(add);
-  else add.addEventListener('click', function () { editMaterial(null); });
+  if (!canCreate()) {
+    add.parentNode.removeChild(add);
+  } else if (sub === 'movements') {
+    // On the ledger, the thing you came to do is move stock, not define a material.
+    add.innerHTML = '<i class="bi bi-box-arrow-in-down"></i> Receive Stock';
+    add.addEventListener('click', function () { moveStock(null, 'Receipt'); });
+  } else {
+    add.addEventListener('click', function () { editMaterial(null); });
+  }
   return h;
 }
 
@@ -276,6 +456,12 @@ function canDelete() { return !EPAL.perm || EPAL.perm.can(CID, 'materials', 'del
 
 /* ---- small formatters shared by the three screens ------------------------- */
 function money(v) { return ui.money(v, { compact: true }); }
+
+/* Movement vocabulary — one place, so the ledger, the grid and the buttons
+   never disagree about what a kind looks like. */
+var KIND_TONE = { Receipt: 'good', Issue: '', Adjustment: 'warn', Wastage: 'bad' };
+var KIND_ICON = { Receipt: 'box-arrow-in-down', Issue: 'box-arrow-up',
+                  Adjustment: 'sliders', Wastage: 'trash3' };
 function stockCell(m) {
   var low = Materials.isLow(m);
   return '<span class="num ' + (low ? 'text-bad' : '') + '">' + ui.num(+m.stock || 0) + '</span>' +
@@ -295,7 +481,8 @@ EPAL.view(ROUTE, {
     page.appendChild(head(sub));
     page.appendChild(tabs(sub));
 
-    ({ stock: stockScreen, reorder: reorderScreen, valuation: valuationScreen }[sub])(page);
+    ({ stock: stockScreen, movements: movementsScreen,
+       reorder: reorderScreen, valuation: valuationScreen }[sub])(page);
 
     ctx.mount.appendChild(page);
   }
@@ -344,11 +531,81 @@ function registerTable(rows) {
     searchKeys: ['id', 'name', 'category', 'supplier'],
     filters: [{ key: 'category', label: 'Category' }],
     onRow: function (r) { editMaterial(Materials.find(r.id)); },
-    actions: canDelete() ? [{ icon: 'trash', title: 'Delete material', onClick: deleteMaterial }] : null,
+    actions: stockRowActions(),
     exportName: 'woodart-materials.csv',
     pageSize: 12,
     empty: { icon: 'boxes', title: 'No materials yet', hint: 'Add your first item to start tracking stock.' }
   });
+}
+
+/** The per-row actions on the register. Moving stock lives HERE, next to the
+ *  material it moves, rather than behind a separate desk — and every one of
+ *  them goes through Materials.apply(), so the ledger is never bypassed. */
+function stockRowActions() {
+  var acts = [];
+  if (canCreate()) {
+    acts.push({ icon: 'box-arrow-in-down', title: 'Receive stock',
+      onClick: function (r) { moveStock(Materials.find(r.id), 'Receipt'); } });
+    acts.push({ icon: 'box-arrow-up', title: 'Issue to a project',
+      onClick: function (r) { moveStock(Materials.find(r.id), 'Issue'); } });
+    acts.push({ icon: 'clock-history', title: 'Movement history',
+      onClick: function (r) { showHistory(Materials.find(r.id)); } });
+  }
+  if (canDelete()) {
+    acts.push({ icon: 'trash', title: 'Delete material', onClick: deleteMaterial });
+  }
+  return acts.length ? acts : null;
+}
+
+/** One material's ledger + where it sits — the answer to "why is it only 26?". */
+function showHistory(m) {
+  if (!m) return;
+  var rows = Materials.historyOf(m.id);
+  var body = el('div');
+
+  body.appendChild(el('div.stat-row.mb-2', null, [
+    st2('In stock', ui.num(m.stock) + ' ' + (m.unit || '')),
+    st2('Movements', String(rows.length)),
+    st2('Value', ui.money(Materials.valueOf(m)))
+  ]));
+
+  var byLoc = Materials.byLocation(m.id);
+  if (byLoc.length) {
+    body.appendChild(el('div.section-label', { text: 'Where it sits' }));
+    var ll = el('div.data-list');
+    byLoc.forEach(function (l) {
+      ll.appendChild(el('div.data-row', null, [
+        el('span.flex-1', { text: l.name }),
+        el('span.num' + (l.qty < 0 ? '.text-bad' : ''), { text: ui.num(l.qty) })
+      ]));
+    });
+    body.appendChild(ll);
+  }
+
+  body.appendChild(el('div.section-label', { text: 'Ledger' }));
+  if (!rows.length) {
+    body.appendChild(el('p.text-mute.sm', { text: 'No movements recorded yet.' }));
+  } else {
+    var list = el('div.data-list');
+    rows.forEach(function (v) {
+      var q = +v.qty || 0;
+      list.appendChild(el('div.data-row', null, [
+        el('span.badge' + (KIND_TONE[v.kind] ? '.badge-' + KIND_TONE[v.kind] : ''), { text: v.kind }),
+        el('div.flex-1', null, [
+          el('div.fw-600', { text: (q >= 0 ? '+' : '') + ui.num(q) + ' · ' + Materials.locationName(v.location) }),
+          el('div.text-mute.xs', { text: (v.ref ? v.ref + ' · ' : '') + (v.note || '') + (v.by ? ' — ' + v.by : '') })
+        ]),
+        el('span.text-mute.xs', { text: v.date ? ui.date(v.date) : '' })
+      ]));
+    });
+    body.appendChild(list);
+  }
+
+  ui.modal({ title: m.name + ' · stock ledger', icon: 'clock-history', size: 'lg', body: body, footer: false });
+}
+
+function st2(k, v) {
+  return el('div.stat', null, [ el('div.stat-label', { text: k }), el('div.stat-value', { text: String(v) }) ]);
 }
 
 /** Delete always asks first, and always names what is being removed — a stock
@@ -357,13 +614,155 @@ function deleteMaterial(row) {
   ui.confirm({
     title: 'Delete ' + row.id + '?',
     body: row.name + ' (' + ui.num(+row.stock || 0) + ' ' + (row.unit || 'units') + ', worth ' +
-      ui.money(Materials.valueOf(row)) + ') will be removed from the register. This cannot be undone.',
+      ui.money(Materials.valueOf(row)) + ') will be removed from the register, along with its ' +
+      Materials.historyOf(row.id).length + ' movement record(s) — a ledger for a material nobody ' +
+      'can look at is orphaned evidence. This cannot be undone.',
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;
     Materials.remove(row.id);
     ui.toast(row.id + ' deleted', 'success');
     EPAL.router.render();
+  });
+}
+
+/* ======================================================== SCREEN · MOVEMENTS */
+function movementsScreen(page) {
+  var s = screen('movements');
+  var sum = Materials.movementSummary();
+  var locs = Materials.locationTotals();
+  var drift = Materials.reconcile();
+
+  fillK(s, 'movements', ui.num(sum.movements));
+  fillK(s, 'received', ui.num(sum.received));
+  fillK(s, 'issued', ui.num(sum.issued));
+  fillK(s, 'wasted', ui.num(sum.wasted));
+  fillK(s, 'locations', ui.num(sum.locations));
+
+  // The drift banner is the invariant made visible. Healthy = removed.
+  var banner = when(s, 'drift', drift.length > 0);
+  if (banner) {
+    fillK(banner, 'driftInline', ui.num(drift.length));
+    banner.querySelector('[data-act="showDrift"]')
+      .addEventListener('click', function () { showDrift(drift); });
+  }
+
+  // one cloned row per location — the count is data
+  var host = fill(s, 'locations');
+  var max = locs.reduce(function (t, l) { return Math.max(t, l.value); }, 0);
+  locs.forEach(function (l) {
+    var row = proto(host, 'loc');
+    slot(row, 'name').textContent = l.name + ' · ' + l.kind;
+    slot(row, 'value').textContent = ui.money(l.value);
+    slot(row, 'detail').textContent = ui.num(l.qty) + ' units' + (l.area ? ' · ' + l.area : '');
+    slot(row, 'bar').style.width = (max ? Math.round(l.value / max * 100) : 0) + '%';
+    host.appendChild(row);
+  });
+  dropProtos(host);
+
+  fill(s, 'register').appendChild(EPAL.table({
+    columns: [
+      { key: 'date', label: 'Date', date: true },
+      { key: 'id', label: 'Ref', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.id) + '</span>'; } },
+      { key: 'material', label: 'Material',
+        render: function (r) {
+          var m = Materials.find(r.material);
+          return m ? ui.escapeHtml(m.name) + ' <span class="text-mute xs">' + ui.escapeHtml(r.material) + '</span>'
+                   : ui.escapeHtml(r.material) + ' <span class="badge badge-warn">removed</span>';
+        } },
+      { key: 'kind', label: 'Kind', badge: KIND_TONE },
+      { key: 'qty', label: 'Qty', num: true,
+        render: function (r) {
+          var q = +r.qty || 0;
+          return '<span class="num ' + (q >= 0 ? 'text-good' : 'text-bad') + '">' +
+            (q >= 0 ? '+' : '') + ui.num(q) + '</span>';
+        } },
+      { key: 'location', label: 'Location', render: function (r) { return '<span class="badge">' + ui.escapeHtml(Materials.locationName(r.location)) + '</span>'; } },
+      { key: 'ref', label: 'Against' },
+      { key: 'by', label: 'By' }
+    ],
+    rows: Materials.movements(),
+    searchKeys: ['id', 'material', 'kind', 'ref', 'by', 'note'],
+    filters: [{ key: 'kind', label: 'Kind' }],
+    exportName: 'woodart-stock-movements.csv',
+    pageSize: 14,
+    empty: { icon: 'arrow-left-right', title: 'No movements yet', hint: 'Receive stock in to start the ledger.' }
+  }).el);
+
+  var canvas = fill(s, 'chart');
+  mountScreen(page, s);
+
+  requestAnimationFrame(function () {
+    var mix = [['Received', sum.received], ['Issued', sum.issued], ['Wastage', sum.wasted]]
+      .filter(function (r) { return r[1] > 0; });
+    if (!EPAL.charts || !mix.length || !canvas.isConnected) return;
+    EPAL.charts.doughnut(canvas, {
+      labels: mix.map(function (r) { return r[0]; }),
+      data: mix.map(function (r) { return r[1]; })
+    });
+  });
+}
+
+/** The invariant, spelled out. Only ever opened from the drift banner, which
+ *  in a healthy system is not on the page at all. */
+function showDrift(rows) {
+  var body = el('div');
+  body.appendChild(el('p.text-mute.sm', { text:
+    'These stored stock levels do not equal the sum of their movements. Until the ' +
+    'difference is explained by an adjustment, the number on the register cannot be trusted.' }));
+  var list = el('div.data-list');
+  rows.forEach(function (r) {
+    list.appendChild(el('div.data-row', null, [
+      el('div.flex-1', null, [
+        el('div.fw-600', { text: r.name }),
+        el('div.text-mute.xs', { text: r.id })
+      ]),
+      el('div', { style: { textAlign: 'right' } }, [
+        el('div.num', { text: 'stored ' + ui.num(r.stock) + ' · ledger ' + ui.num(r.moved) }),
+        el('div.num.text-bad.xs', { text: 'drift ' + (r.drift > 0 ? '+' : '') + ui.num(r.drift) })
+      ])
+    ]));
+  });
+  body.appendChild(list);
+  ui.modal({ title: 'Stock that does not reconcile', icon: 'exclamation-octagon', size: 'md', body: body, footer: false });
+}
+
+/** Move stock — the ONLY path, and it always writes a row. */
+function moveStock(material, kind) {
+  if (!canCreate()) { ui.toast('You do not have permission to move stock', 'error'); return; }
+  var m = material || null;
+
+  EPAL.formModal({
+    title: kind + (m ? ' · ' + m.name : ''),
+    icon: KIND_ICON[kind] || 'arrow-left-right',
+    size: 'sm',
+    record: { material: m ? m.id : null, kind: kind, qty: null,
+      location: Materials.defaultLocation(), date: Materials.today ? Materials.today() : undefined },
+    fields: [
+      { key: 'material', label: 'Material', type: 'select', required: true, searchable: true,
+        options: Materials.all().map(function (x) { return [x.id, x.name + ' · ' + ui.num(x.stock) + ' ' + (x.unit || '')]; }) },
+      { key: 'qty', label: kind === 'Adjustment' ? 'Adjust by (+/-)' : 'Quantity', type: 'number', required: true,
+        hint: kind === 'Receipt' ? 'Adds to stock.'
+            : kind === 'Adjustment' ? 'A count correction. Negative reduces, positive increases.'
+            : 'Comes out of stock — enter a positive number.' },
+      { key: 'location', label: 'Location', type: 'select', required: true, options: Materials.locationOptions() },
+      { key: 'ref', label: 'Against', type: 'text', col2: true,
+        hint: kind === 'Issue' ? 'The project or job this went to, e.g. WAP-102.' : 'Optional reference.' },
+      { key: 'by', label: 'Recorded by', type: 'text', col2: true },
+      { key: 'note', label: 'Note', type: 'text' }
+    ],
+    saveLabel: kind,
+    onSave: function (v) {
+      var row = Materials.apply({
+        material: v.material, kind: kind, qty: v.qty, location: v.location,
+        ref: v.ref, note: v.note, by: v.by || 'Staff'
+      });
+      if (!row) { ui.toast('Nothing to move', 'error'); return true; }
+      var mm = Materials.find(v.material);
+      ui.toast(kind + ' ' + ui.num(Math.abs(row.qty)) + ' · ' + mm.name + ' now ' + ui.num(mm.stock), 'success');
+      EPAL.router.render();
+      return true;
+    }
   });
 }
 

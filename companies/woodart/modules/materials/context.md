@@ -56,9 +56,22 @@ copying changed files in one at a time. Written up in `MODULE-STANDARD.md` §8.
 - **Read by:** nothing else yet. Procurement and Workshop will both read it.
 - **Emits:** nothing to the group bridge — see M1.
 
+## Decisions added 2026-07-27 — the movement ledger
+
+| # | Decision | Why |
+|---|---|---|
+| M8 | **`apply()` is the only way stock changes** — row and number written together | Mirrors `EPAL.bankTxnApply`. A balance without a history is one nobody can explain, which is exactly what the owner hit. |
+| M9 | **The sign belongs to the KIND** | A caller passing a positive `Issue` would double stock instead of consuming it. Deriving it makes that impossible. |
+| M10 | **`reconcile()` is a first-class function, surfaced in the UI** | The invariant is worth nothing if nobody can check it. The Movements tab shows a drift banner; the healthy state is that the banner is absent. |
+| M11 | **A PO's `lines` are OPTIONAL; a receipt with none moves no stock** | Every order seeded before today has no lines. Such an order genuinely does not say WHAT arrived — inventing a guess would be worse than recording nothing. |
+| M12 | **Locations are a dimension on the movement, not a second stock column** | Per-location stock stays derivable while `stock` remains one number, so nothing that already reads it breaks (R2). |
+
 ## Open questions
 
-1. **Stock movements** — the biggest gap. An edit overwrites the count with no
+1. ~~**Stock movements**~~ → **BUILT 2026-07-27.** `wa_movements` + `wa_locations`,
+   wired into Procurement receipts, invariant proven by `books.mjs stock`.
+   ◻ **The Laravel slice for both new stores is still owed.**
+2. *(original note)* **Stock movements** — the biggest gap. An edit overwrites the count with no
    trail of *why*, which is out of step with every money-moving desk in this ERP
    (AUDIT P2: a balance never moves without a row explaining it). Proposal: a
    `wa_material_movements` table (receipt · issue · adjustment · wastage) with

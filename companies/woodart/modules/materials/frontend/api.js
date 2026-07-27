@@ -38,11 +38,16 @@
 var EPAL = window.EPAL, db = EPAL.db;
 
 var STORE = 'wa_materials';      /* ← the one place this collection is named */
+var MOVEMENTS = 'wa_movements';  /* the stock ledger — see THE MOVEMENT LEDGER */
+var LOCATIONS = 'wa_locations';  /* where stock sits: workshop, bay, site store */
+
+var TODAY = '2026-07-05';        /* the demo clock — same anchor as every module */
 
 /* The taxonomy the seed data uses. Kept here (not in the screen) because the
  * backend validates against the same list — they are two halves of one contract. */
 var CATEGORIES = ['Board', 'Laminate', 'Hardware', 'Adhesive', 'Finish', 'Fabric'];
 var UNITS = ['pcs', 'sheet', 'kg', 'litre', 'sft'];
+var KINDS = ['Receipt', 'Issue', 'Adjustment', 'Wastage'];
 
 var Materials = {
 
@@ -130,9 +135,177 @@ var Materials = {
     return 'MAT-' + String(max + 1).replace(/^(\d)$/, '00$1').replace(/^(\d\d)$/, '0$1');
   },
 
-  /** Create or update. db.save emits data:changed, so open screens repaint. */
+  /** Create or update. db.save emits data:changed, so open screens repaint.
+   *  NOTE: this saves the RECORD. It must not be used to change `stock` —
+   *  that is what apply() is for, so the number always has a row behind it. */
   save: function (rec) { return db.save(STORE, rec); },
 
-  /** Delete by id. */
-  remove: function (id) { return db.remove(STORE, id); }
+  /** Delete by id, taking its movement history with it — a ledger for a
+   *  material nobody can look at is orphaned evidence. */
+  remove: function (id) {
+    db.col(MOVEMENTS).filter(function (v) { return v.material === id; })
+      .forEach(function (v) { db.remove(MOVEMENTS, v.id); });
+    return db.remove(STORE, id);
+  },
+
+  /* ======================================================================
+   * THE MOVEMENT LEDGER
+   * ----------------------------------------------------------------------
+   * Until 2026-07-27 `stock` was a bare number: you could see that only 26
+   * sheets were left, but nothing said WHY. Every other balance in this
+   * system refuses to behave that way — a bank balance never moves without a
+   * row in its log (EPAL.bankTxnApply) — and stock is now held to the same
+   * standard: apply() writes the row and the number together.
+   * ==================================================================== */
+
+  kinds: function () { return KINDS.slice(); },
+  locations: function () { return db.col(LOCATIONS).slice(); },
+  location: function (id) {
+    return db.col(LOCATIONS).filter(function (l) { return l.id === id; })[0] || null;
+  },
+  locationName: function (id) {
+    var l = Materials.location(id);
+    return l ? l.name : (id || '—');
+  },
+  locationOptions: function () {
+    return Materials.locations().map(function (l) { return [l.id, l.name + ' · ' + l.kind]; });
+  },
+  defaultLocation: function () {
+    var all = Materials.locations();
+    var p = all.filter(function (l) { return l.primary; })[0];
+    return (p || all[0] || {}).id || null;
+  },
+
+  /** Every movement, newest first. */
+  movements: function () {
+    return db.col(MOVEMENTS).slice().sort(function (a, b) {
+      var x = String(a.date || ''), y = String(b.date || '');
+      if (x === y) return String(b.id).localeCompare(String(a.id));
+      return x < y ? 1 : -1;
+    });
+  },
+
+  /** One material's history — the answer to "why is it only 26?". */
+  historyOf: function (materialId) {
+    return Materials.movements().filter(function (v) { return v.material === materialId; });
+  },
+
+  /**
+   * APPLY A MOVEMENT — the ONLY sanctioned way stock changes.
+   *
+   *   apply({ material, kind, qty, location, ref, note, by, date })
+   *
+   * The SIGN belongs to the KIND, not to the caller: a caller that passed a
+   * positive Issue would otherwise double the stock it meant to consume, so
+   * signedQty() derives it. Returns the movement row, or null if the material
+   * is unknown or the quantity is zero.
+   */
+  apply: function (spec) {
+    spec = spec || {};
+    var m = Materials.find(spec.material);
+    if (!m) return null;
+
+    var kind = KINDS.indexOf(spec.kind) >= 0 ? spec.kind : 'Adjustment';
+    var qty = signedQty(kind, spec.qty);
+    if (!qty) return null;
+
+    var row = {
+      id: nextMovementId(), material: m.id, kind: kind, qty: qty,
+      location: spec.location || Materials.defaultLocation(),
+      ref: spec.ref || '', note: spec.note || '', by: spec.by || 'System',
+      date: spec.date || TODAY, created: spec.date || TODAY
+    };
+    db.save(MOVEMENTS, row);
+
+    // ...and the balance, in the same breath.
+    m.stock = (+m.stock || 0) + qty;
+    db.save(STORE, m);
+
+    return row;
+  },
+
+  /** Stock per location for one material, derived from its movements. */
+  byLocation: function (materialId) {
+    var acc = {};
+    Materials.historyOf(materialId).forEach(function (v) {
+      var k = v.location || 'unassigned';
+      acc[k] = (acc[k] || 0) + (+v.qty || 0);
+    });
+    return Object.keys(acc).map(function (k) {
+      return { location: k, name: Materials.locationName(k), qty: acc[k] };
+    }).sort(function (a, b) { return b.qty - a.qty; });
+  },
+
+  /** Every location with what it currently holds — the warehouse view. */
+  locationTotals: function () {
+    var qty = {}, val = {};
+    Materials.movements().forEach(function (v) {
+      var k = v.location || 'unassigned';
+      var m = Materials.find(v.material);
+      qty[k] = (qty[k] || 0) + (+v.qty || 0);
+      val[k] = (val[k] || 0) + (+v.qty || 0) * ((m && +m.unitCost) || 0);
+    });
+    return Materials.locations().map(function (l) {
+      return { id: l.id, name: l.name, kind: l.kind, area: l.area,
+        qty: qty[l.id] || 0, value: val[l.id] || 0 };
+    }).sort(function (a, b) { return b.value - a.value; });
+  },
+
+  /** The movement screen's header figures. */
+  movementSummary: function () {
+    var vs = Materials.movements();
+    var received = 0, issued = 0, wasted = 0, adjusted = 0;
+    vs.forEach(function (v) {
+      var q = +v.qty || 0;
+      if (v.kind === 'Receipt') received += q;
+      else if (v.kind === 'Issue') issued += -q;
+      else if (v.kind === 'Wastage') wasted += -q;
+      else adjusted += q;
+    });
+    return { movements: vs.length, received: received, issued: issued,
+      wasted: wasted, adjusted: adjusted,
+      locations: Materials.locations().length,
+      lastDate: vs.length ? vs[0].date : null };
+  },
+
+  /**
+   * THE INVARIANT: for every material, the sum of its movements equals its
+   * stored stock. Returns the rows that DISAGREE — an empty array is health,
+   * and `node tools/verify/books.mjs stock` asserts exactly that.
+   * A balance you cannot prove is a balance you cannot trust, which is the
+   * entire reason this ledger exists.
+   */
+  reconcile: function () {
+    var net = {};
+    db.col(MOVEMENTS).forEach(function (v) {
+      net[v.material] = (net[v.material] || 0) + (+v.qty || 0);
+    });
+    return Materials.all().map(function (m) {
+      var moved = net[m.id] || 0;
+      return { id: m.id, name: m.name, stock: +m.stock || 0, moved: moved,
+        drift: (+m.stock || 0) - moved };
+    }).filter(function (r) { return r.drift !== 0; });
+  }
 };
+
+/** The sign belongs to the KIND, not the caller. */
+function signedQty(kind, qty) {
+  var n = Math.abs(+qty || 0);
+  if (!n) return 0;
+  if (kind === 'Receipt') return n;
+  if (kind === 'Issue' || kind === 'Wastage') return -n;
+  return (+qty || 0);                     // Adjustment keeps the caller's sign
+}
+
+function nextMovementId() {
+  var max = 0;
+  db.col(MOVEMENTS).forEach(function (v) {
+    var n = parseInt(String(v.id || '').replace(/^MOV-?/, ''), 10);
+    if (!isNaN(n) && n > max) max = n;
+  });
+  return 'MOV-' + String(max + 1).padStart(4, '0');
+}
+
+/* Exposed for the verification harness — see MODULE-STANDARD §3: a test that
+ * re-implements the rule proves nothing, so books.mjs drives the real seam. */
+(EPAL.diag = EPAL.diag || {}).woodartMaterials = Materials;

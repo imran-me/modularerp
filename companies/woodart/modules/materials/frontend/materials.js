@@ -69,9 +69,9 @@ function dropProtos(host) {
 
 /* ---- shared chrome -------------------------------------------------------- */
 
-var TABS = [['stock', 'Stock'], ['reorder', 'Reorder'], ['valuation', 'Valuation']];
 var TAB_COPY = {
   stock:     ['Stock', 'Wood, laminates, hardware and finishes — live quantities and what each is worth.'],
+  movements: ['Movements', 'The stock ledger — every receipt, issue, adjustment and wastage, and where it sits.'],
   reorder:   ['Reorder', 'Everything at or below its reorder level, with the refill quantity and cost.'],
   valuation: ['Valuation', 'Where the money is sitting — stock value by category and by item.']
 };
@@ -90,8 +90,15 @@ function head(sub) {
   // The New Material button is in the markup and is REMOVED without the
   // permission — the same grammar as a [data-when] block, never built on demand.
   var add = h.querySelector('[data-act="new"]');
-  if (!canCreate()) add.parentNode.removeChild(add);
-  else add.addEventListener('click', function () { editMaterial(null); });
+  if (!canCreate()) {
+    add.parentNode.removeChild(add);
+  } else if (sub === 'movements') {
+    // On the ledger, the thing you came to do is move stock, not define a material.
+    add.innerHTML = '<i class="bi bi-box-arrow-in-down"></i> Receive Stock';
+    add.addEventListener('click', function () { moveStock(null, 'Receipt'); });
+  } else {
+    add.addEventListener('click', function () { editMaterial(null); });
+  }
   return h;
 }
 
@@ -116,6 +123,12 @@ function canDelete() { return !EPAL.perm || EPAL.perm.can(CID, 'materials', 'del
 
 /* ---- small formatters shared by the three screens ------------------------- */
 function money(v) { return ui.money(v, { compact: true }); }
+
+/* Movement vocabulary — one place, so the ledger, the grid and the buttons
+   never disagree about what a kind looks like. */
+var KIND_TONE = { Receipt: 'good', Issue: '', Adjustment: 'warn', Wastage: 'bad' };
+var KIND_ICON = { Receipt: 'box-arrow-in-down', Issue: 'box-arrow-up',
+                  Adjustment: 'sliders', Wastage: 'trash3' };
 function stockCell(m) {
   var low = Materials.isLow(m);
   return '<span class="num ' + (low ? 'text-bad' : '') + '">' + ui.num(+m.stock || 0) + '</span>' +
@@ -135,7 +148,8 @@ EPAL.view(ROUTE, {
     page.appendChild(head(sub));
     page.appendChild(tabs(sub));
 
-    ({ stock: stockScreen, reorder: reorderScreen, valuation: valuationScreen }[sub])(page);
+    ({ stock: stockScreen, movements: movementsScreen,
+       reorder: reorderScreen, valuation: valuationScreen }[sub])(page);
 
     ctx.mount.appendChild(page);
   }
@@ -184,11 +198,81 @@ function registerTable(rows) {
     searchKeys: ['id', 'name', 'category', 'supplier'],
     filters: [{ key: 'category', label: 'Category' }],
     onRow: function (r) { editMaterial(Materials.find(r.id)); },
-    actions: canDelete() ? [{ icon: 'trash', title: 'Delete material', onClick: deleteMaterial }] : null,
+    actions: stockRowActions(),
     exportName: 'woodart-materials.csv',
     pageSize: 12,
     empty: { icon: 'boxes', title: 'No materials yet', hint: 'Add your first item to start tracking stock.' }
   });
+}
+
+/** The per-row actions on the register. Moving stock lives HERE, next to the
+ *  material it moves, rather than behind a separate desk — and every one of
+ *  them goes through Materials.apply(), so the ledger is never bypassed. */
+function stockRowActions() {
+  var acts = [];
+  if (canCreate()) {
+    acts.push({ icon: 'box-arrow-in-down', title: 'Receive stock',
+      onClick: function (r) { moveStock(Materials.find(r.id), 'Receipt'); } });
+    acts.push({ icon: 'box-arrow-up', title: 'Issue to a project',
+      onClick: function (r) { moveStock(Materials.find(r.id), 'Issue'); } });
+    acts.push({ icon: 'clock-history', title: 'Movement history',
+      onClick: function (r) { showHistory(Materials.find(r.id)); } });
+  }
+  if (canDelete()) {
+    acts.push({ icon: 'trash', title: 'Delete material', onClick: deleteMaterial });
+  }
+  return acts.length ? acts : null;
+}
+
+/** One material's ledger + where it sits — the answer to "why is it only 26?". */
+function showHistory(m) {
+  if (!m) return;
+  var rows = Materials.historyOf(m.id);
+  var body = el('div');
+
+  body.appendChild(el('div.stat-row.mb-2', null, [
+    st2('In stock', ui.num(m.stock) + ' ' + (m.unit || '')),
+    st2('Movements', String(rows.length)),
+    st2('Value', ui.money(Materials.valueOf(m)))
+  ]));
+
+  var byLoc = Materials.byLocation(m.id);
+  if (byLoc.length) {
+    body.appendChild(el('div.section-label', { text: 'Where it sits' }));
+    var ll = el('div.data-list');
+    byLoc.forEach(function (l) {
+      ll.appendChild(el('div.data-row', null, [
+        el('span.flex-1', { text: l.name }),
+        el('span.num' + (l.qty < 0 ? '.text-bad' : ''), { text: ui.num(l.qty) })
+      ]));
+    });
+    body.appendChild(ll);
+  }
+
+  body.appendChild(el('div.section-label', { text: 'Ledger' }));
+  if (!rows.length) {
+    body.appendChild(el('p.text-mute.sm', { text: 'No movements recorded yet.' }));
+  } else {
+    var list = el('div.data-list');
+    rows.forEach(function (v) {
+      var q = +v.qty || 0;
+      list.appendChild(el('div.data-row', null, [
+        el('span.badge' + (KIND_TONE[v.kind] ? '.badge-' + KIND_TONE[v.kind] : ''), { text: v.kind }),
+        el('div.flex-1', null, [
+          el('div.fw-600', { text: (q >= 0 ? '+' : '') + ui.num(q) + ' · ' + Materials.locationName(v.location) }),
+          el('div.text-mute.xs', { text: (v.ref ? v.ref + ' · ' : '') + (v.note || '') + (v.by ? ' — ' + v.by : '') })
+        ]),
+        el('span.text-mute.xs', { text: v.date ? ui.date(v.date) : '' })
+      ]));
+    });
+    body.appendChild(list);
+  }
+
+  ui.modal({ title: m.name + ' · stock ledger', icon: 'clock-history', size: 'lg', body: body, footer: false });
+}
+
+function st2(k, v) {
+  return el('div.stat', null, [ el('div.stat-label', { text: k }), el('div.stat-value', { text: String(v) }) ]);
 }
 
 /** Delete always asks first, and always names what is being removed — a stock
@@ -197,13 +281,155 @@ function deleteMaterial(row) {
   ui.confirm({
     title: 'Delete ' + row.id + '?',
     body: row.name + ' (' + ui.num(+row.stock || 0) + ' ' + (row.unit || 'units') + ', worth ' +
-      ui.money(Materials.valueOf(row)) + ') will be removed from the register. This cannot be undone.',
+      ui.money(Materials.valueOf(row)) + ') will be removed from the register, along with its ' +
+      Materials.historyOf(row.id).length + ' movement record(s) — a ledger for a material nobody ' +
+      'can look at is orphaned evidence. This cannot be undone.',
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;
     Materials.remove(row.id);
     ui.toast(row.id + ' deleted', 'success');
     EPAL.router.render();
+  });
+}
+
+/* ======================================================== SCREEN · MOVEMENTS */
+function movementsScreen(page) {
+  var s = screen('movements');
+  var sum = Materials.movementSummary();
+  var locs = Materials.locationTotals();
+  var drift = Materials.reconcile();
+
+  fillK(s, 'movements', ui.num(sum.movements));
+  fillK(s, 'received', ui.num(sum.received));
+  fillK(s, 'issued', ui.num(sum.issued));
+  fillK(s, 'wasted', ui.num(sum.wasted));
+  fillK(s, 'locations', ui.num(sum.locations));
+
+  // The drift banner is the invariant made visible. Healthy = removed.
+  var banner = when(s, 'drift', drift.length > 0);
+  if (banner) {
+    fillK(banner, 'driftInline', ui.num(drift.length));
+    banner.querySelector('[data-act="showDrift"]')
+      .addEventListener('click', function () { showDrift(drift); });
+  }
+
+  // one cloned row per location — the count is data
+  var host = fill(s, 'locations');
+  var max = locs.reduce(function (t, l) { return Math.max(t, l.value); }, 0);
+  locs.forEach(function (l) {
+    var row = proto(host, 'loc');
+    slot(row, 'name').textContent = l.name + ' · ' + l.kind;
+    slot(row, 'value').textContent = ui.money(l.value);
+    slot(row, 'detail').textContent = ui.num(l.qty) + ' units' + (l.area ? ' · ' + l.area : '');
+    slot(row, 'bar').style.width = (max ? Math.round(l.value / max * 100) : 0) + '%';
+    host.appendChild(row);
+  });
+  dropProtos(host);
+
+  fill(s, 'register').appendChild(EPAL.table({
+    columns: [
+      { key: 'date', label: 'Date', date: true },
+      { key: 'id', label: 'Ref', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.id) + '</span>'; } },
+      { key: 'material', label: 'Material',
+        render: function (r) {
+          var m = Materials.find(r.material);
+          return m ? ui.escapeHtml(m.name) + ' <span class="text-mute xs">' + ui.escapeHtml(r.material) + '</span>'
+                   : ui.escapeHtml(r.material) + ' <span class="badge badge-warn">removed</span>';
+        } },
+      { key: 'kind', label: 'Kind', badge: KIND_TONE },
+      { key: 'qty', label: 'Qty', num: true,
+        render: function (r) {
+          var q = +r.qty || 0;
+          return '<span class="num ' + (q >= 0 ? 'text-good' : 'text-bad') + '">' +
+            (q >= 0 ? '+' : '') + ui.num(q) + '</span>';
+        } },
+      { key: 'location', label: 'Location', render: function (r) { return '<span class="badge">' + ui.escapeHtml(Materials.locationName(r.location)) + '</span>'; } },
+      { key: 'ref', label: 'Against' },
+      { key: 'by', label: 'By' }
+    ],
+    rows: Materials.movements(),
+    searchKeys: ['id', 'material', 'kind', 'ref', 'by', 'note'],
+    filters: [{ key: 'kind', label: 'Kind' }],
+    exportName: 'woodart-stock-movements.csv',
+    pageSize: 14,
+    empty: { icon: 'arrow-left-right', title: 'No movements yet', hint: 'Receive stock in to start the ledger.' }
+  }).el);
+
+  var canvas = fill(s, 'chart');
+  mountScreen(page, s);
+
+  requestAnimationFrame(function () {
+    var mix = [['Received', sum.received], ['Issued', sum.issued], ['Wastage', sum.wasted]]
+      .filter(function (r) { return r[1] > 0; });
+    if (!EPAL.charts || !mix.length || !canvas.isConnected) return;
+    EPAL.charts.doughnut(canvas, {
+      labels: mix.map(function (r) { return r[0]; }),
+      data: mix.map(function (r) { return r[1]; })
+    });
+  });
+}
+
+/** The invariant, spelled out. Only ever opened from the drift banner, which
+ *  in a healthy system is not on the page at all. */
+function showDrift(rows) {
+  var body = el('div');
+  body.appendChild(el('p.text-mute.sm', { text:
+    'These stored stock levels do not equal the sum of their movements. Until the ' +
+    'difference is explained by an adjustment, the number on the register cannot be trusted.' }));
+  var list = el('div.data-list');
+  rows.forEach(function (r) {
+    list.appendChild(el('div.data-row', null, [
+      el('div.flex-1', null, [
+        el('div.fw-600', { text: r.name }),
+        el('div.text-mute.xs', { text: r.id })
+      ]),
+      el('div', { style: { textAlign: 'right' } }, [
+        el('div.num', { text: 'stored ' + ui.num(r.stock) + ' · ledger ' + ui.num(r.moved) }),
+        el('div.num.text-bad.xs', { text: 'drift ' + (r.drift > 0 ? '+' : '') + ui.num(r.drift) })
+      ])
+    ]));
+  });
+  body.appendChild(list);
+  ui.modal({ title: 'Stock that does not reconcile', icon: 'exclamation-octagon', size: 'md', body: body, footer: false });
+}
+
+/** Move stock — the ONLY path, and it always writes a row. */
+function moveStock(material, kind) {
+  if (!canCreate()) { ui.toast('You do not have permission to move stock', 'error'); return; }
+  var m = material || null;
+
+  EPAL.formModal({
+    title: kind + (m ? ' · ' + m.name : ''),
+    icon: KIND_ICON[kind] || 'arrow-left-right',
+    size: 'sm',
+    record: { material: m ? m.id : null, kind: kind, qty: null,
+      location: Materials.defaultLocation(), date: Materials.today ? Materials.today() : undefined },
+    fields: [
+      { key: 'material', label: 'Material', type: 'select', required: true, searchable: true,
+        options: Materials.all().map(function (x) { return [x.id, x.name + ' · ' + ui.num(x.stock) + ' ' + (x.unit || '')]; }) },
+      { key: 'qty', label: kind === 'Adjustment' ? 'Adjust by (+/-)' : 'Quantity', type: 'number', required: true,
+        hint: kind === 'Receipt' ? 'Adds to stock.'
+            : kind === 'Adjustment' ? 'A count correction. Negative reduces, positive increases.'
+            : 'Comes out of stock — enter a positive number.' },
+      { key: 'location', label: 'Location', type: 'select', required: true, options: Materials.locationOptions() },
+      { key: 'ref', label: 'Against', type: 'text', col2: true,
+        hint: kind === 'Issue' ? 'The project or job this went to, e.g. WAP-102.' : 'Optional reference.' },
+      { key: 'by', label: 'Recorded by', type: 'text', col2: true },
+      { key: 'note', label: 'Note', type: 'text' }
+    ],
+    saveLabel: kind,
+    onSave: function (v) {
+      var row = Materials.apply({
+        material: v.material, kind: kind, qty: v.qty, location: v.location,
+        ref: v.ref, note: v.note, by: v.by || 'Staff'
+      });
+      if (!row) { ui.toast('Nothing to move', 'error'); return true; }
+      var mm = Materials.find(v.material);
+      ui.toast(kind + ' ' + ui.num(Math.abs(row.qty)) + ' · ' + mm.name + ' now ' + ui.num(mm.stock), 'success');
+      EPAL.router.render();
+      return true;
+    }
   });
 }
 

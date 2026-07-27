@@ -162,7 +162,7 @@
     m('clients',      'Clients',          'person-hearts', { desc:'Homeowners, developers, corporates.',
         subs:[['directory','Directory'],['portfolio','Portfolio'],['segments','Segments']] }),
     m('materials',    'Materials',        'boxes', { desc:'Wood, laminates, hardware, finishes inventory.',
-        subs:[['stock','Stock'],['reorder','Reorder'],['valuation','Valuation']] }),
+        subs:[['stock','Stock'],['movements','Movements'],['reorder','Reorder'],['valuation','Valuation']] }),
     m('production',   'Workshop',         'hammer', { desc:'Fabrication jobs, machine & labour scheduling.',
         subs:[['jobs','Job Register'],['board','Workshop Board'],['load','Station Load']] }),
     m('installation', 'Site & Install',   'truck', { desc:'Delivery, installation, site handover & snags.',
