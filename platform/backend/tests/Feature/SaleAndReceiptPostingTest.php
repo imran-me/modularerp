@@ -6,6 +6,7 @@ use App\Exceptions\LedgerException;
 use App\Services\ReceiptPostingService;
 use App\Services\SalePostingService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\Support\BuildsMoneySchema;
 use Tests\TestCase;
 
@@ -103,6 +104,55 @@ class SaleAndReceiptPostingTest extends TestCase
 
         $this->assertSame(20000.0, $this->lineOn('GL-STKT-4', '1150', 'debit'));
         $this->assertSame(0.0, $this->lineOn('GL-STKT-4', '1200', 'debit'));
+    }
+
+    /**
+     * …and the caller should not have to KNOW. The SPA looks the buyer up in
+     * `tv_agents` (ledger.js isAgentParty), so a module that just posts a sale still
+     * gets 1150. This does the same lookup — without it, every sub-agent sale posted
+     * through the API would have quietly landed in customer AR and corrupted both
+     * ageing books.
+     */
+    public function test_a_known_sub_agent_is_detected_without_being_told(): void
+    {
+        Schema::create('tv_agents', function ($t) {
+            $t->id();
+            $t->string('ext_id')->nullable();
+            $t->string('company_id')->nullable();
+            $t->string('status')->nullable();
+            $t->json('data')->nullable();
+            $t->timestamps();
+        });
+        DB::table('tv_agents')->insert(['ext_id' => 'AG-1', 'company_id' => 'travels',
+            'data' => json_encode(['id' => 'AG-1', 'name' => 'Sky Travels'])]);
+
+        // no isAgent flag passed — the name alone must be enough
+        $this->sales->record(['ref' => 'TKT-4B', 'companyId' => 'travels', 'amount' => 8000,
+            'cost' => 0, 'category' => 'air', 'customer' => 'Sky Travels']);
+        $this->assertSame(8000.0, $this->lineOn('GL-STKT-4B', '1150', 'debit'));
+
+        // a plain customer still goes to 1200
+        $this->sales->record(['ref' => 'TKT-4C', 'companyId' => 'travels', 'amount' => 5000,
+            'cost' => 0, 'category' => 'air', 'customer' => 'Mr Rahman']);
+        $this->assertSame(5000.0, $this->lineOn('GL-STKT-4C', '1200', 'debit'));
+
+        // an explicit flag still overrides the lookup
+        $this->sales->record(['ref' => 'TKT-4D', 'companyId' => 'travels', 'amount' => 3000,
+            'cost' => 0, 'category' => 'air', 'customer' => 'Sky Travels', 'isAgent' => false]);
+        $this->assertSame(3000.0, $this->lineOn('GL-STKT-4D', '1200', 'debit'));
+
+        Schema::dropIfExists('tv_agents');
+    }
+
+    /** No agents table (a host without the vendor-agent module) → customer AR, not a crash. */
+    public function test_it_falls_back_to_customer_ar_when_there_is_no_agents_table(): void
+    {
+        Schema::dropIfExists('tv_agents');
+
+        $this->sales->record(['ref' => 'TKT-4E', 'companyId' => 'travels', 'amount' => 1000,
+            'cost' => 0, 'category' => 'air', 'customer' => 'Sky Travels']);
+
+        $this->assertSame(1000.0, $this->lineOn('GL-STKT-4E', '1200', 'debit'));
     }
 
     /** A void/refund carries a NEGATIVE cost — the cost leg must still reverse. */

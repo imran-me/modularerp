@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\LedgerException;
 use App\Support\CompanySlugs;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -106,7 +107,7 @@ class SalePostingService
         // where the customer's side lands
         $debit = $paid
             ? ($inBank ? $this->register->glAccountFor($inBank) : '1010')
-            : (($in['isAgent'] ?? false) === true ? self::AR_AGENT : self::AR_CUSTOMER);
+            : ($this->isAgent($in) ? self::AR_AGENT : self::AR_CUSTOMER);
         // …and where the vendor's side comes from
         $creditCost = ($in['costPaid'] ?? false) === true
             ? ($outBank ? $this->register->glAccountFor($outBank) : '1010')
@@ -193,6 +194,40 @@ class SalePostingService
                 ])),
             ];
         });
+    }
+
+    /**
+     * Is the buyer one of our SUB-AGENTS? Their debt belongs in 1150 Sub-Agent
+     * Receivable, not customer AR 1200 — mixing the two corrupts both ageing books.
+     *
+     * The SPA does not ask, it LOOKS UP the name in `tv_agents` (ledger.js
+     * isAgentParty). This does the same, so a caller that simply posts a sale gets
+     * the right control account without having to know the party is an agent — an
+     * explicit `isAgent` flag still wins when the caller does know.
+     * Falls back to false if the table is absent (a host without the travels
+     * vendor-agent module), which is the safe side: customer AR, not agent AR.
+     */
+    private function isAgent(array $in): bool
+    {
+        if (array_key_exists('isAgent', $in)) {
+            return $in['isAgent'] === true;
+        }
+        $name = trim((string) ($in['customer'] ?? ''));
+        if ($name === '') {
+            return false;
+        }
+        try {
+            if (! Schema::hasTable('tv_agents')) {
+                return false;
+            }
+            // agents are stored document-style: the display name lives in `data`
+            return DB::table('tv_agents')
+                ->where('data->name', $name)
+                ->orWhere('ext_id', $name)
+                ->exists();
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**
