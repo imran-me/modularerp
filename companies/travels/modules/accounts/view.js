@@ -1616,15 +1616,57 @@ function chequeDetail(c) {
     el('div.data-list', null, [ drow('Type', c.type), drow('Party', c.party), drow('Bank', c.bank), drow('Issue date', c.date ? ui.date(c.date) : '—'), drow('Due / clearing date', c.dueDate ? ui.date(c.dueDate) : '—'), drow('Reference', c.ref) ])
   ]) ]));
 }
-function setChequeStatus(c, status) { c.status = status; db.save('tv_cheques', c); ui.toast('Cheque ' + status.toLowerCase(), 'success'); EPAL.router.render(); }
+/* A cheque only moves money when it CLEARS — and until this audit (2026-07-27)
+ * clearing one changed nothing but a badge: no journal, no bank balance, no row
+ * in the account's history. The bank never heard about it.
+ *   Issued  → cleared:  DR 2000 Accounts Payable / CR <our account>   (we paid)
+ *   Received → cleared: DR <our account> / CR 1200 Receivable         (we were paid)
+ * Bouncing a cleared cheque reverses that journal and hands the money back.
+ * A PENDING cheque still posts nothing — the underlying bill is already on the
+ * books as payable/receivable, and posting on issue would count it twice. */
+function chequeGl(c) { return 'GL-CHQ-' + c.id; }
+function postChequeClearing(c) {
+  var amt = +c.amount || 0;
+  if (amt <= 0 || c.glId) return;
+  var acct = c.bankId ? accountById(c.bankId) : null;
+  var gl = acct ? pay().glAcctOf(acct) : '1010';
+  var issued = (c.type || 'Issued') === 'Issued';
+  try {
+    EPAL.ledger.post({ id: chequeGl(c), date: c.dueDate || c.date || TODAY_STR, companyId: CID,
+      ref: c.number || c.id, source: 'manual', party: c.party || '',
+      memo: 'Cheque ' + (c.number || c.id) + ' cleared · ' + (issued ? 'paid ' : 'received from ') + (c.party || '—') + (c.bankName ? ' · ' + c.bankName : ''),
+      lines: issued ? [{ account: '2000', dr: amt, cr: 0 }, { account: gl, dr: 0, cr: amt }]
+                    : [{ account: gl, dr: amt, cr: 0 }, { account: '1200', dr: 0, cr: amt }] });
+  } catch (e) { ui.toast(e.message || 'Ledger posting failed', 'error'); return; }
+  c.glId = chequeGl(c);
+  if (c.bankId) syncRegisterLeg({ id: c.id, companyId: CID, bankId: c.bankId, kind: issued ? 'Expense' : 'Income',
+    amount: amt, category: 'Cheque ' + (issued ? 'paid' : 'received'), party: c.party || '',
+    ref: c.number || c.id, date: c.dueDate || c.date || TODAY_STR, glId: c.glId }, null);
+}
+function unpostChequeClearing(c) {
+  if (!c.glId) return;
+  try { EPAL.ledger.reverse(c.glId, { reason: 'Cheque ' + (c.number || c.id) + ' bounced' }); } catch (e) {}
+  if (c.bankId) pay().reverseRegister({ id: c.id, companyId: CID, bankId: c.bankId,
+    kind: (c.type || 'Issued') === 'Issued' ? 'Expense' : 'Income', amount: +c.amount || 0,
+    ref: c.number || c.id, glId: c.glId }, TODAY_STR);
+  c.glId = '';
+}
+function syncChequePosting(c) {
+  if (c.status === 'Cleared') postChequeClearing(c); else unpostChequeClearing(c);
+}
+function setChequeStatus(c, status) { c.status = status; syncChequePosting(c); db.save('tv_cheques', c); ui.toast('Cheque ' + status.toLowerCase(), 'success'); EPAL.router.render(); }
 function chequeForm(rec) {
   var isNew = !rec;
+  var seed = Object.assign({ type: 'Issued', status: 'Pending', date: TODAY_STR, dueDate: TODAY_STR }, rec || {}, { account: EPAL.pay.valueOf(rec) });
   EPAL.formModal({
-    title: isNew ? 'New Cheque' : 'Edit Cheque', icon: 'bank', size: 'md', record: rec || { type: 'Issued', status: 'Pending', date: TODAY_STR, dueDate: TODAY_STR },
+    title: isNew ? 'New Cheque' : 'Edit Cheque', icon: 'bank', size: 'md', record: seed,
     fields: [
       { key: 'type', label: 'Type', type: 'select', options: ['Issued', 'Received'], required: true },
       { key: 'number', label: 'Cheque no', type: 'text', required: true },
       { key: 'bank', label: 'Bank', type: 'text' },
+      { key: 'account', label: 'Our account', type: 'select', required: true, searchable: true,
+        options: paySourceOptions(CID),
+        hint: 'Issued → the money leaves this account when the cheque clears. Received → it lands here on clearing. Nothing moves while the cheque is Pending.' },
       { key: 'party', label: 'Party', type: 'text', placeholder: 'Payee / drawer' },
       { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
       { key: 'date', label: 'Issue date', type: 'date', default: TODAY_STR },
@@ -1637,6 +1679,8 @@ function chequeForm(rec) {
       var r = rec || { id: 'CHQ-' + ui.uid('').slice(-5).toUpperCase(), companyId: CID };
       ['type', 'number', 'bank', 'party', 'date', 'dueDate', 'status', 'ref'].forEach(function (k) { r[k] = val[k]; });
       r.amount = +val.amount || 0;
+      pay().stamp(r, val.account);                  // which of OUR accounts it hits
+      syncChequePosting(r);                         // saved as Cleared → post it now
       db.save('tv_cheques', r);
       ui.toast('Cheque saved', 'success'); EPAL.router.render(); return true;
     }
@@ -1719,6 +1763,14 @@ function pettyView(page) {
   });
   page.appendChild(titledCard(ui.icon('cash') + ' Petty Cash — IOU Register', 'click an open slip to settle against a bill', tbl.el));
 }
+/* An IOU is real money leaving a real drawer, so it must say WHICH drawer and
+ * land on the books the moment it is handed over (audit 2026-07-27 — it used to
+ * write only the slip: the cash was gone but every balance still showed it).
+ *   Give IOU   DR 1250 Employee Advances / CR <the account it came out of>
+ *   Settle     DR <expense head> / CR 1250   (+ any unspent balance handed back
+ *              to the same account: DR that account / CR 1250)
+ * so 1250 always shows exactly what staff are still holding, and the paying
+ * account's balance and history follow both legs. */
 function pettyForm(rec) {
   EPAL.formModal({
     title: 'Give Petty-Cash IOU', icon: 'cash', size: 'md', record: { date: TODAY_STR },
@@ -1726,30 +1778,55 @@ function pettyForm(rec) {
       { key: 'staff', label: 'Staff', type: 'text', required: true, placeholder: 'Who is holding the cash' },
       { key: 'amount', label: 'IOU amount (৳)', type: 'money', required: true, min: 1 },
       { key: 'purpose', label: 'Purpose', type: 'text', required: true, placeholder: 'e.g. Office supplies, courier' },
+      { key: 'source', label: 'Given from', type: 'select', required: true, searchable: true,
+        options: paySourceOptions(CID), hint: 'The cash leaves this account and sits on 1250 Employee Advances until the bill comes back.' },
       { key: 'date', label: 'Date', type: 'date', default: TODAY_STR }
     ],
     saveLabel: 'Give IOU',
     onSave: function (val) {
       var r = { id: 'PC-' + ui.uid('').slice(-5).toUpperCase(), companyId: CID, staff: (val.staff || '').trim(), amount: +val.amount || 0, purpose: val.purpose || '', date: val.date || TODAY_STR, status: 'Open' };
+      pay().stamp(r, val.source);                 // method + payAcct + bankId/bankName
+      var src = resolveSource(val.source);
+      try {
+        EPAL.ledger.post({ id: 'GL-PCI-' + r.id, date: r.date, companyId: CID, ref: r.id,
+          memo: 'Petty-cash IOU · ' + r.staff + ' · ' + r.purpose + (r.bankName ? ' · ' + r.bankName : ''),
+          source: 'manual', party: r.staff,
+          lines: [{ account: '1250', dr: r.amount, cr: 0 }, { account: src.gl, dr: 0, cr: r.amount }] });
+      } catch (e) { ui.toast(e.message || 'Ledger posting failed', 'error'); return false; }
+      r.glId = 'GL-PCI-' + r.id;                  // the advance leg exists — settle clears 1250
       db.save('tv_petty', r);
-      ui.toast('IOU given to ' + r.staff, 'success'); EPAL.router.render(); return true;
+      syncRegisterLeg({ id: r.id, companyId: CID, bankId: r.bankId, kind: 'Expense', amount: r.amount,
+        category: 'Petty-cash IOU', party: r.staff, ref: r.id, date: r.date, glId: 'GL-PCI-' + r.id }, null);
+      ui.toast('IOU given to ' + r.staff + (r.bankName ? ' from ' + r.bankName : ''), 'success'); EPAL.router.render(); return true;
     }
   });
 }
-// settle an IOU against a bill — books the actual spend (DR expense / CR Cash).
+// settle an IOU against a bill — books the spend and clears the advance.
 function settlePetty(p) {
   EPAL.formModal({
     title: 'Settle IOU — ' + p.staff, icon: 'check2-circle', size: 'md', record: { billAmount: p.amount, category: 'Travel & Conveyance' },
     fields: [
       { key: 'category', label: 'Expense head', type: 'text', required: true, default: 'Travel & Conveyance', hint: 'What the petty cash was spent on.' },
-      { key: 'billAmount', label: 'Bill amount (৳)', type: 'money', required: true, min: 0, max: p.amount, hint: 'IOU was ' + ui.money(p.amount) + '; any balance is returned to cash.' },
+      { key: 'billAmount', label: 'Bill amount (৳)', type: 'money', required: true, min: 0, max: p.amount, hint: 'IOU was ' + ui.money(p.amount) + '; any balance is returned to ' + (p.bankName || 'cash') + '.' },
       { key: 'billNo', label: 'Bill / voucher no', type: 'text' }
     ],
     saveLabel: 'Settle',
     onSave: function (val) {
       var bill = Math.min(+val.billAmount || 0, p.amount);
+      var back = Math.round((p.amount - bill) * 100) / 100;     // unspent, handed back
+      // slips written before the IOU was booked have no advance to clear — those
+      // still credit the drawer directly, exactly as they always did.
+      var booked = !!p.glId;
+      var srcGl = booked ? (p.bankId && accountById(p.bankId) ? pay().glAcctOf(accountById(p.bankId)) : '1000') : '1000';
       if (EPAL.ledger && EPAL.ledger.post && bill > 0) {
-        try { EPAL.ledger.post({ id: 'GL-PCS-' + p.id, date: TODAY_STR, companyId: CID, ref: p.id, memo: 'Petty cash · ' + p.staff + ' · ' + val.category, source: 'manual', party: p.staff, lines: [{ account: expenseAccountFor(val.category), dr: bill, cr: 0 }, { account: '1000', dr: 0, cr: bill }] }); } catch (e) {}
+        try { EPAL.ledger.post({ id: 'GL-PCS-' + p.id, date: TODAY_STR, companyId: CID, ref: p.id, memo: 'Petty cash · ' + p.staff + ' · ' + val.category, source: 'manual', party: p.staff, lines: [{ account: expenseAccountFor(val.category), dr: bill, cr: 0 }, { account: booked ? '1250' : '1000', dr: 0, cr: bill }] }); } catch (e) {}
+      }
+      if (booked && back > 0) {
+        try { EPAL.ledger.post({ id: 'GL-PCR-' + p.id, date: TODAY_STR, companyId: CID, ref: p.id,
+          memo: 'Petty cash returned · ' + p.staff + (p.bankName ? ' · ' + p.bankName : ''), source: 'manual', party: p.staff,
+          lines: [{ account: srcGl, dr: back, cr: 0 }, { account: '1250', dr: 0, cr: back }] }); } catch (e) {}
+        if (p.bankId) syncRegisterLeg({ id: p.id + '-BACK', companyId: CID, bankId: p.bankId, kind: 'Income', amount: back,
+          category: 'Petty-cash returned', party: p.staff, ref: p.id, date: TODAY_STR, glId: 'GL-PCR-' + p.id }, null);
       }
       p.status = 'Settled'; p.category = val.category; p.billAmount = bill; p.billNo = val.billNo || ''; p.settledDate = TODAY_STR;
       db.save('tv_petty', p);
