@@ -154,23 +154,40 @@ Finance was ONE hand-written 133KB `view.js` (13 chart/table screens). Steps don
   (the law's "live data / feature" carve-out). Then final full parity + backend (LARAVEL
   blueprint exists; build the real slice + test vs MySQL) before FINANCE COMPLETE.
 
-**◑ TRAVELS ACCOUNTS — real-HTML rebuild IN PROGRESS (priority #3, 2026-07-26).**
+**✅ TRAVELS ACCOUNTS — real-HTML rebuild COMPLETE (priority #3, 2026-07-26 → 07-27).**
 The earlier "el()→template markup" pass (below) was the OLD `<template data-tpl>` fragment
-style the owner REJECTED — it's being REDONE as real `<section data-screen>` HTML, exactly
-like master-accounts + finance. Progress:
-- ✅ Added `screen()/shell()/fillK()/mountScreen()` helpers to `frontend/accounts.js`.
-- ✅ Converted screens to `<section data-screen>` — **banks** (full), **income + expenses**
-  (the shared `kindRegister` KPI strip). All **byte-identical** (back-to-back proven).
-  Commits f6864bd, f2f192a. Baseline shots at `.parity/tacc-before` (9 routes × 2).
-- ◻ **REMAINING screens:** overview (`overview()` @ ~392 — action-center + charts),
-  journals (`journalsView`), schedules (`schedulesView`), recurring (`recurringView`), and
-  the `kindRegister` head-chips + `entriesTable` (dynamic filter widget + data grid → stay
-  JS). `cash` + `payroll` routes delegate to shared kits (`EPAL.cashDesk`/`EPAL.payrollDesk`)
-  — out of scope. Screen dispatch map is at `accounts.js` ~line 384; shared head still uses
-  `EPAL.pageHead` + a tab-nav band (~line 269) — convert to shells like finance did.
-- **Verify BACK-TO-BACK** (my build vs the `_frontend-originals/_readability-backup/
-  travels-accounts/` or `git show HEAD:…view.js` backup) — the `.parity` baseline drifts
-  (localStorage accumulation), same as finance. See [[parity-sweep-context-journal]].
+style the owner REJECTED — it was REDONE as real `<section data-screen>` HTML, exactly like
+master-accounts + finance. Every screen this module owns is now markup:
+- ✅ Helpers `screen()/shell()/fillK()/mountScreen()` + a local `head()` in `frontend/accounts.js`.
+- ✅ **banks**, **income + expenses** (the shared `kindRegister` KPI strip) — commits
+  f6864bd, f2f192a.
+- ✅ **recurring · schedules · journals** — commit d4e0a5b. Banners that depend on state
+  (recurring "due this month", schedules "overdue") live in the markup and are REMOVED
+  when they don't apply, which is also how the create-permission hides Generate All.
+- ✅ **overview** (KPI strip · Action Center card *and* its "all clear" banner · the three
+  chart cards + canvases · recent-entries card) **and the shared chrome** — the page-head
+  bar now mirrors `EPAL.pageHead`'s markup as `[data-shell="head"]` (local `head()` fills
+  eyebrow/title/sub/actions; the title stays a TEXT node after the icon), the 9-button
+  section-nav band is markup (its `data-tab` hooks are stripped after wiring) and the
+  period-lock badge is a shell. Commit cf07970.
+- **Still JS BY DESIGN** (mapped, not skipped): the `EPAL.form` line-item repeater, the
+  `EPAL.table` data grids, the `kindRegister` head-chips filter widget, the Action-Center
+  rows (0..N from live data) and the Chart.js canvases. `cash` + `payroll` delegate to the
+  shared kits (`EPAL.cashDesk`/`EPAL.payrollDesk`) — out of scope for this module.
+- **PROOF:** back-to-back parity over **all nine routes × both themes** (stash the change →
+  shoot before → restore → shoot after → diff): **18/18 BYTE-IDENTICAL**. Overview also
+  proven by a **DOM dump**: after normalising the `data-*` hooks and the generated canvas
+  ids, the produced DOM is character-for-character what the `el()` code produced. Sweep
+  222/222 × both themes, 0 console errors.
+- **Method note for the next module:** `.parity` baselines DRIFT (localStorage
+  accumulation), so always shoot before/after back-to-back in one sitting; and a DOM dump
+  (`#view` innerHTML, hooks normalised) is a stronger proof than pixels for markup work —
+  it catches structure the 1440×900 fold never shows. See [[parity-sweep-context-journal]].
+- 🐞 **BUG FOUND + FIXED while converting (6752028):** the overview's *Recent Entries* card
+  passed the table INSTANCE to its container instead of `.el`, so `ui.appendChildren`
+  stringified it and the card rendered the literal text **`[object Object]`** — the whole
+  register was missing from the cockpit. Fixed in its OWN commit, after the byte-identical
+  conversion, so the parity proof stayed honest.
 
 **(superseded) earlier Travels Accounts FE note — was the rejected fragment style:**
 - **FE:** route screens converted el()→template markup; reusable fragments + helpers added;
@@ -194,13 +211,24 @@ each migrated + CRUD-tested vs MySQL + api.js wired: accounts (7c7156f), marketi
 vendor-agent 5 stores (b011c26). Plus passport-mgmt/settings/file-management earlier.
 reports/analytics/dashboard/ledgers are read-only views (no owned stores → no backend).
 
-**▶ NEXT (resume here):** FRONTEND pass for the remaining Travels modules — most were
-"converted" in prior sessions (structural shells templated, dynamic content el(), like
-marketing), so per-module: shoot baseline → convert any UN-templated route cards (like
-Travels Accounts had) → parity byte-identical. Modules to check: automation · reports ·
-analytics · crm · dashboard · ledgers · contract-file · contract-flight · vendor-agent ·
-hrm · visa-processing · air-ticketing (payroll backend already built via master-accounts).
-Then Group-cockpit modules, then woodart/it/shop/construction. Autonomous, push each.
+**▶ NEXT (resume here):** priorities #1–#3 (master-accounts · finance · travels-accounts)
+are all real-HTML COMPLETE. Next is the FRONTEND pass for the remaining Travels modules —
+most were "converted" in prior sessions (structural shells templated, dynamic content
+el(), like marketing), so per-module: shoot baseline → convert any UN-templated route
+cards (exactly as Travels Accounts needed) → parity byte-identical. Modules to check:
+**travels/ledgers first** (it is the statement suite the accounting build order is still
+working through), then automation · reports · analytics · crm · dashboard ·
+contract-file · contract-flight · vendor-agent · hrm · visa-processing · air-ticketing
+(payroll backend already built via master-accounts). Then Group-cockpit modules, then
+woodart/it/shop/construction. Autonomous, push each.
+
+> Also still open from the ACCOUNTING build order (independent of the HTML work):
+> **step 5 part 2 = Group consolidated P&L** (sum every concern's `pnl()` with
+> inter-company 4000/5000 elimination + the Group's own income line; the engine has
+> `consolidatedTrialBalance` but no consolidated P&L).
+> And one OWNER action nobody else can do: **run `php artisan migrate` on the host** so
+> `bank_transactions` exists — the bank movement log then starts persisting by itself
+> (the client already asks the server whether the table is there).
 
 ## 🚨 CORRECTION — 2026-07-26 (owner reminded me) · FULL-STACK MEANS FRONTEND **AND** BACKEND
 
