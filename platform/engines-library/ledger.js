@@ -1060,9 +1060,16 @@
       var incAcct = incomeAccountFor(rec);
       var prod = productForAccount(incAcct);   // product label for per-product P&L
       var paid = rec.paid === true || rec.payStatus === 'Paid';
+      // WHICH account the money went into / out of (owner review 2026-07-27).
+      // A sale that names one books to THAT account's own side — a cash box IS
+      // hard cash 1000, not Bank — and its register moves below, so the sale is
+      // visible in Manage Banks / Manage Cash and not only as an abstract 1010.
+      var pay = EPAL.pay && EPAL.pay.byId ? EPAL.pay : null;
+      var inAcct = (paid && pay && rec.bankId) ? pay.byId(rec.bankId) : null;
+      var outAcct = (rec.costPaid === true && pay) ? pay.byId(rec.costBankId || rec.bankId) : null;
       // cash if paid; else the RIGHT receivable for the party class (audit fix:
       // sub-agent sales go to 1150 Agent Receivable, not customer AR)
-      var debit = paid ? '1010' : (isAgentParty(rec.customer) ? '1150' : '1200');
+      var debit = paid ? (inAcct ? pay.glAcctOf(inAcct) : '1010') : (isAgentParty(rec.customer) ? '1150' : '1200');
       // When the sale price includes VAT, only the NET is revenue — the VAT
       // collected is money owed to the NBR (2130 VAT Payable), not income. Split
       // it out so the P&L is not inflated by tax. (Bookkeeping audit fix 6.)
@@ -1083,10 +1090,23 @@
         // payable to the vendor. Non-zero (either sign) posts; only a true-zero-cost
         // sale still books no cost leg. (Bookkeeping audit fix 1, 2026-07-16.)
         if (cost !== 0) {
-          var creditCost = rec.costPaid === true ? '1010' : '2000';
+          var creditCost = rec.costPaid === true ? (outAcct ? pay.glAcctOf(outAcct) : '1010') : '2000';
           post({ id: 'GL-SC' + (rec.id || key), date: rec.date, companyId: rec.companyId,
             ref: rec.ref, memo: (rec.desc || 'Sale') + ' — cost', source: 'sale', party: rec.vendor || rec.customer || '',
             lines: [ { account: '5000', dr: cost, cr: 0, product: prod }, { account: creditCost, dr: 0, cr: cost } ] });
+        }
+        // THE ACCOUNT'S OWN BOOK — balance + a row in its transaction history, so
+        // the money is where the owner looks for it. Runs inside the same
+        // once-per-sale guard above, so it can never double-move.
+        if (inAcct && amount > 0 && pay.syncRegister) {
+          pay.syncRegister({ id: 'SALE-' + (rec.id || key), bankId: inAcct.id, kind: 'Income', amount: amount,
+            category: rec.desc || 'Sale', party: rec.customer || '', ref: rec.ref || '', date: rec.date,
+            companyId: rec.companyId, glId: 'GL-S' + (rec.id || key) }, null);
+        }
+        if (outAcct && cost > 0 && pay.syncRegister) {
+          pay.syncRegister({ id: 'SALECOST-' + (rec.id || key), bankId: outAcct.id, kind: 'Expense', amount: cost,
+            category: (rec.desc || 'Sale') + ' — cost', party: rec.vendor || '', ref: rec.ref || '', date: rec.date,
+            companyId: rec.companyId, glId: 'GL-SC' + (rec.id || key) }, null);
         }
       } catch (e) { console.error('[ledger] auto-post failed', e); }
     });

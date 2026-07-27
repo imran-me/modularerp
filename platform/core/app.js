@@ -157,6 +157,16 @@
     },
 
     /* ---- SHELL -----------------------------------------------------------*/
+    /* REBUILDING THE SHELL REPLACES #view — so the router's mount must be
+     * re-pointed HERE, not by each caller. It is wiped and rebuilt three ways:
+     * at boot, on auth:changed, and after auto-discovery hides a folder. The
+     * last two used to leave EPAL.router.mount pointing at the OLD, now-detached
+     * #view, so every later render() wrote into a node that is not on the page
+     * and the whole app went BLANK — shell visible, content gone, no error.
+     * That made the migration's headline feature self-destructive: delete a
+     * module folder (or leave one half-built, its manifest saying built:true
+     * before its module.json exists) and discovery correctly hid it — then blanked
+     * the app. Owning the mount here means a caller can never forget it again. */
     renderShell: function () {
       var root = $('#app');
       root.innerHTML = '';
@@ -164,6 +174,7 @@
       root.appendChild(this.buildSidebar());
       root.appendChild(this.buildMain());
       root.appendChild(el('div#sidebar-backdrop.sidebar-backdrop', { onclick: function () { App.toggleSidebar(false); } }));
+      if (EPAL.router) EPAL.router.mount = $('#view');        // the new #view, always
       // Populate the module nav for the active company immediately. Without this
       // the sidebar would stay empty on first load (the initial route's company
       // equals the default, so onRoute's "company changed?" guard wouldn't fire).

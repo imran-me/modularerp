@@ -581,7 +581,12 @@
         // customer paid (cash vs receivable) + the vendor and whether they're paid.
         category: sale.category || '', incomeAccount: sale.incomeAccount || '',
         vendor: sale.vendor || '', paid: sale.paid === true, costPaid: sale.costPaid === true,
-        payStatus: sale.payStatus || ''
+        payStatus: sale.payStatus || '',
+        // WHICH account the money moved through (owner review 2026-07-27) —
+        // bankId = where the customer's payment landed, costBankId = where the
+        // vendor was paid from (defaults to bankId). Optional: a sale that names
+        // neither books to the abstract 1010 exactly as it always did.
+        bankId: sale.bankId || '', costBankId: sale.costBankId || ''
       };
       S.upsert('sales', rec);
       // roll into the company's latest financials month

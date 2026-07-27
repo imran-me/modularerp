@@ -124,6 +124,38 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     }
     return true;
   }
+  /* MARK PAID — a receipt into a REAL account (owner review 2026-07-27), the same
+   * flow as a ticket: the applicant's money has to LAND somewhere, so we ask
+   * which account and settle through it. That is what makes the visa fee show up
+   * in Manage Banks / Manage Cash and not only as "1010 went up" on the ledger.
+   * Two cases, both handled:
+   *   · not yet posted to finance → the SALE itself carries the account
+   *   · already posted as a receivable → the receipt settles it (db.settleSale)
+   * Marking back to Due reverses the receipt. */
+  function markVisaPaid(a, redraw, refresh) {
+    var amount = fees(a).customerTotal || a.sale || 0;
+    if (a.payStatus === 'Paid') {
+      a.payStatus = 'Due'; a.bankId = '';
+      db.saveVisaApp(a);
+      db.settleSale('travels', a.id, amount, a.applicant || '', false);
+      redraw(); refresh(); ui.toast('Marked due — the receipt was reversed', 'success');
+      return;
+    }
+    var take = function (src) {
+      a.payStatus = 'Paid';
+      a.bankId = src && src.bank ? src.bank.id : '';
+      db.saveVisaApp(a);
+      if (!a.posted) postVisaToFinance(a);          // the sale itself carries the account
+      db.settleSale('travels', a.id, amount, a.applicant || '', true, { bankId: a.bankId });
+      redraw(); refresh();
+      ui.toast('Payment received' + (src && src.bank ? ' into ' + src.bank.name : ''), 'success');
+    };
+    if (EPAL.pay && EPAL.pay.ask) {
+      EPAL.pay.ask({ title: 'Payment received · ' + (a.applicant || a.id), icon: 'cash-coin',
+        owner: 'travels', amount: amount, saveLabel: 'Record receipt', onPick: take });
+    } else { take(null); }
+  }
+
   // Post a visa sale to finance exactly once (guarded by app.posted).
   function postVisaToFinance(a) {
     if (a.posted) return;
@@ -138,7 +170,11 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       // forward the customer's payment state: a paid application books to cash
       // (1010), an unpaid one to a receivable. Default 'Due' → AR, as before.
       // (Bookkeeping audit fix 2 — cash was booking as debt.)
-      payStatus: a.payStatus || 'Due'
+      payStatus: a.payStatus || 'Due',
+      // …and WHICH account the money landed in, when the desk asked (owner review
+      // 2026-07-27): the sale then hits that account's own side and moves its
+      // balance + history, instead of only an abstract 1010.
+      bankId: a.bankId || ''
     });
     a.posted = true;
     db.saveVisaApp(a);
@@ -537,7 +573,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       STAGES.forEach(function(s){var o=el('option',{value:s.id,text:'Stage → '+s.id});if(s.id===a.stage)o.selected=true;moveSel.appendChild(o);});
       body.appendChild(el('div.flex.gap-1.flex-wrap', null, [
         moveSel,
-        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(a.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ a.payStatus=a.payStatus==='Paid'?'Due':'Paid'; db.saveVisaApp(a); if(a.payStatus==='Paid') postVisaToFinance(a); db.settleSale('travels', a.id, (fees(a).customerTotal||a.sale||0), a.applicant||'', a.payStatus==='Paid'); redraw(); refresh(); }}),
+        el('button.btn.btn-sm.btn-outline',{html:ui.icon('cash')+' '+(a.payStatus==='Paid'?'Mark Due':'Mark Paid'),onclick:function(){ markVisaPaid(a, redraw, refresh); }}),
         el('button.btn.btn-sm.btn-ghost',{html:ui.icon('file-earmark-text')+' Cover Sheet',onclick:function(){ openCoverSheet(a); }}),
         el('button.btn.btn-sm.btn-danger',{html:ui.icon('trash')+' Delete',onclick:function(){ ui.confirm({title:'Delete application?',danger:true,confirmLabel:'Delete'}).then(function(ok){ if(ok){ S.removeFrom('visaApps',a.id); EPAL.bus.emit('data:changed',{store:'visaApps',action:'delete'}); m.close(); refresh(); ui.toast('Application deleted','success'); } }); }})
       ]));

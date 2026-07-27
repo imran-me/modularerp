@@ -1018,15 +1018,26 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       if(!form.validate()){ ui.toast('Add at least one item','error'); return; }
       var v=form.values(), items=(v.items||[]).filter(function(r){ return (r.passenger||'').trim() || (+r.sale||0)>0; });
       if(!items.length){ ui.toast('Add at least one item','error'); return; }
-      var n=130450090000+Date.now()%900000;
-      items.forEach(function(r,i){
-        var rid = ui.uid('EMD');
-        S.upsert('air_emd', { id:rid, emdNo:r.emdNo||String(n+i), date:v.issueDate, passenger:r.passenger, ticketRef:r.emdNo||'', serviceType:r.serviceType, vendor:r.vendor, description:r.serviceType, cost:+r.cost||0, sale:+r.sale||0, payStatus:v.payStatus||'Due', created:Date.now() });
-        // EMDs are BOOKED, not just tracked: categorised income + vendor payable
-        // + cash-or-receivable by pay status (settled later via the Paid toggle)
-        db.postSale('travels', { amount:+r.sale||0, cost:+r.cost||0, ref:rid, desc:'EMD '+(r.serviceType||'')+' · '+(r.passenger||''), customer:r.passenger||'', category:'emd', vendor:r.vendor||'', payStatus:v.payStatus||'Due' });
-      });
-      ui.toast(items.length+' EMD item'+(items.length===1?'':'s')+' saved','success'); EPAL.router.navigate('travels/air-ticketing/emd');
+      // Sold as PAID? then the money has landed in a real account — ask which one
+      // so the sale moves that account's balance + history, not just GL 1010
+      // (owner review 2026-07-27). Sold as Due/Partial → straight through to AR.
+      var total = items.reduce(function(a,r){ return a + (+r.sale||0); }, 0);
+      if (v.payStatus === 'Paid' && EPAL.pay && EPAL.pay.ask) {
+        EPAL.pay.ask({ title:'EMD payment received', icon:'cash-coin', owner:'travels', amount: total,
+          saveLabel:'Record receipt', onPick: function (src) { save(src && src.bank ? src.bank.id : ''); } });
+      } else { save(''); }
+
+      function save(bankId) {
+        var n=130450090000+Date.now()%900000;
+        items.forEach(function(r,i){
+          var rid = ui.uid('EMD');
+          S.upsert('air_emd', { id:rid, emdNo:r.emdNo||String(n+i), date:v.issueDate, passenger:r.passenger, ticketRef:r.emdNo||'', serviceType:r.serviceType, vendor:r.vendor, description:r.serviceType, cost:+r.cost||0, sale:+r.sale||0, payStatus:v.payStatus||'Due', bankId:bankId, created:Date.now() });
+          // EMDs are BOOKED, not just tracked: categorised income + vendor payable
+          // + cash-or-receivable by pay status (settled later via the Paid toggle)
+          db.postSale('travels', { amount:+r.sale||0, cost:+r.cost||0, ref:rid, desc:'EMD '+(r.serviceType||'')+' · '+(r.passenger||''), customer:r.passenger||'', category:'emd', vendor:r.vendor||'', payStatus:v.payStatus||'Due', bankId:bankId });
+        });
+        ui.toast(items.length+' EMD item'+(items.length===1?'':'s')+' saved','success'); EPAL.router.navigate('travels/air-ticketing/emd');
+      }
     }));
   }
 

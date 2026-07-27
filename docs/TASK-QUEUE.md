@@ -7,6 +7,31 @@
 
 ## ⏳ OPEN
 
+### T-BLANK-APP — 🩹 a hidden folder blanked the WHOLE app (found 2026-07-27, fixed)
+**Symptom:** every route rendered empty — shell fine, `#view` empty, **no console error**.
+Hit while the Woodart *materials* module was half-built (its parent manifest already said
+`built:true` before `modules/materials/module.json` existed).
+
+**Root cause — nothing to do with Woodart.** `App.renderShell()` does `root.innerHTML=''`
+and rebuilds, so **`#view` becomes a NEW element**. Only the boot path re-pointed
+`EPAL.router.mount` at it. The other two callers — `auth:changed` and the
+**auto-discovery** callback (`if (d.changed()) { renderShell(); router.render(); }`) —
+left the mount pointing at the OLD, detached `#view`, so every later render wrote into a
+node that is not on the page. Blank app, silent.
+
+That made the migration's headline feature self-destructive: **delete a module folder and
+discovery correctly hides it — then blanks the app.** Same for any login/role change that
+fires `auth:changed`.
+
+**Fix:** `renderShell()` now owns the mount (`EPAL.router.mount = $('#view')` at the end),
+so no caller can forget it. Verified against the exact repro (half-built module in a clean
+worktree: blank → full render) and on the live working tree: **sweep 225/225 × both
+themes, 0 errors** — including the other session's new module.
+
+**Note for whoever half-builds a module next:** flipping `built:true` in the company
+manifest before the module's own `module.json` exists is legitimate mid-work; discovery
+hides it and the app now stays up.
+
 ### T-SALE-CHAIN — "I sell a ticket: does it record EVERYWHERE?" (owner review 2026-07-27)
 Owner: *"i will review the accounting of travel, if works everywhere. like i do a sell
 in ticketing, if its recording or going everywhere automaticly … travels accounts,
