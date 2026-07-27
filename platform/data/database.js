@@ -666,6 +666,44 @@
       } else if (EPAL.ledger.remove) { try { EPAL.ledger.remove(id); } catch (e) {} }
     },
 
+    /* The MIRROR of settleSale — money going BACK to a customer (audit
+     * 2026-07-27). A refund or a void of a paid ticket reverses the revenue,
+     * which leaves the customer's money sitting as a NEGATIVE receivable: the
+     * books say we owe it, but until this leg runs the cash is still in our bank
+     * and the customer never got it. This pays it, out of a NAMED account:
+     *     DR 1200 Accounts Receivable / CR <that account>  + a register row
+     * so the refund shows in Manage Banks, in the account's own history, in the
+     * cash book, and the receivable nets back to zero.
+     *   ref     — the ORIGINATING sale ref (the id is derived from it, so a
+     *             re-save can never post the same payout twice)
+     *   opts.bankId · opts.date · opts.desc · opts.control ('1200' | '1150')
+     * ==> LARAVEL: ReceiptPostingService::refund() — same shape, same id. */
+    refundPayout: function (companyId, ref, amount, party, opts) {
+      if (!EPAL.ledger || !EPAL.ledger.post) return null;
+      opts = opts || {};
+      var amt = +amount || 0;
+      if (amt <= 0) return null;
+      var id = 'GL-RFP-' + ref;
+      if (S.list('gl_entries').some(function (e) { return e.id === id; })) return null;   // already paid out
+      var bank = (opts.bankId && EPAL.pay && EPAL.pay.byId) ? EPAL.pay.byId(opts.bankId) : null;
+      var from = bank ? EPAL.pay.glAcctOf(bank) : '1010';
+      var control = opts.control || (EPAL.ledger.isAgentParty && EPAL.ledger.isAgentParty(party) ? '1150' : '1200');
+      var when = opts.date || new Date().toISOString().slice(0, 10);
+      var entry;
+      try {
+        entry = EPAL.ledger.post({ id: id, date: when, companyId: companyId, ref: ref,
+          memo: opts.desc || ('Refund paid to ' + (party || 'customer') + ' · ' + ref + (bank ? ' · ' + bank.name : '')),
+          source: 'payment', party: party || '',
+          lines: [ { account: control, dr: amt, cr: 0 }, { account: from, dr: 0, cr: amt } ] });
+      } catch (e) { return null; }
+      if (bank && EPAL.pay.syncRegister) {
+        EPAL.pay.syncRegister({ id: 'RFP-' + ref, bankId: bank.id, kind: 'Expense', amount: amt,
+          category: 'Customer refund', party: party || '', ref: ref, date: when,
+          companyId: companyId, glId: id }, null);
+      }
+      return entry;
+    },
+
     /* --- mutations (all emit events → live sync) --------------------------*/
     saveTask: function (empId, task) {
       var arr = this.tasksFor(empId);

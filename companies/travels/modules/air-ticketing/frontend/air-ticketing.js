@@ -858,12 +858,19 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       { key:'airlineRefund', label:'Airline refund amount', type:'money', required:true, default:0 },
       { key:'penalty', label:'Airline penalty / fee', type:'money', default:0 },
       { key:'serviceCharge', label:'Agent service charge', type:'money', default:0 },
-      { key:'method', label:'Refund method', type:'select', options:['Bank','bKash','Cash','Card Reversal'], default:'Bank' }
+      // the real account the customer's money goes back out of — a refund is
+      // money leaving, so it names an account like every other payment does
+      { key:'method', label:'Refund paid from', type:'select', searchable:true,
+        options:[['m:Due','Not paid out yet — leave it owed to the customer']].concat(payAccountOptions()),
+        hint:'Only when the status is Paid does the money actually leave this account.' }
     ], {});
     function recalc(){ var net = num(form,'airlineRefund') - num(form,'penalty') - num(form,'serviceCharge');
       sum.innerHTML=''; sum.appendChild(opTotals([ ['Airline refund', num(form,'airlineRefund')], ['Airline penalty', -num(form,'penalty')], ['Agent service charge', -num(form,'serviceCharge')], ['Net refund to customer', net, true] ])); }
     ['airlineRefund','penalty','serviceCharge'].forEach(function(k){ if(form.ctrls[k]) form.ctrls[k].input.addEventListener('input', recalc); });
-    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var t=tickets().filter(function(x){ return x.id===this.value; })[0]; if(t){ setInp(form,'ticketCost',t.cost||0); setInp(form,'salePrice',t.sale||0); setInp(form,'airlineRefund',t.cost||0); } recalc(); });
+    // `this` inside the filter callback was window, never the <select> — so
+    // picking a ticket populated NOTHING and every refund was computed off zeros
+    // (audit 2026-07-27). Read the value from the event target instead.
+    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var id=this.value; var t=tickets().filter(function(x){ return x.id===id; })[0]; if(t){ setInp(form,'ticketCost',t.cost||0); setInp(form,'salePrice',t.sale||0); setInp(form,'airlineRefund',t.cost||0); } recalc(); });
     recalc();
     page.appendChild(opBanner('<strong>Refund reverses the original sale.</strong> Ensure the airline has confirmed the refund amount before proceeding.'));
     page.appendChild(opCard('Ticket Refund', 'arrow-counterclockwise', form.el));
@@ -872,7 +879,27 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       if(!form.validate()){ ui.toast('Complete the highlighted fields','error'); return; }
       var v=form.values(), t=tickets().filter(function(x){ return x.id===v.ticketId; })[0]||{}, net=num(form,'airlineRefund')-num(form,'penalty')-num(form,'serviceCharge');
       var rec={ id:ui.uid('RF'), date:v.refundDate, pnr:t.pnr||v.refundRef||'', passenger:t.passenger||'', airline:airlineNameOf(t.airlineCode||''), ticketNo:t.ticketNo||'',
-        gross:num(form,'ticketCost'), airlineRefund:num(form,'airlineRefund'), penalty:num(form,'penalty'), fee:num(form,'serviceCharge'), netRefund:net, method:v.method, status:v.refundStatus||'Confirm', created:Date.now() };
+        gross:num(form,'salePrice')||num(form,'ticketCost'), airlineRefund:num(form,'airlineRefund'), penalty:num(form,'penalty'), fee:num(form,'serviceCharge'), netRefund:net, method:v.method, status:v.refundStatus||'Confirm', created:Date.now(),
+        // link the refund back to the ticket it came from (audit 2026-07-27 — it
+        // used to be created UNLINKED, so the refunds register could never
+        // reverse the sale: the revenue stayed on the books for good)
+        _fromTicket:t.id||'', _origCost:num(form,'ticketCost'), _origComm:+t.commission||0, bankId:bankIdOf(v.method) };
+      // a refund that lands here already Paid must post, exactly as it does when
+      // the register walks it to Paid — same guard, same ids, no double post
+      if (rec.status === 'Paid' && rec._fromTicket && db.postSale) {
+        try {
+          db.postSale('travels', { amount:-(rec.gross||0), cost:-((rec._origCost||0)+(rec._origComm||0)),
+            ref:rec._fromTicket+'-REFUND', desc:'Refund reversal '+(rec.pnr||'')+' '+(rec.airline||''),
+            customer:rec.passenger, category:'air' });
+          var kept = (+rec.penalty||0) + (+rec.fee||0);
+          if (kept > 0) db.postSale('travels', { amount:kept, cost:0, ref:rec._fromTicket+'-REFUNDFEE',
+            desc:'Refund penalty/fee retained '+(rec.pnr||''), customer:rec.passenger, category:'air' });
+          if (rec.bankId && db.refundPayout) db.refundPayout('travels', rec._fromTicket+'-REFUND',
+            Math.max(0, net), rec.passenger, { bankId:rec.bankId, date:rec.date,
+            desc:'Refund paid · '+(rec.passenger||'')+' · '+(rec.pnr||'') });
+          rec._reversed = true;
+        } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); }
+      }
       if(db.saveAirRefund) db.saveAirRefund(rec); else S.upsert('airRefunds', rec);
       if(t.id){ t.status='Refunded'; if(db.saveAirTicket) db.saveAirTicket(t); }
       ui.toast('Refund '+rec.id+' processed · net '+ui.money(net),'success'); EPAL.router.navigate('travels/air-ticketing/refunds');
@@ -904,7 +931,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     function recalc(){ var newCost=num(form,'origCost')+num(form,'penalty')+num(form,'fareDiff'); var addl=num(form,'penalty')+num(form,'fareDiff')+num(form,'serviceCharge');
       sum.innerHTML=''; sum.appendChild(opTotals([ ['Airline penalty', num(form,'penalty')], ['Fare difference', num(form,'fareDiff')], ['Agent service charge', num(form,'serviceCharge')], ['New total cost', newCost], ['Additional charge to customer', addl, true] ])); }
     ['origCost','penalty','fareDiff','serviceCharge'].forEach(function(k){ if(form.ctrls[k]) form.ctrls[k].input.addEventListener('input', recalc); });
-    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var t=tickets().filter(function(x){ return x.id===this.value; })[0]; if(t){ setInp(form,'origCost',t.cost||0); setInp(form,'origSale',t.sale||0); } recalc(); });
+    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var id=this.value; var t=tickets().filter(function(x){ return x.id===id; })[0]; if(t){ setInp(form,'origCost',t.cost||0); setInp(form,'origSale',t.sale||0); } recalc(); });
     recalc();
     page.appendChild(stepper(['Original Ticket','New Ticket Details','Charges & Pricing','Payment'], 1));
     page.appendChild(opBanner('<strong>Re-issue changes the flight / date / route.</strong> Both old and new ticket details are recorded for a full audit trail.'));
@@ -946,12 +973,15 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       { key:'origCost', label:'Original cost price', type:'money', default:0 },
       { key:'origSale', label:'Original sale price', type:'money', default:0 },
       { key:'voidPenalty', label:'Void penalty / fee', type:'money', default:0 },
-      { key:'agentVoidFee', label:'Agent void fee', type:'money', default:0 }
+      { key:'agentVoidFee', label:'Agent void fee', type:'money', default:0 },
+      { key:'refundFrom', label:'Refund the customer from', type:'select', searchable:true,
+        options:[['m:Due','Not refunded yet — leave it owed to the customer']].concat(payAccountOptions()),
+        hint:'Only used when the ticket was already paid — the money goes back out of this account.' }
     ], {});
     function recalc(){ var refund=num(form,'origSale')-num(form,'voidPenalty')-num(form,'agentVoidFee');
       sum.innerHTML=''; sum.appendChild(opTotals([ ['Original sale price', num(form,'origSale')], ['Void penalty', -num(form,'voidPenalty')], ['Agent void fee', -num(form,'agentVoidFee')], ['Refund to agent / customer', refund, true] ])); }
     ['origSale','voidPenalty','agentVoidFee'].forEach(function(k){ if(form.ctrls[k]) form.ctrls[k].input.addEventListener('input', recalc); });
-    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var t=tickets().filter(function(x){ return x.id===this.value; })[0]; if(t){ setInp(form,'origCost',t.cost||0); setInp(form,'origSale',t.sale||0); } recalc(); });
+    if (form.ctrls.ticketId) form.ctrls.ticketId.input.addEventListener('change', function(){ var id=this.value; var t=tickets().filter(function(x){ return x.id===id; })[0]; if(t){ setInp(form,'origCost',t.cost||0); setInp(form,'origSale',t.sale||0); } recalc(); });
     recalc();
     page.appendChild(opBanner('<strong>Void is only allowed within the airline’s void window (usually same day / 24 hrs).</strong> A late void may incur full penalty. This action cannot be undone.'));
     page.appendChild(opCard('Ticket Void', 'x-octagon', form.el));
@@ -961,7 +991,27 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       var v=form.values(), t=tickets().filter(function(x){ return x.id===v.ticketId; })[0]||{}, refund=num(form,'origSale')-num(form,'voidPenalty')-num(form,'agentVoidFee');
       var rec={ id:ui.uid('VD'), date:v.voidDate, ticketId:v.ticketId, passenger:t.passenger||'', reason:v.voidReason, confirmNo:v.confirmNo, penalty:num(form,'voidPenalty'), agentFee:num(form,'agentVoidFee'), refund:refund, created:Date.now() };
       S.upsert('air_voids', rec);
-      if(t.id){ t.status='Void'; if(db.saveAirTicket) db.saveAirTicket(t); }
+      // THE BOOKS (audit 2026-07-27 — this desk used to record the void nowhere
+      // but its own register: the revenue stayed recognised, the customer's money
+      // stayed in our bank, and Group Finance never heard about it). Same posting
+      // the ticket-detail void does, so the two paths agree:
+      //   reversal of the sale · penalty + agent fee retained as income ·
+      //   and the refund actually paid out of a named account when it was paid.
+      if (t.id && db.postSale) {
+        try {
+          var wasPaid = t.payStatus === 'Paid', party = t.customer || t.passenger || '';
+          db.postSale('travels', { amount:-(t.sale||0), cost:-(t.cost||0), ref:t.id+'-VOID',
+            desc:'Void reversal '+(t.route||'')+' ('+(t.airlineCode||'')+')', customer:party, category:'air' });
+          var retained = num(form,'voidPenalty') + num(form,'agentVoidFee');
+          if (retained > 0) db.postSale('travels', { amount:retained, cost:0, ref:t.id+'-VOIDFEE',
+            desc:'Void penalty & fee retained '+(t.route||''), customer:party, category:'air' });
+          var vBank = bankIdOf(v.refundFrom);
+          if (wasPaid && vBank && db.refundPayout) db.refundPayout('travels', t.id+'-VOID',
+            Math.max(0, refund), party, { bankId:vBank, date:v.voidDate,
+            desc:'Void refund · '+(t.passenger||t.id)+' · '+(t.route||'') });
+        } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); }
+      }
+      if(t.id){ t.status='Void'; t.payStatus='Due'; t.voidPenalty=num(form,'voidPenalty'); if(db.saveAirTicket) db.saveAirTicket(t); }
       ui.toast('Ticket voided · refund '+ui.money(refund),'success'); EPAL.router.navigate('travels/air-ticketing/manage-sales');
     }));
   }
@@ -1497,7 +1547,12 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     body.appendChild(el('div.form-grid', null, [
       sec('Reissue — penalty & fare difference'),
       inp('Airline penalty','rePenalty',0,'','number'),
-      inp('Fare difference (new − old)','reFareDiff',0,'','number')
+      inp('Fare difference (new − old)','reFareDiff',0,'','number'),
+      // the extra charge is real money: say whether the customer paid it now and
+      // into WHICH account, or it stays a receivable (audit 2026-07-27 — it used
+      // to post straight to AR with no way to ever collect it)
+      selDyn('Customer paid the extra into','reInto',
+        [['m:Due','Not paid yet — book as Receivable']].concat(payAccountOptions()))
     ]));
     var out = el('div.build-banner',{style:{marginTop:'6px'}},[ ui.frag(ui.icon('calculator')),
       el('div',null,[ el('span',{id:'re-out',html:''}) ]) ]);
@@ -1515,7 +1570,11 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         t.status='Re-issued';
         t.timeline=(t.timeline||[]).concat([{ at:Date.now(), text:'Re-issued · penalty '+ui.money(pen)+' + fare diff '+ui.money(diff) }]);
         db.saveAirTicket(t);
-        db.postSale('travels', { amount:add, cost:diff, ref:t.id+'-RE', desc:'Reissue '+t.route+' ('+t.airlineCode+')', customer:t.passenger });
+        var reInto = (body.querySelector('#f-reInto')||{}).value || 'm:Due';
+        var reBank = bankIdOf(reInto), rePaid = reInto !== 'm:Due';
+        db.postSale('travels', { amount:add, cost:diff, ref:t.id+'-RE', desc:'Reissue '+t.route+' ('+t.airlineCode+')',
+          customer:t.passenger, category:'air', vendor:t.vendor||'',
+          paid:rePaid, payStatus:rePaid?'Paid':'Due', bankId:reBank });
         db.notify({ level:'info', title:'Ticket Reissued', text:t.passenger+' · +'+ui.money(add), companyId:'travels', icon:'arrow-repeat' });
         ui.toast('Ticket reissued','success'); refresh && refresh();
       }}] });
@@ -1526,7 +1585,12 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     var body = el('div');
     body.appendChild(el('div.form-grid', null, [
       sec('Void — reversal & penalty'),
-      inp('Void penalty (retained as income)','voidPenalty',0,'','number')
+      inp('Void penalty (retained as income)','voidPenalty',0,'','number'),
+      // a void of an ALREADY PAID ticket has to give the money back — reversing
+      // the revenue alone leaves the cash in our bank and a negative receivable
+      // on the customer (audit 2026-07-27)
+      selDyn('Refund the customer from','vdFrom',
+        [['m:Due','Not refunded yet — leave it owed to the customer']].concat(payAccountOptions()))
     ]));
     var out = el('div.build-banner',{style:{marginTop:'6px'}},[ ui.frag(ui.icon('calculator')),
       el('div',null,[ el('span',{id:'vd-out',html:''}) ]) ]);
@@ -1540,6 +1604,19 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         // reverse the original recognised sale
         db.postSale('travels', { amount:-(t.sale||0), cost:-(t.cost||0), ref:t.id+'-VOID', desc:'Void reversal '+t.route+' ('+t.airlineCode+')', customer:t.passenger });
         if (pen>0) db.postSale('travels', { amount:pen, cost:0, ref:t.id+'-VOIDFEE', desc:'Void penalty '+t.route, customer:t.passenger });
+        // give the money back if the customer had already paid. The reversal
+        // above leaves the sale owed TO them (a negative receivable); this pays
+        // it out of a named account, so the receivable nets to zero and the bank
+        // keeps only the penalty. The original receipt STAYS on the books —
+        // removing it would leave the payout with nothing to clear.
+        var wasPaid = t.payStatus === 'Paid';
+        var vdFrom = (body.querySelector('#f-vdFrom')||{}).value || 'm:Due';
+        var vdBank = bankIdOf(vdFrom);
+        if (wasPaid && vdBank && db.refundPayout) {
+          db.refundPayout('travels', t.id + '-VOID', Math.max(0, (+t.sale || 0) - pen),
+            t.customer || t.passenger || '',
+            { bankId: vdBank, desc: 'Void refund · ' + (t.passenger || t.id) + ' · ' + t.route });
+        }
         t.status='Void'; t.payStatus='Due'; t.voidPenalty=pen;
         t.timeline=(t.timeline||[]).concat([{ at:Date.now(), text:'Voided · reversal '+ui.money(t.sale||0)+' · penalty '+ui.money(pen) }]);
         db.saveAirTicket(t);
@@ -2049,7 +2126,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       inp('Airline penalty','penalty',r.penalty,'','number'),
       inp('Agent service fee','fee',r.fee,'','number'),
       sec('Payout'),
-      sel('Method','method',r.method,['Bank','bKash','Nagad','Cash','Card Reversal']),
+      selDyn('Paid from','method', payOptionsFor(r.method, 'Not paid out yet — owed to the customer'), r.method),
       sel('Status','status',r.status, REFUND_STAGES)
     ]));
     var net = el('div.build-banner',{style:{marginTop:'6px'}},[ ui.frag(ui.icon('calculator')),
@@ -2073,11 +2150,18 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         if (r.status==='Paid' && !r._reversed && r._fromTicket) {
           var origCost = (r._origCost||0) + (r._origComm||0);
           db.postSale('travels', { amount:-(r.gross||0), cost:-origCost, ref:r._fromTicket+'-REFUND',
-            desc:'Refund reversal '+(r.pnr||'')+' '+(r.airline||''), customer:r.passenger });
+            desc:'Refund reversal '+(r.pnr||'')+' '+(r.airline||''), customer:r.passenger, category:'air' });
           var retained = (+r.penalty||0) + (+r.fee||0);
           if (retained>0) db.postSale('travels', { amount:retained, cost:0, ref:r._fromTicket+'-REFUNDFEE',
-            desc:'Refund penalty/fee retained '+(r.pnr||''), customer:r.passenger });
+            desc:'Refund penalty/fee retained '+(r.pnr||''), customer:r.passenger, category:'air' });
           r._reversed = true;
+          // …and actually pay the customer, out of the account named above. The
+          // reversal alone leaves the money in our bank and the refund owed on
+          // 1200 for ever (audit 2026-07-27).
+          r.bankId = bankIdOf(r.method);
+          if (r.bankId && db.refundPayout) db.refundPayout('travels', r._fromTicket + '-REFUND',
+            Math.max(0, +r.netRefund || 0), r.passenger, { bankId: r.bankId, date: r.date,
+            desc: 'Refund paid · ' + (r.passenger || '') + ' · ' + (r.pnr || '') });
           // flip the originating ticket to Refunded (symmetric with void)
           var src = tickets().filter(function(x){ return x.id===r._fromTicket; })[0];
           if (src && src.status!=='Refunded') {
@@ -2844,6 +2928,14 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
   function refundBadge(s){ return el('span.badge'+(s==='Paid'?'.badge-good':s==='Rejected'?'.badge-bad':'.badge-warn'),{text:s}); }
   function inp(label,id,val,cls,type){ return el('div.field'+(cls?'.'+cls:''),null,[ el('label',{text:label}), el('input.input',{id:'f-'+id,type:type||'text',value:val==null?'':val}) ]); }
   function sel(label,id,val,opts){ var s=el('select.select',{id:'f-'+id}); opts.forEach(function(o){var op=el('option',{value:o,text:o});if(o===val)op.selected=true;s.appendChild(op);}); return el('div.field',null,[el('label',{text:label}),s]); }
-  function selDyn(label,id,pairs){ var s=el('select.select',{id:'f-'+id}); pairs.forEach(function(p){ s.appendChild(el('option',{value:p[0],text:p[1]})); }); return el('div.field',null,[el('label',{text:label}),s]); }
+  function selDyn(label,id,pairs,val){ var s=el('select.select',{id:'f-'+id}); pairs.forEach(function(p){ var op=el('option',{value:p[0],text:p[1]}); if(val!=null&&String(p[0])===String(val)) op.selected=true; s.appendChild(op); }); return el('div.field',null,[el('label',{text:label}),s]); }
+  /* the payment-account list for a record that may still carry an old free-text
+   * method ('Bank', 'bKash') — keep what was recorded as its own option so
+   * editing an old row never silently re-points it at a different account */
+  function payOptionsFor(method, dueLabel) {
+    var opts = [['m:Due', dueLabel || 'Not paid out yet']].concat(payAccountOptions());
+    if (method && !opts.some(function (o) { return o[0] === method; })) opts.splice(1, 0, [method, method + ' (as recorded)']);
+    return opts;
+  }
   function sec(t){ return el('div.form-section-title',{text:t}); }
 
