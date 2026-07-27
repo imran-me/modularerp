@@ -99,6 +99,13 @@ class LedgerService
                 'description' => (string) ($entry['memo'] ?? ''),
                 'updated_at'  => $now,
             ];
+            // WHO it was with — a customer, a vendor, or a sister concern. The party
+            // ledger, AR/AP ageing and the inter-company positions are all derived
+            // from it (migration 2026_07_27_004000). Only written when the column is
+            // there, so an un-migrated host still posts.
+            if ($this->hasPartyColumn()) {
+                $head['party'] = ((string) ($entry['party'] ?? '')) ?: null;
+            }
             if (! is_numeric($frontId) && $frontId !== '') {
                 $head['reference'] = $frontId;   // keep a stored string id
             }
@@ -210,6 +217,20 @@ class LedgerService
         if ($is('conveyance|travel|transport|fuel')) return '5600';
 
         return '5800';
+    }
+
+    /** Does journal_entries carry `party` on THIS host? (migration 2026_07_27_004000)
+     *  Cached on the instance so a mid-process migration is still seen. */
+    private ?bool $partyColumn = null;
+
+    public function hasPartyColumn(): bool
+    {
+        if ($this->partyColumn === null) {
+            try { $this->partyColumn = \Illuminate\Support\Facades\Schema::hasColumn('journal_entries', 'party'); }
+            catch (\Throwable $e) { $this->partyColumn = false; }
+        }
+
+        return $this->partyColumn;
     }
 
     /** True when this account code exists on the chart. */

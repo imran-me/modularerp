@@ -13,6 +13,7 @@
 use Epal\Modules\GroupCockpit\MasterAccounts\AccountController;
 use Epal\Modules\GroupCockpit\MasterAccounts\BankController;
 use Epal\Modules\GroupCockpit\MasterAccounts\BankTxnController;
+use Epal\Modules\GroupCockpit\MasterAccounts\InterCompanyController;
 use Epal\Modules\GroupCockpit\MasterAccounts\JournalController;
 use Epal\Modules\GroupCockpit\MasterAccounts\CustomerController;
 use Epal\Modules\GroupCockpit\MasterAccounts\SupplierController;
@@ -86,3 +87,12 @@ Route::delete('group/master-accounts/loans/{store}/{id}', [LoanController::class
 Route::get('group/master-accounts/payroll/{store}', [PayrollBookController::class, 'index'])->where('store', 'templates|runs|slips|txns');
 Route::post('group/master-accounts/payroll/{store}', [PayrollBookController::class, 'store'])->where('store', 'templates|runs|slips|txns');
 Route::delete('group/master-accounts/payroll/{store}/{id}', [PayrollBookController::class, 'destroy'])->where('store', 'templates|runs|slips|txns');
+
+// Inter-company — money between the sister concerns (App\Services\InterCompanyService).
+// Every one of these writes BOTH concerns' books in ONE transaction, through the
+// 1300/2400 control accounts that consolidation eliminates: a half-posted favour
+// between sisters is a permanently unbalanced group.
+Route::get('group/master-accounts/intercompany/positions', [InterCompanyController::class, 'positions']);
+Route::post('group/master-accounts/intercompany/invoice', [InterCompanyController::class, 'invoice']);
+Route::post('group/master-accounts/intercompany/settle', [InterCompanyController::class, 'settle']);
+Route::post('group/master-accounts/intercompany/shared-cost', [InterCompanyController::class, 'sharedCost']);

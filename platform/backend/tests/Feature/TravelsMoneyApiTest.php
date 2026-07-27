@@ -167,4 +167,61 @@ class TravelsMoneyApiTest extends TestCase
         $cash = collect($accounts)->firstWhere('type', 'Cash Box');
         $this->assertSame('1000', $cash['glAccount']);             // a cash box IS hard cash
     }
+
+    /* ---------------------------------------------------- inter-company (group) */
+
+    /** The Group invoices Travels, Travels settles it — both books, over HTTP. */
+    public function test_the_intercompany_endpoints_post_both_legs(): void
+    {
+        $this->postJson('/api/group/master-accounts/intercompany/invoice', [
+            'from' => 'group', 'to' => 'travels', 'amount' => 50000, 'ref' => 'API-IC-1',
+        ])->assertStatus(201)->assertJsonPath('data.ref', 'IC-API-IC-1');
+
+        $this->getJson('/api/group/master-accounts/intercompany/positions?companyId=travels')
+            ->assertOk()->assertJsonPath('data.owes.group', 50000);
+
+        $this->postJson('/api/group/master-accounts/intercompany/settle', [
+            'companyId' => 'travels', 'party' => 'group', 'amount' => 50000,
+            'direction' => 'pay', 'bankId' => '1', 'partyBankId' => '3',
+        ])->assertStatus(201)->assertJsonPath('data.remaining', 0);
+
+        $this->getJson('/api/group/master-accounts/intercompany/positions?companyId=travels')
+            ->assertOk()->assertJsonPath('totals.owes', 0);
+        $this->assertEquals(900000 - 50000, $this->balanceOf(1));
+        $this->assertTrue($this->booksBalance());
+    }
+
+    public function test_over_settling_an_intercompany_debt_is_a_clean_422(): void
+    {
+        $this->postJson('/api/group/master-accounts/intercompany/invoice', [
+            'from' => 'group', 'to' => 'travels', 'amount' => 1000, 'ref' => 'API-IC-2',
+        ])->assertStatus(201);
+
+        $r = $this->postJson('/api/group/master-accounts/intercompany/settle', [
+            'companyId' => 'travels', 'party' => 'group', 'amount' => 5000,
+            'direction' => 'pay', 'bankId' => '1',
+        ]);
+        $r->assertStatus(422);
+        $this->assertStringContainsString('is owed', $r->json('message'));
+    }
+
+    /** One rent bill, three concerns, paid in full by the Group. */
+    public function test_the_shared_cost_endpoint_splits_and_charges_the_payer(): void
+    {
+        $this->postJson('/api/group/master-accounts/intercompany/shared-cost', [
+            'amount' => 90000, 'paidBy' => 'group', 'among' => ['group', 'travels', 'woodart'],
+            'head' => '5200', 'category' => 'Office Rent', 'bankId' => '3',
+        ])->assertStatus(201)->assertJsonPath('data.shares.travels', 30000);
+
+        $this->assertEquals(5000000 - 90000, $this->balanceOf(3));   // the payer paid it all
+        $this->assertSame(30000.0, $this->netOn('5200', 2));         // travels carries its share
+        $this->assertTrue($this->booksBalance());
+    }
+
+    public function test_a_shared_cost_with_one_concern_is_rejected_by_validation(): void
+    {
+        $this->postJson('/api/group/master-accounts/intercompany/shared-cost', [
+            'amount' => 1000, 'paidBy' => 'group', 'among' => ['group'], 'head' => '5200',
+        ])->assertStatus(422)->assertJsonValidationErrors(['among']);
+    }
 }

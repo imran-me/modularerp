@@ -77,7 +77,10 @@ class JournalController
                 'ref'       => $e->reference ?: (string) $e->id,
                 'memo'      => $e->description ?: '',
                 'source'    => $e->source ?: 'manual',
-                'party'     => '',
+                // was hard-coded '' — the party the client sent was dropped on save AND
+                // on read, which left the Party Ledger, AR/AP ageing and the
+                // inter-company balances card blank in API mode (2026_07_27_004000).
+                'party'     => $e->party ?? '',
                 'lines'     => $lines,
             ];
         })->values();

@@ -37,6 +37,7 @@ trait BuildsMoneySchema
             $t->unsignedBigInteger('company_id')->nullable();
             $t->date('date')->nullable();
             $t->string('source', 40)->nullable();
+            $t->string('party', 255)->nullable()->index();   // migration 2026_07_27_004000
             $t->string('reference')->nullable()->index();
             $t->text('description')->nullable();
             $t->unsignedBigInteger('created_by')->nullable();
