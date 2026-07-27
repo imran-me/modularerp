@@ -290,6 +290,19 @@ authorities (docs only — no screen touched, sweep 222/222 × both themes):
   split out of the blueprint. `wa_materials` wired into api.js HYDRATE+WRITABLE.
   Verified: PHP `-l` 8/8, tw gate green, **sweep 225/225 × both themes, 0 errors**
   (222→225 = the 3 new sub-routes). ◻ MySQL CRUD test still owed.
+- **⭐ MODULE BUILT: `woodart/installation` (Site & Install)** (2026-07-27) —
+  module #5, closing the physical chain Materials → Procurement → Workshop →
+  Install. Its hard rule is the **DUAL-SHAPE SNAG COUNT**: the seeded store
+  carries a plain `snags` number, but the Projects snag modal migrates that into
+  an itemised `[{text,done}]` list on first open — so a record in the wild may
+  carry EITHER. Read counts the un-done items when a list exists and falls back
+  to the number; **write RECOMPUTES the number from the list**, so a stale count
+  from any client cannot corrupt the figure the handover queue is ordered by
+  (proven by a test that sends 99 alongside a 3-item list and gets 2 stored).
+  **Handover billing is deliberately NOT wired here** — `projects/view.js`
+  already calls `db.postSale('woodart', …)` and opens the branded invoice; a
+  second path would DOUBLE-BILL every project. Verified: sweep **237/237 × both
+  themes**, backend **42/42 vs MySQL**.
 - **⭐ MODULE BUILT: `woodart/production` (Workshop)** (2026-07-27) — module #4.
   Job Register · Workshop Board · Station Load. The board is the clearest
   example in the codebase of the line the FRONTEND BUILD LAW draws: its four

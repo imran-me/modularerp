@@ -28,7 +28,7 @@ snagging → handover → billing.
 | Icon | `tree-fill` |
 | Atmosphere scene | `app/atmosphere/interior-scene.{css,js}` (bound via `data-atmos="woodart"`) |
 | Modules declared | 16 (`module.json`) |
-| Modules actually built | **5** — `materials` + `clients` + `procurement` + `production` (✅ to the standard) and `projects` (legacy, also registers `estimates`) |
+| Modules actually built | **6** — `materials` + `clients` + `procurement` + `production` + `installation` (✅ to the standard) and `projects` (legacy, also registers `estimates`) |
 
 **Group rollup (`bridge.map` — already declared, wired in `platform/bridge/bridge.js`):**
 
@@ -85,6 +85,7 @@ Restated here because it is the reason this document exists. Full detail in
 ### Built
 | Module | Routes | Frontend | Backend | Standard |
 |---|---|---|---|---|
+| **`installation`** (Site & Install) | `#/woodart/installation/{schedule,snags,teams}` | ✅ real HTML, `[data-proto]`, all utilities Tailwind, `api.js` seam owning the **dual-shape snag count** + open/overdue + the demo clock | ✅ 8-file slice whose write path RECOMPUTES the snag count from the list + frozen `endpoints.md` · **42/42 vs MySQL** | ✅ to the standard · handover billing deliberately left to `projects` |
 | **`production`** (Workshop) | `#/woodart/production/{jobs,board,load}` | ✅ real HTML — board COLUMNS are fixed markup, cards are `[data-proto]` clones; `api.js` seam owns the open/overdue rules + the demo clock | ✅ 8-file slice, `$today` INJECTED not hidden + frozen `endpoints.md` · **41/41 vs MySQL** | ✅ to the standard |
 | **`procurement`** | `#/woodart/procurement/{orders,vendors,spend}` | ✅ real HTML, `[data-proto]`, all utilities Tailwind, `api.js` seam owning **two stores** + the order→vendor name join | ✅ 12-file slice (2 controllers, 1 shared service) + frozen `endpoints.md` · **40/40 vs MySQL** | ✅ to the standard · ⚠️ ledger posting = open owner decision |
 | **`clients`** | `#/woodart/clients/{directory,portfolio,segments}` | ✅ real HTML, `[data-proto]` repetition, all utilities Tailwind, `frontend/api.js` seam owning the **name join** to projects/estimates | ✅ 9-file Laravel slice + frozen `endpoints.md` · **37/37 vs MySQL** (both join branches) | ✅ to the standard |
@@ -100,7 +101,7 @@ kept.** The rebuild is structure + styling only, pixel-identical (R1/R2).
 
 ### Not built — render the generic placeholder scaffold today
 `dashboard` · `crm` · `estimates` (menu entry; its screen is registered from
-inside `projects/view.js`) · `installation` ·
+inside `projects/view.js`) ·
 `accounts` · `ledgers` · `hrm` · `reports` · `analytics` ·
 `tasks` · `settings`.
 
@@ -136,7 +137,7 @@ Simplest → hardest, each one full-stack and 100% done before the next.
 | 2 | ✅ **clients** | simple master with a real relationship to projects | `wa_clients` |
 | 3 | ✅ **procurement** | vendors · POs · spend | `wa_purchases`, `wa_vendors` |
 | 4 | ✅ **production** | workshop jobs — lifted out of the project drawer into their own desk | `wa_production` |
-| 5 | **installation** | site, teams, snag checklists | `wa_installs` |
+| 5 | ✅ **installation** | site, teams, snag checklists | `wa_installs` |
 | 6 | **crm** | design enquiries → site visit → deal → estimate | `wa_leads` (new) |
 | 7 | **estimates** | quotations · BOQ · costing — split out of `projects/view.js` into its own module | `wa_estimates` |
 | 8 | **projects** | the big one; rebuilt pixel-identical | `wa_projects` |
@@ -214,6 +215,7 @@ none is blocking.
 | Date | What | Commit |
 |---|---|---|
 | 2026-07-27 | Master context created. Build language locked (D1–D10). `MODULE-STANDARD.md` + platform `UI-CONTRACT.md` written. `build-module.mjs` extended with the optional `frontend/api.js` data seam — verified: all 20 existing modules rebuild **byte-identical** (zero git diff). | — |
+| 2026-07-27 | **MODULE #5 `installation` (Site & Install) BUILT full-stack** — Schedule · Snag List · Teams. Closes the physical chain Materials → Procurement → Workshop → Install. Its hard rule is the **dual-shape snag count**: the seed carries a plain number, the Projects snag modal itemises it into `[{text,done}]` on first open, so a record may carry EITHER — read counts the list first, and **write RECOMPUTES the number from the list** so a stale client count cannot corrupt the figure the handover queue is ordered by (proven: a deliberately wrong 99 sent with a 3-item list stored as 2). **Handover billing deliberately NOT wired** — `projects/view.js` already posts the sale, and a second path would double-bill every project. PHP 8/8, sweep **237/237 both themes**, backend **42/42 vs MySQL**. | — |
 | 2026-07-27 | **MODULE #4 `production` (Workshop) BUILT full-stack** — Job Register · Workshop Board · Station Load. The board is the clearest example of the build law's line: its four COLUMNS are fixed markup (they are the workshop's states, not data) and only the CARDS are `[data-proto]` clones. The demo clock is an **explicit constructor argument** on the service, never a hidden `now()`, and is echoed by `GET /load` — proven by tests that move the clock and watch the overdue count move with it. An orphan job (project id that no longer exists) is KEPT and flagged, never hidden. PHP 8/8, sweep **234/234 both themes**, backend **41/41 vs MySQL**. | — |
 | 2026-07-27 | **MODULE #3 `procurement` BUILT full-stack** — Orders · Vendors · Spend. First module owning TWO entities: two thin controllers over ONE shared service, because the rules that matter (the order→vendor name join, the outstanding rule, the roll-ups) span both. New store `wa_vendors` seeded DERIVED. **⚠️ Ledger posting deliberately NOT wired** — `bridge.map` declares `material.purchased → 5002` but three accounting questions are unanswered (on order or on receipt? expense or inventory-asset? paid from cash or a payable?) and guessing corrupts the books; recorded as an OPEN OWNER DECISION and the module ships as an honest register. PHP 12/12, sweep **231/231 both themes**, backend **40/40 vs MySQL** including the unlisted-supplier rule (an order on a supplier with no vendor record is COUNTED, never dropped) and a case/whitespace-insensitive join. | — |
 | 2026-07-27 | **MODULE #2 `clients` BUILT full-stack** — 3 real-HTML screens (Directory · Portfolio · Segments), `api.js` seam owning the client→work NAME join, 9-file Laravel slice, frozen `endpoints.md` v1. `wa_clients` seeded DERIVED from real project/estimate client names + wired into api.js HYDRATE/WRITABLE. PHP 8/8, tw gate green (no new classes), **sweep 228/228 both themes**, backend **37/37 vs MySQL** proving BOTH join branches (absent work table → graceful zero; present → case/whitespace-insensitive roll-up that ignores unknown clients). | — |
