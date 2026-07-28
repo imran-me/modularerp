@@ -76,7 +76,14 @@ module rather than a nice-to-have.
 **Negative variance = the job is eating more material than it was quoted for.**
 That single number is what this module was built to surface.
 
-## 5 · Known gaps
+## 5 · The one table this module owns
+
+wa_recurring — standing monthly costs. It is the exception to section 1, and the
+reason is worth stating: a standing cost is NOT a posting, it is a reminder that
+a posting is due. No shared table holds that concept, so borrowing one would have
+meant inventing a meaning for a column somebody else owns.
+
+## 6 · Known gaps
 
 - **VAT is passed as 0.** Woodart bills VAT-exclusive today. When that changes,
   `EntryPostingService::recordIncome()` must pass the real VAT portion —

@@ -132,6 +132,36 @@ other company has a bill of quantities.
 7. **`Schema::hasTable`-guarded**, and `provisioned` reported, like every other
    Woodart endpoint.
 
+### `GET /recurring` · `POST /recurring` · `DELETE /recurring/{id}`
+
+Standing monthly costs — rent, utilities, retainers. **The only table this
+module owns** (`wa_recurring`). Everything else on this desk reads shared books;
+a standing cost is not a posting but a reminder that a posting is due, and no
+shared table holds that concept.
+
+```json
+200 → { "success": true, "provisioned": true, "count": 6,
+        "summary": { "active": 5, "monthly": 939200, "due": 5, "paused": 1 },
+        "data": [ { "id":"REC-WA001", "name":"Workshop rent — Tejgaon",
+                    "category":"Office Rent", "amount":180000,
+                    "party":"Tejgaon Industrial Estate", "dayOfMonth":5,
+                    "method":"Bank", "status":"Active" } ] }
+```
+
+- `dayOfMonth` is **1–31, not a date** — the field means "the 5th of every
+  month". It is deliberately NOT clamped to a short month: silently rewriting a
+  31 to a 28 moves a bill the user did not move.
+- `status` is Active | Paused. Paused KEEPS the record and stops it counting
+  toward `monthly`. There is no delete-on-stop — a cost that lapses for two
+  months and returns is the same cost.
+- **No project ref.** A standing cost belongs to the business, not a job; tying
+  rent to a project would distort every Project P&L open that month.
+- `DELETE` is a real (soft) delete, not a reversal. Unlike the register, this
+  table holds no money — only the intention to spend it. Entries already posted
+  against the cost stay untouched.
+
+---
+
 ## Change log
 
 | Version | Date | Change |
