@@ -13,17 +13,19 @@
     [data-tab]    a tab button (logic marks .active, wires, strips the hook)
     [data-act]    a button the logic wires an action onto
     [data-when]   a block the logic REMOVES when the condition is false
-    [data-proto]  a hidden prototype cloned once per record
-    [data-slot]   a fill point inside a cloned [data-proto] node
+
+  TAB SET — matches Travels Accounts (owner directive 2026-07-28), plus the two
+  screens only an interiors business can show. Payroll and Manage Cash mount the
+  SHARED desks (EPAL.payrollDesk / EPAL.cashDesk), which already take a company
+  id, so those two tabs are the same code Travels runs — not a copy of it.
 
   STYLING: every UTILITY is Tailwind (tw-). The house COMPONENT classes stay
   (card · kpi-card · btn · page-head · badge · data-row · progress · num).
-  The only inline styles are computed bar widths — values, not utilities.
   ============================================================================ -->
 
 
 <!-- ============================================================================
-     SHARED CHROME — page-head bar (mirrors EPAL.pageHead) + the 3-tab band.
+     SHARED CHROME — page-head bar (mirrors EPAL.pageHead) + the tab band.
      The <h1> inner run stays on ONE line: a newline between those inline tags
      clones as a real space and shifts pixels.
      ============================================================================ -->
@@ -33,26 +35,30 @@
     <p class="page-sub" data-fill="sub"></p>
   </div>
   <div class="page-actions">
-    <a class="btn btn-ghost" href="#/woodart/procurement"><i class="bi bi-cart-fill"></i> Procurement</a>
-    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> Record Entry</button>
+    <a class="btn btn-ghost" href="#/woodart/ledgers"><i class="bi bi-journal-text"></i> Ledgers</a>
+    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> New Entry</button>
   </div>
 </div>
 
-<div data-shell="tabs" class="tab-underline mb-3">
-  <button data-tab="register">Income &amp; Expense</button>
-  <button data-tab="payables">Vendor Payables</button>
+<div data-shell="tabs" class="tab-underline tabs-dense mb-3">
+  <button data-tab="overview">Overview</button>
+  <button data-tab="income">Income</button>
+  <button data-tab="expenses">Expenses</button>
+  <button data-tab="payables">Payables</button>
   <button data-tab="pnl">Project P&amp;L</button>
+  <button data-tab="payroll">Payroll</button>
+  <button data-tab="recurring">Recurring</button>
+  <button data-tab="banks">Banks</button>
+  <button data-tab="cash">Manage Cash</button>
+  <button data-tab="journals">Journals</button>
+  <button data-tab="schedules">Schedules</button>
 </div>
 
 
 <!-- ============================================================================
-     SCREEN 1 · REGISTER — what the interiors business earned and spent.
-
-     These rows live in the SHARED `acc_entries` table, scoped to Woodart. The
-     same money shows on the Group's Master Accounts desk; this is the interiors
-     view of one book, not a second book.
+     SCREEN 1 · OVERVIEW — the money at a glance, and what needs attention.
      ============================================================================ -->
-<section data-screen="register">
+<section data-screen="overview">
 
   <div class="kpi-grid kpi-compact stagger">
     <div class="kpi-card">
@@ -60,44 +66,118 @@
       <div class="kpi-value" data-k="income">—</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-top"><span class="kpi-label">Expense</span><span class="kpi-ico"><i class="bi bi-graph-down-arrow"></i></span></div>
+      <div class="kpi-top"><span class="kpi-label">Expenses</span><span class="kpi-ico"><i class="bi bi-graph-down-arrow"></i></span></div>
       <div class="kpi-value" data-k="expense">—</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-top"><span class="kpi-label">Net</span><span class="kpi-ico"><i class="bi bi-calculator"></i></span></div>
+      <div class="kpi-top"><span class="kpi-label">Net Result</span><span class="kpi-ico"><i class="bi bi-calculator"></i></span></div>
       <div class="kpi-value" data-k="net">—</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-top"><span class="kpi-label">Unpaid Vendors</span><span class="kpi-ico"><i class="bi bi-people"></i></span></div>
-      <div class="kpi-value" data-k="unpaidVendors">—</div>
+      <div class="kpi-top"><span class="kpi-label">Cash &amp; Bank</span><span class="kpi-ico"><i class="bi bi-bank"></i></span></div>
+      <div class="kpi-value" data-k="cash">—</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-top"><span class="kpi-label">Outstanding</span><span class="kpi-ico"><i class="bi bi-hourglass-split"></i></span></div>
+      <div class="kpi-top"><span class="kpi-label">Payables</span><span class="kpi-ico"><i class="bi bi-hourglass-split"></i></span></div>
       <div class="kpi-value" data-k="outstanding">—</div>
+      <div class="kpi-foot" data-k="outstandingFoot"></div>
     </div>
   </div>
 
-  <!-- Shown only when money is owed to a vendor. -->
-  <div class="build-banner" data-when="owing">
-    <i class="bi bi-exclamation-diamond"></i>
-    <div><strong data-k="owingInline">0</strong> purchase order(s) still unpaid.
-      <button class="link-btn" data-act="goPayables">Open vendor payables</button>.</div>
-  </div>
-
+  <div class="section-label">ACTION CENTER — NEEDS ATTENTION</div>
   <div class="card">
-    <div class="card-head">
-      <h3><i class="bi bi-journal-text"></i> Income &amp; Expense Register</h3>
-      <span class="card-sub">Newest first — every rupee in and out, with its project or order</span>
+    <div class="card-body" data-fill="actions"></div>
+  </div>
+
+  <div class="section-label">CASH MOVEMENT</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-activity"></i> Income vs Expense — monthly</h3>
+        <span class="card-sub">last 8 months</span>
+      </div>
+      <div class="card-body"><div style="height: 250px; position: relative;"><canvas data-canvas="trend"></canvas></div></div>
     </div>
-    <div class="card-body" data-fill="register"></div>
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-pie-chart-fill"></i> Expense by Head</h3>
+        <span class="card-sub">where the money goes</span>
+      </div>
+      <div class="card-body"><div style="height: 250px; position: relative;"><canvas data-canvas="mix"></canvas></div></div>
+    </div>
   </div>
 
 </section>
 
 
 <!-- ============================================================================
-     SCREEN 2 · VENDOR PAYABLES — what Woodart owes, per purchase order.
+     SCREEN 2 · INCOME — what the interiors business earned.
+     ============================================================================ -->
+<section data-screen="income">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Income</span><span class="kpi-ico"><i class="bi bi-graph-up-arrow"></i></span></div>
+      <div class="kpi-value" data-k="total">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Entries</span><span class="kpi-ico"><i class="bi bi-receipt"></i></span></div>
+      <div class="kpi-value" data-k="count">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Biggest Head</span><span class="kpi-ico"><i class="bi bi-fire"></i></span></div>
+      <div class="kpi-value" data-k="top">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Billed to Projects</span><span class="kpi-ico"><i class="bi bi-easel2"></i></span></div>
+      <div class="kpi-value" data-k="projects">—</div>
+    </div>
+  </div>
 
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-graph-up-arrow"></i> Income Register</h3>
+      <span class="card-sub">Newest first — project billings, design fees and everything else</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 3 · EXPENSES — what it cost to run the workshop.
+     ============================================================================ -->
+<section data-screen="expenses">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Expenses</span><span class="kpi-ico"><i class="bi bi-graph-down-arrow"></i></span></div>
+      <div class="kpi-value" data-k="total">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Entries</span><span class="kpi-ico"><i class="bi bi-receipt-cutoff"></i></span></div>
+      <div class="kpi-value" data-k="count">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Biggest Head</span><span class="kpi-ico"><i class="bi bi-fire"></i></span></div>
+      <div class="kpi-value" data-k="top">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Paid to Vendors</span><span class="kpi-ico"><i class="bi bi-truck"></i></span></div>
+      <div class="kpi-value" data-k="vendors">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-graph-down-arrow"></i> Expense Register</h3>
+      <span class="card-sub">Newest first — every cost, with its project or purchase order</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 4 · VENDOR PAYABLES — what Woodart owes, per purchase order.
      Two mutually exclusive states, BOTH authored here; the logic removes one.
      ============================================================================ -->
 <section data-screen="payables">
@@ -149,12 +229,11 @@
 
 
 <!-- ============================================================================
-     SCREEN 3 · PROJECT P&L — the screen no other company can show.
+     SCREEN 5 · PROJECT P&L — the screen no other company can show.
 
-     Contract value against committed cost against the approved BOQ budget.
-     `variance` is budget minus material actually issued from the stock ledger:
-     NEGATIVE means the job is eating more material than it was quoted for, and
-     that is the single number this whole module exists to surface.
+     `variance` is BOQ budget minus material actually issued from the stock
+     ledger: NEGATIVE means the job is eating more material than it was quoted
+     for, and that is the single number this module exists to surface.
      ============================================================================ -->
 <section data-screen="pnl">
 
@@ -181,7 +260,6 @@
     </div>
   </div>
 
-  <!-- Shown only when at least one job has consumed more than its BOQ allowed. -->
   <div class="build-banner" data-when="over">
     <i class="bi bi-exclamation-triangle"></i>
     <div><strong data-k="overInline">0</strong> project(s) have issued more material
@@ -196,4 +274,156 @@
     <div class="card-body" data-fill="register"></div>
   </div>
 
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 6 · RECURRING — standing costs that repeat every month.
+     ============================================================================ -->
+<section data-screen="recurring">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Active</span><span class="kpi-ico"><i class="bi bi-arrow-repeat"></i></span></div>
+      <div class="kpi-value" data-k="active">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Monthly Commitment</span><span class="kpi-ico"><i class="bi bi-calendar-check"></i></span></div>
+      <div class="kpi-value" data-k="monthly">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Due This Month</span><span class="kpi-ico"><i class="bi bi-hourglass-split"></i></span></div>
+      <div class="kpi-value" data-k="due">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Paused</span><span class="kpi-ico"><i class="bi bi-pause-circle"></i></span></div>
+      <div class="kpi-value" data-k="paused">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-arrow-repeat"></i> Recurring Costs</h3>
+      <span class="card-sub">Workshop rent, utilities, retainers — the bills that come every month</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 7 · BANKS — Woodart's own accounts and what is in them.
+     ============================================================================ -->
+<section data-screen="banks">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Accounts</span><span class="kpi-ico"><i class="bi bi-bank"></i></span></div>
+      <div class="kpi-value" data-k="count">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Balance</span><span class="kpi-ico"><i class="bi bi-wallet2"></i></span></div>
+      <div class="kpi-value" data-k="total">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Largest</span><span class="kpi-ico"><i class="bi bi-safe2"></i></span></div>
+      <div class="kpi-value" data-k="largest">—</div>
+    </div>
+  </div>
+
+  <div class="build-banner">
+    <i class="bi bi-info-circle"></i>
+    <div>Accounts are group master data — add or edit them on
+      <a href="#/group/master-accounts/banks">Master Accounts › Manage Banks</a>.
+      This screen is Woodart's view of the ones that belong to this concern.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-bank"></i> Woodart Accounts</h3>
+      <span class="card-sub">Balance and last movement per account</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 8 · JOURNALS — the double entry behind every screen above.
+     ============================================================================ -->
+<section data-screen="journals">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Journals</span><span class="kpi-ico"><i class="bi bi-journal-text"></i></span></div>
+      <div class="kpi-value" data-k="count">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Debits</span><span class="kpi-ico"><i class="bi bi-arrow-down-left"></i></span></div>
+      <div class="kpi-value" data-k="dr">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Total Credits</span><span class="kpi-ico"><i class="bi bi-arrow-up-right"></i></span></div>
+      <div class="kpi-value" data-k="cr">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Balanced</span><span class="kpi-ico"><i class="bi bi-check2-square"></i></span></div>
+      <div class="kpi-value" data-k="balanced">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-journal-text"></i> Journal Entries</h3>
+      <span class="card-sub">Every posting this concern has made — newest first</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 9 · SCHEDULES — money promised for a future date.
+     ============================================================================ -->
+<section data-screen="schedules">
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Open</span><span class="kpi-ico"><i class="bi bi-calendar2-week"></i></span></div>
+      <div class="kpi-value" data-k="open">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Scheduled Out</span><span class="kpi-ico"><i class="bi bi-arrow-up-right"></i></span></div>
+      <div class="kpi-value" data-k="out">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Overdue</span><span class="kpi-ico"><i class="bi bi-exclamation-diamond"></i></span></div>
+      <div class="kpi-value" data-k="overdue">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Due in 7 Days</span><span class="kpi-ico"><i class="bi bi-hourglass-split"></i></span></div>
+      <div class="kpi-value" data-k="soon">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-calendar2-week"></i> Payment Schedules</h3>
+      <span class="card-sub">What is promised, to whom, and when</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 10/11 · PAYROLL and MANAGE CASH mount the SHARED desks, which
+     already take a company id (EPAL.payrollDesk / EPAL.cashDesk). Woodart runs
+     the SAME code Travels runs rather than a copy of it — so a fix to the cash
+     book reaches both concerns at once. These hosts exist only to give the desk
+     somewhere to render, and to say so honestly if the kit is missing.
+     ============================================================================ -->
+<section data-screen="desk">
+  <div data-fill="desk"></div>
+  <div class="empty-state" data-when="missing">
+    <i class="bi bi-plug"></i>
+    <h3>Desk unavailable</h3>
+    <p class="tw-text-ink-dim">The shared desk did not load. Check the script order in index.html.</p>
+  </div>
 </section>

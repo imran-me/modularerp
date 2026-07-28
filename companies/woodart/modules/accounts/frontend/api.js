@@ -35,6 +35,7 @@ var PROJECTS  = 'wa_projects';   /* read-only: owned by Projects               *
 var ESTIMATES = 'wa_estimates';  /* read-only: the BOQ that IS the budget      */
 var MOVEMENTS = 'wa_movements';  /* read-only: owned by Materials              */
 var MATERIALS = 'wa_materials';  /* read-only: for unit cost                   */
+var RECURRING = 'wa_recurring';  /* OURS — standing monthly costs              */
 
 var CID = 'woodart';
 var TODAY = '2026-07-05';        /* the demo clock — same anchor as every module */
@@ -222,6 +223,94 @@ var Books = {
       };
     }).sort(function (a, b) { return String(a.project).localeCompare(String(b.project)); });
   },
+
+  /* ---- the split registers ---------------------------------------------- */
+
+  income:   function () { return this.register().filter(function (e) { return e.kind === INCOME; }); },
+  expenses: function () { return this.register().filter(function (e) { return e.kind === EXPENSE; }); },
+
+  /** Totals per category, biggest first — feeds the "biggest head" KPIs. */
+  byHead: function (kind) {
+    var bag = {};
+    this.all().forEach(function (e) {
+      if (e.kind !== kind) return;
+      var k = e.category || 'Uncategorised';
+      bag[k] = num(bag[k]) + num(e.amount);
+    });
+    return Object.keys(bag)
+      .map(function (k) { return { head: k, total: bag[k] }; })
+      .sort(function (a, b) { return b.total - a.total; });
+  },
+
+  /**
+   * Income vs expense for the last `n` months, oldest first.
+   *
+   * Months are walked back from the DEMO CLOCK, not from the real today, so the
+   * chart tells the same story on every machine and in every screenshot.
+   */
+  monthly: function (n) {
+    n = n || 8;
+    var end = new Date(TODAY + 'T00:00:00');
+    var out = [];
+    for (var i = n - 1; i >= 0; i--) {
+      var d = new Date(end.getFullYear(), end.getMonth() - i, 1);
+      var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      out.push({ ym: ym, label: d.toLocaleString('en', { month: 'short' }), income: 0, expense: 0 });
+    }
+    var index = {};
+    out.forEach(function (r) { index[r.ym] = r; });
+
+    this.all().forEach(function (e) {
+      var row = index[String(e.date || '').slice(0, 7)];
+      if (!row) return;
+      if (e.kind === INCOME) row.income += num(e.amount); else row.expense += num(e.amount);
+    });
+    return out;
+  },
+
+  /* ---- the shared books this desk also reads ---------------------------- */
+
+  /** Woodart's own accounts. `banks` is group master data, scoped here. */
+  banks: function () {
+    return db.col('banks').filter(function (b) {
+      return String(b.companyId) === CID || +b.companyId === 6;
+    });
+  },
+
+  cashBalance: function () {
+    return this.banks().reduce(function (t, b) { return t + num(b.balance); }, 0);
+  },
+
+  /**
+   * The double entry behind every other screen.
+   *
+   * Read from the shared LEDGER ENGINE rather than a store of our own — the
+   * whole point of this desk is that Woodart's postings are the group's
+   * postings. If this ever needs its own table, something has gone wrong.
+   */
+  journals: function () {
+    if (!(EPAL.ledger && EPAL.ledger.entries)) return [];
+    try { return EPAL.ledger.entries({ companyId: CID }) || []; } catch (e) { return []; }
+  },
+
+  /** Money promised for a future date — shared store, company-scoped. */
+  schedules: function () {
+    return db.col('acc_schedules').filter(function (s) { return s.companyId === CID; });
+  },
+
+  /** Standing monthly costs. Woodart's own store, mirroring travels' tv_recurring. */
+  recurring: function () {
+    return db.col(RECURRING).filter(function (r) { return r.companyId === CID; });
+  },
+
+  saveRecurring: function (rec) {
+    rec.companyId = CID;
+    rec.amount = Math.abs(num(rec.amount));
+    if (!rec.id) rec.id = 'REC-WA' + String(Date.now()).slice(-5);
+    return db.save(RECURRING, rec);
+  },
+
+  removeRecurring: function (id) { db.remove(RECURRING, id); },
 
   /* ---- option lists (the seam owns every store name, including these) ---- */
 

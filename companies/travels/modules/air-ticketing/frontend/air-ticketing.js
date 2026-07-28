@@ -1234,6 +1234,18 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       var pax = (s.pax||[]).filter(function(p){ return (p.passenger||'').trim(); });
       if (!pax.length) { ui.toast('Add at least one passenger','error'); return; }
       if (v.fromCode === v.toCode) { ui.toast('Origin and destination must differ','error'); return; }
+      /* "PAID" HAS TO SAY PAID FROM WHERE (owner 2026-07-28).
+       * This form carries three controls for two facts: "Pay status (to vendor)",
+       * "Customer paid into" and "Vendor / airline paid from" — and the two that
+       * name an account default to "not paid yet". A ticket saved with the status
+       * on Paid and the accounts left alone booked the airline cost against the
+       * abstract 1010 with no register row: the owner's report — "why is the IATA
+       * cost not minusing from the account, and not in the bank history?".
+       * Money that has moved must say which account it moved through. */
+      if (v.payStatus === 'Paid' && !bankIdOf(v.vendorPaidFrom) && !portalIdOf(v.vendorPaidFrom)) {
+        ui.toast('Pay status says the vendor is Paid — name the account (or portal wallet) it was paid from', 'error');
+        return;
+      }
 
       var al = als.filter(function(a){ return a.iata===v.airlineCode; })[0] || {};
       var ag = agentById(v.agentId);
@@ -1261,6 +1273,14 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           baseFare:base, taxes:tax, markup:mShare, commission:comm, commissionPct:commPct,
           agent:v.agentId||'', agentName: ag ? ag.name : '',
           cost:cost, sale:sale, costPaid: v.payStatus==='Paid' ? cost : 0, payStatus:v.payStatus,
+          // TWO SIDES, TWO ANSWERS (owner 2026-07-28). `payStatus` is the VENDOR's
+          // — whether the airline has been paid — and the sales ledger was showing
+          // it in a column headed "Payment", where it reads as the customer's. The
+          // customer's own status and the account their money landed in are their
+          // own fields now, so neither can be mistaken for the other.
+          custStatus: (v.receivedInto && v.receivedInto !== 'm:Due') ? 'Paid' : 'Due',
+          bankId: bankIdOf(v.receivedInto), bankName: ((EPAL.pay.byId(bankIdOf(v.receivedInto)))||{}).name || '',
+          costBankId: bankIdOf(v.vendorPaidFrom), costPortalId: portalIdOf(v.vendorPaidFrom),
           payable:{ to:v.payTo||'', amount:+v.payableAmount||0, date:v.payableDate||'' },
           receivable:{ from:v.receiveFrom||'', amount:+v.receivableAmount||0, date:v.receivableDate||'' },
           currency:'BDT', status:'Issued', created: today(),
@@ -1358,6 +1378,11 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           tdN(ui.money(base)), tdN(ui.money(tax)), tdN(ui.money(x.cost)), tdN(ui.money(x.sale)),
           tdN(ui.money(comm)),
           td('<span class="num '+(np>=0?'text-good':'text-bad')+'">'+ui.money(np)+'</span>'),
+          // the CUSTOMER's payment and the VENDOR's, each under its own heading —
+          // one column called 'Payment' showing the vendor's status read as the
+          // customer's (owner 2026-07-28). Older tickets carry only payStatus, so
+          // their customer cell says '—' rather than claiming an answer.
+          td(x.custStatus ? payBadge(x.custStatus).outerHTML + (x.bankName ? ' <span class="text-mute xs">' + ui.escapeHtml(x.bankName) + '</span>' : '') : '<span class="text-mute">—</span>'),
           td(payBadge(x.payStatus).outerHTML), td(statusBadge(x.status).outerHTML),
           el('td', null, [ ui.rowActions(ui.actions({
             print: (function(tk){return function(){ printTicket(tk); };})(x),
@@ -1366,8 +1391,17 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           })) ]) ]);
       });
       host.innerHTML='';
+      // sales whose journals never landed — visible here rather than one ticket at
+      // a time, because a sale missing from the books is missing from every total
+      var orphans = all.filter(function (x) { return !isOnTheBooks(x); });
+      if (orphans.length) host.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('exclamation-triangle-fill')),
+        el('div.flex-1', { html: '<strong>' + orphans.length + ' sale' + (orphans.length === 1 ? '' : 's') + ' not in the accounts.</strong> ' +
+          'In the sales book but with no journal — missing from Income, the P&L and the bank history. Open a ticket to post it: ' +
+          orphans.slice(0, 6).map(function (x) { return ui.escapeHtml(x.id); }).join(', ') + (orphans.length > 6 ? '…' : '') }),
+        orphans.length === 1 ? el('button.btn.btn-sm.btn-primary', { html: ui.icon('journal-plus') + ' Post to accounts',
+          onclick: function () { postTicketToBooks(orphans[0], draw); } }) : null ]));
       host.appendChild(tableCard('Ticket Sales Ledger',
-        ['Ticket','Passenger','Route','Airline · PNR','Base','Tax','Cost','Sale','Comm','Net Profit','Payment','Status',''], rows, 'No tickets sold yet.', { chipCol: 11 }));
+        ['Ticket','Passenger','Route','Airline · PNR','Base','Tax','Cost','Sale','Comm','Net Profit','Customer Paid','Vendor Paid','Status',''], rows, 'No tickets sold yet.', { chipCol: 12 }));
     }
     draw();
   }
@@ -1474,6 +1508,58 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     } else { take(null); }                             // kit absent → the old behaviour
   }
 
+  /* Does a sale journal exist for this ticket? (The ledger keys a sale by its ref,
+   * so this is the same question the auto-post asks before it posts.) */
+  function isOnTheBooks(t) {
+    if (!t || !t.id || !EPAL.ledger || !EPAL.ledger.entries) return true;   // can't tell → don't nag
+    try {
+      return EPAL.ledger.entries({ companyId: 'travels' }).some(function (e) {
+        return e.source === 'sale' && (e.ref === t.id || e.id === 'GL-S' + t.id);
+      });
+    } catch (x) { return true; }
+  }
+  /* Post a sale that never made it onto the books — asking for the accounts, because
+   * the whole point is that the money lands somewhere real. Re-runs the SAME
+   * postSale the ticketing desk runs, so every downstream book (Income, expense as
+   * cost, bank register, P&L, group) fills in exactly as it would have. */
+  function postTicketToBooks(t, done) {
+    EPAL.formModal({
+      title: 'Post to accounts · ' + (t.passenger || t.id), icon: 'journal-plus', size: 'md',
+      record: { receivedInto: t.custStatus === 'Paid' && t.bankId ? 'bank:' + t.bankId : 'm:Due',
+                vendorPaidFrom: t.costBankId ? 'bank:' + t.costBankId : (t.costPortalId ? 'portal:' + t.costPortalId : 'm:Due') },
+      fields: [
+        { key: 'receivedInto', label: 'Customer paid the fare into', type: 'select', required: true, searchable: true,
+          options: [['m:Due', 'Not paid yet — book as Receivable']].concat(payAccountOptions()),
+          hint: 'Sale ' + ui.money(t.sale || 0) + ' — naming an account puts the money in it and in its history.' },
+        { key: 'vendorPaidFrom', label: 'Airline / vendor cost paid from', type: 'select', required: true, searchable: true,
+          options: [['m:Due', 'Not paid yet — book as Payable']].concat(payAccountOptions()).concat(portalPayOptions()),
+          hint: 'Cost ' + ui.money(t.cost || 0) + ' — this is the amount that leaves the account.' }
+      ],
+      saveLabel: 'Post to accounts',
+      onSave: function (v) {
+        var paid = v.receivedInto !== 'm:Due', costPaid = v.vendorPaidFrom !== 'm:Due';
+        try {
+          db.postSale('travels', { amount: +t.sale || 0, cost: +t.cost || 0, ref: t.id,
+            desc: 'Air ticket ' + (t.route || '') + ' (' + (t.airlineCode || '') + ') · ' + (t.passenger || ''),
+            customer: t.passenger || '', category: 'air', vendor: t.vendor || '',
+            commission: +t.commission || 0, agent: t.agentName || '',
+            paid: paid, payStatus: paid ? 'Paid' : 'Due', costPaid: costPaid,
+            bankId: bankIdOf(v.receivedInto), costBankId: bankIdOf(v.vendorPaidFrom),
+            costPortalId: portalIdOf(v.vendorPaidFrom) });
+        } catch (e) { ui.toast(e.message || 'Posting failed', 'error'); return false; }
+        t.custStatus = paid ? 'Paid' : 'Due';
+        t.bankId = bankIdOf(v.receivedInto);
+        t.bankName = ((EPAL.pay.byId(t.bankId)) || {}).name || '';
+        t.costBankId = bankIdOf(v.vendorPaidFrom); t.costPortalId = portalIdOf(v.vendorPaidFrom);
+        if (costPaid) { t.costPaid = +t.cost || 0; t.payStatus = 'Paid'; }
+        t.timeline = (t.timeline || []).concat([{ at: Date.now(), text: 'Posted to accounts' }]);
+        db.saveAirTicket(t);
+        ui.toast('Posted — income, cost, bank and P&L updated', 'success');
+        done && done(); return true;
+      }
+    });
+  }
+
   function ticketDetail(t, refresh) {
     var body = el('div');
     var m = ui.modal({ title:t.passenger+' · '+t.route, icon:'ticket-perforated', size:'lg', body:body, footer:false });
@@ -1481,6 +1567,19 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
       body.innerHTML='';
       body.appendChild(el('div.flex.gap-1.flex-wrap.mb-3', null, [
         statusBadge(t.status), el('span.badge',{text:t.tripType}), payBadge(t.payStatus), el('span.badge',{text:t.id}) ]));
+
+      /* IS THIS SALE ON THE BOOKS? (owner 2026-07-28)
+       * A sale posts its journals the moment it is made — but if that posting was
+       * REFUSED (the live "Unknown account code" failure) the ticket exists and the
+       * accounting does not, and nothing would ever try again: the sale event fires
+       * once, at creation. So the ticket says so, and offers to post it. Same guard
+       * the ledger uses, so pressing it twice can never double-post. */
+      if (!isOnTheBooks(t)) {
+        body.appendChild(el('div.build-banner.mb-3', null, [ ui.frag(ui.icon('exclamation-triangle-fill')),
+          el('div.flex-1', { html: '<strong>Not in the accounts yet.</strong> This ticket is in the sales book, but no journal was posted for it — so it is missing from Income, the P&L and the bank history.' }),
+          el('button.btn.btn-sm.btn-primary', { html: ui.icon('journal-plus') + ' Post to accounts',
+            onclick: function () { postTicketToBooks(t, function () { redraw(); refresh && refresh(); }); } }) ]));
+      }
 
       var base = t.baseFare!=null ? t.baseFare : (t.cost||0);
       body.appendChild(el('div.form-grid', null, [
