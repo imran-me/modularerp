@@ -1300,6 +1300,10 @@ function journalsView(page) {
     { key: 'lines', type: 'items', label: 'Journal Lines', required: true, min: 2, addLabel: 'Add line',
       columns: [
         { key: 'account', label: 'Account', type: 'select', width: '2.4fr', options: acctOpts },
+        // per-line counterparty (owner 2026-07-28) — one journal can settle three
+        // vendors at once and each of them sees only their own line on their
+        // statement. Blank = the header Party above.
+        { key: 'party', label: 'Party', type: 'text', width: '1.4fr' },
         { key: 'debit', label: 'Debit', type: 'money', width: '1fr' },
         { key: 'credit', label: 'Credit', type: 'money', width: '1fr' }
       ],
@@ -1313,7 +1317,7 @@ function journalsView(page) {
     if (!form.validate()) { ui.toast('Please complete the journal', 'error'); return; }
     var v = form.values();
     var lines = (v.lines || []).filter(function (r) { return r.account && ((+r.debit || 0) > 0 || (+r.credit || 0) > 0); })
-      .map(function (r) { return { account: r.account, dr: +r.debit || 0, cr: +r.credit || 0 }; });
+      .map(function (r) { return { account: r.account, dr: +r.debit || 0, cr: +r.credit || 0, party: (r.party || '').trim() }; });
     if (lines.length < 2) { ui.toast('A journal needs at least two lines', 'error'); return; }
     try {
       EPAL.ledger.post({ date: v.date, companyId: CID, ref: v.ref || '', memo: v.memo || 'Manual journal', source: 'manual', party: v.party || '', lines: lines });
@@ -1346,14 +1350,20 @@ function journalsView(page) {
   mountScreen(page, jv);
 
   function showEntry(e) {
-    var lines = (e.lines || []).map(function (l) { var a = EPAL.ledger.account(l.account); return { account: l.account + ' · ' + (a ? a.name : ''), debit: +l.dr || 0, credit: +l.cr || 0 }; });
+    var lines = (e.lines || []).map(function (l) { var a = EPAL.ledger.account(l.account);
+      return { account: l.account + ' · ' + (a ? a.name : ''), party: l.party || e.party || '',
+               debit: +l.dr || 0, credit: +l.cr || 0 }; });
     var lt = EPAL.table({
-      columns: [ { key: 'account', label: 'Account' }, { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true } ],
+      columns: [ { key: 'account', label: 'Account' },
+        { key: 'party', label: 'Party', render: function (r) { return r.party ? esc(r.party) : '—'; } },
+        { key: 'debit', label: 'Debit', num: true, money: true }, { key: 'credit', label: 'Credit', num: true, money: true } ],
       rows: lines, empty: { icon: 'journal', title: 'No lines' }
     });
     ui.modal({ title: 'Journal ' + e.id, icon: 'journal-text', size: 'lg',
-      body: el('div', null, [ el('div.text-mute.sm.mb-2', { text: ui.date(e.date) + ' · ' + (e.memo || '') + (e.party ? ' · ' + e.party : '') }), lt.el ]),
-      actions: [{ label: 'Close', variant: 'ghost' }] });
+      body: el('div', null, [ el('div.text-mute.sm.mb-2', { text: ui.date(e.date) + ' · ' + (e.memo || '')
+        + (e.party ? ' · ' + e.party : '') + (e.sourceId ? ' · from ' + e.source + ' ' + e.sourceId : '') }), lt.el ]),
+      actions: [{ label: 'Close', variant: 'ghost' },
+        { label: 'Print voucher', variant: 'primary', onClick: function () { EPAL.journalVoucher(e, coLabel(CID)); return false; } }] });
   }
 }
 

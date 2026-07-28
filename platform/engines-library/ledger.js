@@ -191,6 +191,43 @@
     return out;
   }
   function isTopLevel(acc) { return !acc.parent; }
+
+  /* ==========================================================================
+   * ACCOUNT ROLES  (owner 2026-07-28)
+   * --------------------------------------------------------------------------
+   * What an account is FOR, separately from the number it happens to carry. The
+   * reference ERP keeps this in config/accounts.php and its posting code asks for
+   * a role, never a literal — the right instinct: a chart is a company's own
+   * numbering, and business logic that hardcodes '1200' breaks the day a group
+   * renumbers or a second concern uses a different chart.
+   *
+   * Ours does the same, with the codes this chart actually uses. Read it with
+   * ledger.acct('accounts_receivable'), and prefer that over a literal in any new
+   * posting code. Existing call sites still pass literals and still work — this
+   * is the map they migrate to as they are touched, not a rename.
+   * ========================================================================*/
+  var ROLES = {
+    cash: '1000', bank: '1010',
+    agent_receivable: '1150', accounts_receivable: '1200',
+    portal_wallets: '1180', employee_advances: '1250', staff_loans: '1260',
+    intercompany_receivable: '1300', inventory: '1400', fixed_assets: '1500',
+    accounts_payable: '2000', bsp_payable: '2050', salary_payable: '2100',
+    vat_payable: '2130', ait_tds_payable: '2140', customer_advances: '2300',
+    intercompany_payable: '2400',
+    owners_equity: '3000', retained_earnings: '3100',
+    sales_revenue: '4000', ticket_sales_revenue: '4010', visa_revenue: '4020',
+    package_revenue: '4030', hotel_revenue: '4040', contract_revenue: '4050',
+    commission_income: '4100', other_income: '4900',
+    cost_of_sales: '5000', salary_expense: '5100', rent: '5200', utilities: '5300',
+    agent_commission: '5350', marketing: '5400', office_admin: '5500',
+    food_entertainment: '5550', conveyance: '5600', misc_expense: '5800',
+    penalties: '5900', bank_charges: '6000'
+  };
+  function acctFor(role) {
+    var code = ROLES[String(role)];
+    if (!code) throw new Error('ledger.acct: no account is mapped to the role "' + role + '"');
+    return code;
+  }
   /* Is `code` this control account, or anything under it? Every screen that used
    * to ask `l.account === '1010'` asks this instead, so a per-bank sub-account
    * still counts as bank money. */
@@ -242,6 +279,10 @@
       var ln = lines[i] || {};
       var out = { account: String(ln.account), dr: +ln.dr || 0, cr: +ln.cr || 0 };
       if (ln.product) out.product = ln.product;
+      // a line may name its OWN counterparty — that beats the header party on the
+      // party statement and in the aging (owner 2026-07-28)
+      if (ln.party) out.party = String(ln.party);
+      if (ln.note) out.note = String(ln.note);
       clean.push(out);
     }
     var dr = sumSide(clean, 'dr'), cr = sumSide(clean, 'cr');
@@ -256,6 +297,10 @@
       ref: spec.ref || '',
       memo: spec.memo || '',
       source: spec.source || 'manual',
+      // WHICH document this journal came from, so the entry can be traced back to
+      // it (the reference ERP's source/source_id pair — ours also keeps the ref,
+      // which is the human-readable number on that document)
+      sourceId: spec.sourceId || '',
       party: spec.party || '',
       lines: clean,
       posted: true,
@@ -488,22 +533,38 @@
   var AP_ACCOUNTS = ['2000', '2050', '2300'];
   function inList(code, arr) { return arr.indexOf(code) >= 0; }
 
-  // A party statement blends their receivable + payable movement; a positive
-  // running balance means the party owes us (net AR), negative means we owe.
+  /* A party statement blends their receivable + payable movement; a positive
+   * running balance means the party owes us (net AR), negative means we owe.
+   *
+   * PER-LINE PARTY (owner 2026-07-28): a line may name its OWN party, and when
+   * it does that beats the entry's header party. One journal can then split
+   * across counterparties — a shared bill where each concern's share is owed by
+   * a different party, a settlement paying three vendors at once — and each of
+   * them sees only their own line on their statement. The reference ERP carries
+   * party columns on journal_items but has no party statement to read them; the
+   * header party stays the fallback, so every existing entry reads as before. */
   function partyLedger(party, opts) {
     opts = opts || {};
     return runningRowsForParty(party, opts.companyId);
   }
+  // the party a line belongs to: its own, else the entry's
+  function partyOfLine(line, entry) {
+    return String((line && line.party) || (entry && entry.party) || '');
+  }
 
   function runningRowsForParty(party, companyId) {
+    // an entry counts when its header names the party OR any single line does
     var rows = S.list(GL_KEY).filter(function (e) {
-      return e.party === party && (!companyId || e.companyId === companyId);
+      if (companyId && e.companyId !== companyId) return false;
+      if (e.party === party) return true;
+      return (e.lines || []).some(function (l) { return l.party === party; });
     }).sort(byDate);
     var out = [], bal = 0;
     for (var i = 0; i < rows.length; i++) {
       var e = rows[i], d = 0, c = 0;
       for (var j = 0; j < e.lines.length; j++) {
         var ln = e.lines[j];
+        if (partyOfLine(ln, e) !== party) continue;      // only THIS party's lines
         if (inList(ln.account, AR_ACCOUNTS)) { d += (+ln.dr || 0); c += (+ln.cr || 0); }
         else if (inList(ln.account, AP_ACCOUNTS)) { c += (+ln.dr || 0); d += (+ln.cr || 0); }
       }
@@ -539,10 +600,10 @@
     }
     for (var i = 0; i < rows.length; i++) {
       var e = rows[i];
-      var party = e.party || '(unassigned)';
       for (var j = 0; j < e.lines.length; j++) {
         var ln = e.lines[j];
         if (!inList(ln.account, accs)) continue;
+        var party = partyOfLine(ln, e) || '(unassigned)';   // the LINE's party wins
         var d = +ln.dr || 0, c = +ln.cr || 0;
         // AR: debit raises the invoice, credit is a payment. AP: reversed.
         var invAmt = kind === 'AP' ? c : d;
@@ -833,6 +894,8 @@
     accounts: accounts,
     account: account,
     ensureAccount: ensureAccount,
+    acct: acctFor,                   // acct('accounts_receivable') -> '1200'
+    roles: function () { return Object.assign({}, ROLES); },
     childrenOf: childrenOf,          // sub-accounts of a control account
     familyOf: familyOf,              // a code plus every descendant
     isUnder: isUnder,                // '1010-BNK-04' is under '1010'

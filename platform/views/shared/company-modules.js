@@ -21,6 +21,46 @@
 (function (EPAL) {
   'use strict';
   var ui = EPAL.ui, el = ui.el;
+
+  /* ==========================================================================
+   * THE JOURNAL VOUCHER  (owner 2026-07-28)
+   * --------------------------------------------------------------------------
+   * The formal document behind a posted journal — the one accounting artefact the
+   * reference ERP had that we didn't (its JournalController::voucher). Who posted
+   * it, which document it came from, every line with ITS OWN party, and the
+   * three signature lines a voucher is filed with.
+   *
+   * Shared, not copied: every Manage Journals desk prints the same document, so
+   * the day this grows a company seal it grows one everywhere.
+   * ========================================================================*/
+  EPAL.journalVoucher = function (e, companyName) {
+    if (!e) return;
+    var dr = 0, cr = 0;
+    var rows = (e.lines || []).map(function (l) {
+      var a = EPAL.ledger.account(l.account);
+      dr += +l.dr || 0; cr += +l.cr || 0;
+      return '<tr><td class="mono">' + ui.escapeHtml(l.account) + '</td><td>' + ui.escapeHtml(a ? a.name : '') +
+        '</td><td>' + ui.escapeHtml(l.party || e.party || '—') + '</td>' +
+        '<td class="num">' + (+l.dr ? ui.money(l.dr) : '') + '</td>' +
+        '<td class="num">' + (+l.cr ? ui.money(l.cr) : '') + '</td></tr>';
+    }).join('');
+    ui.printDoc({
+      title: 'Journal Voucher · ' + e.id,
+      subtitle: (companyName || '') + ' · ' + ui.date(e.date),
+      meta: (e.source || 'manual') + (e.sourceId ? ' ' + e.sourceId : '') + (e.ref ? ' · ref ' + e.ref : ''),
+      bodyHtml:
+        '<table><tr><td>Narration</td><td>' + ui.escapeHtml(e.memo || '—') + '</td></tr>' +
+        '<tr><td>Party</td><td>' + ui.escapeHtml(e.party || '—') + '</td></tr>' +
+        '<tr><td>Posted by</td><td>' + ui.escapeHtml(e.by || 'System') + '</td></tr></table>' +
+        '<table style="margin-top:14px"><thead><tr><th>Code</th><th>Account</th><th>Party</th>' +
+        '<th class="num">Debit</th><th class="num">Credit</th></tr></thead><tbody>' + rows +
+        '</tbody><tfoot><tr><th colspan="3">Total</th><th class="num">' + ui.money(dr) +
+        '</th><th class="num">' + ui.money(cr) + '</th></tr></tfoot></table>' +
+        '<div style="margin-top:38px;display:flex;justify-content:space-between">' +
+        '<div>Prepared by ______________</div><div>Checked by ______________</div>' +
+        '<div>Approved by ______________</div></div>'
+    });
+  };
   var db = function () { return EPAL.db; };
 
   /* ---- tiny shared helpers ------------------------------------------------*/
@@ -302,6 +342,10 @@
         { key: 'lines', type: 'items', label: 'Journal Lines', required: true, min: 2, addLabel: 'Add line',
           columns: [
             { key: 'account', label: 'Account', type: 'select', width: '2.4fr', options: acctOpts },
+            // per-line counterparty (owner 2026-07-28): one journal can settle
+            // three vendors at once and each of them sees only their own line on
+            // their statement. Blank = the header Party above.
+            { key: 'party', label: 'Party', type: 'text', width: '1.4fr' },
             { key: 'debit', label: 'Debit', type: 'money', width: '1fr' },
             { key: 'credit', label: 'Credit', type: 'money', width: '1fr' }
           ],
@@ -316,7 +360,8 @@
         if (!form.validate()) { ui.toast('Please complete the journal', 'error'); return; }
         var v = form.values();
         var lines = (v.lines || []).filter(function (r) { return r.account && ((+r.debit || 0) > 0 || (+r.credit || 0) > 0); })
-          .map(function (r) { return { account: r.account, dr: +r.debit || 0, cr: +r.credit || 0 }; });
+          .map(function (r) { return { account: r.account, dr: +r.debit || 0, cr: +r.credit || 0,
+            party: (r.party || '').trim() }; });
         if (lines.length < 2) { ui.toast('A journal needs at least two lines', 'error'); return; }
         try {
           EPAL.ledger.post({ date: v.date, companyId: cid, ref: v.ref || '', memo: v.memo || 'Manual journal',
@@ -358,17 +403,23 @@
 
       function showEntry(e) {
         var lines = (e.lines || []).map(function (l) { var a = EPAL.ledger.account(l.account);
-          return { account: l.account + ' · ' + (a ? a.name : ''), debit: +l.dr || 0, credit: +l.cr || 0 }; });
+          return { account: l.account + ' · ' + (a ? a.name : ''), party: l.party || e.party || '',
+                   debit: +l.dr || 0, credit: +l.cr || 0 }; });
         var lt = EPAL.table({
           columns: [ { key: 'account', label: 'Account' },
+            { key: 'party', label: 'Party', render: function (r) { return r.party ? ui.escapeHtml(r.party) : '—'; } },
             { key: 'debit', label: 'Debit', num: true, money: true },
             { key: 'credit', label: 'Credit', num: true, money: true } ],
           rows: lines, empty: { icon: 'journal', title: 'No lines' }
         });
         ui.modal({ title: 'Journal ' + e.id, icon: 'journal-text', size: 'lg',
-          body: el('div', null, [ el('div.text-mute.sm.mb-2', { text: ui.date(e.date) + ' · ' + (e.memo || '') + (e.party ? ' · ' + e.party : '') }), lt.el ]),
-          actions: [ { label: 'Close', variant: 'ghost' } ] });
+          body: el('div', null, [
+            el('div.text-mute.sm.mb-2', { text: ui.date(e.date) + ' · ' + (e.memo || '') + (e.party ? ' · ' + e.party : '')
+              + (e.sourceId ? ' · from ' + e.source + ' ' + e.sourceId : '') }), lt.el ]),
+          actions: [ { label: 'Close', variant: 'ghost' },
+            { label: 'Print voucher', variant: 'primary', onClick: function () { printVoucher(e); return false; } } ] });
       }
+      function printVoucher(e) { EPAL.journalVoucher(e, (ctx.company && ctx.company.name) || cid); }
     }
   } });
 
