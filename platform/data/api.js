@@ -97,7 +97,14 @@
     wa_drawings:   'woodart/design/drawings',
     wa_revisions:  'woodart/design/revisions',
     wa_movements:  'woodart/materials/movements',
-    wa_locations:  'woodart/materials/locations'
+    wa_locations:  'woodart/materials/locations',
+    // READ-ONLY (absent from WRITABLE and CONDITIONAL on purpose): the portfolio
+    // screen still writes through EPAL.db to localStorage until the projects
+    // module gets its own build slot. Hydrating the reads is what stops eight
+    // seeded projects sitting in MySQL behind no route — the state that made a
+    // migrated host show "No projects yet".
+    wa_projects:   'woodart/projects/portfolio',
+    wa_estimates:  'woodart/projects/estimates'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
