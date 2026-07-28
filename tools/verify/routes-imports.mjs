@@ -19,9 +19,17 @@
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
-const files = execSync('git ls-files "companies/**/routes.php" "platform/**/routes.php"', {
-  encoding: 'utf8',
-}).split('\n').filter(Boolean);
+/* --cached --others --exclude-standard, NOT a plain `git ls-files`.
+ *
+ * Plain ls-files lists only TRACKED files, so a brand-new module's routes.php
+ * is invisible to this gate until it is staged — which is exactly the moment
+ * the missing-import bug is most likely and least noticed. Caught while adding
+ * woodart/accounts: the gate reported a confident green over 22 files while the
+ * 23rd, written seconds earlier, was never opened. */
+const files = execSync(
+  'git ls-files --cached --others --exclude-standard "companies/**/routes.php" "platform/**/routes.php"',
+  { encoding: 'utf8' }
+).split('\n').filter(Boolean);
 
 let bad = 0;
 let checked = 0;
