@@ -256,6 +256,21 @@
 </section>
 
 <!-- ---------------------------------------------------------------------------
+  PAYROLL HISTORY — sits directly under the Salary Sheet on Salary Manage (owner
+  2026-07-28). One row per payroll month, newest first; the row opens a modal
+  listing EVERY payroll transaction that month, and a transaction opens its own
+  printable detail. The month list is built from pay_runs UNION the distinct ym
+  values in pay_slips, so a month with payslips but no run row still appears.
+--------------------------------------------------------------------------- -->
+<div data-shell="history" class="card mt-3">
+  <div class="card-head">
+    <h3 data-k="title"></h3>
+    <span class="card-sub" data-k="sub"></span>
+  </div>
+  <div class="card-body tbl-dense" data-fill="body"></div>
+</div>
+
+<!-- ---------------------------------------------------------------------------
   ONE MONTH, IN FULL — the drill behind a row of the Monthly Register (owner
   2026-07-28: "if I click on January, it should show me how many transactions
   happened … all their accounts summary of January in a table — gross, net,

@@ -47,6 +47,25 @@
         var empId = ctx.params.emp || (isAdmin ? 'EPL-DEV1' : (EPAL.auth.current().id === 'EPL-0001' ? 'EPL-DEV1' : EPAL.auth.current().id));
         var emp = db.employee(empId) || db.employee('EPL-DEV1');
         var page = el('div.page');
+        /* NOBODY ON FILE YET (live crash 2026-07-28: "Cannot read properties of
+         * null (reading 'id')" took My Task down). The board is built around one
+         * employee, and on a freshly migrated database the directory is empty, so
+         * neither the signed-in user nor the demo fallback resolves. An empty
+         * directory is a normal state on day one — say so instead of breaking. */
+        if (!emp) {
+          page.appendChild(EPAL.pageHead({
+            eyebrow: isAdmin ? 'Task Oversight' : 'My Workspace', icon: 'kanban-fill',
+            title: isAdmin ? 'Team Task Board' : 'My Task Board',
+            sub: 'Boards belong to people — add the team first.'
+          }));
+          page.appendChild(el('div.card', null, [el('div.card-body', null, [
+            EPAL.emptyState
+              ? EPAL.emptyState({ icon: 'people', title: 'No employees on file yet',
+                  hint: 'Add someone in Workforce ▸ Directory and their task board opens here.' })
+              : el('div.text-mute', { text: 'No employees on file yet — add someone in Workforce ▸ Directory and their task board opens here.' })
+          ])]));
+          return page;
+        }
 
         // ---- header ----
         page.appendChild(EPAL.pageHead({

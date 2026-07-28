@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · PAYROLL · MARKUP  (company-agnostic — registered for every concern)\n  ----------------------------------------------------------------------------\n  The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +\n  filled at runtime via [data-tpl] / [data-slot] hooks.\n\n  Seven tabs (overview / template / manage / loans / payslip / advance /\n  reports), rendered BOTH standalone (cid/payroll/…) and embedded in Master\n  Accounts via EPAL.payrollDesk. Every modal/form (manage-salary, correction/\n  edit, print-sheet, pay, money, encashment) keeps its legacy el()-built DOM, as\n  do the compound-styled leaf helpers formField() and field() (label+control rows\n  with inline padding/width — impractical as utilities). STYLING = the house\n  design system; the only new tw util is tw-max-w-[230px] (the run's month\n  select). The salary-sheet body keeps its .tbl-dense modifier (owner: fit\n  without h-scroll).\n\n  TWO STYLES LIVE HERE, on purpose:\n   · the [data-tpl] fragments below are the ORIGINAL screens, kept exactly as\n     they were so their proven-identical pixels do not move;\n   · everything under \"REAL-HTML BLOCKS\" is the current FRONTEND BUILD LAW —\n     whole screens written out as plain HTML. All NEW work goes there.\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section band ----------------------------------------------->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid + one KPI card + a two-column row ------------------------------>\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n<template data-tpl=\"two-col\"><div class=\"two-col\"></div></template>\n\n<!-- generic cards: plain (body), register (head+sub+body), head-only -------->\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"head-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n\n<!-- Salary Manage: the run-control card + the .tbl-dense salary sheet -------->\n<template data-tpl=\"run-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex justify-between items-center flex-wrap gap-2\"><div class=\"flex items-center gap-2 flex-wrap\" data-slot=\"left\"></div><div class=\"flex gap-1 flex-wrap\" data-slot=\"actions\"></div></div><div class=\"text-mute sm mt-2\" data-slot=\"status\"></div></div></div></template>\n<template data-tpl=\"salary-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body tbl-dense\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"grid-auto-compact\"><div class=\"grid-auto kpi-compact\"></div></template>\n<template data-tpl=\"pay-tier-card\"><div class=\"card tier-card\"><div class=\"card-pad\"><div class=\"fw-700\" data-slot=\"name\"></div><div class=\"text-mute sm\" data-slot=\"out\"></div><span class=\"badge\" data-slot=\"badge\"></span></div></div></template>\n\n<!-- Payslip: the employee/month/view-statement picker row ------------------->\n<template data-tpl=\"pick-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex gap-2 flex-wrap items-end\" data-slot=\"row\"></div></div></div></template>\n\n<!-- a plain \"New …\" button row (loans/advance disburse) -------------------->\n<template data-tpl=\"btn-row\"><div class=\"mb-3\"><button class=\"btn btn-primary\" data-slot=\"btn\"></button></div></template>\n\n\n<!-- ============================================================================\n  ▼▼ REAL-HTML BLOCKS (FRONTEND BUILD LAW, owner 2026-07-28) ▼▼\n  Everything below is the screen written out as plain HTML — not cloned\n  fragments, not el(). JS only fills the [data-k] placeholders, clones the\n  [data-proto] rows (0..N of them is DATA, not layout) and wires [data-act].\n\n  LEGEND\n    [data-shell=\"…\"]  a shared bar/panel used by more than one screen\n    [data-screen=\"…\"] one whole screen; mountScreen() moves its children onto the page\n    [data-k=\"…\"]      a text/HTML placeholder JS writes into\n    [data-fill=\"…\"]   a container JS appends a built widget (table/SVG) into\n    [data-proto=\"…\"]  a hidden prototype row — cloned once per record\n    [data-el=\"…\"]     an element JS needs a handle on (to hide, or to click-wire)\n    [data-act=\"…\"]    a click target JS binds a navigation/action to\n\n  ⚠ CLASS NAMES: the dashboard row deliberately reuses the `bank-*` component\n  vocabulary from components.css. That block is the house SUMMARY-IDENTITY-PANEL\n  design (hero figure · drill facts · last-event mini-statement · mirrored\n  sparkline · reconciliation · mini stack); Manage Banks was simply its first\n  caller. Reusing it means Payroll is pixel-consistent with Manage Banks for\n  free and forks not a single rule. The extra `pay-*` classes carry no styling —\n  they are semantic hooks for anything payroll ever needs to override.\n  ============================================================================ -->\n\n<!-- ---------------------------------------------------------------------------\n  DASHBOARD ROW — the four same-height cards that head both Payroll Overview\n  and Salary Manage. ONE shell, filled with different numbers by each caller:\n\n    1  identity panel  company · hero figure · 3 clickable drill facts ·\n                       the last payroll event (direction · amount · reference ·\n                       opening → closing of what we owe staff)\n    2  flow card       a mirrored 2-colour sparkline + its two totals\n    3  reconciliation  a 2×2 of control figures + a variance badge + \"why?\"\n    4  mini stack      two small click-through cards\n--------------------------------------------------------------------------- -->\n<div data-shell=\"dash\" class=\"bank-cards-row pay-cards-row\">\n\n  <div class=\"bank-summary pay-summary\" data-el=\"panel\">\n    <div class=\"bank-summary-in\">\n      <div class=\"bank-summary-body\">\n        <div class=\"bank-summary-left\">\n          <div class=\"bank-summary-head\">\n            <div class=\"bank-summary-ico\" data-k=\"ico\"></div>\n            <div class=\"bank-summary-id\">\n              <div class=\"bank-summary-co\" data-k=\"co\"></div>\n              <div class=\"bank-summary-sub\" data-k=\"co-sub\"></div>\n            </div>\n          </div>\n          <div class=\"bank-summary-hero clik\" data-act=\"hero\">\n            <div class=\"bank-summary-bal\" data-k=\"hero\"></div>\n            <div class=\"bank-summary-ballabel\" data-k=\"hero-label\"></div>\n          </div>\n        </div>\n        <div class=\"bank-summary-last\" data-el=\"last\">\n          <div class=\"bank-summary-last-top\">\n            <span class=\"bank-summary-last-lbl\" data-k=\"last-label\"></span>\n            <span class=\"bank-summary-dir\" data-k=\"dir\"></span>\n          </div>\n          <div class=\"bank-summary-last-row\">\n            <span class=\"bank-summary-last-amt\" data-k=\"amt\"></span>\n            <span class=\"bank-summary-last-date\" data-k=\"when\"></span>\n          </div>\n          <div class=\"bank-summary-last-ref\" data-k=\"ref\"></div>\n          <div class=\"bank-summary-last-oc\">\n            <div class=\"oc-open\" data-k=\"oc-open\"></div>\n            <div class=\"oc-close\" data-k=\"oc-close\"></div>\n          </div>\n        </div>\n      </div>\n      <div class=\"bank-summary-facts\">\n        <div class=\"bank-summary-fact clik\" data-act=\"f1\"><div class=\"k\" data-k=\"f1k\"></div><div class=\"v\" data-k=\"f1v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f2\"><div class=\"k\" data-k=\"f2k\"></div><div class=\"v\" data-k=\"f2v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f3\"><div class=\"k\" data-k=\"f3k\"></div><div class=\"v\" data-k=\"f3v\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-flow pay-flow\" data-el=\"flow\">\n    <div class=\"bank-flow-head\">\n      <div>\n        <div class=\"bank-flow-title\" data-k=\"flow-title\"></div>\n        <div class=\"bank-flow-sub\" data-k=\"flow-sub\"></div>\n      </div>\n      <span class=\"bank-flow-net\" data-k=\"flow-net\"></span>\n    </div>\n    <div class=\"bank-flow-spark\" data-fill=\"spark\"></div>\n    <div class=\"bank-flow-foot\">\n      <span><span class=\"bank-flow-dot in\"></span><span data-k=\"flow-in\"></span></span>\n      <span><span class=\"bank-flow-dot out\"></span><span data-k=\"flow-out\"></span></span>\n    </div>\n  </div>\n\n  <div class=\"card bank-recon bank-recon-clik pay-recon\" data-el=\"recon\">\n    <!-- no head badge: inside .bank-cards-row components.css hides it, because\n         the verdict already reads in the 4th stat (coloured + its \"why?\"). -->\n    <div class=\"card-head\">\n      <h3 data-k=\"recon-title\"></h3>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"bank-recon-2x2\">\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r1k\"></div><div class=\"stat-value num\" data-k=\"r1v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r2k\"></div><div class=\"stat-value num\" data-k=\"r2v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r3k\"></div><div class=\"stat-value num\" data-k=\"r3v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r4k\"></div><div class=\"stat-value num\" data-k=\"r4v\"></div>\n          <button class=\"float-why\" type=\"button\" data-el=\"why\" hidden></button>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-ministack pay-ministack\">\n    <div class=\"card bank-mini\" data-el=\"m1\">\n      <div class=\"fw-600 sm\" data-k=\"m1t\"></div>\n      <div class=\"strong num\" data-k=\"m1v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m1s\"></div>\n    </div>\n    <div class=\"card bank-mini\" data-el=\"m2\">\n      <div class=\"fw-600 sm\" data-k=\"m2t\"></div>\n      <div class=\"strong num\" data-k=\"m2v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m2s\"></div>\n    </div>\n  </div>\n\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL OVERVIEW — the payroll command centre (new tab, owner 2026-07-28).\n  Reads only what the payroll engine and the general ledger already hold; it\n  never posts by itself. Every automation is a PROPOSAL with a button (owner:\n  automation lives on the overview/summary and asks before it moves money).\n--------------------------------------------------------------------------- -->\n<section data-screen=\"overview\">\n\n  <!-- 1 · the four-card dashboard row (cloned from [data-shell=\"dash\"]) -->\n  <div data-fill=\"dash\"></div>\n\n  <!-- 2 · the narrated digest — every figure computed live from the books -->\n  <div class=\"brief-hero\">\n    <div class=\"brief-date\" data-k=\"digest-date\"></div>\n    <h2 data-k=\"digest-title\"></h2>\n    <div class=\"brief-narrative\" data-k=\"digest-text\"></div>\n  </div>\n\n  <!-- 3 · Autopilot (what should happen next) + Radar (what looks wrong) -->\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"auto-title\"></h3>\n        <span class=\"card-sub\" data-k=\"auto-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"auto\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"radar-title\"></h3>\n        <span class=\"card-sub\" data-k=\"radar-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"radar\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n  </div>\n\n  <!-- 4 · the last 12 payroll months, and where the money goes by department -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"trend-title\"></h3>\n      <span class=\"card-sub\" data-k=\"trend-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"trend\"></div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3 data-k=\"dept-title\"></h3>\n      <span class=\"card-sub\" data-k=\"dept-sub\"></span>\n    </div>\n    <div class=\"card-body\" data-fill=\"dept\"></div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  ONE MONTH, IN FULL — the drill behind a row of the Monthly Register (owner\n  2026-07-28: \"if I click on January, it should show me how many transactions\n  happened … all their accounts summary of January in a table — gross, net,\n  deductions, additions, overtime, late, bonus\"). Everything that touched\n  payroll in that month, on one screen:\n    · the month's dashboard row (same four cards, month-scoped)\n    · the SALARY REGISTER — every employee, every component, additions and\n      deductions broken out and subtotalled, exportable and printable\n    · the month's EMPLOYEE MONEY MOVEMENTS (advance · loan · repayment · bonus ·\n      encashment payout) and every LEDGER POSTING payroll wrote that month\n--------------------------------------------------------------------------- -->\n<section data-screen=\"month\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"flex justify-between items-center flex-wrap gap-2\">\n        <div class=\"flex items-center gap-2 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"back\"></button>\n          <select class=\"input tw-max-w-[230px]\" data-el=\"mpick\"></select>\n          <span class=\"badge\" data-k=\"status\"></span>\n        </div>\n        <div class=\"flex gap-1 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"print\"></button>\n          <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"open-run\"></button>\n        </div>\n      </div>\n      <div class=\"text-mute sm mt-2\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n  <div data-fill=\"dash\"></div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"reg-title\"></h3>\n      <span class=\"card-sub\" data-k=\"reg-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"reg\"></div>\n  </div>\n\n  <div class=\"two-col\">\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"txn-title\"></h3>\n        <span class=\"card-sub\" data-k=\"txn-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"txns\"></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"post-title\"></h3>\n        <span class=\"card-sub\" data-k=\"post-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"posts\"></div>\n    </div>\n  </div>\n\n</section>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · PAYROLL · MARKUP  (company-agnostic — registered for every concern)\n  ----------------------------------------------------------------------------\n  The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +\n  filled at runtime via [data-tpl] / [data-slot] hooks.\n\n  Seven tabs (overview / template / manage / loans / payslip / advance /\n  reports), rendered BOTH standalone (cid/payroll/…) and embedded in Master\n  Accounts via EPAL.payrollDesk. Every modal/form (manage-salary, correction/\n  edit, print-sheet, pay, money, encashment) keeps its legacy el()-built DOM, as\n  do the compound-styled leaf helpers formField() and field() (label+control rows\n  with inline padding/width — impractical as utilities). STYLING = the house\n  design system; the only new tw util is tw-max-w-[230px] (the run's month\n  select). The salary-sheet body keeps its .tbl-dense modifier (owner: fit\n  without h-scroll).\n\n  TWO STYLES LIVE HERE, on purpose:\n   · the [data-tpl] fragments below are the ORIGINAL screens, kept exactly as\n     they were so their proven-identical pixels do not move;\n   · everything under \"REAL-HTML BLOCKS\" is the current FRONTEND BUILD LAW —\n     whole screens written out as plain HTML. All NEW work goes there.\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section band ----------------------------------------------->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid + one KPI card + a two-column row ------------------------------>\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n<template data-tpl=\"two-col\"><div class=\"two-col\"></div></template>\n\n<!-- generic cards: plain (body), register (head+sub+body), head-only -------->\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"head-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n\n<!-- Salary Manage: the run-control card + the .tbl-dense salary sheet -------->\n<template data-tpl=\"run-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex justify-between items-center flex-wrap gap-2\"><div class=\"flex items-center gap-2 flex-wrap\" data-slot=\"left\"></div><div class=\"flex gap-1 flex-wrap\" data-slot=\"actions\"></div></div><div class=\"text-mute sm mt-2\" data-slot=\"status\"></div></div></div></template>\n<template data-tpl=\"salary-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body tbl-dense\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"grid-auto-compact\"><div class=\"grid-auto kpi-compact\"></div></template>\n<template data-tpl=\"pay-tier-card\"><div class=\"card tier-card\"><div class=\"card-pad\"><div class=\"fw-700\" data-slot=\"name\"></div><div class=\"text-mute sm\" data-slot=\"out\"></div><span class=\"badge\" data-slot=\"badge\"></span></div></div></template>\n\n<!-- Payslip: the employee/month/view-statement picker row ------------------->\n<template data-tpl=\"pick-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex gap-2 flex-wrap items-end\" data-slot=\"row\"></div></div></div></template>\n\n<!-- a plain \"New …\" button row (loans/advance disburse) -------------------->\n<template data-tpl=\"btn-row\"><div class=\"mb-3\"><button class=\"btn btn-primary\" data-slot=\"btn\"></button></div></template>\n\n\n<!-- ============================================================================\n  ▼▼ REAL-HTML BLOCKS (FRONTEND BUILD LAW, owner 2026-07-28) ▼▼\n  Everything below is the screen written out as plain HTML — not cloned\n  fragments, not el(). JS only fills the [data-k] placeholders, clones the\n  [data-proto] rows (0..N of them is DATA, not layout) and wires [data-act].\n\n  LEGEND\n    [data-shell=\"…\"]  a shared bar/panel used by more than one screen\n    [data-screen=\"…\"] one whole screen; mountScreen() moves its children onto the page\n    [data-k=\"…\"]      a text/HTML placeholder JS writes into\n    [data-fill=\"…\"]   a container JS appends a built widget (table/SVG) into\n    [data-proto=\"…\"]  a hidden prototype row — cloned once per record\n    [data-el=\"…\"]     an element JS needs a handle on (to hide, or to click-wire)\n    [data-act=\"…\"]    a click target JS binds a navigation/action to\n\n  ⚠ CLASS NAMES: the dashboard row deliberately reuses the `bank-*` component\n  vocabulary from components.css. That block is the house SUMMARY-IDENTITY-PANEL\n  design (hero figure · drill facts · last-event mini-statement · mirrored\n  sparkline · reconciliation · mini stack); Manage Banks was simply its first\n  caller. Reusing it means Payroll is pixel-consistent with Manage Banks for\n  free and forks not a single rule. The extra `pay-*` classes carry no styling —\n  they are semantic hooks for anything payroll ever needs to override.\n  ============================================================================ -->\n\n<!-- ---------------------------------------------------------------------------\n  DASHBOARD ROW — the four same-height cards that head both Payroll Overview\n  and Salary Manage. ONE shell, filled with different numbers by each caller:\n\n    1  identity panel  company · hero figure · 3 clickable drill facts ·\n                       the last payroll event (direction · amount · reference ·\n                       opening → closing of what we owe staff)\n    2  flow card       a mirrored 2-colour sparkline + its two totals\n    3  reconciliation  a 2×2 of control figures + a variance badge + \"why?\"\n    4  mini stack      two small click-through cards\n--------------------------------------------------------------------------- -->\n<div data-shell=\"dash\" class=\"bank-cards-row pay-cards-row\">\n\n  <div class=\"bank-summary pay-summary\" data-el=\"panel\">\n    <div class=\"bank-summary-in\">\n      <div class=\"bank-summary-body\">\n        <div class=\"bank-summary-left\">\n          <div class=\"bank-summary-head\">\n            <div class=\"bank-summary-ico\" data-k=\"ico\"></div>\n            <div class=\"bank-summary-id\">\n              <div class=\"bank-summary-co\" data-k=\"co\"></div>\n              <div class=\"bank-summary-sub\" data-k=\"co-sub\"></div>\n            </div>\n          </div>\n          <div class=\"bank-summary-hero clik\" data-act=\"hero\">\n            <div class=\"bank-summary-bal\" data-k=\"hero\"></div>\n            <div class=\"bank-summary-ballabel\" data-k=\"hero-label\"></div>\n          </div>\n        </div>\n        <div class=\"bank-summary-last\" data-el=\"last\">\n          <div class=\"bank-summary-last-top\">\n            <span class=\"bank-summary-last-lbl\" data-k=\"last-label\"></span>\n            <span class=\"bank-summary-dir\" data-k=\"dir\"></span>\n          </div>\n          <div class=\"bank-summary-last-row\">\n            <span class=\"bank-summary-last-amt\" data-k=\"amt\"></span>\n            <span class=\"bank-summary-last-date\" data-k=\"when\"></span>\n          </div>\n          <div class=\"bank-summary-last-ref\" data-k=\"ref\"></div>\n          <div class=\"bank-summary-last-oc\">\n            <div class=\"oc-open\" data-k=\"oc-open\"></div>\n            <div class=\"oc-close\" data-k=\"oc-close\"></div>\n          </div>\n        </div>\n      </div>\n      <div class=\"bank-summary-facts\">\n        <div class=\"bank-summary-fact clik\" data-act=\"f1\"><div class=\"k\" data-k=\"f1k\"></div><div class=\"v\" data-k=\"f1v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f2\"><div class=\"k\" data-k=\"f2k\"></div><div class=\"v\" data-k=\"f2v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f3\"><div class=\"k\" data-k=\"f3k\"></div><div class=\"v\" data-k=\"f3v\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-flow pay-flow\" data-el=\"flow\">\n    <div class=\"bank-flow-head\">\n      <div>\n        <div class=\"bank-flow-title\" data-k=\"flow-title\"></div>\n        <div class=\"bank-flow-sub\" data-k=\"flow-sub\"></div>\n      </div>\n      <span class=\"bank-flow-net\" data-k=\"flow-net\"></span>\n    </div>\n    <div class=\"bank-flow-spark\" data-fill=\"spark\"></div>\n    <div class=\"bank-flow-foot\">\n      <span><span class=\"bank-flow-dot in\"></span><span data-k=\"flow-in\"></span></span>\n      <span><span class=\"bank-flow-dot out\"></span><span data-k=\"flow-out\"></span></span>\n    </div>\n  </div>\n\n  <div class=\"card bank-recon bank-recon-clik pay-recon\" data-el=\"recon\">\n    <!-- no head badge: inside .bank-cards-row components.css hides it, because\n         the verdict already reads in the 4th stat (coloured + its \"why?\"). -->\n    <div class=\"card-head\">\n      <h3 data-k=\"recon-title\"></h3>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"bank-recon-2x2\">\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r1k\"></div><div class=\"stat-value num\" data-k=\"r1v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r2k\"></div><div class=\"stat-value num\" data-k=\"r2v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r3k\"></div><div class=\"stat-value num\" data-k=\"r3v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r4k\"></div><div class=\"stat-value num\" data-k=\"r4v\"></div>\n          <button class=\"float-why\" type=\"button\" data-el=\"why\" hidden></button>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-ministack pay-ministack\">\n    <div class=\"card bank-mini\" data-el=\"m1\">\n      <div class=\"fw-600 sm\" data-k=\"m1t\"></div>\n      <div class=\"strong num\" data-k=\"m1v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m1s\"></div>\n    </div>\n    <div class=\"card bank-mini\" data-el=\"m2\">\n      <div class=\"fw-600 sm\" data-k=\"m2t\"></div>\n      <div class=\"strong num\" data-k=\"m2v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m2s\"></div>\n    </div>\n  </div>\n\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL OVERVIEW — the payroll command centre (new tab, owner 2026-07-28).\n  Reads only what the payroll engine and the general ledger already hold; it\n  never posts by itself. Every automation is a PROPOSAL with a button (owner:\n  automation lives on the overview/summary and asks before it moves money).\n--------------------------------------------------------------------------- -->\n<section data-screen=\"overview\">\n\n  <!-- 1 · the four-card dashboard row (cloned from [data-shell=\"dash\"]) -->\n  <div data-fill=\"dash\"></div>\n\n  <!-- 2 · the narrated digest — every figure computed live from the books -->\n  <div class=\"brief-hero\">\n    <div class=\"brief-date\" data-k=\"digest-date\"></div>\n    <h2 data-k=\"digest-title\"></h2>\n    <div class=\"brief-narrative\" data-k=\"digest-text\"></div>\n  </div>\n\n  <!-- 3 · Autopilot (what should happen next) + Radar (what looks wrong) -->\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"auto-title\"></h3>\n        <span class=\"card-sub\" data-k=\"auto-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"auto\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"radar-title\"></h3>\n        <span class=\"card-sub\" data-k=\"radar-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"radar\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n  </div>\n\n  <!-- 4 · the last 12 payroll months, and where the money goes by department -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"trend-title\"></h3>\n      <span class=\"card-sub\" data-k=\"trend-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"trend\"></div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3 data-k=\"dept-title\"></h3>\n      <span class=\"card-sub\" data-k=\"dept-sub\"></span>\n    </div>\n    <div class=\"card-body\" data-fill=\"dept\"></div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL HISTORY — sits directly under the Salary Sheet on Salary Manage (owner\n  2026-07-28). One row per payroll month, newest first; the row opens a modal\n  listing EVERY payroll transaction that month, and a transaction opens its own\n  printable detail. The month list is built from pay_runs UNION the distinct ym\n  values in pay_slips, so a month with payslips but no run row still appears.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"history\" class=\"card mt-3\">\n  <div class=\"card-head\">\n    <h3 data-k=\"title\"></h3>\n    <span class=\"card-sub\" data-k=\"sub\"></span>\n  </div>\n  <div class=\"card-body tbl-dense\" data-fill=\"body\"></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  ONE MONTH, IN FULL — the drill behind a row of the Monthly Register (owner\n  2026-07-28: \"if I click on January, it should show me how many transactions\n  happened … all their accounts summary of January in a table — gross, net,\n  deductions, additions, overtime, late, bonus\"). Everything that touched\n  payroll in that month, on one screen:\n    · the month's dashboard row (same four cards, month-scoped)\n    · the SALARY REGISTER — every employee, every component, additions and\n      deductions broken out and subtotalled, exportable and printable\n    · the month's EMPLOYEE MONEY MOVEMENTS (advance · loan · repayment · bonus ·\n      encashment payout) and every LEDGER POSTING payroll wrote that month\n--------------------------------------------------------------------------- -->\n<section data-screen=\"month\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"flex justify-between items-center flex-wrap gap-2\">\n        <div class=\"flex items-center gap-2 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"back\"></button>\n          <select class=\"input tw-max-w-[230px]\" data-el=\"mpick\"></select>\n          <span class=\"badge\" data-k=\"status\"></span>\n        </div>\n        <div class=\"flex gap-1 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"print\"></button>\n          <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"open-run\"></button>\n        </div>\n      </div>\n      <div class=\"text-mute sm mt-2\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n  <div data-fill=\"dash\"></div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"reg-title\"></h3>\n      <span class=\"card-sub\" data-k=\"reg-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"reg\"></div>\n  </div>\n\n  <div class=\"two-col\">\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"txn-title\"></h3>\n        <span class=\"card-sub\" data-k=\"txn-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"txns\"></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"post-title\"></h3>\n        <span class=\"card-sub\" data-k=\"post-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"posts\"></div>\n    </div>\n  </div>\n\n</section>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="travels/payroll"]')) {
     var st = document.createElement('style');
@@ -370,22 +370,310 @@ function position() {
 }
 
 /* The last 12 payroll months as one series (newest last) — the trend line, the
- * Monthly Register and the digest all read this. */
+ * Monthly Register, the digest and Payroll History all read this one function,
+ * so a month can never exist on one screen and be missing from another.
+ * ⚠ These totals INCLUDE draft payslips (a draft month is still a month you want
+ * to see); position()/sheetOwed deliberately excludes them, so never compare
+ * these figures against the ledger without filtering drafts out first. */
+function blankMonth(ym) {
+  return { ym: ym, heads: 0, paidHeads: 0, gross: 0, adds: 0, deds: 0, net: 0, encash: 0, paid: 0, due: 0, drafts: 0 };
+}
 function monthSeries(limit) {
   var byYm = {};
   S.list('pay_slips').filter(function (s) { return s.companyId === CID; }).forEach(function (s) {
-    var m = byYm[s.ym] || (byYm[s.ym] = { ym: s.ym, heads: 0, gross: 0, adds: 0, deds: 0, net: 0, encash: 0, paid: 0, due: 0, drafts: 0 });
+    var m = byYm[s.ym] || (byYm[s.ym] = blankMonth(s.ym));
     m.heads++; m.gross += s.earnedGross || 0; m.adds += addOf(s); m.deds += dedOf(s);
     m.net += PR().slipPayable(s); m.encash += s.encashAmt || 0;
     m.paid += s.paid || 0; m.due += dueOf(s);
+    if ((s.paid || 0) > 0) m.paidHeads++;
     if (s.status === 'draft') m.drafts++;
   });
+  // pay_runs is the OTHER half of the union: a run can exist before any payslip
+  // does, and a month with payslips can have no run row — Payroll History has to
+  // list both, so the month list is built from both.
   S.list('pay_runs').filter(function (r) { return r.companyId === CID; }).forEach(function (r) {
-    if (!byYm[r.ym]) byYm[r.ym] = { ym: r.ym, heads: 0, gross: 0, adds: 0, deds: 0, net: 0, encash: 0, paid: 0, due: 0, drafts: 0 };
+    if (!byYm[r.ym]) byYm[r.ym] = blankMonth(r.ym);
     byYm[r.ym].status = r.status;
   });
   var out = Object.keys(byYm).sort().map(function (k) { return byYm[k]; });
   return limit ? out.slice(-limit) : out;
+}
+
+
+/* ============================================================================
+ * PAYROLL HISTORY — month list → every transaction in a month → one transaction
+ * ----------------------------------------------------------------------------
+ * Sits under the Salary Sheet on Salary Manage (owner 2026-07-28).
+ *
+ * THREE THINGS THE DATA ACTUALLY SAYS, which shaped this (all verified against
+ * platform/engines-library/payroll.js, not assumed):
+ *
+ *  1. `pay_txns` rows DO NOT store a glId. The engine builds one from a counter
+ *     at post time — 'GL-ADV-<empId>-<n>' where n is that employee's n-th
+ *     advance — and only the ledger keeps it. So the voucher link is REBUILT
+ *     here and then CHECKED against the ledger; the button only appears when a
+ *     real entry is found (glEntryFor). Guessing an id and printing a blank
+ *     voucher would be worse than offering nothing.
+ *  2. A payslip carries NO bank name — only a free-text `payMethod`, and only
+ *     the LAST one. The account a payment truly moved through is on its ledger
+ *     line, so 'Paid from' is read from the JOURNAL first and falls back to the
+ *     slip's method string only when no journal exists.
+ *  3. A slip can be paid in INSTALMENTS. `pay_slips` keeps running totals plus
+ *     the last date/method; the individual payments exist only as
+ *     'GL-PAYP-<empId>-<ym>-<n>'. So salary rows are enumerated from those
+ *     journals — a partial payment shows as its own dated row, which is the
+ *     whole point of a history. The slip is used only as a fallback for money
+ *     that moved without a journal behind it (older/seeded data), because a
+ *     payment that happened must never be invisible.
+ * ==========================================================================*/
+
+// One payroll transaction, whatever its origin, normalised to the row the
+// history speaks in.
+var PURPOSE = { salary: 'Salary', advance: 'Advance', loan: 'Staff loan',
+  'loan-repay': 'Loan repayment', bonus: 'Bonus', 'encash-paid': 'Leave encashment',
+  settlement: 'Final settlement' };
+// the counter-built glId prefix per pay_txns type (see note 1 above)
+var GL_PREFIX = { advance: 'GL-ADV-', loan: 'GL-LOAN-', 'loan-repay': 'GL-LREP-', bonus: 'GL-BON-' };
+
+function acctName(code) {
+  if (!code) return '';
+  var a = (EPAL.ledger && EPAL.ledger.account) ? EPAL.ledger.account(code) : null;
+  return a ? a.name : String(code);
+}
+// A stored method string is one of: 'bank:<id>' (a real account), 'm:<Method>'
+// (a generic with no account behind it), or a legacy plain 'Bank' / 'Cash'.
+// There is no helper for this anywhere in the repo — EPAL.pay.resolve() answers
+// with the bank RECORD, and a deleted bank must say so rather than silently
+// reading as a generic 'Bank'.
+function paidFrom(method) {
+  var m = String(method || '');
+  if (EPAL.pay && EPAL.pay.resolve) {
+    var src = EPAL.pay.resolve(m);
+    if (src && src.bank) return src.bank.name + (src.bank.branch && src.bank.branch !== '—' ? ' · ' + src.bank.branch : '');
+    if (m.indexOf('bank:') === 0) return 'Account no longer on file';
+    return (src && src.method) || 'Bank';
+  }
+  if (m.indexOf('m:') === 0) return m.slice(2);
+  if (m.indexOf('bank:') === 0) return 'Account no longer on file';
+  return m || 'Bank';
+}
+function findGl(id) {
+  var rows = payEntries();
+  for (var i = 0; i < rows.length; i++) if (rows[i].id === id) return rows[i];
+  return null;
+}
+// the cash leg of a journal: which account, and how much actually left it
+function entryCash(e) {
+  var acct = null, out = 0;
+  (e.lines || []).forEach(function (l) {
+    if (!EPAL.ledger.isCashAccount(l.account)) return;
+    var v = (+l.cr || 0) - (+l.dr || 0);          // credit = money leaving the account
+    if (v !== 0) { acct = l.account; out += v; }
+  });
+  return { account: acct, out: out };
+}
+function entryTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.dr || 0; }); return t; }
+
+/* Find the journal behind a pay_txns row. The deterministic id is tried first;
+ * if it is absent (an auto-deducted EMI has no journal of its own — it is a LINE
+ * inside the salary payment) we fall back to a strictly UNIQUE match on party +
+ * date + amount, and give up rather than guess when more than one fits. */
+function glEntryFor(t) {
+  var e = null;
+  if (t.type === 'encash-paid') e = findGl('GL-ENCP-' + t.empId + '-' + String(t.date || '').slice(0, 4));
+  else if (t.type === 'settlement') e = findGl('GL-SETL-' + t.empId);
+  else if (GL_PREFIX[t.type]) {
+    var peers = S.list('pay_txns').filter(function (x) { return x.empId === t.empId && x.type === t.type; });
+    var n = 0;
+    for (var i = 0; i < peers.length; i++) if (peers[i].id === t.id) { n = i + 1; break; }
+    if (n) e = findGl(GL_PREFIX[t.type] + t.empId + '-' + n);
+  }
+  if (e) return e;
+  var hits = payEntries().filter(function (x) {
+    return x.party === t.empId && x.date === t.date && Math.abs(entryTotal(x) - (+t.amount || 0)) < 1;
+  });
+  return hits.length === 1 ? hits[0] : null;
+}
+
+/* EVERY payroll transaction in one month, newest first. */
+function monthTxns(ym) {
+  var out = [];
+  PR().slipsFor(CID, ym).forEach(function (s) {
+    var found = 0;
+    for (var n = 1; n <= (s.payCount || 0); n++) {
+      var e = findGl('GL-PAYP-' + s.empId + '-' + ym + '-' + n);
+      if (!e) continue;
+      found++;
+      var cash = entryCash(e), amt = entryTotal(e);
+      out.push({ key: e.id, empId: s.empId, empName: s.empName, purpose: 'Salary', type: 'salary',
+        date: e.date, amount: amt,
+        from: cash.account ? acctName(cash.account) : 'Recovered from advance / loan — no cash',
+        cash: cash.out, memo: e.memo || ('Salary paid · ' + PR().mLabel(ym)),
+        ym: ym, slip: s, entry: e, glId: e.id, instalment: n, instalments: s.payCount || 1 });
+    }
+    // money that moved with no journal behind it still has to show (see note 3)
+    if (!found && (s.paid || 0) > 0) {
+      out.push({ key: 'slip-' + s.empId + '-' + ym, empId: s.empId, empName: s.empName, purpose: 'Salary', type: 'salary',
+        date: s.paidDate || (ym + '-01'), amount: s.paid || 0, from: paidFrom(s.payMethod),
+        cash: cashOf(s), memo: 'Salary paid · ' + PR().mLabel(ym) + ' (no journal on file)',
+        ym: ym, slip: s, entry: null, glId: null, instalment: 1, instalments: 1 });
+    }
+  });
+  S.list('pay_txns').filter(function (t) {
+    return t.companyId === CID && String(t.date || '').slice(0, 7) === ym;
+  }).forEach(function (t) {
+    var e = glEntryFor(t), cash = e ? entryCash(e) : null;
+    out.push({ key: t.id, empId: t.empId, empName: t.empName, purpose: PURPOSE[t.type] || cap(t.type || 'Payroll'), type: t.type,
+      date: t.date, amount: +t.amount || 0,
+      from: (cash && cash.account) ? acctName(cash.account) : (e ? 'Recovered from salary — no cash' : paidFrom(t.method)),
+      cash: cash ? Math.abs(cash.out) : 0, memo: t.memo || '', ym: ym, txn: t, entry: e, glId: e ? e.id : null });
+  });
+  out.sort(function (a, b) { return a.date === b.date ? (a.empName < b.empName ? -1 : 1) : (a.date < b.date ? 1 : -1); });
+  return out;
+}
+
+/* THE CARD — one row per payroll month, newest first. */
+function payrollHistoryCard() {
+  var months = monthSeries().slice().reverse();
+  var c = shell('history');
+  fillH(c, 'title', ui.icon('clock-history') + ' Payroll History');
+  fillK(c, 'sub', months.length
+    ? 'every payroll month · click one for all its transactions'
+    : 'no payroll month has been generated yet');
+  box(c, 'body').appendChild(EPAL.table({
+    columns: [
+      { key: 'ym', label: 'Month', render: function (m) { return '<span class="strong">' + esc(PR().mLabel(m.ym)) + '</span>'; } },
+      { key: 'staff', label: 'Staff paid', num: true, sortVal: function (m) { return m.paidHeads; },
+        render: function (m) { return '<span class="num">' + m.paidHeads + ' / ' + m.heads + '</span>'; } },
+      { key: 'gross', label: 'Gross', num: true, money: true },
+      { key: 'paid', label: 'Net paid', num: true, sortVal: function (m) { return m.paid; },
+        render: function (m) { return m.paid ? '<span class="text-good">' + ui.money(m.paid) + '</span>' : '—'; } },
+      { key: 'due', label: 'Still outstanding', num: true, sortVal: function (m) { return m.due; },
+        render: function (m) { return m.due ? '<span class="num strong text-bad">' + ui.money(m.due) + '</span>' : '—'; } },
+      { key: 'status', label: 'Run status', badge: { draft: 'warn', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' },
+        // a month with payslips but no pay_runs row has no status of its own
+        render: function (m) { var s = m.status || 'draft'; return '<span class="badge badge-' + (s === 'paid' ? 'good' : s === 'due' ? 'bad' : s === 'draft' ? 'warn' : 'info') + '">' + esc(cap(s)) + '</span>'; } }
+    ],
+    rows: months, sortKey: 'ym', sortDir: -1, pageSize: 12, totalKey: 'paid',
+    exportName: 'payroll-history.csv', pdfTitle: coFull(CID) + ' — Payroll History',
+    onRow: function (m) { monthTxnsModal(m.ym); },
+    actions: [{ icon: 'list-ul', title: 'Every transaction in this month', onClick: function (m) { monthTxnsModal(m.ym); } }],
+    empty: { icon: 'clock-history', title: 'No payroll history yet', hint: 'Generating a month in Salary Manage starts the history.' }
+  }).el);
+  return c;
+}
+
+/* THE MONTH — every payroll transaction in it, printable as one sheet. */
+function monthTxnsModal(ym) {
+  var rows = monthTxns(ym);
+  var total = sum(rows, function (r) { return r.amount; });
+  var cash = sum(rows, function (r) { return r.cash; });
+  var body = el('div');
+  body.appendChild(el('p.text-mute.sm.mb-2', { html:
+    rows.length
+      ? esc(String(rows.length)) + ' transaction(s) in <b>' + esc(PR().mLabel(ym)) + '</b> — salary payments (each instalment separately), advances, staff loans, repayments, bonuses and encashment payouts. Click any row for its detail and voucher.'
+      : 'Nothing was paid or recorded in <b>' + esc(PR().mLabel(ym)) + '</b>. Salary that is accrued but unpaid does not appear here — it is money owed, not money moved.' }));
+  body.appendChild(EPAL.table({
+    columns: [
+      { key: 'empId', label: 'Employee ID', render: function (r) { return '<span class="mono xs">' + esc(r.empId) + '</span>'; } },
+      { key: 'empName', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.empName) + '</span>'; } },
+      { key: 'purpose', label: 'Purpose', badge: { Salary: 'good', Advance: 'warn', 'Staff loan': 'warn', 'Loan repayment': 'info', Bonus: 'good', 'Leave encashment': 'info', 'Final settlement': 'bad' } },
+      { key: 'date', label: 'Date', date: true },
+      { key: 'from', label: 'Paid from' },
+      { key: 'amount', label: 'Amount', num: true, money: true }
+    ],
+    rows: rows, searchKeys: ['empName', 'empId', 'purpose', 'from', 'memo'], pageSize: 12,
+    totalKey: 'amount', exportName: 'payroll-transactions-' + ym + '.csv',
+    onRow: function (r) { txnDetailModal(r); },
+    empty: { icon: 'journal', title: 'No transactions in ' + PR().mLabel(ym) }
+  }).el);
+  if (rows.length && Math.abs(cash - total) >= 1) {
+    body.appendChild(el('p.text-mute.xs.mt-2', { text:
+      'Of the ' + ui.money(total) + ' above, ' + ui.money(cash) + ' actually left an account — the rest was recovered internally ' +
+      '(an advance or a loan EMI taken out of the same salary), so it moved between books rather than out of the bank.' }));
+  }
+  ui.modal({
+    title: 'Payroll transactions — ' + PR().mLabel(ym), icon: 'journal-text', size: 'xl', body: body,
+    actions: [
+      { label: 'Print month', icon: 'printer', onClick: function () { printMonthSheet(ym, rows, total, cash); return false; } },
+      { label: 'Close' }
+    ]
+  });
+}
+
+function printMonthSheet(ym, rows, total, cash) {
+  var head = '<tr><th>Employee ID</th><th>Employee</th><th>Purpose</th><th>Date</th><th>Paid from</th><th style="text-align:right">Amount</th></tr>';
+  var body = rows.map(function (r) {
+    return '<tr><td>' + esc(r.empId) + '</td><td>' + esc(r.empName) + '</td><td>' + esc(r.purpose) + '</td><td>' +
+      esc(ui.date(r.date)) + '</td><td>' + esc(r.from) + '</td><td style="text-align:right">' + ui.money(r.amount) + '</td></tr>';
+  }).join('');
+  var totRow = '<tr><th colspan="5">Total</th><th style="text-align:right">' + ui.money(total) + '</th></tr>';
+  if (Math.abs(cash - total) >= 1) {
+    totRow += '<tr><td colspan="5" style="text-align:right">of which cash actually left an account</td>' +
+      '<td style="text-align:right">' + ui.money(cash) + '</td></tr>';
+  }
+  ui.printDoc({
+    title: 'Payroll Transactions — ' + PR().mLabel(ym),
+    subtitle: coFull(CID) + ' · Payroll',
+    meta: rows.length + ' transaction(s) · generated ' + ui.date(today()),
+    footer: 'System-generated payroll transaction sheet — Confidential',
+    bodyHtml: '<table>' + head + body + totRow + '</table>'
+  });
+}
+
+/* ONE TRANSACTION — what it was, who it was for, and which account it moved
+ * through; printable on its own, and as the formal journal voucher when the
+ * posting behind it can actually be found. */
+function txnDetailModal(r) {
+  var body = el('div');
+  var rows = [
+    ['Employee', r.empName], ['Employee ID', r.empId],
+    ['Purpose', r.purpose + (r.instalments > 1 ? '  ·  instalment ' + r.instalment + ' of ' + r.instalments : '')],
+    ['Amount', ui.money(r.amount)],
+    ['Date', ui.date(r.date)],
+    ['Paid from', r.from],
+    ['Cash that left the account', r.cash ? ui.money(r.cash) : '— nothing left the bank'],
+    ['Month', PR().mLabel(r.ym)],
+    ['Note', r.memo || '—'],
+    ['Journal', r.glId || 'no posting on file']
+  ];
+  body.appendChild(el('div.card', null, [el('div.card-body', null, [
+    el('div.data-list', null, rows.map(function (p) { return drow(p[0], p[1]); }))
+  ])]));
+  if (r.slip) {
+    body.appendChild(el('div.card.mt-3', null, [
+      el('div.card-head', null, [el('h3', { html: ui.icon('receipt') + ' That month\'s payslip' })]),
+      el('div.card-body', null, [el('div.data-list', null, [
+        drow('Net payable', ui.money(PR().slipPayable(r.slip))),
+        drow('Paid in total', ui.money(r.slip.paid || 0)),
+        drow('Still due', ui.money(dueOf(r.slip))),
+        drow('Advance recovered', ui.money(r.slip.advanceRecovered || 0)),
+        drow('Loan EMI recovered', ui.money(r.slip.loanRecovered || 0)),
+        drow('Status', cap(r.slip.status || ''))
+      ])])
+    ]));
+  }
+  var acts = [{ label: 'Print', icon: 'printer', onClick: function () { printTxn(r, rows); return false; } }];
+  // EPAL.journalVoucher wants the whole ledger ENTRY (there is no id lookup on
+  // the engine), and its 2nd argument is a display NAME, not a company id.
+  if (r.entry) acts.push({ label: 'Print voucher', icon: 'file-earmark-text', variant: 'primary',
+    onClick: function () { EPAL.journalVoucher(r.entry, coFull(CID)); return false; } });
+  if (r.slip) acts.push({ label: 'Payslip', icon: 'receipt',
+    onClick: function () { var e = empById(r.empId); if (e) statement(e, r.ym); return true; } });
+  acts.push({ label: 'Close' });
+  ui.modal({ title: r.purpose + ' — ' + r.empName, icon: 'cash-coin', size: 'lg', body: body, actions: acts });
+}
+
+function printTxn(r, rows) {
+  ui.printDoc({
+    title: r.purpose + ' — ' + r.empName,
+    subtitle: coFull(CID) + ' · Payroll · ' + PR().mLabel(r.ym),
+    meta: (r.glId ? 'journal ' + r.glId + ' · ' : '') + 'generated ' + ui.date(today()),
+    footer: 'System-generated payroll transaction record — Confidential',
+    bodyHtml: '<table>' + rows.map(function (p) {
+      return '<tr><td>' + esc(p[0]) + '</td><td>' + esc(String(p[1])) + '</td></tr>';
+    }).join('') + '</table>'
+  });
 }
 
 
@@ -519,9 +807,17 @@ function digest(s, P, ym, series) {
     var delta = net - prev.net, pct = Math.round(Math.abs(delta) / prev.net * 100);
     if (pct >= 1) lines.push('That is ' + b((delta >= 0 ? '+' : '−') + ui.money(Math.abs(delta)) + ' (' + pct + '%)') + ' ' + (delta >= 0 ? 'more' : 'less') + ' than ' + PR().mLabel(prev.ym) + '.');
   }
-  lines.push(st === 'draft'
-    ? 'The month is still a ' + b('draft') + (PR().inCorrectionWindow(CID, ym) ? ' and the correction window is open until ' + b(ui.date(run.correctionUntil)) + '.' : ' — the correction window closed on ' + b(ui.date(run.correctionUntil)) + ', so nothing is on the books yet.')
-    : 'The month is ' + b(cap(st)) + ' — accrued to the ledger, ' + b(ui.money(paid)) + ' paid and ' + b(ui.money(Math.max(0, due))) + ' still owed.');
+  /* A MONTH THAT HAS NOT BEEN OPENED YET HAS NO RUN (live crash 2026-07-28:
+   * "Cannot read properties of null (reading 'correctionUntil')" took the whole
+   * payroll screen down). Salary Manage calls generate() first, so a run always
+   * exists by the time it reads one; Overview only READS — correctly, a dashboard
+   * must not create records as a side effect of being looked at. So it says what
+   * is true instead: the month has not been started. */
+  lines.push(!run
+    ? PR().mLabel(ym) + ' has not been opened yet — generate it on ' + b('Salary Manage') + ' to create this month’s payslips.'
+    : st === 'draft'
+      ? 'The month is still a ' + b('draft') + (PR().inCorrectionWindow(CID, ym) ? ' and the correction window is open until ' + b(ui.date(run.correctionUntil)) + '.' : ' — the correction window closed on ' + b(ui.date(run.correctionUntil)) + ', so nothing is on the books yet.')
+      : 'The month is ' + b(cap(st)) + ' — accrued to the ledger, ' + b(ui.money(paid)) + ' paid and ' + b(ui.money(Math.max(0, due))) + ' still owed.');
   if (P.advOut || P.loanOut) lines.push('Staff hold ' + b(ui.money(P.advOut)) + ' of advances and ' + b(ui.money(P.loanOut)) + ' of loans, recovered automatically from future pay.');
   if (P.encashLiability > 0) lines.push('Leave encashment has built a ' + b(ui.money(P.encashLiability)) + ' liability.');
   var variance = P.glPayable - P.sheetOwed;
@@ -544,7 +840,9 @@ function autopilot(ym, P) {
   var paid = sum(slips, function (s) { return s.paid || 0; });
   var due = net - paid, td = today();
 
-  if (st === 'draft' && slips.length) {
+  // both draft proposals quote the correction window, which only a RUN carries —
+  // and a hydrated install can hold payslips with no run row (live 2026-07-28)
+  if (st === 'draft' && slips.length && run) {
     if (PR().inCorrectionWindow(CID, ym)) {
       out.push({ sev: 'low', icon: 'pencil-square', title: 'Correction window is open until ' + ui.date(run.correctionUntil),
         why: 'Record absents, lates, overtime and bonuses now — after that the month should be accrued.',
@@ -1063,9 +1361,13 @@ function manageView(page) {
       } }));
     if (st !== 'draft' && due > 0) actions.appendChild(el('button.btn.btn-primary', { html: ui.icon('cash-coin') + ' Pay All', onclick: function () { payAll(ym); } }));
   }
-  slot(rcard, 'status').innerHTML = st === 'draft'
-    ? (inWin ? ('<b>Correction window open</b> until ' + ui.date(run.correctionUntil) + ' — adjust per head, then finalize.') : ('Correction window closed (' + ui.date(run.correctionUntil) + ') — finalize to accrue.'))
-    : ('Finalized — pay by ' + ui.date(run.dueAfter) + ' or unpaid salaries flag Due.');
+  // generate() above normally creates the run, but a hydrated install can answer
+  // with slips and no run row — say so rather than crash (live 2026-07-28)
+  slot(rcard, 'status').innerHTML = !run
+    ? ('No payroll run exists for ' + PR().mLabel(ym) + ' yet — generating this month will open one.')
+    : st === 'draft'
+      ? (inWin ? ('<b>Correction window open</b> until ' + ui.date(run.correctionUntil) + ' — adjust per head, then finalize.') : ('Correction window closed (' + ui.date(run.correctionUntil) + ') — finalize to accrue.'))
+      : ('Finalized — pay by ' + ui.date(run.dueAfter) + ' or unpaid salaries flag Due.');
   page.appendChild(rcard);
 
   // The FULL salary sheet: Gross | OT | Bonus | Encash | Advance | Loan EMI |
@@ -1104,6 +1406,12 @@ function manageView(page) {
   slot(scard, 'sub').textContent = 'click a row = payslip · 💰 manage pay/due/status · ✎ adjust';
   slot(scard, 'body').appendChild(tbl.el);
   page.appendChild(scard);
+
+  // PAYROLL HISTORY sits directly under the sheet (owner 2026-07-28). It goes in
+  // BEFORE the pay-individual-salaries grid on purpose: that grid only exists
+  // when the run is finalized and something is still owed, so appending after it
+  // would move the history card up and down the page as the run status changes.
+  page.appendChild(payrollHistoryCard());
 
   if (st !== 'draft' && due > 0 && canCreate()) {
     var pgrid = frag('grid-auto-compact');

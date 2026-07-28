@@ -499,6 +499,19 @@
       var gSel = el('select.select', { style: { maxWidth: '340px' } });
       gAccts.forEach(function (a) { gSel.appendChild(el('option', { value: a.code, text: a.code + ' · ' + a.name })); });
       var gBody = el('div.mt-3');
+      /* NO POSTINGS YET — NO ACCOUNTS TO PICK (live crash 2026-07-28).
+       * gAccts is the accounts this company has actually POSTED to, so on a
+       * freshly migrated database it is empty and gAccts[0].code took the whole
+       * Ledgers screen down. A company that has not traded yet is a normal state,
+       * not an error: say so. */
+      if (!gAccts.length) {
+        gBody.appendChild(EPAL.emptyState
+          ? EPAL.emptyState({ icon: 'journal-text', title: 'No ledger entries yet',
+              hint: 'Record an income, an expense or a sale and the accounts it touches appear here.' })
+          : el('div.text-mute.sm', { text: 'No ledger entries yet — record an income or an expense and the accounts it touches appear here.' }));
+        page.appendChild(el('div.card', null, [el('div.card-pad', null, [gBody])]));
+        return;
+      }
       var gCode = (ctx.params && ctx.params.code) || gAccts[0].code;
       gSel.value = gCode;
 
