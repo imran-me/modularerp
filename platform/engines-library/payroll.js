@@ -344,7 +344,11 @@
    * A PARTIAL payment leaves the rest where it belongs: 2100 Salary Payable keeps the
    * unpaid balance — that is the company's debt to the employee — and the slip reads
    * 'partial' until it is cleared. */
-  function pay(empId, ym, amount, method) {
+  /* opts.date — pay it AS OF a past date, for back-filling a real month
+   * (the sample-payroll generator). Everything else is unchanged and every
+   * existing caller keeps today. */
+  function pay(empId, ym, amount, method, opts) {
+    var when = (opts && opts.date) || today();
     var s = slip(empId, ym); if (!s) throw new Error('No payslip for ' + empId + ' ' + ym);
     var run = getRun(s.companyId, ym);
     if (!run || run.status === 'draft') throw new Error('Finalize the payroll before paying.');
@@ -357,6 +361,18 @@
     var advOut = advanceOutstanding(empId);
     var advWant = (s.advCap == null || s.advCap === '') ? advOut : Math.min(advOut, round(+s.advCap));
     var emiWant = (s.emiCap == null || s.emiCap === '') ? emiInstallment(empId) : round(+s.emiCap);
+    /* …and never recover more than the BOOKS say is outstanding (2026-07-28).
+     * emiInstallment/advanceOutstanding read the pay_txns trail; 1250 and 1260 are
+     * what the ledger actually carries, and on an imported or seeded book the two
+     * can disagree. Recovering past the ledger balance drives an ASSET negative —
+     * the company appears to collect back money it never lent. Whichever is
+     * smaller is the honest ceiling. */
+    function onBooks(code) {
+      try { return Math.max(0, round(L().balance(code, { companyId: s.companyId }))); }
+      catch (e) { return Infinity; }                    // ledger unavailable → old behaviour
+    }
+    advWant = Math.min(advWant, onBooks('1250'));
+    emiWant = Math.min(emiWant, onBooks('1260'));
     var recover = clamp(advWant, 0, amt);                // agreed advance recovery out of this pay
     var emiRecover = clamp(emiWant, 0, amt - recover);   // agreed loan EMI installment
     var cash = amt - recover - emiRecover;
@@ -370,18 +386,18 @@
     if (emiRecover > 0) lines.push({ account: '1260', dr: 0, cr: emiRecover });   // reduce the staff loan
     lines.push({ account: cashAcct, dr: 0, cr: cash });
     var glId = 'GL-PAYP-' + s.empId + '-' + ym + '-' + ((s.payCount || 0) + 1);
-    glPost(glId, today(), s.companyId, 'PAY-' + ym, 'Salary paid · ' + s.empName + ' · ' + ym +
+    glPost(glId, when, s.companyId, 'PAY-' + ym, 'Salary paid · ' + s.empName + ' · ' + ym +
       (src && src.bank ? ' · ' + src.bank.name : ''), 'payroll', s.empId, lines);
     // …and the account's own book, for the cash that actually left it (recoveries
     // are book entries against the employee, not money out of the account)
     if (src && src.bank && cash > 0 && EPAL.pay.syncRegister) {
       EPAL.pay.syncRegister({ id: glId, bankId: src.bank.id, kind: 'Expense', amount: cash,
         category: 'Salary · ' + mLabel(ym), party: s.empName || s.empId, ref: 'PAY-' + ym,
-        date: today(), companyId: s.companyId, glId: glId }, null);
+        date: when, companyId: s.companyId, glId: glId }, null);
     }
-    if (emiRecover > 0) txn({ type: 'loan-repay', empId: empId, empName: s.empName, companyId: s.companyId, date: today(), amount: emiRecover, memo: 'EMI auto-deducted from ' + mLabel(ym) + ' salary' });
+    if (emiRecover > 0) txn({ type: 'loan-repay', empId: empId, empName: s.empName, companyId: s.companyId, date: when, amount: emiRecover, memo: 'EMI auto-deducted from ' + mLabel(ym) + ' salary' });
     s.paid = (s.paid || 0) + amt; s.advanceRecovered = (s.advanceRecovered || 0) + recover; s.loanRecovered = (s.loanRecovered || 0) + emiRecover;
-    s.payMethod = method || s.payMethod || 'Bank'; s.payCount = (s.payCount || 0) + 1; s.paidDate = today();
+    s.payMethod = method || s.payMethod || 'Bank'; s.payCount = (s.payCount || 0) + 1; s.paidDate = when;
     s.status = s.paid >= payable ? 'paid' : 'partial';
     S.upsert('pay_slips', s);
     refreshRunStatus(s.companyId, ym);

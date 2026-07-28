@@ -1445,6 +1445,31 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         });
         actions.appendChild(sb);
       }
+      /* SIX MONTHS OF TRAVELS PAYROLL (owner 2026-07-28: "in travels, push some
+       * realistic data of past 6 month … in payroll"). Runs the real engine month
+       * by month — generate, accrue, pay — with a staff loan on EMI, an Eid bonus,
+       * an advance recovered from the next salary, and every payment leaving a
+       * named account. Idempotent: a month already finalized is left alone. */
+      if (EPAL.samplePayroll) {
+        var pb = btn('btn btn-sm btn-outline', ui.icon('people') + ' Load 6 months of Travels payroll', function () {
+          var ms = EPAL.samplePayroll.months();
+          ui.confirm({ title: 'Write six months of Travels payroll?', icon: 'people',
+            text: 'Runs ' + ms[0] + ' to ' + ms[ms.length - 1] + ' through the payroll engine: each month generated, ' +
+              'accrued to the ledger and paid from a real account, plus a staff loan on EMI, an Eid bonus for the team ' +
+              'and an advance recovered from the following salary. Travels only, payroll only. Running it again changes ' +
+              'nothing — months already finalized are left as they are.',
+            confirmLabel: 'Write it' }).then(function (ok) {
+              if (!ok) return;
+              var r;
+              try { r = EPAL.samplePayroll.write(); }
+              catch (e) { ui.toast(e.message || 'Could not write the payroll history', 'error'); return; }
+              ui.toast(r.made.months + ' months · ' + r.made.slips + ' payslips · ' + r.made.payments +
+                ' payments posted — salary cost ' + ui.money(r.salaryCost), 'success');
+              EPAL.router.render();
+            });
+        });
+        actions.appendChild(pb);
+      }
     } else { actions.parentNode.removeChild(actions); }
     TYPE_META.forEach(function (t) {
       var card = s.querySelector('[data-type="' + t[0] + '"]');
