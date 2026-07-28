@@ -154,7 +154,14 @@
     for (var i = 0; i < list.length; i++) if (list[i].code === code) { at = i; break; }
     if (at >= 0) list[at] = row; else list.push(row);
     S.set(COA_KEY, list);
-    bus.emit('data:changed', { store: COA_KEY, action: 'create', record: row });
+    /* DELIBERATELY SILENT (live fix 2026-07-28). This helper is the AUTOMATIC
+     * top-up — a head the app needs in order to post, filled in on demand. It used
+     * to emit data:changed, which on a live install is a POST to the host for every
+     * account any code path touched: the screen filled with "Not saved · Operation
+     * not permitted" as the host refused the burst. A chart row the USER adds still
+     * saves, because that path goes through db.save('coa', …) and emits as always.
+     * An automatic one is local, and the server's own chart wins at the next
+     * hydration — which is the right precedence anyway. */
     return row;
   }
 
