@@ -1666,3 +1666,90 @@ workspace — ready to graduate one file at a time.
 **domain reference only** (realistic field lists for travel forms, RBAC ideas). The
 owner disliked it because it was a monolith — do **not** copy its structure; we
 deliberately rebuilt it modular, multi-file, and premium.
+
+---
+
+## 11. Deployment — the live host (added 2026-07-28)
+
+Everything below was learned by deploying, not by reading code. None of it is
+visible to the local harness.
+
+### Where it runs
+
+| | |
+|---|---|
+| URL | **https://dev.epal.com.bd** |
+| Repo | `/home/u203838805/domains/epal.com.bd/public_html/modularerp` |
+| Laravel | `platform/backend` · MariaDB 11.8.8 |
+
+The directory sits under `domains/epal.com.bd/`, so the URL *looks* like it
+should be `epal.com.bd/modularerp`. It is not — the `dev` subdomain's document
+root points at that folder. Never derive the site URL from the host path.
+
+### The database is SHARED — never run a bare `migrate`
+
+`u203838805_modularerp` holds **a deliberate copy of the owner's live Travels
+ERP** (~179 tables, ~20 MB of real business data) alongside our `wa_*` tables.
+The owner's instruction: *keep them, add ours.*
+
+`php artisan migrate` runs every pending migration, and ~20 of them collide with
+that live schema — `create_acc_entries_table`, `create_party_types_table`,
+`create_bank_transactions_table`, `create_personal_access_tokens_table`, payroll
+and CRM all try to CREATE tables that already exist. Worse,
+`add_payment_source_to_acc_entries` would die on a duplicate column, because the
+live `acc_entries` **already has** `pay_acct` and `funded_by` despite Laravel
+listing that migration as pending.
+
+Migrate one module at a time instead:
+
+```bash
+php artisan migrate --force --path=../../companies/<co>/modules/<id>/backend/migrations
+```
+
+Run `php artisan db:show` BEFORE anything, and back up from hPanel → Databases →
+Backups (SSH `mysqldump` fails authentication on this host).
+
+All twelve Woodart tables migrated cleanly with zero collisions purely because
+every one carries the `wa_` prefix frozen in `NAMING-AND-TERMINOLOGY.md` before
+any of them existed. `projects`/`estimates` exist in the live copy; ours are
+`wa_projects`/`wa_estimates`.
+
+### Boot hydration must stay throttled
+
+The host runs at a **load average of 45–50**. At that saturation it refuses new
+MySQL connections, PDO reports `Operation not permitted`, and the `api/*`
+QueryException handler in `platform/backend/bootstrap/app.php` turns that into a
+**422**.
+
+`EPAL.api.hydrate()` therefore uses a **pool of 3 with exponential backoff**
+(300 ms / 900 ms / 2.7 s, three retries) — never `Promise.all` over all ~59
+stores. Unthrottled it lost ~15 stores per boot, scattered at random across
+woodart, travels *and* group, and every affected screen rendered an empty state
+over a full table.
+
+### The verification blind spot this exposed
+
+Three real defects shipped past a green local suite in one evening:
+
+1. `projects` had a migration, models and a seeder but **no controller** — data
+   seeded into MySQL that no route could reach.
+2. `materials/routes.php` referenced `MovementController` and
+   `StockLocationController` without importing them. `routes.php` declares no
+   namespace, so both resolved to the global name. PHP does not catch this and
+   `php -l` passes clean; it killed `php artisan route:list` for the ENTIRE
+   application and 500'd the movements endpoint.
+3. Unthrottled hydration, above.
+
+None were detectable locally. Module test suites call controllers directly and
+never exercise route resolution; `tools/verify/sweep.mjs` runs in DEMO mode where
+`api.js` never hydrates at all. The sweep reported 242/242 clean while the
+deployed app was losing a third of its data on every boot.
+
+Gates added: `tools/verify/routes-imports.mjs` (every `Name::class` in a
+routes.php must be imported) and `tools/verify/deployed-smoke.mjs` (assert the
+live API actually serves each hydrated store).
+
+**When a deployed screen is empty, read the `[api] hydrated in …` console line
+FIRST.** It reports every store's row count plus the failures, and it
+distinguishes "no data on the server", "endpoint down" and "frontend bug" in one
+glance. Guessing before reading it cost four wrong diagnoses.

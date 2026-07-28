@@ -97,6 +97,7 @@ woodart/projects · it/projects · shop/pos · construction/projects.
 ## Log (one line per completed gate)
 | Date | Module | Gate | Verified by | Commit |
 |------|--------|------|-------------|--------|
+| 2026-07-28 | **HOST DEPLOY** | Woodart LIVE on dev.epal.com.bd — 12 `wa_*` tables migrated into the 179-table shared DB (copy of live Travels) with ZERO collisions, 9 seeders run; then three deploy-only defects found and fixed: `projects` had no controller (data stranded in MySQL), two controllers unimported in `materials/routes.php` (killed `route:list` app-wide, 500'd movements), and unthrottled boot hydration losing ~15 stores/boot to a host at load 50 | **live `[api] hydrated`: all 12 wa_ stores non-empty** (wa_projects 8 · wa_materials 12 · wa_movements 27 · wa_revisions 30 · wa_production 18) · Projects screen ৳4.38Cr portfolio · sweep 242/242 · new gates `routes-imports.mjs` + `deployed-smoke.mjs` | e3feec1 |
 | 2026-07-26 | — | full backup + tracker + method locked | 9442 files backed up | 702dcaf |
 | 2026-07-26 | passport-mgmt | backend 100% (8-file Laravel slice, migrated+seeded+CRUD-tested vs MySQL); FE already HTML/template + read-only so pixel-identical | tinker CRUD test + raw SQL row check + sweep 222/222 | 99e5af4 |
 | 2026-07-26 | settings | backend 100% (company_settings JSON table + Model/Service/Request/Controller; migrated+tested vs MySQL, shallow-merge no-clobber proven); FE already HTML/template, untouched | tinker merge test vs MySQL | 34b7d27 |
