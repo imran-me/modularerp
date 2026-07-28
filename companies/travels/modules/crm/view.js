@@ -258,8 +258,32 @@ function moveStage(l, stage) {
   l.stage = stage;
   if (stage === 'Won' && !l.posted) {
     l.posted = true;
-    if (db.postSale) db.postSale(CID, { amount: l.value || 0, cost: 0, ref: l.id, desc: 'CRM deal: ' + l.name, customer: l.company || l.name });
-    if (db.notify) db.notify({ level: 'success', title: 'Deal won 🎉', text: l.name + ' · ' + ui.money(l.value), companyId: CID, icon: 'trophy-fill' });
+    /* A WON DEAL IS A SALE — and it should say whether the money came in
+     * (audit 2026-07-28). It used to book straight to 1200 Receivable with no
+     * screen anywhere able to collect it, so a deal paid on the spot sat as debt
+     * for ever. Asking here costs one dialog on the one stage move that matters;
+     * "not paid yet" still books the receivable, which is the honest default for
+     * a deal that has been agreed but not settled. */
+    var post = function (src) {
+      var bankId = src && src.bank ? src.bank.id : '';
+      if (db.postSale) db.postSale(CID, { amount: l.value || 0, cost: 0, ref: l.id,
+        desc: 'CRM deal: ' + l.name, customer: l.company || l.name,
+        paid: !!bankId, payStatus: bankId ? 'Paid' : 'Due', bankId: bankId });
+      if (bankId) { l.bankId = bankId; l.bankName = src.bank.name; l.payStatus = 'Paid'; }
+      db.save('leads', l);
+      if (db.notify) db.notify({ level: 'success', title: 'Deal won 🎉', text: l.name + ' · ' + ui.money(l.value), companyId: CID, icon: 'trophy-fill' });
+      ui.toast('Moved to ' + stage + (bankId ? ' · ' + ui.money(l.value) + ' into ' + src.bank.name : ''), 'success');
+      EPAL.router.render();
+    };
+    if (EPAL.pay && EPAL.pay.ask && (+l.value || 0) > 0) {
+      EPAL.pay.ask({ title: 'Deal won · ' + l.name, icon: 'trophy-fill', owner: CID,
+        amount: +l.value || 0, saveLabel: 'Record the win',
+        allowNone: true, noneLabel: 'Not paid yet — book as Receivable',
+        onPick: post });
+      return;
+    }
+    post(null);
+    return;
   }
   db.save('leads', l);
   ui.toast('Moved to ' + stage, 'success');
@@ -390,8 +414,12 @@ function leadForm(l) {
       r.source = val.source; r.stage = val.stage; r.value = +val.value || 0; r.owner = val.owner || r.owner; r.closeDate = val.closeDate;
       r.companyId = CID;
       if (val.stage === 'Won' && !wasWon && !r.posted) {
-        r.posted = true;
-        if (db.postSale) db.postSale(CID, { amount: r.value, cost: 0, ref: r.id, desc: 'CRM deal: ' + r.name, customer: r.company || r.name });
+        // marking Won from the form goes through the same money question as the
+        // board does (moveStage) — one sale, one place that decides where the
+        // money went, so the two paths can never book it differently
+        db.save('leads', r);
+        moveStage(r, 'Won');
+        return true;
       }
       db.save('leads', r);
       ui.toast('Lead saved', 'success'); EPAL.router.render();
