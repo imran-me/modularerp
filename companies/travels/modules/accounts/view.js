@@ -634,7 +634,12 @@ function fromLedgerGuard(e, verb) {
  * Each row is tagged with the desk it came from and cannot be edited here. */
 function ledgerAsExpense() {
   if (!(EPAL.ledger && EPAL.ledger.entries)) return [];
-  var SKIP_SOURCE = { sale: 1, payroll: 1 };
+  // Payroll keeps its own tab; everything else that spends money belongs here —
+  // INCLUDING what a sale cost us (owner 2026-07-28: "the 90 cost will be minusing
+  // from the bank, then the 90 minus will go to the expense too as cost"). Cost of
+  // sales stays a head of its own so gross profit is still readable: the P&L takes
+  // 5000 off revenue to get gross, and the operating heads off that to get net.
+  var SKIP_SOURCE = { payroll: 1 };
   var out = [];
   try {
     // every voucher-backed journal, by id and by the glId a voucher points at
@@ -649,7 +654,6 @@ function ledgerAsExpense() {
       if (spoken[e.id]) return;
       var amt = 0, head = '';
       (e.lines || []).forEach(function (l) {
-        if (String(l.account) === '5000') return;                 // a sale's own cost
         var a = EPAL.ledger.account ? EPAL.ledger.account(l.account) : null;
         if (a && a.type === 'expense') { amt += (+l.dr || 0) - (+l.cr || 0); head = head || a.name; }
       });
@@ -671,7 +675,7 @@ function ledgerAsExpense() {
 }
 // which desk a directly-posted journal came from, for the Method column
 var SOURCE_DESK = { cash: 'Manage Cash', bank: 'Manage Banks', manual: 'Journal',
-  payment: 'Payment', intercompany: 'Inter-company', opening: 'Opening' };
+  payment: 'Payment', intercompany: 'Inter-company', opening: 'Opening', sale: 'Sale · cost' };
 
 // The entries datatable — chips by head, filter card, PDF, row-click rich detail,
 // canonical row actions (edit · delete │ print). Returns the table instance.
