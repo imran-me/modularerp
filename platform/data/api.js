@@ -286,7 +286,7 @@
        *
        * A small pool plus ONE retry fixes it without touching any endpoint.
        * Boot is marginally slower and actually completes. */
-      var POOL = 4, RETRY_MS = 250;
+      var POOL = 3, RETRIES = 3, RETRY_MS = 300;
 
       function fetchStore(key, attempt) {
         return call(HYDRATE[key]).then(function (j) {
@@ -307,9 +307,15 @@
           // A resource-limit refusal is transient by definition: the same call
           // succeeds once the crowd thins. Retry once before giving up, so a
           // momentary squeeze does not blank a store for the whole session.
-          if (!attempt) {
-            return new Promise(function (go) { setTimeout(go, RETRY_MS); })
-              .then(function () { return fetchStore(key, 1); });
+          // EXPONENTIAL backoff, not a fixed pause. The host refuses the
+          // connection because it is saturated (observed load average ~50), so
+          // retrying immediately just adds to the pile-up that caused the
+          // refusal. Waiting progressively longer is the only thing that
+          // actually clears it. 300ms, then 900ms, then 2.7s.
+          if (attempt < RETRIES) {
+            var wait = RETRY_MS * Math.pow(3, attempt);
+            return new Promise(function (go) { setTimeout(go, wait); })
+              .then(function () { return fetchStore(key, attempt + 1); });
           }
           return { key: key, n: -1, err: String(err.message || err) };   // one endpoint down ≠ dead app
         });
