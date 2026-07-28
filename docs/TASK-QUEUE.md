@@ -5,6 +5,39 @@
 > screenshot, then do them ONE BY ONE, top to bottom, skipping none. If the owner
 > forgets to continue, REMIND them what's still open. Mark each ✅ when done+pushed.
 
+
+## ✅ CLOSED 2026-07-28 (evening)
+- **Woodart Accounts — full Travels tab set.** Owner circled the Travels tab band:
+  "I need these all in the Interiors Account." 3 tabs → 11. Payroll and Manage Cash
+  MOUNT THE SHARED DESKS (`EPAL.payrollDesk` / `EPAL.cashDesk` already take a cid),
+  so Woodart runs the same code Travels does. 7 of 9 needed no new table.
+- **`wa_recurring` persists** — migration, model, controller, request, seeder,
+  CONDITIONAL hydration. Verified vs MySQL: 6 rows, 5 active, 9,39,200 commitment.
+- **Sidebar grouping + eyebrow convention** aligned to Travels.
+- **SEVEN stale `view.js` rebuilt.** air-ticketing · travels/accounts (×2) ·
+  master-accounts · contract-flight · crm. Root cause: commit 7afa4e3 landed source
+  edits without running the build. Every one was swallowing an owner-requested money
+  fix — the Paid-without-an-account guard, the won-deal receipt question, and the
+  ledger naming a generic 1010 instead of the real bank.
+- **Gates added:** `routes-imports.mjs` · `build-fresh.mjs` · `deployed-smoke.mjs` ·
+  `preflight.mjs` (all of them, one command) · `tools/hooks/pre-push` (installable).
+- **`php artisan migrate:collisions`** — read-only report of what each pending
+  migration would hit. Replaces guesswork on the shared-database problem.
+
+## ⏭️ STILL OPEN
+- **Woodart accent colour** — green `#6f9c1c` is the DELIBERATE per-company identity
+  (group blue · travels blue · woodart green · IT purple · shop pink · construction
+  orange). Making it blue erases one member of that system. ONE LINE in
+  `platform/core/config.js` — **owner decision, not a style fix.**
+- **Density & typography** — compared the same screens in both companies; found no
+  divergence beyond what is already fixed. Needs the owner to point at something
+  specific, or it should be closed.
+- **The ~20 non-Woodart pending migrations** — now ANSWERABLE: run
+  `php artisan migrate:collisions` on the host and act on what it says.
+- **Projects module writes** — hydrates read-only; promoting to WRITABLE belongs
+  with the projects rebuild (its own build slot).
+- **Install the pre-push hook on each clone:**
+  `cp tools/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push`
 ## ⏳ OPEN
 
 ### T-BE-MONEY — the Laravel money chain (autonomous session, 2026-07-27) ✅
