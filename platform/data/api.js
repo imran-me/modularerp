@@ -272,7 +272,23 @@
     hydrate: function () {
       var S = EPAL.store, keys = Object.keys(HYDRATE);
       var t0 = Date.now();
-      return Promise.all(keys.map(function (key) {
+      /* THROTTLED, and this matters on real hosting.
+       *
+       * This used to be Promise.all over every key — 30+ requests fired at
+       * once. Shared hosting caps concurrent PHP workers and MySQL connections,
+       * and when that cap is hit PDO throws "Operation not permitted", which
+       * this app's exception handler dresses up as "Database rejected the
+       * write" and returns as a 422. The result on dev.epal.com.bd was a
+       * random third of the stores failing on EVERY boot — scattered across
+       * woodart, travels and group — while the rest loaded fine. It reads
+       * exactly like a per-module bug and is not one: the same endpoint
+       * succeeds on its own and fails in a crowd.
+       *
+       * A small pool plus ONE retry fixes it without touching any endpoint.
+       * Boot is marginally slower and actually completes. */
+      var POOL = 4, RETRY_MS = 250;
+
+      function fetchStore(key, attempt) {
         return call(HYDRATE[key]).then(function (j) {
           // A CONDITIONAL store whose table the server does NOT have is, for this
           // host, a module with no backend at all — and this file's rule for
@@ -288,9 +304,31 @@
           return { key: key, n: unprovisioned ? 0 : (j.data || []).length, writable: !!WRITABLE[key] };
         }, function (err) {
           if (err.auth) throw err;                  // stale token — abort to login
+          // A resource-limit refusal is transient by definition: the same call
+          // succeeds once the crowd thins. Retry once before giving up, so a
+          // momentary squeeze does not blank a store for the whole session.
+          if (!attempt) {
+            return new Promise(function (go) { setTimeout(go, RETRY_MS); })
+              .then(function () { return fetchStore(key, 1); });
+          }
           return { key: key, n: -1, err: String(err.message || err) };   // one endpoint down ≠ dead app
         });
-      })).then(function (results) {
+      }
+
+      // A fixed number of workers draining one shared queue — the simplest
+      // concurrency limiter that needs no library.
+      var queue = keys.slice(), results = [];
+
+      function worker() {
+        var key = queue.shift();
+        if (!key) return Promise.resolve();
+        return fetchStore(key, 0).then(function (r) { results.push(r); return worker(); });
+      }
+
+      var workers = [];
+      for (var w = 0; w < Math.min(POOL, keys.length); w++) workers.push(worker());
+
+      return Promise.all(workers).then(function () {
         var report = { ms: Date.now() - t0, loaded: {}, failed: {}, readOnly: [] };
         results.forEach(function (r) {
           if (r.n >= 0) report.loaded[r.key] = r.n; else report.failed[r.key] = r.err;

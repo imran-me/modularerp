@@ -40,9 +40,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
             $reason = $e->errorInfo[2] ?? $e->getMessage();   // PDO driver message, not the full query
+            // Say which it was. This handler catches EVERY QueryException on
+            // api/*, reads included, and hard-coding the word "write" sent a
+            // debugging session hunting for a phantom save when 15 GET
+            // endpoints were really being refused connections by the host.
+            $verb = $request->isMethod('GET') ? 'read' : 'write';
             return response()->json([
                 'success' => false,
-                'message' => 'Database rejected the write: ' . $reason,
+                'message' => 'Database rejected the ' . $verb . ': ' . $reason,
             ], 422);
         });
     })->create();
