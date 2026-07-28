@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# EPAL ERP — pre-push gate.
+#
+# INSTALL (once per clone; .git/hooks is not tracked by git, so this cannot
+# install itself):
+#
+#     cp tools/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#
+# WHY: on 2026-07-28 five modules were found whose committed view.js did not
+# match its sources, swallowing real owner-requested fixes for weeks. The gates
+# existed the whole time. What failed was remembering to run them.
+#
+# Runs the fast gates only — imports, build-freshness, tailwind. The browser
+# sweep takes ~3 minutes, which is too long to sit in front of every push; run
+# it yourself with `node tools/verify/preflight.mjs` before anything that
+# reaches the live host.
+#
+# To push anyway (a docs-only change, a hotfix at 2am):  git push --no-verify
+# That is a deliberate, visible choice, which is the point.
+
+echo "pre-push: running fast gates (imports · build-freshness · tailwind)…"
+
+if ! node tools/verify/preflight.mjs --fast; then
+  echo ""
+  echo "pre-push: BLOCKED. Fix the gate above, or push with --no-verify if you"
+  echo "          genuinely mean to skip it."
+  exit 1
+fi
+
+exit 0
