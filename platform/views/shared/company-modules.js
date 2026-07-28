@@ -258,21 +258,40 @@
     ctx.mount.appendChild(page);
 
     function newEntry(rec) {
+      /* THE ACCOUNT, NOT A METHOD (audit 2026-07-28). Travels has its own richer
+       * accounts desk; IT, Shop and Construction fall back to this shared one —
+       * and here "Method" was still a word (Bank / Cash / bKash / Cheque), so an
+       * expense recorded on those companies posted to the abstract 1010 and moved
+       * no account: the ledger changed and every balance and history stayed put.
+       * Same treatment as everywhere else now — a real account, and its register
+       * follows. The generic methods stay in the list for a cheque or a card swipe
+       * that no registered account carries. */
+      var seed = Object.assign({ date: new Date().toISOString().slice(0, 10) }, rec || {},
+        { source: EPAL.pay ? EPAL.pay.valueOf(rec) : 'm:Bank' });
       EPAL.formModal({
         title: rec ? 'Edit Entry' : 'New Journal Entry', icon: 'journal-plus',
-        record: rec, fields: [
+        record: seed, fields: [
           { key: 'kind', label: 'Kind', type: 'select', options: ['Income', 'Expense'], required: true },
           { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
           { key: 'category', label: 'Category', type: 'text', required: true, placeholder: 'e.g. Office Rent' },
-          { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Cheque'], required: true },
+          { key: 'source', label: 'Bank / cash account', type: 'select', required: true, searchable: true,
+            options: EPAL.pay ? EPAL.pay.options(cid) : ['Bank', 'Cash'],
+            hint: 'Expense → the money leaves this account. Income → it lands in it. Either way its balance and history follow.' },
           { key: 'date', label: 'Date', type: 'date', required: true, default: new Date().toISOString().slice(0, 10) },
           { key: 'desc', label: 'Description', type: 'text', col2: true }
         ],
         onSave: function (vals) {
+          var before = rec ? Object.assign({}, rec) : null;
           var record = Object.assign({}, rec || { id: 'JV-' + Date.now().toString().slice(-6), companyId: cid, created: new Date().toISOString().slice(0, 10) }, vals);
+          if (EPAL.pay) EPAL.pay.stamp(record, vals.source);   // method + payAcct + bankId/bankName
+          delete record.source;
           db().save('acc_entries', record);
           mirrorToLedger(record);   // quick entry -> balanced double-entry in the real ledger
-          ui.toast('Entry saved & posted to the ledger', 'success');
+          // …and the named account's own book: balance + a row saying why
+          if (EPAL.pay && EPAL.pay.syncRegister && record.bankId) {
+            EPAL.pay.syncRegister(record, before, before ? 'Adjustment ·' : '');
+          }
+          ui.toast('Entry saved & posted to the ledger' + (record.bankName ? ' · ' + record.bankName : ''), 'success');
           EPAL.router.render();
         }
       });
@@ -287,11 +306,14 @@
       if (!EPAL.ledger || !EPAL.ledger.post) return;
       var amt = +record.amount || 0;
       if (amt <= 0) return;
+      // the account the entry names — a cash box IS hard cash (1000), a bank its
+      // own code under 1010; a generic method keeps the old abstract behaviour
+      var payAcct = record.payAcct || (record.method === 'Cash' ? '1000' : '1010');
       var lines;
       if (record.kind === 'Income') {
-        lines = [ { account: '1010', dr: amt, cr: 0 }, { account: '4000', dr: 0, cr: amt } ];
+        lines = [ { account: payAcct, dr: amt, cr: 0 }, { account: '4000', dr: 0, cr: amt } ];
       } else {
-        lines = [ { account: expenseAccountFor(record.category), dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt } ];
+        lines = [ { account: expenseAccountFor(record.category), dr: amt, cr: 0 }, { account: payAcct, dr: 0, cr: amt } ];
       }
       try {
         EPAL.ledger.post({ id: 'GL-ACC-' + record.id, date: record.date, companyId: cid,

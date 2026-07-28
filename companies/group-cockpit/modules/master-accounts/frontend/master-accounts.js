@@ -860,7 +860,9 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         var glId = 'GL-NBR-' + ui.uid('').slice(-6).toUpperCase();
         try {
           EPAL.ledger.post({ id: glId, date: v.date, companyId: v.companyId, ref: v.ref || 'NBR', memo: memo, source: 'bank',
-            lines: [{ account: code, dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: amt }] });
+            // the bank's OWN code, so the ledger names the account the challan was
+            // paid from — the register already did (audit 2026-07-28)
+            lines: [{ account: code, dr: amt, cr: 0 }, { account: EPAL.pay.glAcctOf(bank), dr: 0, cr: amt }] });
         } catch (e) { ui.toast(e.message || 'Ledger post failed', 'error'); return false; }
         bankTxnApply(bank, 'withdraw', amt, v.date, memo, v.ref || '', glId);
         ui.toast(label + ' deposit recorded — ' + ui.money(amt), 'success'); EPAL.router.render(); return true;
@@ -909,9 +911,12 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         var memo = (isCr ? 'Deposit to ' : 'Withdrawal from ') + bank.name + (v.desc ? ' — ' + v.desc : '')
           + (vat ? ' · VAT ' + ui.money(vat) : '') + (tds ? ' · TDS ' + ui.money(tds) : '');
         var glId = 'GL-BK-' + ui.uid('').slice(-6).toUpperCase();
+        // the chosen bank's OWN code on both sides (audit 2026-07-28) — the
+        // register has always moved that account; now the ledger names it too
+        var bankAcct = EPAL.pay.glAcctOf(bank);
         var lines = isCr
-          ? [{ account: '1010', dr: amt, cr: 0 }, { account: v.account, dr: 0, cr: amt - vat }].concat(vat ? [{ account: '2130', dr: 0, cr: vat }] : [])
-          : [{ account: v.account, dr: amt, cr: 0 }, { account: '1010', dr: 0, cr: bankMove }].concat(tds ? [{ account: '2140', dr: 0, cr: tds }] : []);
+          ? [{ account: bankAcct, dr: amt, cr: 0 }, { account: v.account, dr: 0, cr: amt - vat }].concat(vat ? [{ account: '2130', dr: 0, cr: vat }] : [])
+          : [{ account: v.account, dr: amt, cr: 0 }, { account: bankAcct, dr: 0, cr: bankMove }].concat(tds ? [{ account: '2140', dr: 0, cr: tds }] : []);
         try {
           // Book the movement to the BANK's own company, not the form's default
           // (which is 'group' from the All-Companies view). Money moving through
