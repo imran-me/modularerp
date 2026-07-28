@@ -8,8 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Vendor & Agent API — serves the five module-owned stores (agents / vendors /
- * party-txns / commissions / portals) behind one controller keyed by {store}.
+ * Vendor & Agent API — serves the six module-owned stores (agents / vendors /
+ * party-txns / commissions / portals / portal-txns) behind one controller keyed
+ * by {store}.
  * Schema::hasTable-guarded.
  */
 class VendorAgentController
@@ -20,6 +21,8 @@ class VendorAgentController
         'party-txns'  => 'party_txns',
         'commissions' => 'tv_comm_paid',
         'portals'     => 'tv_portals',
+        // the wallet STATEMENT — every top-up and every booking that drew it down
+        'portal-txns' => 'tv_portal_txns',
     ];
 
     public function __construct(private VendorAgentBookService $service) {}

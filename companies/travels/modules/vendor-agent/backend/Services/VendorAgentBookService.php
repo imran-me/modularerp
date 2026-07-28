@@ -6,11 +6,12 @@ use Epal\Modules\Travels\VendorAgent\Models\Agent;
 use Epal\Modules\Travels\VendorAgent\Models\CommissionPaid;
 use Epal\Modules\Travels\VendorAgent\Models\PartyTxn;
 use Epal\Modules\Travels\VendorAgent\Models\Portal;
+use Epal\Modules\Travels\VendorAgent\Models\PortalTxn;
 use Epal\Modules\Travels\VendorAgent\Models\Vendor;
 use Illuminate\Support\Str;
 
 /**
- * VendorAgentBookService — document-style service for the five Vendor & Agent
+ * VendorAgentBookService — document-style service for the six Vendor & Agent
  * stores. Upsert by frontend id; the full record round-trips in `data`.
  */
 class VendorAgentBookService
@@ -21,10 +22,11 @@ class VendorAgentBookService
         'party-txns'  => PartyTxn::class,
         'commissions' => CommissionPaid::class,
         'portals'     => Portal::class,
+        'portal-txns' => PortalTxn::class,
     ];
 
     private const PREFIX = [
-        'agents' => 'AG', 'vendors' => 'VN', 'party-txns' => 'PTX', 'commissions' => 'CM', 'portals' => 'PT',
+        'agents' => 'AG', 'vendors' => 'VN', 'party-txns' => 'PTX', 'commissions' => 'CM', 'portals' => 'PT', 'portal-txns' => 'PW',
     ];
 
     public function modelFor(string $store): ?string

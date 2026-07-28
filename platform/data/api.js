@@ -88,6 +88,8 @@
     party_txns:    'travels/vendor-agent/books/party-txns',
     tv_comm_paid:  'travels/vendor-agent/books/commissions',
     tv_portals:    'travels/vendor-agent/books/portals',
+    // the wallet STATEMENT — brand-new table, so writes are CONDITIONAL (below)
+    tv_portal_txns: 'travels/vendor-agent/books/portal-txns',
     wa_materials:  'woodart/materials/stock',
     wa_clients:    'woodart/clients/directory',
     wa_purchases:  'woodart/procurement/orders',
@@ -183,6 +185,10 @@
    * provisioned — no code change, no redeploy, and no loop if it never is. */
   var CONDITIONAL = {
     bank_txns:    'group/master-accounts/bank-transactions',
+    // the portal wallet statement (2026-07-28) — same reasoning as the Woodart
+    // tables below: absent until its module migration runs, and a top-up must not
+    // be blanked on the next boot by an endpoint that honestly has nothing yet.
+    tv_portal_txns: 'travels/vendor-agent/books/portal-txns',
     /* The Woodart modules (2026-07-27). Every one of their tables arrives as a
      * module migration, so on a host that has pulled the code but not run
      * `php artisan migrate` they are simply absent. Listing them here instead
