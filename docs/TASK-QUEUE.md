@@ -361,7 +361,7 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
 - New machine bring-up (Node/Git), repo reconnected to origin.
 
 ## 🆕 QUEUED 2026-07-28
-- **Woodart Accounts (module #8)** — IN PROGRESS. Model + AccountsService committed
+- ✅ **Woodart Accounts (module #8)** — DONE 2026-07-28 (e0b1169). Was: Model + AccountsService committed
   (`AccEntry` model, register / payables / project-P&L). Remaining: controller, routes,
   Request, Resource, module.json, README, context.md, frontend (template/api/logic),
   registration in platform/core/config.js + index.html. Blocked point: the income leg
