@@ -38,6 +38,9 @@ function kgrid(sel, _p, children) { var g = frag('kpi-grid'); g.className = sel.
 function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b.classList.add('active'); b.textContent = label; b.addEventListener('click', onClick); return b; }
 
   var TODAY = new Date(2026, 6, 5);           // demo "today" = 2026-07-05 (ageing)
+  // the REAL date, for money entries a user makes now (the demo TODAY above only
+  // ages the seeded party ledgers)
+  function nowStr() { return new Date().toISOString().slice(0, 10); }
   var VENDOR_TYPES = ['Ticketing', 'Visa', 'Hotel', 'Umrah', 'Multi-service'];
   var TERMS = ['Cash', 'Net 7', 'Net 15', 'Net 30', 'Net 45'];
   var CURRENCIES = ['BDT', 'USD', 'SAR', 'AED', 'EUR'];
@@ -747,6 +750,33 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
   }
 
   /* ======================================================= PORTALS */
+  /* TOP UP A PORTAL WALLET (owner 2026-07-28) — the money leaves a real account
+   * and becomes a prepayment asset on 1180-<portal>, with a row in the portal's
+   * own statement. Before this the wallet number moved for nobody. */
+  function topUpPortal(p, done) {
+    EPAL.formModal({
+      title: 'Top up ' + p.name, icon: 'wallet2', size: 'md',
+      record: { date: nowStr(), amount: null },
+      fields: [
+        { key: 'amount', label: 'Amount to wire (৳)', type: 'money', required: true, min: 1,
+          hint: 'Wallet now ' + ui.money(p.balance || 0) },
+        { key: 'source', label: 'Wired from', type: 'select', required: true, searchable: true,
+          options: EPAL.pay.options(p.companyId || 'travels'),
+          hint: 'The money leaves this account and sits with the portal until a booking spends it.' },
+        { key: 'date', label: 'Date', type: 'date', required: true, default: nowStr() },
+        { key: 'ref', label: 'Reference', type: 'text', placeholder: 'e.g. wire slip no' },
+        { key: 'memo', label: 'Note', type: 'text', col2: true }
+      ],
+      saveLabel: 'Top up',
+      onSave: function (v) {
+        var row = EPAL.pay.portalTopUp({ portal: p, amount: +v.amount || 0, source: v.source,
+          date: v.date, ref: v.ref, memo: v.memo, companyId: p.companyId || 'travels' });
+        if (!row) return false;
+        ui.toast(p.name + ' topped up · wallet ' + ui.money(row.balance), 'success');
+        done && done(); EPAL.router.render(); return true;
+      }
+    });
+  }
   function portalsView(page) {
     if (canCreate()) page.querySelector('.page-actions').prepend(el('button.btn.btn-ghost', {
       html: ui.icon('plus-lg') + ' Add Portal', onclick: function () { editPortal(null); } }));
@@ -787,7 +817,11 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         filters: [{ key: 'status', label: 'Status' }],
         pageSize: 10, exportName: 'portals.csv', pdfTitle: 'Portals & Channels',
         onRow: function (p) { portalDetail(p); },
-        actions: actionsFor(function (p) { editPortal(p); }, function (p) { removeRec('tv_portals', p, draw); }),
+        actions: canCreate() ? [
+          { icon: 'wallet2', title: 'Top up wallet', onClick: function (p) { topUpPortal(p, draw); } },
+          { icon: 'pencil', title: 'Edit', onClick: function (p) { editPortal(p); } },
+          { icon: 'trash', title: 'Delete', onClick: function (p) { removeRec('tv_portals', p, draw); } }
+        ] : actionsFor(function (p) { editPortal(p); }, function (p) { removeRec('tv_portals', p, draw); }),
         empty: { icon: 'hdd-network', title: 'No portals yet', hint: 'Connect your first channel.' }
       });
       host.appendChild(t.el);
@@ -809,6 +843,7 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
     ui.modal({ title: p.name, icon: 'hdd-network', size: 'lg', body: body, footer: false });
     var resp = p.responsible || {};
     var actions = el('div.flex.gap-1.items-center.flex-wrap', { style: { marginLeft: 'auto' } });
+    if (canCreate()) actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('wallet2') + ' Top up', onclick: function () { topUpPortal(p); } }));
     if (canCreate()) actions.appendChild(el('button.btn.btn-sm.btn-outline', { html: ui.icon('pencil') + ' Edit', onclick: function () { editPortal(p); } }));
     actions.appendChild(el('button.btn.btn-sm.btn-primary', { html: ui.icon('printer') + ' Print', onclick: function () { printPortal(p); } }));
     actions.appendChild(ui.rowActions(ui.actions({
@@ -842,6 +877,31 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         drow('Auto-sync', p.autoSync), drow('Account manager', resp.name), drow('Manager phone', resp.phone), drow('Manager email', resp.email),
         drow('Notes', p.notes)
       ]) ])
+    ]));
+    // THE WALLET'S OWN STATEMENT — every top-up and every booking that spent it,
+    // with the balance before and after, and the journal each one posted.
+    var moves = (EPAL.pay.portalLedger ? EPAL.pay.portalLedger(p.id) : []) || [];
+    var wt = EPAL.table({
+      columns: [
+        { key: 'date', label: 'Date', date: true },
+        { key: 'kind', label: 'Movement', badge: { topup: 'good', booking: 'warn', refund: 'info', adjustment: '' } },
+        { key: 'memo', label: 'Detail', render: function (r) { return ui.escapeHtml(r.memo || r.ref || '—'); } },
+        { key: 'amount', label: 'In / Out', num: true, render: function (r) {
+            var a = +r.amount || 0;
+            return '<span class="num ' + (a < 0 ? 'text-warn' : 'text-good') + '">' + (a < 0 ? '−' : '+') + ui.money(Math.abs(a)) + '</span>'; },
+          sortVal: function (r) { return +r.amount || 0; } },
+        { key: 'balance', label: 'Wallet after', num: true, money: true }
+      ],
+      rows: moves, searchKeys: ['memo', 'ref'], pageSize: 8,
+      exportName: 'portal-wallet.csv', pdfTitle: 'Wallet statement — ' + p.name,
+      empty: { icon: 'wallet2', title: 'No wallet movements yet',
+        hint: 'Top up the wallet, and every booking that draws on it appears here.' }
+    });
+    body.appendChild(el('div.card', null, [
+      el('div.card-head', null, [ el('h3', { html: ui.icon('wallet2') + ' Wallet Statement' }),
+        el('span.text-mute.sm', { style: { marginLeft: 'auto' },
+          text: 'on the books as 1180-' + p.id + ' · prepayment asset' }) ]),
+      el('div.card-body', null, [ wt.el ])
     ]));
   }
   function drow(k, v) { return el('div.data-row', null, [ el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v == null || v === '' ? '—' : String(v) }) ]); }

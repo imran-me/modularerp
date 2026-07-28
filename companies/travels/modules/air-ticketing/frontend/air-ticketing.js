@@ -1078,6 +1078,15 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
   function payAccountOptions() {
     return (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options('travels') : [];
   }
+  /* The GDS / portal wallets, as payment sources for what a ticket COST us: a
+   * booking bought against a wallet draws that prepayment down instead of a bank
+   * (owner 2026-07-28 — the wallet used to be a number nothing ever moved). */
+  function portalPayOptions() {
+    return (db.col('tv_portals') || []).filter(function (p) { return p.status !== 'Disconnected'; })
+      .map(function (p) { return ['portal:' + p.id, 'Portal wallet · ' + p.name + ' — ' + ui.money(p.balance || 0)]; });
+  }
+  function portalIdOf(v) { v = String(v || ''); return v.indexOf('portal:') === 0 ? v.slice(7) : ''; }
+
   /* 'bank:BNK-3' → 'BNK-3'; the generic 'm:…' placeholders name no real account. */
   function bankIdOf(v) {
     v = String(v || '');
@@ -1158,8 +1167,8 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
         options:[['m:Due','Not paid yet — book as Receivable']].concat(payAccountOptions()),
         default:'m:Due', hint:'Naming an account posts the fare into it now and moves its balance.' },
       { key:'vendorPaidFrom', label:'Vendor / airline paid from', type:'select', searchable:true,
-        options:[['m:Due','Not paid yet — book as Payable']].concat(payAccountOptions()),
-        default:'m:Due', hint:'Only applies when Pay status (to vendor) is Paid.' }
+        options:[['m:Due','Not paid yet — book as Payable']].concat(payAccountOptions()).concat(portalPayOptions()),
+        default:'m:Due', hint:'Only applies when Pay status (to vendor) is Paid. Buying against a GDS / portal wallet draws that wallet down instead of a bank.' }
     ];
 
     form = EPAL.form(fields, {});
@@ -1272,7 +1281,8 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
           category:'air', vendor:(t.vendor||''), costPaid:(+t.costPaid||0) > 0,
           commission:(+t.commission||0), agent:(t.agentName||''),
           paid: !!v.receivedInto && v.receivedInto !== 'm:Due', payStatus: v.receivedInto && v.receivedInto !== 'm:Due' ? 'Paid' : 'Due',
-          bankId: bankIdOf(v.receivedInto), costBankId: bankIdOf(v.vendorPaidFrom) });
+          bankId: bankIdOf(v.receivedInto), costBankId: bankIdOf(v.vendorPaidFrom),
+          costPortalId: portalIdOf(v.vendorPaidFrom) });
         docRows.push({ passenger:t.passenger, ticketNo:t.ticketNo||'—', sector:route, base:base, tax:tax, fee:mShare, total:sale });
         sumBase+=base; sumTax+=tax; sumSale+=sale; sumComm+=comm;
       });

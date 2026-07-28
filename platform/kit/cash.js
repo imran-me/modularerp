@@ -153,6 +153,91 @@
       return code;
     },
 
+    /* ==========================================================================
+     * PORTAL & GDS WALLETS  (owner 2026-07-28)
+     * --------------------------------------------------------------------------
+     * A booking portal holds our money: we wire Sabre ৳5,00,000 and draw tickets
+     * against it. Until now that float lived in one number on the portal record
+     * that NOTHING ever moved — an automation alert read it, and it was wrong the
+     * moment anyone booked. The reference ERP does keep a portal_balances ledger,
+     * but its wallets sit outside the chart of accounts, so the float never shows
+     * on the balance sheet.
+     *
+     * Here a wallet IS an account: 1180-<portal id> under 1180 Portal & GDS
+     * Wallets, so the money is a prepayment asset while it sits there.
+     *   top up   DR 1180-<portal> / CR <the bank it was wired from>
+     *   booking  DR 5000 Cost of Sales / CR 1180-<portal>
+     * Every movement also writes a wallet-register row (tv_portal_txns) with the
+     * balance before and after, so the portal has its own statement — and the
+     * portal's `balance` field stays the fast read every screen already uses.
+     * ========================================================================*/
+    portalById: function (id) { return db().col('tv_portals').filter(function (p) { return p.id === id || p.name === id; })[0] || null; },
+
+    /** The wallet's own account on the chart, created the first time it is used. */
+    portalAcctOf: function (portal) {
+      if (!portal || !portal.id) return '1180';
+      var L = EPAL.ledger;
+      if (!L || !L.ensureAccount) return '1180';
+      var code = '1180-' + portal.id;
+      L.ensureAccount(code, (portal.name || portal.id) + ' wallet', 'asset',
+        { parent: '1180', group: 'Current Assets' });
+      return code;
+    },
+
+    /** One wallet movement: the GL leg, the portal balance, and the register row.
+     *  kind 'topup' | 'booking' | 'refund' | 'adjustment' — sign is up to the caller
+     *  (positive = money INTO the wallet). Returns the register row. */
+    portalMove: function (opts) {
+      opts = opts || {};
+      var portal = opts.portal || Pay.portalById(opts.portalId);
+      if (!portal) return null;
+      var amt = +opts.amount || 0;
+      if (!amt) return null;
+      var before = +portal.balance || 0;
+      portal.balance = Math.round((before + amt) * 100) / 100;
+      db().save('tv_portals', portal);
+      var row = { id: opts.id || ('PW-' + ui.uid('').slice(-6).toUpperCase()),
+        portalId: portal.id, portalName: portal.name || '', companyId: opts.companyId || 'travels',
+        kind: opts.kind || (amt > 0 ? 'topup' : 'booking'), amount: amt,
+        openingBalance: before, balance: portal.balance,
+        date: opts.date || today(), ref: opts.ref || '', memo: opts.memo || '',
+        glId: opts.glId || '', bankId: opts.bankId || '' };
+      S.upsert('tv_portal_txns', row);
+      EPAL.bus.emit('data:changed', { store: 'tv_portal_txns', action: 'create', record: row });
+      return row;
+    },
+
+    /** The wallet's statement, newest first. */
+    portalLedger: function (portalId) {
+      return S.list('tv_portal_txns').filter(function (r) { return r.portalId === portalId; })
+        .sort(function (a, b) { return (a.date || '') < (b.date || '') ? 1 : -1; });
+    },
+
+    /** Wire money to a portal: it leaves a real account and becomes a prepayment. */
+    portalTopUp: function (opts) {
+      opts = opts || {};
+      var portal = opts.portal || Pay.portalById(opts.portalId);
+      var amt = +opts.amount || 0;
+      if (!portal || amt <= 0) return null;
+      var src = Pay.resolve(opts.source || '');
+      var co = opts.companyId || portal.companyId || 'travels';
+      var id = 'PW-' + (opts.ref || ui.uid('').slice(-6).toUpperCase());
+      var glId = 'GL-' + id;
+      try {
+        EPAL.ledger.post({ id: glId, date: opts.date || today(), companyId: co,
+          ref: opts.ref || id, source: 'payment', party: portal.name || '',
+          memo: 'Portal top-up · ' + (portal.name || '') + (src.bank ? ' · from ' + src.bank.name : ''),
+          lines: [ { account: Pay.portalAcctOf(portal), dr: amt, cr: 0 },
+                   { account: src.gl, dr: 0, cr: amt } ] });
+      } catch (e) { ui.toast(e.message || 'Ledger posting failed', 'error'); return null; }
+      if (src.bank) Pay.syncRegister({ id: id, companyId: co, bankId: src.bank.id, kind: 'Expense',
+        amount: amt, category: 'Portal top-up', party: portal.name || '', ref: opts.ref || id,
+        date: opts.date || today(), glId: glId }, null);
+      return Pay.portalMove({ id: id, portal: portal, amount: amt, kind: 'topup', companyId: co,
+        date: opts.date || today(), ref: opts.ref || id, memo: opts.memo || 'Top-up',
+        glId: glId, bankId: src.bank ? src.bank.id : '' });
+    },
+
     /** "Cash Box · Travels Petty Cash · Gulshan — ৳ 40K" */
     label: function (b) {
       var bits = [b.name];

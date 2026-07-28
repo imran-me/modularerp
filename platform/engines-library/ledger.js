@@ -944,6 +944,12 @@
       { code: '4040', name: 'Hotel & Other Travel', type: 'income', group: 'Revenue' },
       { code: '4050', name: 'Contract Flights & Files', type: 'income', group: 'Revenue' },
       { code: '5350', name: 'Agent Commission', type: 'expense', group: 'Selling Expenses' },
+      // GDS / portal wallets (owner 2026-07-28). Money prepaid to Sabre, Amadeus
+      // or a consolidator is OUR asset until a booking spends it — a prepayment,
+      // not an expense. The reference ERP keeps portal balances in their own table
+      // OUTSIDE the books, so that float never appears on the balance sheet at
+      // all; here it is a control account with one sub-account per portal.
+      { code: '1180', name: 'Portal & GDS Wallets', type: 'asset', group: 'Current Assets' },
       // AUDIT P1: every head expenseAccountFor() can emit MUST exist as an
       // account — trialBalance silently skips unknown codes, and ৳66.04L of
       // register expenses were invisible to the TB via 5550/5600/5800
@@ -1192,7 +1198,12 @@
         // payable to the vendor. Non-zero (either sign) posts; only a true-zero-cost
         // sale still books no cost leg. (Bookkeeping audit fix 1, 2026-07-16.)
         if (cost !== 0) {
-          var creditCost = rec.costPaid === true ? (outAcct ? pay.glAcctOf(outAcct) : '1010') : '2000';
+          // paid out of a PORTAL WALLET? then the money is already with the portal
+          // and the booking draws that prepayment down — no bank, no payable
+          // (owner 2026-07-28). Otherwise: the paying account, or a payable.
+          var wallet = (rec.costPortalId && pay && pay.portalById) ? pay.portalById(rec.costPortalId) : null;
+          var creditCost = wallet ? pay.portalAcctOf(wallet)
+            : (rec.costPaid === true ? (outAcct ? pay.glAcctOf(outAcct) : '1010') : '2000');
           post({ id: 'GL-SC' + (rec.id || key), date: rec.date, companyId: rec.companyId,
             ref: rec.ref, memo: (rec.desc || 'Sale') + ' — cost', source: 'sale', party: rec.vendor || rec.customer || '',
             lines: [ { account: '5000', dr: cost, cr: 0, product: prod }, { account: creditCost, dr: 0, cr: cost } ] });
@@ -1223,10 +1234,16 @@
             category: rec.desc || 'Sale', party: rec.customer || '', ref: rec.ref || '', date: rec.date,
             companyId: rec.companyId, glId: 'GL-S' + (rec.id || key) }, null);
         }
-        if (outAcct && cost > 0 && pay.syncRegister) {
+        if (outAcct && cost > 0 && !rec.costPortalId && pay.syncRegister) {
           pay.syncRegister({ id: 'SALECOST-' + (rec.id || key), bankId: outAcct.id, kind: 'Expense', amount: cost,
             category: (rec.desc || 'Sale') + ' — cost', party: rec.vendor || '', ref: rec.ref || '', date: rec.date,
             companyId: rec.companyId, glId: 'GL-SC' + (rec.id || key) }, null);
+        }
+        // …and the portal wallet's own statement, when the booking drew it down
+        if (rec.costPortalId && cost !== 0 && pay.portalMove) {
+          pay.portalMove({ id: 'PWSALE-' + (rec.id || key), portalId: rec.costPortalId, amount: -cost,
+            kind: 'booking', companyId: rec.companyId, date: rec.date, ref: rec.ref || '',
+            memo: rec.desc || 'Booking', glId: 'GL-SC' + (rec.id || key) });
         }
       } catch (e) { console.error('[ledger] auto-post failed', e); }
     });

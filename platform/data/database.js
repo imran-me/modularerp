@@ -594,7 +594,10 @@
         // bankId = where the customer's payment landed, costBankId = where the
         // vendor was paid from (defaults to bankId). Optional: a sale that names
         // neither books to the abstract 1010 exactly as it always did.
-        bankId: sale.bankId || '', costBankId: sale.costBankId || ''
+        bankId: sale.bankId || '', costBankId: sale.costBankId || '',
+        // …or the GDS / portal WALLET the booking was bought against, in which case
+        // the cost draws that prepayment down instead of a bank (owner 2026-07-28).
+        costPortalId: sale.costPortalId || ''
       };
       S.upsert('sales', rec);
       // roll into the company's latest financials month
