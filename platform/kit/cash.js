@@ -114,9 +114,47 @@
 
   function srcRank(b) { var r = SRC_ORDER[b.type || 'Bank']; return r == null ? 9 : r; }
 
+  /* EVERY CONCERN HAS A CASH DRAWER, AND IT MUST BE SELECTABLE (owner 2026-07-28:
+   * "in the expense sheet we can see the from bank we are expensing, but we can
+   * not select the travels cash — why? solve that").
+   *
+   * Because hard cash was only ever an ACCOUNT CODE (1000), never an account you
+   * could open: Manage Cash showed a real drawer with real money in it, read
+   * straight from the ledger, while every payment picker offered banks plus a
+   * vague "Cash — no registered account". So the money existed on the books and
+   * had no name to pick.
+   *
+   * A concern's drawer is now a real payment account like any other. It is opened
+   * at whatever hard cash that company's books already show, so the register and
+   * the ledger agree from the first moment WITHOUT posting anything: no journal,
+   * no double count — the opening figure is READ from 1000, not added to it.
+   * After this every cash movement posts to the drawer's own code (1000-<id>) and
+   * moves its balance, and 1000 still answers for the lot because a control
+   * account includes its children. */
+  var cashBoxChecked = {};
+  function ensureCashBox(owner) {
+    if (!owner || cashBoxChecked[owner]) return;
+    cashBoxChecked[owner] = true;
+    try {
+      var mine = db().col('banks').filter(function (b) { return (b.companyId || 'group') === owner; });
+      if (mine.some(function (b) { return b.type === 'Cash Box'; })) return;
+      var onBooks = 0;
+      try { onBooks = Math.round((EPAL.ledger.balance('1000', { companyId: owner }) || 0) * 100) / 100; } catch (e) {}
+      db().save('banks', {
+        id: 'CASH-' + owner.toUpperCase(),
+        name: coName(owner) + ' — Hard Cash',
+        type: 'Cash Box', status: 'Active', companyId: owner,
+        balance: onBooks,             // what the books already say is in the drawer
+        account: '', branch: 'Office', currency: 'BDT',
+        note: 'The office cash drawer. Opened at the hard cash already on the books (GL 1000).'
+      });
+    } catch (e) { /* a picker must never fail because of this */ }
+  }
+
   var Pay = {
     /** Every ACTIVE payment account one concern owns, in the owner's order. */
     accountsOf: function (owner) {
+      ensureCashBox(owner);        // the drawer is an account too — see above
       return db().col('banks').filter(function (b) {
         return (b.companyId || 'group') === owner && (b.status || 'Active') !== 'Inactive';
       }).sort(function (a, b) { return (srcRank(a) - srcRank(b)) || String(a.name || '').localeCompare(String(b.name || '')); });
