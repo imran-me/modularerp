@@ -416,3 +416,27 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
   where Woodart diverged. Travels is the reference implementation. Take a before-shot
   of every Woodart screen first; the parity harness proves only what we intend to
   change actually changed. Do AFTER accounts #8.
+
+## 🆕 2026-07-28 — PAYROLL COMMAND CENTRE
+
+- ✅ **DONE — payroll rebuilt to the Manage Banks design language.** Owner ask: the banks
+  KPI/structure/style in Payroll, monthly reports that drill to every employee's figures,
+  search by name AND employee ID, a full employee file, plus automation/AI/brief. Shipped:
+  the shared four-card dashboard row (`[data-shell="dash"]`), a new **Overview** tab
+  (digest · Autopilot proposals · Anomaly Radar · Monthly Register · department cost), the
+  **month drill** (23-column salary register + that month's money movements + ledger
+  postings), a new **Staff Accounts** tab, and the dashboard row on Salary Manage. One
+  implementation, so it lands identically in Master Accounts › Master Payroll, Travels ›
+  Accounts › Payroll, Woodart › Accounts › Payroll and the standalone routes.
+  Verified: sweep 253/253 × both themes, tw gate green, trial balance balances, plus a
+  21-check headless driver. Full write-up in CONTEXT.md.
+- ◻ **NEXT on payroll (not started):** deepen the employee dossier
+  (`platform/kit/emp-profile.js`) — the owner wants "everything possible" on one employee:
+  it already has the ledger with running net-due, payslip history, loans/advances,
+  attendance and the settlement action; what is missing is partial-payment history per
+  month, an encashment timeline, and a print/export of the whole file.
+- ◻ **Laravel read endpoints** for the Overview/Monthly Register. No new tables needed —
+  they read `pay_runs`/`pay_slips`/`pay_txns` which Master Accounts' payroll backend
+  already persists.
+- ⏸ **Interiors layout + style to match Travels** (queued 2026-07-28, above) — still
+  pending; the owner interrupted with the payroll work.

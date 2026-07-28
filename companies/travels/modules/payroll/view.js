@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · PAYROLL · MARKUP  (company-agnostic — registered for every concern)\n  ----------------------------------------------------------------------------\n  The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +\n  filled at runtime via [data-tpl] / [data-slot] hooks.\n\n  Six tabs (template / manage / loans / payslip / advance / reports), rendered\n  BOTH standalone (cid/payroll/…) and embedded in Master Accounts via\n  EPAL.payrollDesk. Every modal/form (manage-salary, correction/edit, print-\n  sheet, pay, money, encashment) keeps its legacy el()-built DOM, as do the\n  compound-styled leaf helpers formField() and field() (label+control rows with\n  inline padding/width — impractical as utilities). STYLING = the house design\n  system; the only new tw util is tw-max-w-[230px] (the run's month select). The\n  salary-sheet body keeps its .tbl-dense modifier (owner: fit without h-scroll).\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section band ----------------------------------------------->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid + one KPI card + a two-column row ------------------------------>\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n<template data-tpl=\"two-col\"><div class=\"two-col\"></div></template>\n\n<!-- generic cards: plain (body), register (head+sub+body), head-only -------->\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"head-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n\n<!-- Salary Manage: the run-control card + the .tbl-dense salary sheet -------->\n<template data-tpl=\"run-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex justify-between items-center flex-wrap gap-2\"><div class=\"flex items-center gap-2 flex-wrap\" data-slot=\"left\"></div><div class=\"flex gap-1 flex-wrap\" data-slot=\"actions\"></div></div><div class=\"text-mute sm mt-2\" data-slot=\"status\"></div></div></div></template>\n<template data-tpl=\"salary-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body tbl-dense\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"grid-auto-compact\"><div class=\"grid-auto kpi-compact\"></div></template>\n<template data-tpl=\"pay-tier-card\"><div class=\"card tier-card\"><div class=\"card-pad\"><div class=\"fw-700\" data-slot=\"name\"></div><div class=\"text-mute sm\" data-slot=\"out\"></div><span class=\"badge\" data-slot=\"badge\"></span></div></div></template>\n\n<!-- Payslip: the employee/month/view-statement picker row ------------------->\n<template data-tpl=\"pick-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex gap-2 flex-wrap items-end\" data-slot=\"row\"></div></div></div></template>\n\n<!-- a plain \"New …\" button row (loans/advance disburse) -------------------->\n<template data-tpl=\"btn-row\"><div class=\"mb-3\"><button class=\"btn btn-primary\" data-slot=\"btn\"></button></div></template>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · PAYROLL · MARKUP  (company-agnostic — registered for every concern)\n  ----------------------------------------------------------------------------\n  The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +\n  filled at runtime via [data-tpl] / [data-slot] hooks.\n\n  Seven tabs (overview / template / manage / loans / payslip / advance /\n  reports), rendered BOTH standalone (cid/payroll/…) and embedded in Master\n  Accounts via EPAL.payrollDesk. Every modal/form (manage-salary, correction/\n  edit, print-sheet, pay, money, encashment) keeps its legacy el()-built DOM, as\n  do the compound-styled leaf helpers formField() and field() (label+control rows\n  with inline padding/width — impractical as utilities). STYLING = the house\n  design system; the only new tw util is tw-max-w-[230px] (the run's month\n  select). The salary-sheet body keeps its .tbl-dense modifier (owner: fit\n  without h-scroll).\n\n  TWO STYLES LIVE HERE, on purpose:\n   · the [data-tpl] fragments below are the ORIGINAL screens, kept exactly as\n     they were so their proven-identical pixels do not move;\n   · everything under \"REAL-HTML BLOCKS\" is the current FRONTEND BUILD LAW —\n     whole screens written out as plain HTML. All NEW work goes there.\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section band ----------------------------------------------->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid + one KPI card + a two-column row ------------------------------>\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<template data-tpl=\"kpi\"><div class=\"kpi-card\"><div class=\"kpi-top\"><span class=\"kpi-label\" data-slot=\"label\"></span><span class=\"kpi-ico\" data-slot=\"ico\"></span></div><div class=\"kpi-value\" data-slot=\"value\"></div></div></template>\n<template data-tpl=\"two-col\"><div class=\"two-col\"></div></template>\n\n<!-- generic cards: plain (body), register (head+sub+body), head-only -------->\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"head-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n\n<!-- Salary Manage: the run-control card + the .tbl-dense salary sheet -------->\n<template data-tpl=\"run-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex justify-between items-center flex-wrap gap-2\"><div class=\"flex items-center gap-2 flex-wrap\" data-slot=\"left\"></div><div class=\"flex gap-1 flex-wrap\" data-slot=\"actions\"></div></div><div class=\"text-mute sm mt-2\" data-slot=\"status\"></div></div></div></template>\n<template data-tpl=\"salary-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body tbl-dense\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"grid-auto-compact\"><div class=\"grid-auto kpi-compact\"></div></template>\n<template data-tpl=\"pay-tier-card\"><div class=\"card tier-card\"><div class=\"card-pad\"><div class=\"fw-700\" data-slot=\"name\"></div><div class=\"text-mute sm\" data-slot=\"out\"></div><span class=\"badge\" data-slot=\"badge\"></span></div></div></template>\n\n<!-- Payslip: the employee/month/view-statement picker row ------------------->\n<template data-tpl=\"pick-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex gap-2 flex-wrap items-end\" data-slot=\"row\"></div></div></div></template>\n\n<!-- a plain \"New …\" button row (loans/advance disburse) -------------------->\n<template data-tpl=\"btn-row\"><div class=\"mb-3\"><button class=\"btn btn-primary\" data-slot=\"btn\"></button></div></template>\n\n\n<!-- ============================================================================\n  ▼▼ REAL-HTML BLOCKS (FRONTEND BUILD LAW, owner 2026-07-28) ▼▼\n  Everything below is the screen written out as plain HTML — not cloned\n  fragments, not el(). JS only fills the [data-k] placeholders, clones the\n  [data-proto] rows (0..N of them is DATA, not layout) and wires [data-act].\n\n  LEGEND\n    [data-shell=\"…\"]  a shared bar/panel used by more than one screen\n    [data-screen=\"…\"] one whole screen; mountScreen() moves its children onto the page\n    [data-k=\"…\"]      a text/HTML placeholder JS writes into\n    [data-fill=\"…\"]   a container JS appends a built widget (table/SVG) into\n    [data-proto=\"…\"]  a hidden prototype row — cloned once per record\n    [data-el=\"…\"]     an element JS needs a handle on (to hide, or to click-wire)\n    [data-act=\"…\"]    a click target JS binds a navigation/action to\n\n  ⚠ CLASS NAMES: the dashboard row deliberately reuses the `bank-*` component\n  vocabulary from components.css. That block is the house SUMMARY-IDENTITY-PANEL\n  design (hero figure · drill facts · last-event mini-statement · mirrored\n  sparkline · reconciliation · mini stack); Manage Banks was simply its first\n  caller. Reusing it means Payroll is pixel-consistent with Manage Banks for\n  free and forks not a single rule. The extra `pay-*` classes carry no styling —\n  they are semantic hooks for anything payroll ever needs to override.\n  ============================================================================ -->\n\n<!-- ---------------------------------------------------------------------------\n  DASHBOARD ROW — the four same-height cards that head both Payroll Overview\n  and Salary Manage. ONE shell, filled with different numbers by each caller:\n\n    1  identity panel  company · hero figure · 3 clickable drill facts ·\n                       the last payroll event (direction · amount · reference ·\n                       opening → closing of what we owe staff)\n    2  flow card       a mirrored 2-colour sparkline + its two totals\n    3  reconciliation  a 2×2 of control figures + a variance badge + \"why?\"\n    4  mini stack      two small click-through cards\n--------------------------------------------------------------------------- -->\n<div data-shell=\"dash\" class=\"bank-cards-row pay-cards-row\">\n\n  <div class=\"bank-summary pay-summary\" data-el=\"panel\">\n    <div class=\"bank-summary-in\">\n      <div class=\"bank-summary-body\">\n        <div class=\"bank-summary-left\">\n          <div class=\"bank-summary-head\">\n            <div class=\"bank-summary-ico\" data-k=\"ico\"></div>\n            <div class=\"bank-summary-id\">\n              <div class=\"bank-summary-co\" data-k=\"co\"></div>\n              <div class=\"bank-summary-sub\" data-k=\"co-sub\"></div>\n            </div>\n          </div>\n          <div class=\"bank-summary-hero clik\" data-act=\"hero\">\n            <div class=\"bank-summary-bal\" data-k=\"hero\"></div>\n            <div class=\"bank-summary-ballabel\" data-k=\"hero-label\"></div>\n          </div>\n        </div>\n        <div class=\"bank-summary-last\" data-el=\"last\">\n          <div class=\"bank-summary-last-top\">\n            <span class=\"bank-summary-last-lbl\" data-k=\"last-label\"></span>\n            <span class=\"bank-summary-dir\" data-k=\"dir\"></span>\n          </div>\n          <div class=\"bank-summary-last-row\">\n            <span class=\"bank-summary-last-amt\" data-k=\"amt\"></span>\n            <span class=\"bank-summary-last-date\" data-k=\"when\"></span>\n          </div>\n          <div class=\"bank-summary-last-ref\" data-k=\"ref\"></div>\n          <div class=\"bank-summary-last-oc\">\n            <div class=\"oc-open\" data-k=\"oc-open\"></div>\n            <div class=\"oc-close\" data-k=\"oc-close\"></div>\n          </div>\n        </div>\n      </div>\n      <div class=\"bank-summary-facts\">\n        <div class=\"bank-summary-fact clik\" data-act=\"f1\"><div class=\"k\" data-k=\"f1k\"></div><div class=\"v\" data-k=\"f1v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f2\"><div class=\"k\" data-k=\"f2k\"></div><div class=\"v\" data-k=\"f2v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f3\"><div class=\"k\" data-k=\"f3k\"></div><div class=\"v\" data-k=\"f3v\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-flow pay-flow\" data-el=\"flow\">\n    <div class=\"bank-flow-head\">\n      <div>\n        <div class=\"bank-flow-title\" data-k=\"flow-title\"></div>\n        <div class=\"bank-flow-sub\" data-k=\"flow-sub\"></div>\n      </div>\n      <span class=\"bank-flow-net\" data-k=\"flow-net\"></span>\n    </div>\n    <div class=\"bank-flow-spark\" data-fill=\"spark\"></div>\n    <div class=\"bank-flow-foot\">\n      <span><span class=\"bank-flow-dot in\"></span><span data-k=\"flow-in\"></span></span>\n      <span><span class=\"bank-flow-dot out\"></span><span data-k=\"flow-out\"></span></span>\n    </div>\n  </div>\n\n  <div class=\"card bank-recon bank-recon-clik pay-recon\" data-el=\"recon\">\n    <!-- no head badge: inside .bank-cards-row components.css hides it, because\n         the verdict already reads in the 4th stat (coloured + its \"why?\"). -->\n    <div class=\"card-head\">\n      <h3 data-k=\"recon-title\"></h3>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"bank-recon-2x2\">\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r1k\"></div><div class=\"stat-value num\" data-k=\"r1v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r2k\"></div><div class=\"stat-value num\" data-k=\"r2v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r3k\"></div><div class=\"stat-value num\" data-k=\"r3v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r4k\"></div><div class=\"stat-value num\" data-k=\"r4v\"></div>\n          <button class=\"float-why\" type=\"button\" data-el=\"why\" hidden></button>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-ministack pay-ministack\">\n    <div class=\"card bank-mini\" data-el=\"m1\">\n      <div class=\"fw-600 sm\" data-k=\"m1t\"></div>\n      <div class=\"strong num\" data-k=\"m1v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m1s\"></div>\n    </div>\n    <div class=\"card bank-mini\" data-el=\"m2\">\n      <div class=\"fw-600 sm\" data-k=\"m2t\"></div>\n      <div class=\"strong num\" data-k=\"m2v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m2s\"></div>\n    </div>\n  </div>\n\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL OVERVIEW — the payroll command centre (new tab, owner 2026-07-28).\n  Reads only what the payroll engine and the general ledger already hold; it\n  never posts by itself. Every automation is a PROPOSAL with a button (owner:\n  automation lives on the overview/summary and asks before it moves money).\n--------------------------------------------------------------------------- -->\n<section data-screen=\"overview\">\n\n  <!-- 1 · the four-card dashboard row (cloned from [data-shell=\"dash\"]) -->\n  <div data-fill=\"dash\"></div>\n\n  <!-- 2 · the narrated digest — every figure computed live from the books -->\n  <div class=\"brief-hero\">\n    <div class=\"brief-date\" data-k=\"digest-date\"></div>\n    <h2 data-k=\"digest-title\"></h2>\n    <div class=\"brief-narrative\" data-k=\"digest-text\"></div>\n  </div>\n\n  <!-- 3 · Autopilot (what should happen next) + Radar (what looks wrong) -->\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"auto-title\"></h3>\n        <span class=\"card-sub\" data-k=\"auto-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"auto\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"radar-title\"></h3>\n        <span class=\"card-sub\" data-k=\"radar-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"radar\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n  </div>\n\n  <!-- 4 · the last 12 payroll months, and where the money goes by department -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"trend-title\"></h3>\n      <span class=\"card-sub\" data-k=\"trend-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"trend\"></div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3 data-k=\"dept-title\"></h3>\n      <span class=\"card-sub\" data-k=\"dept-sub\"></span>\n    </div>\n    <div class=\"card-body\" data-fill=\"dept\"></div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  ONE MONTH, IN FULL — the drill behind a row of the Monthly Register (owner\n  2026-07-28: \"if I click on January, it should show me how many transactions\n  happened … all their accounts summary of January in a table — gross, net,\n  deductions, additions, overtime, late, bonus\"). Everything that touched\n  payroll in that month, on one screen:\n    · the month's dashboard row (same four cards, month-scoped)\n    · the SALARY REGISTER — every employee, every component, additions and\n      deductions broken out and subtotalled, exportable and printable\n    · the month's EMPLOYEE MONEY MOVEMENTS (advance · loan · repayment · bonus ·\n      encashment payout) and every LEDGER POSTING payroll wrote that month\n--------------------------------------------------------------------------- -->\n<section data-screen=\"month\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"flex justify-between items-center flex-wrap gap-2\">\n        <div class=\"flex items-center gap-2 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"back\"></button>\n          <select class=\"input tw-max-w-[230px]\" data-el=\"mpick\"></select>\n          <span class=\"badge\" data-k=\"status\"></span>\n        </div>\n        <div class=\"flex gap-1 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"print\"></button>\n          <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"open-run\"></button>\n        </div>\n      </div>\n      <div class=\"text-mute sm mt-2\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n  <div data-fill=\"dash\"></div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"reg-title\"></h3>\n      <span class=\"card-sub\" data-k=\"reg-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"reg\"></div>\n  </div>\n\n  <div class=\"two-col\">\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"txn-title\"></h3>\n        <span class=\"card-sub\" data-k=\"txn-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"txns\"></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"post-title\"></h3>\n        <span class=\"card-sub\" data-k=\"post-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"posts\"></div>\n    </div>\n  </div>\n\n</section>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="travels/payroll"]')) {
     var st = document.createElement('style');
@@ -25,10 +25,22 @@
  * is NOT an IIFE and has no 'use strict' of its own: the build wraps it.
  *
  * A payroll desk driven by EPAL.payroll, rendered standalone (cid/payroll) AND
- * embedded in Master Accounts (EPAL.payrollDesk). Six tabs: template / manage /
- * loans / payslip / advance / reports. All accounting posts to the ledger. Every
- * modal/form and the compound-styled leaf helpers (formField, field, drow) keep
- * their legacy el()-built DOM. Never write a literal star-slash in this comment.
+ * embedded in Master Accounts (EPAL.payrollDesk) and in each company's Accounts
+ * module. ONE implementation — so Master Accounts > Master Payroll, Travels >
+ * Accounts > Payroll and travels/payroll are the same screen, same design, same
+ * logic, always. Seven tabs: overview / template / manage / loans / payslip /
+ * advance / reports. All accounting posts to the ledger. Every modal/form and the
+ * compound-styled leaf helpers (formField, field, drow) keep their legacy
+ * el()-built DOM. Never write a literal star-slash in this comment.
+ *
+ * OVERVIEW (owner 2026-07-28) — the payroll command centre, built to the same
+ * design language as Manage Banks: a four-card dashboard row (identity panel
+ * with a hero figure + drill facts + the last payroll event · a mirrored
+ * sparkline · a reconciliation against the general ledger · a mini stack), a
+ * narrated digest, an AUTOPILOT of proposed next actions and an anomaly RADAR.
+ * The autopilot never posts by itself — every proposal is a button (owner:
+ * "automation will [be] on overview, summary"). Salary Manage heads with the
+ * same dashboard row, scoped to the selected month.
  * ==> LARAVEL: a PayrollController over the PayrollService.
  * ========================================================================== */
 
@@ -43,11 +55,44 @@ function frag(name) {
 }
 function slot(root, name) { return root.querySelector('[data-slot="' + name + '"]'); }
 
+/* ---- real-HTML plumbing (FRONTEND BUILD LAW) -----------------------------
+ * A screen / shell is written out as plain HTML in template.html; the logic only
+ * clones it, writes into its [data-k] placeholders, appends widgets into its
+ * [data-fill] containers, clones its [data-proto] rows once per record and wires
+ * its [data-act] targets. HTML stays the foundation of the screen. */
+function screen(name) { return TPL.querySelector('[data-screen="' + name + '"]').cloneNode(true); }
+function shell(name) { return TPL.querySelector('[data-shell="' + name + '"]').cloneNode(true); }
+function fillK(root, k, v) { var n = root.querySelector('[data-k="' + k + '"]'); if (n) n.textContent = (v == null ? '' : String(v)); return n; }
+function fillH(root, k, html) { var n = root.querySelector('[data-k="' + k + '"]'); if (n) n.innerHTML = (html == null ? '' : html); return n; }
+function part(root, name) { return root.querySelector('[data-el="' + name + '"]'); }
+function box(root, name) { return root.querySelector('[data-fill="' + name + '"]'); }
+function act(root, name, fn) {
+  var n = root.querySelector('[data-act="' + name + '"]');
+  if (n && fn) n.addEventListener('click', fn); else if (n) n.classList.remove('clik');
+  return n;
+}
+// move a screen's element children onto `page` (no wrapper, no whitespace nodes)
+function mountScreen(page, s) { Array.prototype.slice.call(s.children).forEach(function (c) { page.appendChild(c); }); }
+
 // COMPANY-AGNOSTIC payroll desk: CID is stamped at render time.
 var CID = 'travels';
 function PR() { return EPAL.payroll; }
-var TABS = [['template', 'Salary Template'], ['manage', 'Salary Manage'], ['loans', 'Loan Management'], ['payslip', 'Payslip'], ['advance', 'Advance Salary'], ['reports', 'Reports']];
+var TABS = [['overview', 'Overview'], ['manage', 'Salary Manage'], ['staff', 'Staff Accounts'], ['template', 'Salary Template'], ['loans', 'Loan Management'], ['payslip', 'Payslip'], ['advance', 'Advance Salary'], ['reports', 'Reports']];
 var payYm = null;
+
+/* The payroll chart-of-accounts (mirrors the engine's posting rules — see
+ * platform/engines-library/payroll.js). The overview reconciles the desk's own
+ * figures against THESE ledger balances, which is the whole point: the sheet and
+ * the books have to say the same thing, and if they don't you should see it here
+ * rather than at audit. */
+var ACC = { exp: '5100', encashExp: '5150', payable: '2100', pf: '2110', tax: '2120', encashPay: '2150', adv: '1250', loan: '1260' };
+function glBal(code) { return (EPAL.ledger && EPAL.ledger.balance) ? EPAL.ledger.balance(code, { companyId: CID }) : 0; }
+// every journal the payroll engine writes carries source:'payroll'
+function payEntries(ym) {
+  if (!EPAL.ledger || !EPAL.ledger.entries) return [];
+  var rows = EPAL.ledger.entries({ companyId: CID, source: 'payroll' });
+  return ym ? rows.filter(function (e) { return String(e.date || '').slice(0, 7) === ym; }) : rows;
+}
 
 function team() { return (db.employees ? db.employees({ companyId: CID }) : []).slice().sort(function (a, b) { return (a.name || '') < (b.name || '') ? -1 : 1; }); }
 function empById(id) { return team().filter(function (e) { return e.id === id; })[0] || (db.employee ? db.employee(id) : null); }
@@ -77,34 +122,42 @@ function sectionNav(sub, cid) {
 ['travels', 'woodart', 'it', 'shop', 'construction'].forEach(function (cid) {
   EPAL.view(cid + '/payroll', {
     render: function (ctx) {
-      if (CID !== cid) payYm = null;          // reset month only when switching company
+      if (CID !== cid) { payYm = null; ovMonth = null; }   // reset only when switching company
       CID = cid;
-      var sub = ctx.subId || 'manage';
-      if (TABS.map(function (t) { return t[0]; }).indexOf(sub) < 0) sub = 'manage';
+      deskRedraw = null;                       // standalone: a tab click is a route change
+      var sub = ctx.subId || 'overview';
+      if (TABS.map(function (t) { return t[0]; }).indexOf(sub) < 0) sub = 'overview';
       var page = frag('page');
-      var titles = { template: 'Salary Template', manage: 'Salary Manage', loans: 'Loan Management', payslip: 'Payslip', advance: 'Advance Salary', reports: 'Payroll Reports' };
-      var subs = { template: 'The statutory salary structure — components, tax, provident fund and the leave-encashment rule.',
+      var titles = { overview: 'Payroll Overview', staff: 'Staff Accounts', template: 'Salary Template', manage: 'Salary Manage', loans: 'Loan Management', payslip: 'Payslip', advance: 'Advance Salary', reports: 'Payroll Reports' };
+      var subs = { overview: 'The payroll command centre — position, ledger reconciliation, what to do next, and what looks wrong.',
+        staff: 'Everyone on this payroll — search by name or employee ID, open anyone for their complete file.',
+        template: 'The statutory salary structure — components, tax, provident fund and the leave-encashment rule.',
         manage: 'The monthly payroll run — generate, correct, finalize and pay. Posts to the ledger.', loans: 'Staff loans — disburse, track balances and record repayments.',
         payslip: 'Salary statements per employee & month, with the annual Leave-Encashment benefit.', advance: 'Advance salary — disburse and recover against future pay.',
         reports: 'Leave-encashment liability, salary due, advance & loan registers, department cost.' };
       page.appendChild(EPAL.pageHead({ eyebrow: coShort(cid) + ' › Payroll', icon: 'cash-coin', title: titles[sub], sub: subs[sub] }));
       page.appendChild(sectionNav(sub, cid));
       if (!PR()) { page.appendChild(card('Payroll engine unavailable.')); ctx.mount.appendChild(page); return; }
-      ({ template: tplView, manage: manageView, loans: loansView, payslip: payslipView, advance: advanceView, reports: reportsView }[sub])(page);
+      VIEWS[sub](page);
       ctx.mount.appendChild(page);
     }
   });
 });
 
-/* ---- EMBEDDED MODE — the payroll desk mounted INSIDE Master Accounts. The
- * six sections render as a second pill row; the pill-tab + nav-row shell stays
- * legacy el() (captured there, byte-identical); the section views are the same. */
-var deskTab = 'manage';
+/* ---- EMBEDDED MODE — the SAME desk mounted inside Master Accounts (Master
+ * Payroll) and inside each company's Accounts module (Travels > Accounts >
+ * Payroll, Woodart > Accounts > Payroll). The sections render as a second pill
+ * row; the pill-tab + nav-row shell stays legacy el() (captured there,
+ * byte-identical). The section views are literally the same functions as the
+ * standalone route, so design, logic and behaviour cannot diverge between the
+ * group desk and a company desk. */
+var deskTab = 'overview';
 EPAL.payrollDesk = function (page, cid, opts) {
-  if (CID !== cid) { payYm = null; deskTab = 'manage'; }
+  if (CID !== cid) { payYm = null; ovMonth = null; deskTab = 'overview'; }
   CID = cid;
   var host = el('div');
   function draw() {
+    deskRedraw = draw;                 // embedded: a tab click redraws in place
     host.innerHTML = '';
     var bar = el('div.pill-tab');
     TABS.forEach(function (t) { bar.appendChild(el('button' + (deskTab === t[0] ? '.active' : ''), { text: t[1], onclick: function () { deskTab = t[0]; draw(); } })); });
@@ -119,12 +172,766 @@ EPAL.payrollDesk = function (page, cid, opts) {
     host.appendChild(row);
     if (!PR()) { host.appendChild(card('Payroll engine unavailable.')); return; }
     var section = el('div');
-    ({ template: tplView, manage: manageView, loans: loansView, payslip: payslipView, advance: advanceView, reports: reportsView }[deskTab])(section);
+    (VIEWS[deskTab] || VIEWS.overview)(section);
     host.appendChild(section);
   }
   draw();
   page.appendChild(host);
 };
+
+/* ============================================================================
+ * SHARED PIECES — the dashboard row, and the maths behind it
+ * ==========================================================================*/
+
+// slip arithmetic, hoisted so the month register, the salary sheet and the
+// radar all read a payslip the SAME way. Mirrors the engine's slipPayable():
+// earnedGross is already net of absence, so absence is NOT re-deducted here.
+function advOf(s) { var auto = Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); return (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? auto : Math.min(auto, +s.advCap)); }
+function emiOf(s) { return (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? PR().emiInstallment(s.empId) : +s.emiCap); }
+function otherOf(s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.otherDeduction || 0); }
+function addOf(s) { return (s.overtime || 0) + (s.bonus || 0) + Math.max(0, s.adjustment || 0); }
+function dedOf(s) { return otherOf(s) + Math.max(0, -(s.adjustment || 0)); }
+function dueOf(s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }
+function cashOf(s) { return Math.max(0, (s.paid || 0) - (s.advanceRecovered || 0) - (s.loanRecovered || 0)); }
+
+function coFull(cid) { var c = EPAL.config && EPAL.config.company ? EPAL.config.company(cid) : null; return c ? (c.name || c.short || cid) : cid; }
+function coMeta(cid) {
+  var c = EPAL.config && EPAL.config.company ? EPAL.config.company(cid) : null;
+  return { accent: (c && c.accent) ? c.accent : 'var(--accent)', icon: (c && c.icon) ? c.icon : 'cash-coin' };
+}
+
+/* Where a tab click goes depends on how the desk is mounted: standalone it is a
+ * route, embedded (Master Accounts · Travels Accounts · Woodart Accounts) it is
+ * an in-place redraw. One helper so every screen below is written once. */
+var deskRedraw = null;
+function goTab(tab) { if (deskRedraw) { deskTab = tab; deskRedraw(); return; } EPAL.router.navigate(CID + '/payroll/' + tab); }
+function repaint() { EPAL.router.render(); }
+
+/* A mirrored sparkline — up bars in green, down bars in red, a hairline zero
+ * axis between them. rows = [{ up, down, tip }]. Same visual grammar as the
+ * cash-flow card on Manage Banks. */
+function sparkSvg(rows) {
+  var W = 300, H = 52, mid = H / 2, n = Math.max(1, rows.length), slotW = W / n, bw = Math.max(2, Math.min(22, slotW - 3));
+  var maxV = 1;
+  rows.forEach(function (r) { maxV = Math.max(maxV, r.up || 0, r.down || 0); });
+  var bars = rows.map(function (r, i) {
+    var x = i * slotW + (slotW - bw) / 2, s = '';
+    var hu = (r.up || 0) / maxV * (mid - 3), hd = (r.down || 0) / maxV * (mid - 3);
+    var tip = r.tip ? '<title>' + esc(r.tip) + '</title>' : '';
+    if ((r.up || 0) > 0) s += '<rect x="' + x.toFixed(1) + '" y="' + (mid - hu).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, hu).toFixed(1) + '" rx="1" fill="#23c17e">' + tip + '</rect>';
+    if ((r.down || 0) > 0) s += '<rect x="' + x.toFixed(1) + '" y="' + mid.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(1, hd).toFixed(1) + '" rx="1" fill="#f0506e">' + tip + '</rect>';
+    return s;
+  }).join('');
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<line x1="0" y1="' + mid + '" x2="' + W + '" y2="' + mid + '" stroke="currentColor" stroke-opacity="0.13" stroke-width="1"/>' + bars + '</svg>';
+}
+
+/* THE DASHBOARD ROW — four same-height cards, cloned from [data-shell="dash"].
+ * Overview fills it with the company's whole payroll position; Salary Manage
+ * fills the identical shell with the selected month. */
+function dashRow(cfg) {
+  var d = shell('dash');
+  part(d, 'panel').style.setProperty('--bank-hue', cfg.hue);   // custom prop: setProperty only
+
+  fillH(d, 'ico', ui.icon(cfg.icon));
+  fillK(d, 'co', cfg.co); fillK(d, 'co-sub', cfg.coSub);
+  var heroV = fillK(d, 'hero', cfg.hero); if (cfg.heroBad) heroV.classList.add('text-bad');
+  fillK(d, 'hero-label', cfg.heroLabel);
+  var heroEl = act(d, 'hero', cfg.heroOn); if (heroEl) heroEl.setAttribute('title', cfg.heroTitle || '');
+
+  (cfg.facts || []).forEach(function (f, i) {
+    var n = i + 1;
+    fillK(d, 'f' + n + 'k', f.k); fillK(d, 'f' + n + 'v', f.v);
+    var el2 = act(d, 'f' + n, f.on); if (el2 && f.title) el2.setAttribute('title', f.title);
+  });
+
+  // LAST EVENT — never blank: with no history it still renders every field at
+  // zero, so the card's shape is readable before the first payroll ever runs.
+  var L = cfg.last || {}, lastEl = part(d, 'last');
+  fillK(d, 'last-label', L.label || 'Last payroll event');
+  fillK(d, 'dir', L.dirText || '—').classList.add(L.dir || 'none');
+  var amtEl = fillK(d, 'amt', L.amount); if (L.amtTone) amtEl.classList.add(L.amtTone);
+  fillK(d, 'when', L.when || '—');
+  fillH(d, 'ref', L.refHtml || '');
+  fillH(d, 'oc-open', L.openHtml || '');
+  fillH(d, 'oc-close', L.closeHtml || '').classList.add(L.up ? 'up' : 'down');
+  lastEl.setAttribute('title', L.title || '');
+  if (L.empty) lastEl.classList.add('is-empty');
+  if (L.on) lastEl.addEventListener('click', L.on);
+
+  var F = cfg.flow;
+  fillK(d, 'flow-title', F.title); fillK(d, 'flow-sub', F.sub);
+  fillK(d, 'flow-net', F.net).classList.add(F.netUp ? 'is-up' : 'is-down');
+  box(d, 'spark').innerHTML = sparkSvg(F.rows || []);
+  fillK(d, 'flow-in', F.inText); fillK(d, 'flow-out', F.outText);
+  var flowEl = part(d, 'flow');
+  flowEl.setAttribute('title', F.hint || '');
+  if (F.on) flowEl.addEventListener('click', F.on);
+
+  var R = cfg.recon;
+  fillH(d, 'recon-title', ui.icon(R.icon || 'shield-check') + ' ' + esc(R.title));
+  (R.stats || []).forEach(function (s, i) {
+    var n = i + 1;
+    fillK(d, 'r' + n + 'k', s.k);
+    var v = fillK(d, 'r' + n + 'v', s.v); if (s.tone) v.classList.add(s.tone);
+  });
+  var why = part(d, 'why');
+  if (R.why) {
+    why.removeAttribute('hidden');
+    why.innerHTML = ui.icon('question-circle') + ' why?';
+    why.addEventListener('click', function (ev) { ev.stopPropagation(); R.why(); });
+  } else why.parentNode.removeChild(why);
+  var reconEl = part(d, 'recon');
+  reconEl.setAttribute('title', R.hint || '');
+  if (R.on) reconEl.addEventListener('click', R.on);
+
+  (cfg.minis || []).forEach(function (m, i) {
+    var n = i + 1;
+    fillH(d, 'm' + n + 't', m.t);
+    var v = fillK(d, 'm' + n + 'v', m.v); if (m.bad) v.classList.add('text-bad');
+    fillK(d, 'm' + n + 's', m.s);
+    part(d, 'm' + n).addEventListener('click', m.on);
+  });
+  return d;
+}
+
+/* What we owe staff (2100 Salary Payable) the moment `entry` was posted — walked
+ * from the payroll journals themselves, so opening/closing are exact even when
+ * several postings share one date. */
+function payableAsOf(entry) {
+  var all = payEntries(), bal = 0;
+  for (var i = 0; i < all.length; i++) {
+    var lines = all[i].lines || [];
+    for (var j = 0; j < lines.length; j++) {
+      if (EPAL.ledger.isUnder(lines[j].account, ACC.payable)) bal += (+lines[j].cr || 0) - (+lines[j].dr || 0);
+    }
+    if (all[i].id === entry.id) break;
+  }
+  return bal;
+}
+
+/* The LAST PAYROLL EVENT as the mini-statement wants it. Cash direction comes
+ * from the cash line (a payment moves money OUT); an accrual has no cash line at
+ * all, so it reads ACCRUED rather than pretending to be a movement. */
+function lastEventCfg(ym, label) {
+  var rows = payEntries(ym);
+  if (!rows.length) {
+    return { label: label, empty: true, dir: 'none', dirText: '—', amount: ui.money(0), when: '—',
+      refHtml: ym ? 'No payroll posting this month' : 'No payroll posting yet',
+      openHtml: 'Owed before <b>' + esc(ui.money(0)) + '</b>', closeHtml: 'Owed after <b>' + esc(ui.money(0)) + '</b>', up: false,
+      title: 'Nothing posted yet' };
+  }
+  var e = rows[rows.length - 1];                 // entries() comes back chronological
+  var cashIn = 0, cashOut = 0, totalDr = 0;
+  (e.lines || []).forEach(function (l) {
+    var dr = +l.dr || 0, cr = +l.cr || 0; totalDr += dr;
+    if (EPAL.ledger.isCashAccount(l.account)) { cashIn += dr; cashOut += cr; }
+  });
+  var cashNet = cashIn - cashOut;
+  var dir = cashNet > 0 ? 'in' : (cashNet < 0 ? 'out' : 'none');
+  var amount = cashNet !== 0 ? Math.abs(cashNet) : totalDr;
+  var closing = payableAsOf(e);
+  var opening = closing;
+  (e.lines || []).forEach(function (l) { if (EPAL.ledger.isUnder(l.account, ACC.payable)) opening -= ((+l.cr || 0) - (+l.dr || 0)); });
+  return {
+    label: label,
+    dir: dir, dirText: dir === 'in' ? 'IN' : (dir === 'out' ? 'OUT' : 'ACCRUED'),
+    amount: (dir === 'in' ? '+' : dir === 'out' ? '−' : '') + ui.money(amount),
+    amtTone: dir === 'in' ? 'in' : (dir === 'out' ? 'out' : ''),
+    when: ui.date(e.date),
+    refHtml: '<span class="txn-id-chip">' + esc(e.ref || e.id) + '</span>' + (e.memo ? ' ' + esc(e.memo) : ''),
+    openHtml: 'Owed staff <b>' + esc(ui.money(opening)) + '</b>',
+    closeHtml: 'Now owed <b>' + esc(ui.money(closing)) + '</b>',
+    up: closing <= opening,                       // paying staff DOWN is the good direction
+    title: 'Open this posting in the ledger',
+    on: function () { EPAL.router.navigate('group/master-accounts/journals'); }
+  };
+}
+
+/* The company's whole payroll position, computed once and shared by the
+ * overview, the digest, the autopilot and the radar. */
+function position() {
+  var t = team();
+  var slips = S.list('pay_slips').filter(function (s) { return s.companyId === CID; });
+  var live = slips.filter(function (s) { return s.status !== 'draft'; });
+  var sheetOwed = sum(live, dueOf);
+  var advOut = sum(t, function (e) { return PR().advanceOutstanding(e.id); });
+  var loanOut = sum(t, function (e) { return PR().loanOutstanding(e.id); });
+  return {
+    team: t, slips: slips, live: live,
+    sheetOwed: sheetOwed,
+    glPayable: glBal(ACC.payable),
+    glStatutory: glBal(ACC.pf) + glBal(ACC.tax) + glBal(ACC.encashPay),
+    glAdvLoan: glBal(ACC.adv) + glBal(ACC.loan),
+    advOut: advOut, loanOut: loanOut,
+    encashLiability: PR().encashmentLiability(CID),
+    runs: S.list('pay_runs').filter(function (r) { return r.companyId === CID; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; })
+  };
+}
+
+/* The last 12 payroll months as one series (newest last) — the trend line, the
+ * Monthly Register and the digest all read this. */
+function monthSeries(limit) {
+  var byYm = {};
+  S.list('pay_slips').filter(function (s) { return s.companyId === CID; }).forEach(function (s) {
+    var m = byYm[s.ym] || (byYm[s.ym] = { ym: s.ym, heads: 0, gross: 0, adds: 0, deds: 0, net: 0, encash: 0, paid: 0, due: 0, drafts: 0 });
+    m.heads++; m.gross += s.earnedGross || 0; m.adds += addOf(s); m.deds += dedOf(s);
+    m.net += PR().slipPayable(s); m.encash += s.encashAmt || 0;
+    m.paid += s.paid || 0; m.due += dueOf(s);
+    if (s.status === 'draft') m.drafts++;
+  });
+  S.list('pay_runs').filter(function (r) { return r.companyId === CID; }).forEach(function (r) {
+    if (!byYm[r.ym]) byYm[r.ym] = { ym: r.ym, heads: 0, gross: 0, adds: 0, deds: 0, net: 0, encash: 0, paid: 0, due: 0, drafts: 0 };
+    byYm[r.ym].status = r.status;
+  });
+  var out = Object.keys(byYm).sort().map(function (k) { return byYm[k]; });
+  return limit ? out.slice(-limit) : out;
+}
+
+
+/* ============================================================================
+ * PAYROLL OVERVIEW — the command centre
+ * ==========================================================================*/
+var ovMonth = null;                 // set → the Monthly Register drill is open
+
+function overviewView(page) {
+  if (ovMonth) { monthView(page); return; }
+  var s = screen('overview');
+  var P = position(), meta = coMeta(CID), ym = payYm || PR().curYm();
+  var series = monthSeries(12);
+
+  /* ---- 1 · the dashboard row -------------------------------------------- */
+  var paid12 = sum(series, function (m) { return m.paid; });
+  var due12 = sum(series, function (m) { return m.due; });
+  var variance = P.glPayable - P.sheetOwed, reconciled = Math.abs(variance) < 1;
+  box(s, 'dash').appendChild(dashRow({
+    // SHORT name on the panel (as Manage Banks does) — the full legal name is
+    // 30+ characters and ellipsises inside a four-card row; it reads in full on
+    // the digest below.
+    hue: meta.accent, icon: meta.icon, co: coShort(CID), coSub: 'Payroll position · ' + PR().mLabel(ym),
+    hero: ui.money(P.sheetOwed), heroBad: P.sheetOwed > 0, heroLabel: 'Owed to staff',
+    heroTitle: 'Open the salary sheet', heroOn: function () { goTab('manage'); },
+    facts: [
+      { k: 'Headcount', v: String(P.team.length), title: 'Every employee on this payroll', on: function () { goTab('staff'); } },
+      { k: 'Payroll months', v: String(P.runs.length), title: 'Every month ever run', on: function () { goTab('manage'); } },
+      { k: 'Postings', v: String(payEntries().length), title: 'Journals payroll has written', on: function () { EPAL.router.navigate('group/master-accounts/journals'); } }
+    ],
+    last: lastEventCfg(null, 'Last payroll event'),
+    flow: {
+      title: 'Payroll Cost', sub: 'last ' + series.length + ' months · paid vs still owed' + (series.length ? '' : ' · no runs yet'),
+      rows: series.map(function (m) { return { up: m.paid, down: m.due, tip: PR().mLabel(m.ym) + ' · paid ' + ui.money(m.paid) + (m.due ? ' · owed ' + ui.money(m.due) : '') }; }),
+      net: due12 > 0 ? '−' + ui.money(due12, { compact: true }) : ui.money(0), netUp: due12 <= 0,
+      inText: 'Paid ' + ui.money(paid12), outText: 'Owed ' + ui.money(due12),
+      hint: 'Open the Monthly Register', on: function () { var last = series[series.length - 1]; if (last) { ovMonth = last.ym; repaint(); } }
+    },
+    recon: {
+      icon: 'shield-check', title: 'Payroll ↔ Ledger', hint: 'Open the ledger',
+      stats: [
+        { k: 'Salary payable (2100)', v: ui.money(P.glPayable) },
+        { k: 'Sheet says owed', v: ui.money(P.sheetOwed) },
+        { k: 'Advances + loans', v: ui.money(P.glAdvLoan) },
+        { k: 'Variance', v: ui.money(variance), tone: reconciled ? '' : 'text-warn' }
+      ],
+      why: reconciled ? null : function () { varianceExplainer(P, variance); },
+      on: function () { EPAL.router.navigate('group/master-accounts/journals'); }
+    },
+    minis: [
+      { t: ui.icon('bank') + ' Advances · Loans out', v: ui.money(P.advOut + P.loanOut), s: 'recovered from salary → advance', on: function () { goTab('advance'); } },
+      { t: ui.icon('shield-lock') + ' Statutory payable', v: ui.money(P.glStatutory), s: 'PF · income tax · leave encash', on: function () { goTab('reports'); } }
+    ]
+  }));
+
+  /* ---- 2 · the narrated digest ------------------------------------------ */
+  digest(s, P, ym, series);
+
+  /* ---- 3 · autopilot (what to do next) + radar (what looks wrong) ------- */
+  fillH(s, 'auto-title', ui.icon('magic') + ' Payroll Autopilot');
+  fillK(s, 'auto-sub', 'proposals only — nothing posts until you click');
+  rowsInto(box(s, 'auto'), autopilot(ym, P), 'Nothing to do — this payroll is up to date.');
+
+  fillH(s, 'radar-title', ui.icon('radar') + ' Anomaly Radar');
+  fillK(s, 'radar-sub', 'click to open the employee');
+  rowsInto(box(s, 'radar'), radar(P), 'No anomalies in the payroll book.');
+
+  /* ---- 4 · the Monthly Register + department cost ----------------------- */
+  fillH(s, 'trend-title', ui.icon('calendar3') + ' Monthly Register');
+  fillK(s, 'trend-sub', 'click a month for every employee, every transaction, every figure');
+  box(s, 'trend').appendChild(registerTable(monthSeries()));
+
+  fillH(s, 'dept-title', ui.icon('diagram-3') + ' Where the money goes');
+  fillK(s, 'dept-sub', 'monthly salary cost by department');
+  box(s, 'dept').appendChild(deptTable(P));
+
+  mountScreen(page, s);
+}
+
+/* Fill an autopilot/radar card: one cloned [data-proto] row per finding, or the
+ * dashed all-clear panel when there are none.
+ *
+ * ⚠ TRAP (found by the headless driver, 2026-07-28): the `hidden` attribute is
+ * NOT enough to keep a prototype off the screen. The UA rule `[hidden]{display:
+ * none}` and a house class like `.brief-exc{display:flex}` / `.btn{display:
+ * inline-flex}` have the SAME specificity, and the author stylesheet is applied
+ * later — so the class WINS and the "hidden" prototype renders as a blank row.
+ * Anything that must not appear is therefore REMOVED from the DOM, not hidden. */
+function rowsInto(host, items, clearText) {
+  var clear = part(host, 'clear');
+  var tpl = host.querySelector('[data-proto="row"]');
+  tpl.parentNode.removeChild(tpl);                 // the prototype itself never renders
+  if (!items.length) { clear.removeAttribute('hidden'); clear.innerHTML = ui.icon('check2-circle') + ' ' + esc(clearText); return; }
+  clear.parentNode.removeChild(clear);
+  items.forEach(function (it) {
+    var r = tpl.cloneNode(true);
+    r.removeAttribute('hidden'); r.removeAttribute('data-proto');
+    r.classList.add('sev-' + (it.sev || 'low'));
+    fillH(r, 'ico', ui.icon(it.icon || 'info-circle'));
+    fillK(r, 'title', it.title);
+    fillK(r, 'why', it.why);
+    var go = part(r, 'go');
+    if (it.action) {
+      go.removeAttribute('hidden');
+      go.innerHTML = ui.icon(it.actionIcon || 'arrow-right') + ' ' + esc(it.action);
+      go.addEventListener('click', it.on);
+    } else {
+      go.parentNode.removeChild(go);                // an actionless row shows no button
+      if (it.on) { r.style.cursor = 'pointer'; r.addEventListener('click', it.on); }
+    }
+    host.appendChild(r);
+  });
+}
+
+/* THE DIGEST — plain English over live figures. Every number below is read from
+ * the payslips and the ledger at render time, so it cannot drift from source. */
+function digest(s, P, ym, series) {
+  var run = PR().getRun(CID, ym), st = run ? run.status : 'draft';
+  var slips = PR().slipsFor(CID, ym);
+  var gross = sum(slips, function (x) { return x.earnedGross; });
+  var net = sum(slips, function (x) { return PR().slipPayable(x); });
+  var paid = sum(slips, function (x) { return x.paid || 0; });
+  var due = net - paid;
+  var prev = series.length > 1 ? series[series.length - 2] : null;
+  function b(v) { return '<strong>' + esc(v) + '</strong>'; }
+  var lines = [];
+  lines.push(slips.length
+    ? b(String(slips.length)) + ' people are on the ' + b(PR().mLabel(ym)) + ' payroll, costing ' + b(ui.money(gross)) + ' gross and ' + b(ui.money(net)) + ' net.'
+    : 'No payslips exist for ' + b(PR().mLabel(ym)) + ' yet.');
+  if (prev && prev.net > 0 && net > 0) {
+    var delta = net - prev.net, pct = Math.round(Math.abs(delta) / prev.net * 100);
+    if (pct >= 1) lines.push('That is ' + b((delta >= 0 ? '+' : '−') + ui.money(Math.abs(delta)) + ' (' + pct + '%)') + ' ' + (delta >= 0 ? 'more' : 'less') + ' than ' + PR().mLabel(prev.ym) + '.');
+  }
+  lines.push(st === 'draft'
+    ? 'The month is still a ' + b('draft') + (PR().inCorrectionWindow(CID, ym) ? ' and the correction window is open until ' + b(ui.date(run.correctionUntil)) + '.' : ' — the correction window closed on ' + b(ui.date(run.correctionUntil)) + ', so nothing is on the books yet.')
+    : 'The month is ' + b(cap(st)) + ' — accrued to the ledger, ' + b(ui.money(paid)) + ' paid and ' + b(ui.money(Math.max(0, due))) + ' still owed.');
+  if (P.advOut || P.loanOut) lines.push('Staff hold ' + b(ui.money(P.advOut)) + ' of advances and ' + b(ui.money(P.loanOut)) + ' of loans, recovered automatically from future pay.');
+  if (P.encashLiability > 0) lines.push('Leave encashment has built a ' + b(ui.money(P.encashLiability)) + ' liability.');
+  var variance = P.glPayable - P.sheetOwed;
+  lines.push(Math.abs(variance) < 1
+    ? 'The salary sheet and the general ledger ' + b('agree') + ' to the taka.'
+    : 'The ledger and the sheet disagree by ' + b(ui.money(variance)) + ' — worth opening before month-end.');
+
+  fillK(s, 'digest-date', 'PAYROLL DIGEST · ' + ui.date(today(), 'long'));
+  fillK(s, 'digest-title', coFull(CID) + ' — ' + PR().mLabel(ym));
+  fillH(s, 'digest-text', lines.join(' '));
+}
+
+/* AUTOPILOT — everything the payroll calendar and the books say SHOULD happen
+ * next, each as a proposal with the button that does it. It never acts on its
+ * own (owner 2026-07-28), so an automatic payroll can never surprise the bank. */
+function autopilot(ym, P) {
+  var out = [], run = PR().getRun(CID, ym), st = run ? run.status : 'draft';
+  var slips = PR().slipsFor(CID, ym);
+  var net = sum(slips, function (s) { return PR().slipPayable(s); });
+  var paid = sum(slips, function (s) { return s.paid || 0; });
+  var due = net - paid, td = today();
+
+  if (st === 'draft' && slips.length) {
+    if (PR().inCorrectionWindow(CID, ym)) {
+      out.push({ sev: 'low', icon: 'pencil-square', title: 'Correction window is open until ' + ui.date(run.correctionUntil),
+        why: 'Record absents, lates, overtime and bonuses now — after that the month should be accrued.',
+        action: 'Open sheet', actionIcon: 'table', on: function () { goTab('manage'); } });
+    } else {
+      out.push({ sev: 'high', icon: 'lock', title: 'Finalize & accrue ' + PR().mLabel(ym) + ' — ' + ui.money(net),
+        why: 'The correction window closed on ' + ui.date(run.correctionUntil) + '. Until this is accrued the books do not carry the month\'s salary cost.',
+        action: 'Finalize & Accrue', actionIcon: 'lock', on: function () { finalizeRun(ym, net); } });
+    }
+  }
+  if (st !== 'draft' && due > 0 && canCreate()) {
+    var late = run && td > run.dueAfter;
+    out.push({ sev: late ? 'high' : 'med', icon: 'cash-coin',
+      title: 'Pay ' + ui.money(due) + ' to ' + slips.filter(function (s) { return dueOf(s) > 0; }).length + ' staff',
+      why: late ? 'The pay-by date (' + ui.date(run.dueAfter) + ') has passed — unpaid salaries are flagged Due.' : 'Due by ' + ui.date(run.dueAfter) + '.',
+      action: 'Pay All', actionIcon: 'cash-coin', on: function () { payAll(ym); } });
+  }
+  var arrearsBy = P.team.map(function (e) { return { e: e, amt: PR().previousDue(e.id, ym) }; }).filter(function (r) { return r.amt > 0; });
+  if (arrearsBy.length && canCreate()) {
+    out.push({ sev: 'high', icon: 'hourglass-split', title: 'Clear ' + ui.money(sum(arrearsBy, function (r) { return r.amt; })) + ' of past-month arrears',
+      why: arrearsBy.length + ' employee(s) are still owed for earlier months — that arrears balance rides on every future payslip.',
+      action: 'Pay arrears', actionIcon: 'cash-stack',
+      on: function () {
+        ui.confirm({ title: 'Pay all past-month dues?', confirmLabel: 'Pay Arrears',
+          text: ui.money(sum(arrearsBy, function (r) { return r.amt; })) + ' across ' + arrearsBy.length + ' employee(s) and earlier months.' })
+          .then(function (ok) { if (!ok) return; arrearsBy.forEach(function (r) { try { PR().payArrears(r.e.id); } catch (x) {} }); ui.toast('Arrears paid', 'success'); repaint(); });
+      } });
+  }
+  var eligible = P.team.filter(function (e) { var ls = PR().leaveState(e); return ls.eligibleFullYear && ls.value > 0; });
+  if (eligible.length) {
+    out.push({ sev: 'med', icon: 'piggy-bank', title: eligible.length + ' employee(s) have completed a full year',
+      why: 'Their accrued leave is now encashable — ' + ui.money(sum(eligible, function (e) { return PR().leaveState(e).value; })) + ' is payable out of the ' + ui.money(P.encashLiability) + ' provision.',
+      action: 'Open reports', actionIcon: 'clipboard-data', on: function () { goTab('reports'); } });
+  }
+  var noSchedule = P.team.filter(function (e) { return PR().loanOutstanding(e.id) > 0 && PR().emiInstallment(e.id) <= 0; });
+  if (noSchedule.length) {
+    out.push({ sev: 'med', icon: 'bank', title: noSchedule.length + ' staff loan(s) have no repayment schedule',
+      why: 'Nothing is deducted automatically, so ' + ui.money(sum(noSchedule, function (e) { return PR().loanOutstanding(e.id); })) + ' will sit on the books until someone records a repayment by hand.',
+      action: 'Open loans', actionIcon: 'bank', on: function () { goTab('loans'); } });
+  }
+  var noSalary = P.team.filter(function (e) { return !(+e.salary > 0); });
+  if (noSalary.length) {
+    out.push({ sev: 'med', icon: 'person-exclamation', title: noSalary.length + ' employee(s) have no salary set',
+      why: 'They generate a zero payslip every month and quietly understate the payroll cost.',
+      action: 'Open staff', actionIcon: 'people', on: function () { goTab('staff'); } });
+  }
+  var variance = P.glPayable - P.sheetOwed;
+  if (Math.abs(variance) >= 1) {
+    out.push({ sev: 'high', icon: 'shield-exclamation', title: 'The ledger and the salary sheet disagree by ' + ui.money(variance),
+      why: 'Salary Payable (2100) says ' + ui.money(P.glPayable) + ', the payslips say ' + ui.money(P.sheetOwed) + '.',
+      action: 'Show me why', actionIcon: 'question-circle', on: function () { varianceExplainer(P, variance); } });
+  }
+  return out;
+}
+
+/* RADAR — the things nobody asked about that a payroll manager would want to be
+ * told. Every finding names the employee and opens their file. */
+function radar(P) {
+  var out = [];
+  function openEmp(e) { return function () { if (EPAL.people) EPAL.people.open(e.id); }; }
+  P.live.forEach(function (s) {
+    var payable = PR().slipPayable(s);
+    if ((s.paid || 0) > payable + 1) out.push({ sev: 'high', icon: 'exclamation-octagon',
+      title: s.empName + ' was overpaid in ' + PR().mLabel(s.ym),
+      why: 'Paid ' + ui.money(s.paid) + ' against a payslip of ' + ui.money(payable) + ' — ' + ui.money(s.paid - payable) + ' more than the sheet allows.',
+      on: function () { if (EPAL.people) EPAL.people.statement(s.empId, s.ym); } });
+  });
+  P.team.forEach(function (e) {
+    var owed = PR().previousDueList ? PR().previousDueList(e.id) : [];
+    if (owed.length >= 2) out.push({ sev: 'high', icon: 'hourglass-bottom',
+      title: e.name + ' is unpaid for ' + owed.length + ' months',
+      why: ui.money(sum(owed, function (r) { return r.amount; })) + ' outstanding — oldest ' + owed[owed.length - 1].label + '.', on: openEmp(e) });
+    var adv = PR().advanceOutstanding(e.id);
+    if (adv > 0 && +e.salary > 0 && adv > +e.salary) out.push({ sev: 'med', icon: 'cash',
+      title: e.name + ' holds an advance bigger than a month\'s salary',
+      why: ui.money(adv) + ' outstanding against a ' + ui.money(e.salary) + ' salary — it cannot clear in one payslip.', on: openEmp(e) });
+    var loan = PR().loanOutstanding(e.id), emi = PR().emiInstallment(e.id);
+    if (loan > 0 && emi > 0 && loan / emi > 24) out.push({ sev: 'low', icon: 'bank',
+      title: e.name + '\'s loan runs past two years',
+      why: ui.money(loan) + ' at ' + ui.money(emi) + ' a month is ' + Math.ceil(loan / emi) + ' more instalments.', on: openEmp(e) });
+  });
+  var byEmp = {};
+  P.live.forEach(function (s) { (byEmp[s.empId] || (byEmp[s.empId] = [])).push(s); });
+  Object.keys(byEmp).forEach(function (id) {
+    var list = byEmp[id].slice().sort(function (a, b) { return a.ym < b.ym ? -1 : 1; });
+    for (var i = 1; i < list.length; i++) {
+      var a = list[i - 1], c = list[i], pa = PR().slipPayable(a), pc = PR().slipPayable(c);
+      if (pa > 0 && Math.abs(pc - pa) / pa >= 0.25) {
+        out.push({ sev: 'med', icon: 'graph-up-arrow',
+          title: c.empName + '\'s pay moved ' + Math.round((pc - pa) / pa * 100) + '% in ' + PR().mLabel(c.ym),
+          why: ui.money(pa) + ' → ' + ui.money(pc) + '. Usually an increment, absence or overtime — worth confirming which.',
+          on: (function (cc) { return function () { if (EPAL.people) EPAL.people.statement(cc.empId, cc.ym); }; })(c) });
+        break;                       // one swing per employee is enough to flag
+      }
+    }
+  });
+  P.live.forEach(function (s) {
+    if ((s.leaveDeductDays || 0) >= 5) out.push({ sev: 'low', icon: 'calendar-x',
+      title: s.empName + ' was absent ' + s.leaveDeductDays + ' days in ' + PR().mLabel(s.ym),
+      why: ui.money(s.absentDeduction || 0) + ' deducted. Repeated months are an attendance conversation, not a payroll one.',
+      on: (function (ss) { return function () { if (EPAL.people) EPAL.people.statement(ss.empId, ss.ym); }; })(s) });
+  });
+  return out.slice(0, 12);
+}
+
+/* Why the ledger and the sheet differ — the honest answer, month by month, so
+ * the number is traceable instead of just red. */
+function varianceExplainer(P, variance) {
+  var rows = monthSeries().map(function (m) {
+    return { ym: m.ym, label: PR().mLabel(m.ym), status: m.status || '—', sheet: m.due, drafts: m.drafts };
+  }).filter(function (r) { return r.sheet > 0 || r.drafts > 0; });
+  var body = el('div');
+  body.appendChild(el('p.text-mute.sm', { html:
+    'Salary Payable <b>2100</b> is what the general ledger says the company owes staff. The salary sheet adds up what every ' +
+    'payslip still has outstanding. They should be the same figure.<br>Ledger <b>' + esc(ui.money(P.glPayable)) + '</b> − sheet <b>' +
+    esc(ui.money(P.sheetOwed)) + '</b> = <b>' + esc(ui.money(variance)) + '</b>.' }));
+  body.appendChild(el('p.text-mute.xs.mb-2', { text:
+    'The usual causes: a month accrued but its payslips later adjusted; a payment posted straight to the ledger instead of through the desk; ' +
+    'or draft months that are not on the books yet (drafts are correctly excluded from the sheet figure below).' }));
+  body.appendChild(EPAL.table({
+    columns: [
+      { key: 'label', label: 'Month', render: function (r) { return '<span class="strong">' + esc(r.label) + '</span>'; } },
+      { key: 'status', label: 'Run', badge: { draft: 'warn', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } },
+      { key: 'sheet', label: 'Sheet says owed', num: true, money: true },
+      { key: 'drafts', label: 'Draft payslips', num: true, render: function (r) { return r.drafts ? String(r.drafts) : '—'; } }
+    ],
+    rows: rows, pageSize: 12, empty: { icon: 'journal', title: 'No months to compare' }
+  }).el);
+  ui.modal({ title: 'Payroll ↔ Ledger — where the difference is', icon: 'shield-exclamation', size: 'md', body: body, footer: false });
+}
+
+/* THE MONTHLY REGISTER — one row per payroll month; the row IS the drill. */
+function registerTable(series) {
+  var rows = series.slice().reverse();
+  return EPAL.table({
+    columns: [
+      { key: 'ym', label: 'Month', render: function (m) { return '<span class="strong">' + esc(PR().mLabel(m.ym)) + '</span>'; }, sortVal: function (m) { return m.ym; } },
+      { key: 'status', label: 'Run', badge: { draft: 'warn', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } },
+      { key: 'heads', label: 'Employees', num: true, sortVal: function (m) { return m.heads; } },
+      { key: 'gross', label: 'Gross', num: true, money: true },
+      { key: 'adds', label: 'Additions', num: true, sortVal: function (m) { return m.adds; }, render: function (m) { return m.adds ? '<span class="num text-good">+' + ui.money(m.adds) + '</span>' : '—'; } },
+      { key: 'deds', label: 'Deductions', num: true, sortVal: function (m) { return m.deds; }, render: function (m) { return m.deds ? '<span class="num text-warn">−' + ui.money(m.deds) + '</span>' : '—'; } },
+      { key: 'encash', label: 'Encash', num: true, money: true },
+      { key: 'net', label: 'Net Payable', num: true, sortVal: function (m) { return m.net; }, render: function (m) { return '<span class="num strong">' + ui.money(m.net) + '</span>'; } },
+      { key: 'paid', label: 'Paid', num: true, sortVal: function (m) { return m.paid; }, render: function (m) { return m.paid ? '<span class="text-good">' + ui.money(m.paid) + '</span>' : '—'; } },
+      { key: 'due', label: 'Due', num: true, sortVal: function (m) { return m.due; }, render: function (m) { return m.due ? '<span class="num strong text-bad">' + ui.money(m.due) + '</span>' : '—'; } }
+    ],
+    rows: rows, pageSize: 12, totalKey: 'net', exportName: 'payroll-monthly-register.csv',
+    pdfTitle: coFull(CID) + ' — Payroll Monthly Register',
+    onRow: function (m) { ovMonth = m.ym; repaint(); },
+    actions: [{ icon: 'box-arrow-up-right', title: 'Open this month in full', onClick: function (m) { ovMonth = m.ym; repaint(); } }],
+    empty: { icon: 'calendar3', title: 'No payroll months yet', hint: 'Salary Manage generates the current month.' }
+  }).el;
+}
+
+function deptTable(P) {
+  var dc = PR().departmentCost(CID), total = sum(dc, function (r) { return r.cost; });
+  return EPAL.table({
+    columns: [
+      { key: 'dept', label: 'Department', render: function (r) { return '<span class="strong">' + esc(r.dept) + '</span>'; } },
+      { key: 'heads', label: 'Headcount', num: true, sortVal: function (r) { return P.team.filter(function (e) { return (e.dept || '—') === r.dept; }).length; },
+        render: function (r) { return String(P.team.filter(function (e) { return (e.dept || '—') === r.dept; }).length); } },
+      { key: 'cost', label: 'Monthly Cost', num: true, money: true },
+      { key: 'share', label: 'Share', num: true, sortVal: function (r) { return r.cost; },
+        render: function (r) { return total > 0 ? Math.round(r.cost / total * 100) + '%' : '—'; } }
+    ],
+    rows: dc, pageSize: 10, totalKey: 'cost', exportName: 'department-cost.csv',
+    empty: { icon: 'diagram-3', title: 'No department data' }
+  }).el;
+}
+
+
+/* ============================================================================
+ * ONE MONTH, IN FULL — the drill behind a Monthly Register row
+ * ==========================================================================*/
+function monthView(page) {
+  var ym = ovMonth, s = screen('month'), meta = coMeta(CID);
+  var run = PR().getRun(CID, ym), st = run ? run.status : 'draft';
+  var slips = PR().slipsFor(CID, ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
+  var gross = sum(slips, function (x) { return x.earnedGross; });
+  var net = sum(slips, function (x) { return PR().slipPayable(x); });
+  var paid = sum(slips, function (x) { return x.paid || 0; });
+  var due = net - paid;
+  var adds = sum(slips, addOf), deds = sum(slips, dedOf);
+  var advRec = sum(slips, advOf), emiRec = sum(slips, emiOf);
+
+  /* ---- the control bar -------------------------------------------------- */
+  act(s, 'back', function () { ovMonth = null; repaint(); }).innerHTML = ui.icon('arrow-left') + ' Monthly Register';
+  act(s, 'print', function () { printSheetForm(slips, ym); }).innerHTML = ui.icon('printer') + ' Print register';
+  act(s, 'open-run', function () { payYm = ym; goTab('manage'); }).innerHTML = ui.icon('sliders') + ' Manage this run';
+  var pick = part(s, 'mpick');
+  monthSeries().slice().reverse().forEach(function (m) {
+    var o = el('option', { value: m.ym, text: PR().mLabel(m.ym) + '  ·  ' + cap(m.status || 'draft') });
+    if (m.ym === ym) o.selected = true; pick.appendChild(o);
+  });
+  pick.addEventListener('change', function () { ovMonth = this.value; repaint(); });
+  fillK(s, 'status', cap(st)).classList.add('badge-' + (st === 'paid' ? 'good' : st === 'due' ? 'bad' : st === 'draft' ? 'warn' : 'info'));
+  fillK(s, 'note', slips.length + ' employees · ' + payEntries(ym).length + ' ledger postings · ' +
+    S.list('pay_txns').filter(function (x) { return x.companyId === CID && String(x.date || '').slice(0, 7) === ym; }).length +
+    ' employee money movements in ' + PR().mLabel(ym) + '.');
+
+  /* ---- the dashboard row, scoped to this month -------------------------- */
+  box(s, 'dash').appendChild(dashRow({
+    hue: meta.accent, icon: 'calendar3', co: PR().mLabel(ym), coSub: coShort(CID) + ' · ' + cap(st),
+    hero: ui.money(net), heroLabel: 'Net payable', heroTitle: 'Manage this run', heroOn: function () { payYm = ym; goTab('manage'); },
+    facts: [
+      { k: 'Employees', v: String(slips.length), on: null },
+      { k: 'Gross', v: ui.money(gross, { compact: true }), on: null },
+      { k: 'Outstanding', v: ui.money(Math.max(0, due), { compact: true }), on: function () { payYm = ym; goTab('manage'); } }
+    ],
+    last: lastEventCfg(ym, 'Last posting this month'),
+    flow: {
+      title: 'Payment progress', sub: 'per employee · paid vs outstanding',
+      rows: slips.map(function (x) { return { up: x.paid || 0, down: dueOf(x), tip: x.empName + ' · paid ' + ui.money(x.paid || 0) + (dueOf(x) ? ' · due ' + ui.money(dueOf(x)) : '') }; }),
+      net: due > 0 ? '−' + ui.money(due, { compact: true }) : ui.money(0), netUp: due <= 0,
+      inText: 'Paid ' + ui.money(paid), outText: 'Due ' + ui.money(Math.max(0, due)),
+      hint: 'Manage this run', on: function () { payYm = ym; goTab('manage'); }
+    },
+    recon: {
+      icon: 'calculator', title: 'How the month adds up', hint: 'Manage this run',
+      stats: [
+        { k: 'Gross earned', v: ui.money(gross) },
+        { k: 'Additions', v: '+' + ui.money(adds), tone: adds ? 'text-good' : '' },
+        { k: 'Deductions', v: '−' + ui.money(deds), tone: deds ? 'text-warn' : '' },
+        { k: 'Net payable', v: ui.money(net) }
+      ],
+      on: function () { payYm = ym; goTab('manage'); }
+    },
+    minis: [
+      { t: ui.icon('cash') + ' Advance recovered', v: ui.money(advRec), s: 'taken out of this month\'s pay', on: function () { goTab('advance'); } },
+      { t: ui.icon('bank') + ' Loan EMI taken', v: ui.money(emiRec), s: 'auto-deducted → loan management', on: function () { goTab('loans'); } }
+    ]
+  }));
+
+  /* ---- THE SALARY REGISTER — every component, additions and deductions
+   * broken out and subtotalled. Gross here is EARNED gross (contract gross less
+   * absence), which is what the net is built from — so the row adds up on paper
+   * exactly as the engine computes it, with no hidden step. */
+  fillH(s, 'reg-title', ui.icon('table') + ' Salary Register — ' + esc(PR().mLabel(ym)));
+  fillK(s, 'reg-sub', 'every employee · click a row for the payslip · export or print the lot');
+  box(s, 'reg').appendChild(EPAL.table({
+    columns: [
+      { key: 'empName', label: 'Employee', render: function (x) { return EPAL.people ? EPAL.people.linkify(x.empName, x.empId) : '<span class="strong">' + esc(x.empName) + '</span>'; } },
+      { key: 'empId', label: 'ID', render: function (x) { return '<span class="mono xs text-mute">' + esc(x.empId) + '</span>'; } },
+      { key: 'dept', label: 'Dept', badge: {} },
+      { key: 'gross', label: 'Gross', num: true, sortVal: function (x) { return x.gross || 0; }, render: function (x) { return ui.money(x.gross || 0); } },
+      { key: 'absentDeduction', label: 'Absent', num: true, sortVal: function (x) { return x.absentDeduction || 0; },
+        render: function (x) { return x.absentDeduction ? '<span class="text-bad">−' + ui.money(x.absentDeduction) + ' <span class="xs text-mute">(' + (x.leaveDeductDays || 0) + 'd)</span></span>' : '—'; } },
+      { key: 'earnedGross', label: 'Earned Gross', num: true, money: true },
+      { key: 'overtime', label: 'Overtime', num: true, sortVal: function (x) { return x.overtime || 0; },
+        render: function (x) { return x.overtime ? '<span class="text-good">' + ui.money(x.overtime) + ' <span class="xs text-mute">(' + (x.overtimeHours || 0) + 'h)</span></span>' : '—'; } },
+      { key: 'bonus', label: 'Bonus', num: true, sortVal: function (x) { return x.bonus || 0; }, render: function (x) { return x.bonus ? '<span class="text-good">' + ui.money(x.bonus) + '</span>' : '—'; } },
+      { key: 'adjustment', label: 'Adjustment', num: true, sortVal: function (x) { return x.adjustment || 0; },
+        render: function (x) { var v = x.adjustment || 0; return v ? '<span class="' + (v > 0 ? 'text-good' : 'text-bad') + '">' + (v > 0 ? '+' : '−') + ui.money(Math.abs(v)) + '</span>' : '—'; } },
+      { key: 'adds', label: 'Additions', num: true, sortVal: addOf, render: function (x) { var v = addOf(x); return v ? '<span class="num strong text-good">+' + ui.money(v) + '</span>' : '—'; } },
+      { key: 'lateDeduction', label: 'Late', num: true, sortVal: function (x) { return x.lateDeduction || 0; },
+        render: function (x) { return x.lateDeduction ? '<span class="text-warn">−' + ui.money(x.lateDeduction) + ' <span class="xs text-mute">(' + (x.lateDays || 0) + ')</span></span>' : '—'; } },
+      { key: 'earlyDeduction', label: 'Early', num: true, sortVal: function (x) { return x.earlyDeduction || 0; },
+        render: function (x) { return x.earlyDeduction ? '<span class="text-warn">−' + ui.money(x.earlyDeduction) + '</span>' : '—'; } },
+      { key: 'tax', label: 'Tax', num: true, sortVal: function (x) { return x.tax || 0; }, render: function (x) { return x.tax ? ui.money(x.tax) : '—'; } },
+      { key: 'pf', label: 'PF', num: true, sortVal: function (x) { return x.pf || 0; }, render: function (x) { return x.pf ? ui.money(x.pf) : '—'; } },
+      { key: 'otherDeduction', label: 'Other Ded.', num: true, sortVal: function (x) { return x.otherDeduction || 0; }, render: function (x) { return x.otherDeduction ? ui.money(x.otherDeduction) : '—'; } },
+      { key: 'deds', label: 'Deductions', num: true, sortVal: dedOf, render: function (x) { var v = dedOf(x); return v ? '<span class="num strong text-warn">−' + ui.money(v) + '</span>' : '—'; } },
+      { key: 'net', label: 'Net Payable', num: true, sortVal: function (x) { return PR().slipPayable(x); }, render: function (x) { return '<span class="num strong">' + ui.money(PR().slipPayable(x)) + '</span>'; } },
+      { key: 'encashAmt', label: 'Encash Accrued', num: true, money: true },
+      { key: 'adv', label: 'Advance rec.', num: true, sortVal: advOf, render: function (x) { var v = advOf(x); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
+      { key: 'emi', label: 'Loan EMI', num: true, sortVal: emiOf, render: function (x) { var v = emiOf(x); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
+      { key: 'cash', label: 'Cash Out', num: true, sortVal: cashOf, render: function (x) { var v = cashOf(x); return v ? '<span class="num">' + ui.money(v) + '</span>' : '—'; } },
+      { key: 'paid', label: 'Paid', num: true, sortVal: function (x) { return x.paid || 0; }, render: function (x) { return x.paid ? '<span class="text-good">' + ui.money(x.paid) + '</span>' : '—'; } },
+      { key: 'due', label: 'Due', num: true, sortVal: dueOf, render: function (x) { var v = dueOf(x); return v ? '<span class="num strong text-bad">' + ui.money(v) + '</span>' : '—'; } },
+      { key: 'status', label: 'Status', badge: { draft: '', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
+    ],
+    rows: slips, searchKeys: ['empName', 'empId', 'dept'], quickFilter: 'status', filterPanel: true,
+    filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }],
+    totalKey: 'net', pageSize: 25,
+    exportName: 'salary-register-' + ym + '.csv', pdfTitle: coFull(CID) + ' — Salary Register ' + PR().mLabel(ym),
+    onRow: function (x) { var e = empById(x.empId); if (e) statement(e, ym); },
+    actions: [{ icon: 'person-lines-fill', title: 'Open the employee\'s full file', onClick: function (x) { if (EPAL.people) EPAL.people.open(x.empId); } }]
+      .concat(ui.actions({ print: function (x) { var e = empById(x.empId); if (e) statementPrint(e, ym); } })),
+    empty: { icon: 'table', title: 'No payslips in ' + PR().mLabel(ym) }
+  }).el);
+
+  /* ---- every movement that touched an employee's money this month ------- */
+  var txns = S.list('pay_txns').filter(function (x) { return x.companyId === CID && String(x.date || '').slice(0, 7) === ym; })
+    .sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+  fillH(s, 'txn-title', ui.icon('journal-text') + ' Employee money movements');
+  fillK(s, 'txn-sub', txns.length + ' in ' + PR().mLabel(ym) + ' · advance · loan · repayment · bonus · encashment');
+  box(s, 'txns').appendChild(EPAL.table({
+    columns: [
+      { key: 'date', label: 'Date', date: true },
+      { key: 'empName', label: 'Employee', render: function (x) { return EPAL.people ? EPAL.people.linkify(x.empName, x.empId) : esc(x.empName); } },
+      { key: 'type', label: 'Type', badge: { advance: 'warn', loan: 'warn', 'loan-repay': 'good', bonus: 'good', 'encash-paid': 'info', settlement: 'bad' } },
+      { key: 'memo', label: 'Detail' },
+      { key: 'method', label: 'Through', badge: {} },
+      { key: 'amount', label: 'Amount', num: true, money: true }
+    ],
+    rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, totalKey: 'amount',
+    exportName: 'payroll-movements-' + ym + '.csv',
+    onRow: function (x) { if (EPAL.people) EPAL.people.open(x.empId); },
+    empty: { icon: 'journal', title: 'No movements in ' + PR().mLabel(ym) }
+  }).el);
+
+  /* ---- and every journal payroll wrote into the books that month -------- */
+  var posts = payEntries(ym).slice().reverse().map(function (e) {
+    var amt = 0; (e.lines || []).forEach(function (l) { amt += +l.dr || 0; });
+    return { id: e.id, date: e.date, ref: e.ref || e.id, memo: e.memo || '', amount: amt, entry: e };
+  });
+  fillH(s, 'post-title', ui.icon('shield-check') + ' Ledger postings');
+  fillK(s, 'post-sub', posts.length + ' journal(s) written by payroll');
+  box(s, 'posts').appendChild(EPAL.table({
+    columns: [
+      { key: 'date', label: 'Date', date: true },
+      { key: 'ref', label: 'Ref', render: function (r) { return '<span class="txn-id-chip">' + esc(r.ref) + '</span>'; } },
+      { key: 'memo', label: 'Posting' },
+      { key: 'amount', label: 'Amount', num: true, money: true }
+    ],
+    rows: posts, searchKeys: ['ref', 'memo'], pageSize: 10, totalKey: 'amount',
+    exportName: 'payroll-postings-' + ym + '.csv',
+    onRow: function () { EPAL.router.navigate('group/master-accounts/journals'); },
+    empty: { icon: 'shield-check', title: 'Nothing posted in ' + PR().mLabel(ym), hint: 'A draft month is not on the books until it is finalized.' }
+  }).el);
+
+  mountScreen(page, s);
+}
+
+
+/* ============================================================================
+ * STAFF ACCOUNTS — find anyone by NAME or EMPLOYEE ID, open their whole file
+ * ==========================================================================*/
+function staffView(page) {
+  var t = team();
+  var rows = t.map(function (e) {
+    var led = PR().empLedger(e.id);
+    var slips = S.list('pay_slips').filter(function (s) { return s.empId === e.id && s.status !== 'draft'; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
+    var lastPaid = null;
+    for (var i = 0; i < slips.length; i++) if (slips[i].paid > 0) lastPaid = slips[i];
+    var ls = PR().leaveState(e);
+    return {
+      id: e.id, emp: e, name: e.name, dept: e.dept || '—', designation: e.designation || '—',
+      status: e.status || 'active', salary: +e.salary || 0,
+      netDue: led.length ? led[led.length - 1].balance : 0,
+      salaryDue: PR().salaryDue(e.id), advance: PR().advanceOutstanding(e.id),
+      loan: PR().loanOutstanding(e.id), emi: PR().emiInstallment(e.id),
+      encash: ls.value, encashDays: ls.encashableDays, eligible: ls.eligibleFullYear,
+      lastPaid: lastPaid ? lastPaid.ym : '', movements: PR().txnsFor(e.id).length + slips.length
+    };
+  });
+  var tbl = EPAL.table({
+    columns: [
+      { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id) : '<span class="strong">' + esc(r.name) + '</span>'; } },
+      { key: 'id', label: 'Employee ID', render: function (r) { return '<span class="mono xs">' + esc(r.id) + '</span>'; } },
+      { key: 'dept', label: 'Dept', badge: {} },
+      { key: 'designation', label: 'Designation' },
+      { key: 'salary', label: 'Salary', num: true, money: true },
+      { key: 'netDue', label: 'Net position', num: true, sortVal: function (r) { return r.netDue; },
+        render: function (r) { return '<span class="num strong ' + (r.netDue >= 0 ? 'text-good' : 'text-bad') + '">' + ui.money(Math.abs(r.netDue)) + '</span> <span class="xs text-mute">' + (r.netDue >= 0 ? 'we owe' : 'they owe') + '</span>'; } },
+      { key: 'salaryDue', label: 'Salary due', num: true, sortVal: function (r) { return r.salaryDue; }, render: function (r) { return r.salaryDue ? '<span class="num text-bad">' + ui.money(r.salaryDue) + '</span>' : '—'; } },
+      { key: 'advance', label: 'Advance out', num: true, sortVal: function (r) { return r.advance; }, render: function (r) { return r.advance ? '<span class="text-warn">' + ui.money(r.advance) + '</span>' : '—'; } },
+      { key: 'loan', label: 'Loan out', num: true, sortVal: function (r) { return r.loan; },
+        render: function (r) { return r.loan ? '<span class="text-warn">' + ui.money(r.loan) + '</span>' + (r.emi ? ' <span class="xs text-mute">' + ui.money(r.emi) + '/mo</span>' : ' <span class="xs text-mute">no EMI</span>') : '—'; } },
+      { key: 'encash', label: 'Leave encash', num: true, sortVal: function (r) { return r.encash; },
+        render: function (r) { return r.encash ? ui.money(r.encash) + ' <span class="xs text-mute">' + r.encashDays.toFixed(1) + 'd</span>' + (r.eligible ? ' <span class="badge badge-good">Eligible</span>' : '') : '—'; } },
+      { key: 'lastPaid', label: 'Last paid', render: function (r) { return r.lastPaid ? PR().mLabel(r.lastPaid) : '<span class="text-mute">never</span>'; } },
+      { key: 'movements', label: 'Records', num: true, sortVal: function (r) { return r.movements; } },
+      { key: 'status', label: 'Status', badge: { active: 'good', resigned: 'bad', probation: 'warn' } }
+    ],
+    rows: rows, searchKeys: ['name', 'id', 'dept', 'designation'], quickFilter: 'status', filterPanel: true,
+    filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }],
+    pageSize: 15, exportName: 'staff-accounts.csv', pdfTitle: coFull(CID) + ' — Staff Payroll Accounts',
+    onRow: function (r) { if (EPAL.people) EPAL.people.open(r.id); },
+    actions: (canCreate() ? [
+      { icon: 'cash', title: 'Give advance', onClick: function (r) { moneyForm(r.emp, 'advance'); } },
+      { icon: 'bank', title: 'Disburse loan', onClick: function (r) { moneyForm(r.emp, 'loan'); } }
+    ] : []).concat(ui.actions({ print: function (r) { statementPrint(r.emp, PR().curYm()); } })),
+    empty: { icon: 'people', title: 'No employees on this payroll' }
+  });
+  var card2 = frag('reg-card');
+  slot(card2, 'title').innerHTML = ui.icon('people') + ' Staff Accounts';
+  slot(card2, 'sub').textContent = 'search by name OR employee ID · click anyone for their complete file — ledger, payslips, loans, advances, attendance';
+  slot(card2, 'body').appendChild(tbl.el);
+  page.appendChild(card2);
+}
+
+/* the tab → view map, in one place so the route and the embedded desk can never
+ * drift apart (Master Accounts, Travels Accounts and cid/payroll are one screen) */
+var VIEWS = { overview: overviewView, template: tplView, manage: manageView, loans: loansView,
+  payslip: payslipView, advance: advanceView, reports: reportsView, staff: staffView };
 
 /* =================================================== SALARY TEMPLATE */
 function tplView(page) {
@@ -196,13 +1003,44 @@ function manageView(page) {
   var paid = sum(slips, function (s) { return s.paid || 0; }), due = net - paid;
   var st = run ? run.status : 'draft', inWin = PR().inCorrectionWindow(CID, ym);
 
-  var grid = frag('kpi-grid');
-  grid.appendChild(kpi('Headcount', String(slips.length), 'people'));
-  grid.appendChild(kpi('Gross', ui.money(gross, { compact: true }), 'cash-stack'));
-  grid.appendChild(kpi('Net Payable', ui.money(net, { compact: true }), 'wallet2'));
-  grid.appendChild(kpi('Paid', ui.money(paid, { compact: true }), 'check2-circle', 'text-good'));
-  grid.appendChild(kpi('Outstanding', ui.money(due, { compact: true }), 'hourglass-split', due > 0 ? 'text-warn' : 'text-good'));
-  page.appendChild(grid);
+  // THE DASHBOARD ROW (owner 2026-07-28) — the five flat KPI tiles became the
+  // same four-card row Manage Banks uses, scoped to the selected month. Every
+  // figure the tiles carried is still here: Headcount and Gross are drill facts,
+  // Net Payable is the hero, Paid and Outstanding are the payment-progress card.
+  var meta = coMeta(CID);
+  var advRec = sum(slips, advOf), emiRec = sum(slips, emiOf);
+  page.appendChild(dashRow({
+    hue: meta.accent, icon: meta.icon, co: coShort(CID), coSub: PR().mLabel(ym) + ' payroll run · ' + cap(st),
+    hero: ui.money(net), heroLabel: 'Net payable · ' + PR().mLabel(ym),
+    heroTitle: 'Open this month in full', heroOn: function () { ovMonth = ym; goTab('overview'); },
+    facts: [
+      { k: 'Headcount', v: String(slips.length), title: 'Everyone on this run', on: function () { goTab('staff'); } },
+      { k: 'Gross', v: ui.money(gross, { compact: true }), title: 'Earned gross this month', on: function () { ovMonth = ym; goTab('overview'); } },
+      { k: 'Outstanding', v: ui.money(Math.max(0, due), { compact: true }), title: 'Still owed to staff', on: function () { ovMonth = ym; goTab('overview'); } }
+    ],
+    last: lastEventCfg(ym, 'Last posting this month'),
+    flow: {
+      title: 'Payment progress', sub: 'per employee · paid vs outstanding' + (slips.length ? '' : ' · nobody on this run'),
+      rows: slips.map(function (s) { return { up: s.paid || 0, down: dueOf(s), tip: s.empName + ' · paid ' + ui.money(s.paid || 0) + (dueOf(s) ? ' · due ' + ui.money(dueOf(s)) : '') }; }),
+      net: due > 0 ? '−' + ui.money(due, { compact: true }) : ui.money(0), netUp: due <= 0,
+      inText: 'Paid ' + ui.money(paid), outText: 'Due ' + ui.money(Math.max(0, due)),
+      hint: 'Open the full month', on: function () { ovMonth = ym; goTab('overview'); }
+    },
+    recon: {
+      icon: 'calculator', title: 'How the month adds up', hint: 'Open the full month',
+      stats: [
+        { k: 'Gross earned', v: ui.money(gross) },
+        { k: 'Additions', v: '+' + ui.money(sum(slips, addOf)), tone: sum(slips, addOf) ? 'text-good' : '' },
+        { k: 'Deductions', v: '−' + ui.money(sum(slips, dedOf)), tone: sum(slips, dedOf) ? 'text-warn' : '' },
+        { k: 'Paid', v: ui.money(paid), tone: paid > 0 ? 'text-good' : '' }
+      ],
+      on: function () { ovMonth = ym; goTab('overview'); }
+    },
+    minis: [
+      { t: ui.icon('cash') + ' Advance recovered', v: ui.money(advRec), s: 'taken from this month\'s pay', on: function () { goTab('advance'); } },
+      { t: ui.icon('bank') + ' Loan EMI taken', v: ui.money(emiRec), s: 'auto-deducted → loan management', on: function () { goTab('loans'); } }
+    ]
+  }));
 
   var runs = S.list('pay_runs').filter(function (r) { return r.companyId === CID; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
   var sel = el('select.input', { onchange: function () { payYm = this.value; EPAL.router.render(); } }); sel.classList.add('tw-max-w-[230px]');
@@ -232,10 +1070,8 @@ function manageView(page) {
 
   // The FULL salary sheet: Gross | OT | Bonus | Encash | Advance | Loan EMI |
   // Absent | Other ded | Net Payable | Paid | Due | Status per head.
-  function advOf(s) { var auto = Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); return (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? auto : Math.min(auto, +s.advCap)); }
-  function emiOf(s) { return (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? PR().emiInstallment(s.empId) : +s.emiCap); }
-  function otherOf(s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.otherDeduction || 0); }
-  function dueOf(s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }
+  // (advOf / emiOf / otherOf / dueOf are shared helpers — see the top of the
+  // file — so the sheet, the month register and the radar read a slip alike.)
   var tbl = EPAL.table({
     columns: [
       { key: 'empName', label: 'Employee', render: function (s) { return EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : '<span class="strong">' + esc(s.empName) + '</span>'; } },
@@ -252,7 +1088,7 @@ function manageView(page) {
       { key: 'due', label: 'Due', num: true, sortVal: dueOf, render: function (s) { var v = dueOf(s); return v ? '<span class="num strong text-bad">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'status', label: 'Status', badge: { draft: '', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
     ],
-    rows: slips, searchKeys: ['empName', 'dept'], quickFilter: 'status', filterPanel: true, filters: [{ key: 'dept', label: 'Dept' }],
+    rows: slips, searchKeys: ['empName', 'empId', 'dept'], quickFilter: 'status', filterPanel: true, filters: [{ key: 'dept', label: 'Dept' }],
     totalKey: 'net',
     exportName: 'salary-sheet-' + ym + '.csv', pdfTitle: 'Salary Sheet — ' + PR().mLabel(ym),
     onRow: function (s) { var e = empById(s.empId); if (e) statement(e, ym); },
@@ -514,7 +1350,7 @@ function txnTable(title, txns) {
       { key: 'type', label: 'Type', badge: { advance: 'warn', loan: 'warn', 'loan-repay': 'good' } },
       { key: 'memo', label: 'Note' }, { key: 'method', label: 'Method', badge: {} },
       { key: 'amount', label: 'Amount', num: true, money: true } ],
-    rows: txns, searchKeys: ['empName', 'memo'], pageSize: 10, exportName: 'payroll-txns.csv', empty: { icon: 'journal', title: 'No transactions' }
+    rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, exportName: 'payroll-txns.csv', empty: { icon: 'journal', title: 'No transactions' }
   });
   var card2 = frag('head-card'); slot(card2, 'title').innerHTML = ui.icon('journal-text') + ' ' + title; slot(card2, 'body').appendChild(tbl.el); return card2;
 }
@@ -564,7 +1400,7 @@ function payslipView(page) {
       { key: 'encashAmt', label: 'Leave Encash', num: true, money: true },
       { key: 'status', label: 'Status', badge: { accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
     ],
-    rows: slips, searchKeys: ['empName'], quickFilter: 'status', pageSize: 12, exportName: 'payslips.csv', pdfTitle: 'Travels Payslips',
+    rows: slips, searchKeys: ['empName', 'empId'], quickFilter: 'status', pageSize: 12, exportName: 'payslips.csv', pdfTitle: 'Travels Payslips',
     onRow: function (s) { var e = empById(s.empId); if (e) statement(e, s.ym); },
     actions: ui.actions({ print: function (s) { var e = empById(s.empId); if (e) statementPrint(e, s.ym); } }),
     empty: { icon: 'receipt', title: 'No payslips yet', hint: 'Finalize a payroll month in Salary Manage.' }

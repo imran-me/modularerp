@@ -490,6 +490,93 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-28 · PAYROLL BECOMES A COMMAND CENTRE (owner ask: "make it world class")
+
+**The ask.** The owner pointed at *Manage Banks* — "I liked its KPI, its structure and
+its styles; I want this type in the Payroll too" — plus: month-by-month reports that drill
+into every employee's figures for that month, search by name **and** employee ID, an
+employee file that opens everything, and "automations, AI, brief". Then, mid-build:
+*"the payroll should be reflected both in the master account and in the travels account
+accordingly — design, UI, functions, logics, everything."*
+
+**Why that last line was already satisfied by the architecture.** There is exactly ONE
+payroll implementation — `companies/travels/modules/payroll/` — and it mounts in four
+places: the standalone route `<cid>/payroll` (woodart · it · shop · construction),
+`EPAL.payrollDesk` inside **Master Accounts › Master Payroll**, inside **Travels ›
+Accounts › Payroll**, and inside **Woodart › Accounts › Payroll**. A `VIEWS` map now
+drives BOTH the route and the embedded desk, so the group desk and a company desk cannot
+drift apart. One edit ships to all six companies.
+
+**WHAT SHIPPED**
+- **The dashboard row** — `[data-shell="dash"]`, real HTML, four same-height cards, filled
+  by `dashRow(cfg)`: brand-accented identity panel (hero figure · 3 clickable drill facts ·
+  the LAST PAYROLL EVENT as a mini-statement with IN/OUT/ACCRUED, a ref chip and
+  owed-before → owed-after) · a mirrored sparkline · a reconciliation card · a mini stack.
+  It heads **Payroll Overview**, **Salary Manage** (month-scoped) and the **month drill**.
+  ⚠ It deliberately reuses the `bank-*` classes from `components.css`: that block is the
+  house SUMMARY-IDENTITY-PANEL design and Manage Banks was merely its first caller —
+  reusing it makes Payroll pixel-consistent with Banks for free and forks zero rules.
+  The `pay-*` classes alongside carry no styling; they are override hooks.
+- **NEW TAB · Payroll Overview** (now the landing tab, first in `TABS`) — the dashboard
+  row, a narrated **digest** (`.brief-hero`, every figure computed live), **Payroll
+  Autopilot**, **Anomaly Radar**, the **Monthly Register** and department cost.
+- **Payroll ↔ Ledger reconciliation** — the piece no off-the-shelf payroll ships. Salary
+  Payable **2100** vs what the payslips still say is outstanding, plus advances+loans
+  (1250/1260) and the variance, with a **"why?"** explainer that lists the months where the
+  two disagree. `ACC` in payroll.js mirrors the engine's posting rules.
+- **AUTOPILOT — proposals only** (owner: *"automation will [be] on overview, summary"*).
+  It detects: correction window open · month not accrued · salaries due (louder past the
+  pay-by date) · past-month arrears · staff who completed a year (encashment payable) ·
+  loans with **no EMI schedule** · employees with **no salary set** · a ledger↔sheet
+  variance. Each is a card with the button that does it. **Nothing posts by itself**, so an
+  "automatic" payroll can never surprise the bank.
+- **AI, honestly.** This is a static site with no LLM backend, and the app's existing AI
+  (MD Briefing) is `EPAL.intel` — a deterministic narrative engine. The payroll digest and
+  radar follow that pattern rather than faking a chatbot: overpayment vs the payslip,
+  unpaid ≥2 months, an advance bigger than a month's salary, a loan that runs past two
+  years, a ±25% pay swing month-on-month, 5+ absent days. Every finding names the person
+  and opens their file.
+- **MONTHLY REGISTER → the month drill** (`<section data-screen="month">`) — click a month
+  and get: its own dashboard row, a **23-column Salary Register** (gross · absent · earned
+  gross · overtime · bonus · adjustment · **additions** · late · early · tax · PF · other ·
+  **deductions** · net payable · encash accrued · advance recovered · loan EMI · cash out ·
+  paid · due · status) that is exportable/printable, plus **every employee money movement**
+  and **every ledger posting** payroll wrote that month. Presentation matches
+  `slipPayable()` exactly — `earnedGross` is already net of absence, so absence is shown as
+  its own line and never double-deducted.
+- **NEW TAB · Staff Accounts** — searchable by **name OR employee ID** (also added `empId`
+  to every other payroll table's `searchKeys`). Columns: net position (we owe / they owe),
+  salary due, advance out, loan out + EMI, leave encashment + eligibility, last paid,
+  record count. A row opens `EPAL.people.open()` — the existing universal dossier (ledger
+  with running net-due · payslip history · attendance · full A–Z details · money actions).
+- **Salary Manage** — the five flat KPI tiles became the same dashboard row. Every figure
+  they carried survives: Headcount and Gross are drill facts, Net Payable is the hero, Paid
+  and Outstanding live in the payment-progress and add-up cards. The run bar and the
+  13-column salary sheet are untouched.
+
+**🐞 TRAP WORTH REMEMBERING — `hidden` is NOT enough to hide a prototype row.** The UA rule
+`[hidden]{display:none}` and a house class like `.brief-exc{display:flex}` /
+`.btn{display:inline-flex}` have the SAME specificity, and the author sheet applies later —
+so the class wins and a "hidden" `[data-proto]` row renders as a blank card row. Found by
+the headless driver, not by eye. **Anything that must not appear is REMOVED from the DOM,
+never hidden.** This applies to every module using the `[hidden][data-proto]` pattern.
+
+**VERIFIED** — sweep **253/253 × both themes, 0 console errors**; tailwind gate green (24
+classes, no orphans, byte-identical rebuild — no new `tw-` literal was needed); trial
+balance balances. Plus a purpose-built headless driver (21 checks) that clicks through
+every tab, opens the month drill and back, searches an employee ID down to one row, and
+asserts the dashboard row is fully filled at **all four mount points** including a company
+with no payroll history (readable zero-state, never a blank).
+
+**◻ STILL OWED on payroll:** no backend slice for the new screens — they are read models
+over stores Master Accounts' payroll backend already persists (`pay_runs`/`pay_slips`/
+`pay_txns`/`pay_templates`), so nothing new needs a table, but the Laravel read endpoints
+for the register/overview are not written. The dossier (`platform/kit/emp-profile.js`) was
+NOT touched — it already covers ledger/payslips/loans/advances/settlement; deepening it is
+the natural next slice.
+
+---
+
 ## 🆕 SESSION — 2026-07-27 · GROUP CONSOLIDATED P&L (accounting step 5, part 2 — the plan's LAST step)
 
 **Step 5 part 2 is DONE — the accounting build order is now complete.**

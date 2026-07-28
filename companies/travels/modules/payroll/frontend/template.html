@@ -4,14 +4,21 @@
   The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +
   filled at runtime via [data-tpl] / [data-slot] hooks.
 
-  Six tabs (template / manage / loans / payslip / advance / reports), rendered
-  BOTH standalone (cid/payroll/…) and embedded in Master Accounts via
-  EPAL.payrollDesk. Every modal/form (manage-salary, correction/edit, print-
-  sheet, pay, money, encashment) keeps its legacy el()-built DOM, as do the
-  compound-styled leaf helpers formField() and field() (label+control rows with
-  inline padding/width — impractical as utilities). STYLING = the house design
-  system; the only new tw util is tw-max-w-[230px] (the run's month select). The
-  salary-sheet body keeps its .tbl-dense modifier (owner: fit without h-scroll).
+  Seven tabs (overview / template / manage / loans / payslip / advance /
+  reports), rendered BOTH standalone (cid/payroll/…) and embedded in Master
+  Accounts via EPAL.payrollDesk. Every modal/form (manage-salary, correction/
+  edit, print-sheet, pay, money, encashment) keeps its legacy el()-built DOM, as
+  do the compound-styled leaf helpers formField() and field() (label+control rows
+  with inline padding/width — impractical as utilities). STYLING = the house
+  design system; the only new tw util is tw-max-w-[230px] (the run's month
+  select). The salary-sheet body keeps its .tbl-dense modifier (owner: fit
+  without h-scroll).
+
+  TWO STYLES LIVE HERE, on purpose:
+   · the [data-tpl] fragments below are the ORIGINAL screens, kept exactly as
+     they were so their proven-identical pixels do not move;
+   · everything under "REAL-HTML BLOCKS" is the current FRONTEND BUILD LAW —
+     whole screens written out as plain HTML. All NEW work goes there.
 
   Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte
   the DOM the old ui.el() calls produced.
@@ -43,3 +50,267 @@
 
 <!-- a plain "New …" button row (loans/advance disburse) -------------------->
 <template data-tpl="btn-row"><div class="mb-3"><button class="btn btn-primary" data-slot="btn"></button></div></template>
+
+
+<!-- ============================================================================
+  ▼▼ REAL-HTML BLOCKS (FRONTEND BUILD LAW, owner 2026-07-28) ▼▼
+  Everything below is the screen written out as plain HTML — not cloned
+  fragments, not el(). JS only fills the [data-k] placeholders, clones the
+  [data-proto] rows (0..N of them is DATA, not layout) and wires [data-act].
+
+  LEGEND
+    [data-shell="…"]  a shared bar/panel used by more than one screen
+    [data-screen="…"] one whole screen; mountScreen() moves its children onto the page
+    [data-k="…"]      a text/HTML placeholder JS writes into
+    [data-fill="…"]   a container JS appends a built widget (table/SVG) into
+    [data-proto="…"]  a hidden prototype row — cloned once per record
+    [data-el="…"]     an element JS needs a handle on (to hide, or to click-wire)
+    [data-act="…"]    a click target JS binds a navigation/action to
+
+  ⚠ CLASS NAMES: the dashboard row deliberately reuses the `bank-*` component
+  vocabulary from components.css. That block is the house SUMMARY-IDENTITY-PANEL
+  design (hero figure · drill facts · last-event mini-statement · mirrored
+  sparkline · reconciliation · mini stack); Manage Banks was simply its first
+  caller. Reusing it means Payroll is pixel-consistent with Manage Banks for
+  free and forks not a single rule. The extra `pay-*` classes carry no styling —
+  they are semantic hooks for anything payroll ever needs to override.
+  ============================================================================ -->
+
+<!-- ---------------------------------------------------------------------------
+  DASHBOARD ROW — the four same-height cards that head both Payroll Overview
+  and Salary Manage. ONE shell, filled with different numbers by each caller:
+
+    1  identity panel  company · hero figure · 3 clickable drill facts ·
+                       the last payroll event (direction · amount · reference ·
+                       opening → closing of what we owe staff)
+    2  flow card       a mirrored 2-colour sparkline + its two totals
+    3  reconciliation  a 2×2 of control figures + a variance badge + "why?"
+    4  mini stack      two small click-through cards
+--------------------------------------------------------------------------- -->
+<div data-shell="dash" class="bank-cards-row pay-cards-row">
+
+  <div class="bank-summary pay-summary" data-el="panel">
+    <div class="bank-summary-in">
+      <div class="bank-summary-body">
+        <div class="bank-summary-left">
+          <div class="bank-summary-head">
+            <div class="bank-summary-ico" data-k="ico"></div>
+            <div class="bank-summary-id">
+              <div class="bank-summary-co" data-k="co"></div>
+              <div class="bank-summary-sub" data-k="co-sub"></div>
+            </div>
+          </div>
+          <div class="bank-summary-hero clik" data-act="hero">
+            <div class="bank-summary-bal" data-k="hero"></div>
+            <div class="bank-summary-ballabel" data-k="hero-label"></div>
+          </div>
+        </div>
+        <div class="bank-summary-last" data-el="last">
+          <div class="bank-summary-last-top">
+            <span class="bank-summary-last-lbl" data-k="last-label"></span>
+            <span class="bank-summary-dir" data-k="dir"></span>
+          </div>
+          <div class="bank-summary-last-row">
+            <span class="bank-summary-last-amt" data-k="amt"></span>
+            <span class="bank-summary-last-date" data-k="when"></span>
+          </div>
+          <div class="bank-summary-last-ref" data-k="ref"></div>
+          <div class="bank-summary-last-oc">
+            <div class="oc-open" data-k="oc-open"></div>
+            <div class="oc-close" data-k="oc-close"></div>
+          </div>
+        </div>
+      </div>
+      <div class="bank-summary-facts">
+        <div class="bank-summary-fact clik" data-act="f1"><div class="k" data-k="f1k"></div><div class="v" data-k="f1v"></div></div>
+        <div class="bank-summary-fact clik" data-act="f2"><div class="k" data-k="f2k"></div><div class="v" data-k="f2v"></div></div>
+        <div class="bank-summary-fact clik" data-act="f3"><div class="k" data-k="f3k"></div><div class="v" data-k="f3v"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bank-flow pay-flow" data-el="flow">
+    <div class="bank-flow-head">
+      <div>
+        <div class="bank-flow-title" data-k="flow-title"></div>
+        <div class="bank-flow-sub" data-k="flow-sub"></div>
+      </div>
+      <span class="bank-flow-net" data-k="flow-net"></span>
+    </div>
+    <div class="bank-flow-spark" data-fill="spark"></div>
+    <div class="bank-flow-foot">
+      <span><span class="bank-flow-dot in"></span><span data-k="flow-in"></span></span>
+      <span><span class="bank-flow-dot out"></span><span data-k="flow-out"></span></span>
+    </div>
+  </div>
+
+  <div class="card bank-recon bank-recon-clik pay-recon" data-el="recon">
+    <!-- no head badge: inside .bank-cards-row components.css hides it, because
+         the verdict already reads in the 4th stat (coloured + its "why?"). -->
+    <div class="card-head">
+      <h3 data-k="recon-title"></h3>
+    </div>
+    <div class="card-body">
+      <div class="bank-recon-2x2">
+        <div class="stat"><div class="stat-label" data-k="r1k"></div><div class="stat-value num" data-k="r1v"></div></div>
+        <div class="stat"><div class="stat-label" data-k="r2k"></div><div class="stat-value num" data-k="r2v"></div></div>
+        <div class="stat"><div class="stat-label" data-k="r3k"></div><div class="stat-value num" data-k="r3v"></div></div>
+        <div class="stat"><div class="stat-label" data-k="r4k"></div><div class="stat-value num" data-k="r4v"></div>
+          <button class="float-why" type="button" data-el="why" hidden></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bank-ministack pay-ministack">
+    <div class="card bank-mini" data-el="m1">
+      <div class="fw-600 sm" data-k="m1t"></div>
+      <div class="strong num" data-k="m1v"></div>
+      <div class="text-mute xs" data-k="m1s"></div>
+    </div>
+    <div class="card bank-mini" data-el="m2">
+      <div class="fw-600 sm" data-k="m2t"></div>
+      <div class="strong num" data-k="m2v"></div>
+      <div class="text-mute xs" data-k="m2s"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ---------------------------------------------------------------------------
+  PAYROLL OVERVIEW — the payroll command centre (new tab, owner 2026-07-28).
+  Reads only what the payroll engine and the general ledger already hold; it
+  never posts by itself. Every automation is a PROPOSAL with a button (owner:
+  automation lives on the overview/summary and asks before it moves money).
+--------------------------------------------------------------------------- -->
+<section data-screen="overview">
+
+  <!-- 1 · the four-card dashboard row (cloned from [data-shell="dash"]) -->
+  <div data-fill="dash"></div>
+
+  <!-- 2 · the narrated digest — every figure computed live from the books -->
+  <div class="brief-hero">
+    <div class="brief-date" data-k="digest-date"></div>
+    <h2 data-k="digest-title"></h2>
+    <div class="brief-narrative" data-k="digest-text"></div>
+  </div>
+
+  <!-- 3 · Autopilot (what should happen next) + Radar (what looks wrong) -->
+  <div class="two-col">
+
+    <div class="card">
+      <div class="card-head">
+        <h3 data-k="auto-title"></h3>
+        <span class="card-sub" data-k="auto-sub"></span>
+      </div>
+      <div class="card-body" data-fill="auto">
+        <div class="brief-exc" hidden data-proto="row">
+          <div class="brief-exc-ico" data-k="ico"></div>
+          <div class="brief-exc-body">
+            <strong data-k="title"></strong>
+            <span data-k="why"></span>
+          </div>
+          <button class="btn btn-sm btn-outline" type="button" data-el="go" hidden></button>
+        </div>
+        <div class="brief-good" hidden data-el="clear"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3 data-k="radar-title"></h3>
+        <span class="card-sub" data-k="radar-sub"></span>
+      </div>
+      <div class="card-body" data-fill="radar">
+        <div class="brief-exc" hidden data-proto="row">
+          <div class="brief-exc-ico" data-k="ico"></div>
+          <div class="brief-exc-body">
+            <strong data-k="title"></strong>
+            <span data-k="why"></span>
+          </div>
+          <button class="btn btn-sm btn-outline" type="button" data-el="go" hidden></button>
+        </div>
+        <div class="brief-good" hidden data-el="clear"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 4 · the last 12 payroll months, and where the money goes by department -->
+  <div class="card mb-3">
+    <div class="card-head">
+      <h3 data-k="trend-title"></h3>
+      <span class="card-sub" data-k="trend-sub"></span>
+    </div>
+    <div class="card-body tbl-dense" data-fill="trend"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3 data-k="dept-title"></h3>
+      <span class="card-sub" data-k="dept-sub"></span>
+    </div>
+    <div class="card-body" data-fill="dept"></div>
+  </div>
+
+</section>
+
+<!-- ---------------------------------------------------------------------------
+  ONE MONTH, IN FULL — the drill behind a row of the Monthly Register (owner
+  2026-07-28: "if I click on January, it should show me how many transactions
+  happened … all their accounts summary of January in a table — gross, net,
+  deductions, additions, overtime, late, bonus"). Everything that touched
+  payroll in that month, on one screen:
+    · the month's dashboard row (same four cards, month-scoped)
+    · the SALARY REGISTER — every employee, every component, additions and
+      deductions broken out and subtotalled, exportable and printable
+    · the month's EMPLOYEE MONEY MOVEMENTS (advance · loan · repayment · bonus ·
+      encashment payout) and every LEDGER POSTING payroll wrote that month
+--------------------------------------------------------------------------- -->
+<section data-screen="month">
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="flex justify-between items-center flex-wrap gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline" type="button" data-act="back"></button>
+          <select class="input tw-max-w-[230px]" data-el="mpick"></select>
+          <span class="badge" data-k="status"></span>
+        </div>
+        <div class="flex gap-1 flex-wrap">
+          <button class="btn btn-sm btn-outline" type="button" data-act="print"></button>
+          <button class="btn btn-sm btn-primary" type="button" data-act="open-run"></button>
+        </div>
+      </div>
+      <div class="text-mute sm mt-2" data-k="note"></div>
+    </div>
+  </div>
+
+  <div data-fill="dash"></div>
+
+  <div class="card mb-3">
+    <div class="card-head">
+      <h3 data-k="reg-title"></h3>
+      <span class="card-sub" data-k="reg-sub"></span>
+    </div>
+    <div class="card-body tbl-dense" data-fill="reg"></div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-head">
+        <h3 data-k="txn-title"></h3>
+        <span class="card-sub" data-k="txn-sub"></span>
+      </div>
+      <div class="card-body" data-fill="txns"></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h3 data-k="post-title"></h3>
+        <span class="card-sub" data-k="post-sub"></span>
+      </div>
+      <div class="card-body" data-fill="posts"></div>
+    </div>
+  </div>
+
+</section>
