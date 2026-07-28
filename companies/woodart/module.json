@@ -268,10 +268,29 @@
       "id": "accounts",
       "label": "Accounts",
       "icon": "cash-stack",
-      "desc": "Income, expenses, project P&L.",
+      "desc": "Income, expenses, vendor payables & project P&L.",
       "enabled": true,
-      "subs": [],
-      "built": false
+      "subs": [
+        {
+          "id": "register",
+          "label": "Income & Expense",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "payables",
+          "label": "Vendor Payables",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "pnl",
+          "label": "Project P&L",
+          "icon": "dot",
+          "enabled": true
+        }
+      ],
+      "built": true
     },
     {
       "id": "ledgers",

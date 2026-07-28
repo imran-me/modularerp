@@ -1,0 +1,26 @@
+{
+  "key": "accounts",
+  "company": "woodart",
+  "title": "Accounts",
+  "icon": "cash-stack",
+  "desc": "Income, expenses, vendor payables & project P&L.",
+  "route": "#/woodart/accounts",
+  "enabled": true,
+  "menu": [
+    { "id": "register", "label": "Income & Expense", "route": "#/woodart/accounts/register", "enabled": true },
+    { "id": "payables", "label": "Vendor Payables", "route": "#/woodart/accounts/payables", "enabled": true },
+    { "id": "pnl", "label": "Project P&L", "route": "#/woodart/accounts/pnl", "enabled": true }
+  ],
+  "stores": ["acc_entries"],
+  "reads": ["wa_purchases", "wa_projects", "wa_estimates", "wa_movements", "wa_materials", "banks"],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/accounts.js",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — the presence of THIS file is what auto-discovery HEAD-probes (platform/discovery/discovery.js). A module registered built:true in the company manifest but missing this file is treated as deleted.",
+  "ownership": "This module owns NO table. `acc_entries` is listed under stores because this desk WRITES to it, but the table belongs to Master Accounts and is shared group-wide — Woodart is one company-scoped tenant of it, exactly as Travels is. There is deliberately no migration in backend/. Postings go through the kernel services in platform/backend/app/Services, so the group's books cannot differ by which company's screen recorded the money. See backend/endpoints.md, invariant 1."
+}
