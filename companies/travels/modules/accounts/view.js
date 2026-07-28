@@ -1580,8 +1580,12 @@ function generateRecurring(r) {
   var ym = TODAY_STR.slice(0, 7);
   var e = { id: 'JV-' + ui.uid('').slice(-6).toUpperCase(), companyId: CID, created: TODAY_STR, kind: 'Expense',
     amount: +r.amount || 0, category: r.category, method: r.method || 'Bank',
+    // the voucher inherits the template's ACCOUNT, so a generated bill leaves a
+    // real balance and shows in that account's history (audit 2026-07-28)
+    payAcct: r.payAcct || '', bankId: r.bankId || '', bankName: r.bankName || '',
     date: ym + '-' + String(r.dayOfMonth || 1).padStart(2, '0'), party: r.party || '', ref: 'REC-' + r.id, desc: (r.desc || r.category) + ' (recurring)', auto: true };
   db.save('acc_entries', e); mirrorToLedger(e);
+  if (e.bankId) syncRegisterLeg(e, null);
   r.lastGenerated = ym; db.save('tv_recurring', r);
   return e;
 }
@@ -1636,7 +1640,12 @@ function recurringForm(rec) {
       { key: 'category', label: 'Expense head', type: 'text', required: true, placeholder: 'e.g. Office Rent, Internet' },
       { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 1 },
       { key: 'dayOfMonth', label: 'Day of month', type: 'number', min: 1, max: 28, default: 1 },
-      { key: 'method', label: 'Method', type: 'select', options: METHODS, default: 'Bank' },
+      // a real account, not a generic method (audit 2026-07-28): a recurring bill
+      // generates a voucher every month, and it has to leave an account and land in
+      // that account's history like any other expense
+      { key: 'source', label: 'Paid from', type: 'select', required: true, searchable: true,
+        options: paySourceOptions(CID),
+        hint: 'Every month this bill is generated, the money leaves this account.' },
       { key: 'party', label: 'Paid to (vendor)', type: 'text' },
       { key: 'active', label: 'Active', type: 'checkbox', default: true, col2: true },
       { key: 'desc', label: 'Note', type: 'textarea', col2: true }
@@ -1644,7 +1653,8 @@ function recurringForm(rec) {
     saveLabel: isNew ? 'Add' : 'Save',
     onSave: function (val) {
       var r = rec || { id: 'REC-' + ui.uid('').slice(-5).toUpperCase(), companyId: CID };
-      r.category = (val.category || '').trim(); r.amount = +val.amount || 0; r.dayOfMonth = +val.dayOfMonth || 1; r.method = val.method; r.party = val.party || ''; r.desc = val.desc || ''; r.active = val.active !== false;
+      r.category = (val.category || '').trim(); r.amount = +val.amount || 0; r.dayOfMonth = +val.dayOfMonth || 1; r.party = val.party || ''; r.desc = val.desc || ''; r.active = val.active !== false;
+      pay().stamp(r, val.source);            // method + payAcct + bankId/bankName
       db.save('tv_recurring', r);
       ui.toast('Recurring expense saved', 'success'); EPAL.router.render(); return true;
     }
