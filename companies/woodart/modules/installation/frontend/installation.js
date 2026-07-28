@@ -58,7 +58,7 @@ var TAB_COPY = {
 function head(sub) {
   var copy = TAB_COPY[sub] || TAB_COPY.schedule;
   var h = shell('head');
-  fill(h, 'eyebrow').textContent = 'Woodart › Site & Install';
+  fill(h, 'eyebrow').textContent = sub === 'schedule' ? 'Woodart Interiors' : 'Woodart › Site & Install';
   fill(h, 'title').appendChild(document.createTextNode(copy[0]));
   var s = fill(h, 'sub');
   s.textContent = copy[1];

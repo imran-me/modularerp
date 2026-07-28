@@ -415,7 +415,7 @@ var TAB_COPY = {
 function head(sub) {
   var copy = TAB_COPY[sub] || TAB_COPY.stock;
   var h = shell('head');
-  fill(h, 'eyebrow').textContent = 'Woodart › Materials';
+  fill(h, 'eyebrow').textContent = sub === 'stock' ? 'Woodart Interiors' : 'Woodart › Materials';
   fill(h, 'title').appendChild(document.createTextNode(copy[0]));
   var s = fill(h, 'sub');
   s.textContent = copy[1];

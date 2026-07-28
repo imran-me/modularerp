@@ -152,7 +152,13 @@
    * ========================================================================*/
   var WOODART_MODULES = [
     m('dashboard',    'Dashboard',        'speedometer2', { desc:'Projects, pipeline, workshop load, margins.' }),
-    m('crm',          'Leads & CRM',      'person-lines-fill', { desc:'Design enquiries → site visits → deals.' }),
+    /* SIDEBAR GROUPING — `sectionEnd` draws the divider after an item.
+     * Woodart declared none, so its 18 modules rendered as one flat list while
+     * every other concern's sidebar is grouped. The bands below are the ones
+     * already documented in companies/woodart/ROOT-MAP.md, so the menu and the
+     * architecture doc finally describe the same shape:
+     *   navigate · sell & design · make & deliver · money & reporting · admin */
+    m('crm',          'Leads & CRM',      'person-lines-fill', { desc:'Design enquiries → site visits → deals.', sectionEnd:true }),
     m('projects',     'Projects',         'easel2-fill', { desc:'Design-build projects, phases & milestones.',
         subs:[['active','Active Projects'],['design','Design Studio'],['milestones','Milestones'],['gallery','Gallery']] }),
     m('design',       'Design & 3D',      'vector-pen', { desc:'Drawings, 3D models, revisions and client approval — the architecture phase.',
@@ -160,7 +166,7 @@
     m('estimates',    'Estimates & BOQ',  'calculator-fill', { desc:'Quotations, bill of materials, costing.',
         subs:[['quotations','Quotations'],['boq','Bill of Materials'],['costing','Costing']] }),
     m('clients',      'Clients',          'person-hearts', { desc:'Homeowners, developers, corporates.',
-        subs:[['directory','Directory'],['portfolio','Portfolio'],['segments','Segments']] }),
+        subs:[['directory','Directory'],['portfolio','Portfolio'],['segments','Segments']], sectionEnd:true }),
     m('materials',    'Materials',        'boxes', { desc:'Wood, laminates, hardware, finishes inventory.',
         subs:[['stock','Stock'],['movements','Movements'],['reorder','Reorder'],['valuation','Valuation']] }),
     m('production',   'Workshop',         'hammer', { desc:'Fabrication jobs, machine & labour scheduling.',
@@ -168,14 +174,14 @@
     m('installation', 'Site & Install',   'truck', { desc:'Delivery, installation, site handover & snags.',
         subs:[['schedule','Schedule'],['snags','Snag List'],['teams','Teams']] }),
     m('procurement',  'Procurement',      'cart-fill', { desc:'Vendors, purchase orders, GRN.',
-        subs:[['orders','Purchase Orders'],['vendors','Vendors'],['spend','Spend']] }),
+        subs:[['orders','Purchase Orders'],['vendors','Vendors'],['spend','Spend']], sectionEnd:true }),
     m('accounts',     'Accounts',         'cash-stack', { desc:'Income, expenses, vendor payables & project P&L.',
         subs:[['register','Income & Expense'],['payables','Vendor Payables'],['pnl','Project P&L']] }),
     m('payroll',     'Payroll',      'cash-coin', { desc:'Salary sheet, loans, payslips & advances — tabs at the top.' }),
     m('ledgers',      'Ledgers',          'journal-text', { desc:'General & client ledgers.' }),
     m('hrm',          'HRM',              'people-fill', { desc:'Designers, carpenters, site crew.' }),
     m('reports',      'Reports',          'file-earmark-bar-graph', { desc:'Project, material & financial reports.' }),
-    m('analytics',    'Analytics',        'graph-up', { desc:'Margin analysis, wastage, on-time delivery.' }),
+    m('analytics',    'Analytics',        'graph-up', { desc:'Margin analysis, wastage, on-time delivery.', sectionEnd:true }),
     m('tasks',        'My Tasks',         'kanban', { desc:'Personal Kanban board with phase timers.' }),
     m('settings',     'Settings',         'gear-fill', { admin:true, desc:'Woodart configuration.' })
   ];

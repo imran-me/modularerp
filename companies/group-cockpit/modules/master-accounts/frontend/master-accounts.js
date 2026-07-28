@@ -1412,6 +1412,33 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       var rc = s.querySelector('[data-act="reclass"]');
       rc.innerHTML = ui.icon('shuffle') + ' Reclass 4000 Catch-all' + (in4000 > 0.5 ? ' (' + ui.money(in4000, { compact: true }) + ')' : '');
       rc.addEventListener('click', reclass4000Tool);
+      /* LOAD SAMPLE BOOK (owner 2026-07-28: "push 5 ticket sell, 5 visa sell,
+       * 5 others sells … so i have a full view of all"). One month of real-shaped
+       * Travels trading, written through the SAME functions the desks call — so
+       * every book fills as if a person had typed each entry, and on this live
+       * install each write goes to the database the normal way. Fixed ids, so
+       * pressing it twice updates the same rows instead of doubling the book. */
+      if (EPAL.sampleBook) {
+        var sb = btn('btn btn-sm btn-outline', ui.icon('collection') + ' Load sample book', function () {
+          ui.confirm({ title: 'Load the sample book?', icon: 'collection',
+            text: 'Writes one month of Travels trading — 5 air tickets, 5 visa files, 5 other sales, ' +
+              'their commission payouts and vendor fees, the monthly rent / salary / utilities / marketing, ' +
+              'a GDS wallet top-up, a petty-cash IOU and a day\'s banking. Every entry posts for real, so ' +
+              'income, cost, the bank histories, the P&L and the group books all fill. Running it again ' +
+              'updates the same entries rather than duplicating them.',
+            confirmLabel: 'Load it' }).then(function (ok) {
+              if (!ok) return;
+              var r;
+              try { r = EPAL.sampleBook.write(); }
+              catch (e) { ui.toast(e.message || 'Could not write the sample book', 'error'); return; }
+              ui.toast(r.made.tickets + ' tickets · ' + r.made.visas + ' visas · ' + r.made.other +
+                ' other sales · ' + r.made.expenses + ' expenses posted — gross profit ' +
+                ui.money(r.mine.gross), 'success');
+              EPAL.router.render();
+            });
+        });
+        actions.appendChild(sb);
+      }
     } else { actions.parentNode.removeChild(actions); }
     TYPE_META.forEach(function (t) {
       var card = s.querySelector('[data-type="' + t[0] + '"]');
