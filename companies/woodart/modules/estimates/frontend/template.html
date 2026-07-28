@@ -1,0 +1,189 @@
+<!-- ============================================================================
+  WOODART · ESTIMATES & BOQ · MARKUP
+  ----------------------------------------------------------------------------
+  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.
+  Nothing here is built by JavaScript. No <script> tag, no <template> tag —
+  standing owner rule (companies/woodart/MODULE-STANDARD.md §2.1).
+
+  THE HOOKS the logic uses:
+    [data-shell]  reusable chrome (head bar, tab band)   → shell('x')
+    [data-screen] a whole screen                          → screen('x')
+    [data-fill]   a slot a built widget drops into
+    [data-k]      a live scalar slot (a KPI number)       → fillK(node,'x',v)
+    [data-tab]    a tab button (logic marks .active, wires, strips the hook)
+    [data-act]    a button the logic wires an action onto
+    [data-when]   a block the logic REMOVES when the condition is false
+
+  STYLING: every UTILITY is Tailwind (tw-). The house COMPONENT classes stay
+  (card · kpi-card · btn · page-head · badge · data-row · progress · num).
+  ============================================================================ -->
+
+
+<!-- ============================================================================
+     SHARED CHROME — page-head bar (mirrors EPAL.pageHead) + the 3-tab band.
+     The <h1> inner run stays on ONE line: a newline between those inline tags
+     clones as a real space and shifts pixels.
+     ============================================================================ -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow" data-fill="eyebrow"></span><i class="bi bi-calculator-fill"></i></h1>
+    <p class="page-sub" data-fill="sub"></p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-ghost" href="#/woodart/projects"><i class="bi bi-easel2-fill"></i> Projects</a>
+    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> New Quotation</button>
+  </div>
+</div>
+
+<div data-shell="tabs" class="tab-underline mb-3">
+  <button data-tab="quotations">Quotations</button>
+  <button data-tab="boq">Bill of Materials</button>
+  <button data-tab="costing">Costing</button>
+</div>
+
+
+<!-- ============================================================================
+     SCREEN 1 · QUOTATIONS — what we have quoted, and what came back.
+     ============================================================================ -->
+<section data-screen="quotations">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Quotations</span><span class="kpi-ico"><i class="bi bi-file-earmark-text"></i></span></div>
+      <div class="kpi-value" data-k="count">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Open Pipeline</span><span class="kpi-ico"><i class="bi bi-hourglass-split"></i></span></div>
+      <div class="kpi-value" data-k="pipeline">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Approved</span><span class="kpi-ico"><i class="bi bi-check2-circle"></i></span></div>
+      <div class="kpi-value" data-k="approved">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Win Rate</span><span class="kpi-ico"><i class="bi bi-trophy"></i></span></div>
+      <div class="kpi-value" data-k="winRate">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Expired</span><span class="kpi-ico"><i class="bi bi-clock-history"></i></span></div>
+      <div class="kpi-value" data-k="expired">—</div>
+    </div>
+  </div>
+
+  <!-- Shown only when a quote has gone past its validity with no answer. -->
+  <div class="build-banner" data-when="expired">
+    <i class="bi bi-clock-history"></i>
+    <div><strong data-k="expiredInline">0</strong> quotation(s) are past their valid-till
+      date and still waiting on the client. Re-price before re-sending — material
+      costs move.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-file-earmark-text"></i> Quotation Register</h3>
+      <span class="card-sub">Biggest first — click one to open its bill of quantities</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 2 · BILL OF MATERIALS — every quoted line, and what it costs TODAY.
+
+     `drift` compares each quoted unit cost against the live Materials register.
+     A quote written months ago against plywood that has since gone up is the
+     commonest way an interiors job loses its margin before a sheet is cut, and
+     nothing else in the system was showing it.
+     ============================================================================ -->
+<section data-screen="boq">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Quoted Lines</span><span class="kpi-ico"><i class="bi bi-list-ol"></i></span></div>
+      <div class="kpi-value" data-k="lines">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Materials</span><span class="kpi-ico"><i class="bi bi-boxes"></i></span></div>
+      <div class="kpi-value" data-k="materials">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Quoted Cost</span><span class="kpi-ico"><i class="bi bi-cash-stack"></i></span></div>
+      <div class="kpi-value" data-k="cost">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Priced Above Quote</span><span class="kpi-ico"><i class="bi bi-fire"></i></span></div>
+      <div class="kpi-value" data-k="drifted">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Not In Register</span><span class="kpi-ico"><i class="bi bi-question-circle"></i></span></div>
+      <div class="kpi-value" data-k="unknown">—</div>
+    </div>
+  </div>
+
+  <div class="build-banner" data-when="drift">
+    <i class="bi bi-exclamation-triangle"></i>
+    <div><strong data-k="driftInline">0</strong> quoted line(s) now cost MORE than
+      they were quoted at — <strong data-k="driftValue">৳0</strong> of margin at risk
+      across open work. The Drift column shows each one.</div>
+  </div>
+
+  <div class="section-label">EVERY QUOTED LINE</div>
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-list-ol"></i> Bill of Quantities</h3>
+      <span class="card-sub">Across every quotation — quoted cost vs today's register price</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+  <div class="section-label">WHAT THE PIPELINE WILL CONSUME</div>
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-boxes"></i> Material Demand</h3>
+      <span class="card-sub">Totals per material across all quoted work — rejected quotes excluded</span>
+    </div>
+    <div class="card-body" data-fill="demand"></div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 3 · COSTING — which quotes actually make money.
+     ============================================================================ -->
+<section data-screen="costing">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Quoted Value</span><span class="kpi-ico"><i class="bi bi-tag-fill"></i></span></div>
+      <div class="kpi-value" data-k="sale">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Quoted Cost</span><span class="kpi-ico"><i class="bi bi-cash-stack"></i></span></div>
+      <div class="kpi-value" data-k="cost">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Quoted Margin</span><span class="kpi-ico"><i class="bi bi-graph-up"></i></span></div>
+      <div class="kpi-value" data-k="margin">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Margin at Today's Prices</span><span class="kpi-ico"><i class="bi bi-activity"></i></span></div>
+      <div class="kpi-value" data-k="today">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Thinnest Margin</span><span class="kpi-ico"><i class="bi bi-exclamation-diamond"></i></span></div>
+      <div class="kpi-value" data-k="worst">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-percent"></i> Margin by Quotation</h3>
+      <span class="card-sub">Thinnest first — these are the ones worth arguing about</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>

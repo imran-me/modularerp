@@ -116,7 +116,7 @@
           "enabled": true
         }
       ],
-      "built": false
+      "built": true
     },
     {
       "id": "clients",

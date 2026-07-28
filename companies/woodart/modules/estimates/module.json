@@ -1,0 +1,47 @@
+{
+  "key": "estimates",
+  "company": "woodart",
+  "title": "Estimates & BOQ",
+  "icon": "calculator-fill",
+  "desc": "Quotations, bill of materials, costing.",
+  "route": "#/woodart/estimates",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "quotations",
+      "label": "Quotations",
+      "route": "#/woodart/estimates",
+      "enabled": true
+    },
+    {
+      "id": "boq",
+      "label": "Bill of Materials",
+      "route": "#/woodart/estimates/boq",
+      "enabled": true
+    },
+    {
+      "id": "costing",
+      "label": "Costing",
+      "route": "#/woodart/estimates/costing",
+      "enabled": true
+    }
+  ],
+  "stores": [
+    "wa_estimates"
+  ],
+  "reads": [
+    "wa_projects",
+    "wa_materials",
+    "wa_clients"
+  ],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/estimates.js",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — the presence of THIS file is what auto-discovery HEAD-probes (platform/discovery/discovery.js). A module registered built:true in the company manifest but missing this file is treated as deleted.",
+  "ownership": "wa_estimates is CREATED by the projects module — its migration, model and seeder live there, because the estimates were the spine every other Woodart seeder pointed at long before this module existed. This module owns the SCREENS and the write path; projects keeps the table. Same arrangement as Accounts over acc_entries."
+}

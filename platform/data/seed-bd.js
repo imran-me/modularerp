@@ -327,14 +327,45 @@
       S.set('wa_revisions', rvns);
     }
 
-    gen('wa_materials', 22, function (i) {
-      var mats = [['Marine Plywood 18mm','Board'],['Veneer Board','Board'],['MDF 12mm','Board'],['Formica Laminate','Laminate'],
-        ['German Hinge (Hettich)','Hardware'],['Drawer Channel 18"','Hardware'],['SS Handle','Hardware'],['Wood Glue 5kg','Adhesive'],
-        ['NC Lacquer','Finish'],['PU Polish','Finish'],['Fabric — Velvet','Fabric'],['Foam 4"','Fabric']];
-      var m = mats[i % mats.length];
-      return { id: seq('MAT', i, 3), name: m[0], category: m[1], unit: pick(['pcs','sheet','kg','litre','sft']),
-        stock: ri(2, 220), reorder: ri(10, 40), unitCost: ri(120, 8500),
-        supplier: pick(['Timber World BD','Hatil Trade','RFL Hardware','Akij Board','Partex Star']), created: dt() };
+    /* Woodart MATERIALS — a MIRROR of the backend MaterialSeeder, not a generator.
+     *
+     * This used to be gen('wa_materials', 22, …) cycling 12 names with a random
+     * unitCost of ri(120, 8500). Two things were wrong with that, and both were
+     * visible on screen:
+     *   1. 22 rows from 12 names meant DUPLICATES — MAT-006 and MAT-018 were
+     *      both 'Drawer Channel 18"' at different prices, so the register showed
+     *      one material twice and neither row was authoritative.
+     *   2. the random cost disagreed with the BOQ, which quotes these same
+     *      materials at their REAL prices (ProjectSeeder). Estimates › Bill of
+     *      Materials compares the two, and reported plywood quoted at 3,400 now
+     *      costing 6,513 — a 92% price rise that never happened.
+     *
+     * The list below is byte-for-byte the backend seeder's, so demo mode and a
+     * migrated host describe ONE register.
+     *
+     * THREE items deliberately cost MORE than the BOQ quoted them at — plywood,
+     * lacquer and hinges — because that is a real thing that happens to a joinery
+     * business between quoting and building, and the Drift column exists to
+     * catch it. Every other item sits exactly at its quoted cost, so a non-zero
+     * drift always means something. */
+    gen('wa_materials', 12, function (i) {
+      var mats = [
+        ['MAT-001','Marine Plywood 18mm',    'Board',   'sheet', 142,  40, 3610, 'Timber World BD'],
+        ['MAT-002','Veneer Board',           'Board',   'sheet',  38,  25, 4200, 'Akij Board'],
+        ['MAT-003','MDF 12mm',               'Board',   'sheet',  16,  30, 1850, 'Partex Star'],
+        ['MAT-004','Formica Laminate',       'Laminate','sheet',  88,  35, 1250, 'Hatil Trade'],
+        ['MAT-005','German Hinge (Hettich)', 'Hardware','pcs',   420, 150,  335, 'RFL Hardware'],
+        ['MAT-006','Drawer Channel 18"',     'Hardware','pcs',    64, 100,  540, 'RFL Hardware'],
+        ['MAT-007','SS Handle',              'Hardware','pcs',   210,  80,  185, 'RFL Hardware'],
+        ['MAT-008','Wood Glue 5kg',          'Adhesive','kg',     52,  20,  760, 'Timber World BD'],
+        ['MAT-009','NC Lacquer',             'Finish',  'litre',  28,  30, 1065, 'Akij Board'],
+        ['MAT-010','PU Polish',              'Finish',  'litre',  44,  20, 1420, 'Akij Board'],
+        ['MAT-011','Fabric — Velvet',        'Fabric',  'sft',   160,  60,  420, 'Hatil Trade'],
+        ['MAT-012','Foam 4"',                'Fabric',  'sft',     0,  50,  260, 'Hatil Trade']
+      ];
+      var m = mats[i];
+      return { id: m[0], name: m[1], category: m[2], unit: m[3],
+        stock: m[4], reorder: m[5], unitCost: m[6], supplier: m[7], created: '2026-01-12' };
     });
     gen('wa_production', 12, function (i) {
       return { id: seq('JOB', i, 3), job: pick(['Cabinet carcass','Wardrobe shutters','Conference table','Wall paneling','Reception desk','Bed frame','TV unit']),
