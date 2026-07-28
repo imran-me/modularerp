@@ -7,12 +7,87 @@
   "route": "#/woodart/accounts",
   "enabled": true,
   "menu": [
-    { "id": "register", "label": "Income & Expense", "route": "#/woodart/accounts/register", "enabled": true },
-    { "id": "payables", "label": "Vendor Payables", "route": "#/woodart/accounts/payables", "enabled": true },
-    { "id": "pnl", "label": "Project P&L", "route": "#/woodart/accounts/pnl", "enabled": true }
+    {
+      "id": "overview",
+      "label": "Overview",
+      "route": "#/woodart/accounts",
+      "enabled": true
+    },
+    {
+      "id": "income",
+      "label": "Income",
+      "route": "#/woodart/accounts/income",
+      "enabled": true
+    },
+    {
+      "id": "expenses",
+      "label": "Expenses",
+      "route": "#/woodart/accounts/expenses",
+      "enabled": true
+    },
+    {
+      "id": "payables",
+      "label": "Payables",
+      "route": "#/woodart/accounts/payables",
+      "enabled": true
+    },
+    {
+      "id": "pnl",
+      "label": "Project P&L",
+      "route": "#/woodart/accounts/pnl",
+      "enabled": true
+    },
+    {
+      "id": "payroll",
+      "label": "Payroll",
+      "route": "#/woodart/accounts/payroll",
+      "enabled": true
+    },
+    {
+      "id": "recurring",
+      "label": "Recurring",
+      "route": "#/woodart/accounts/recurring",
+      "enabled": true
+    },
+    {
+      "id": "banks",
+      "label": "Banks",
+      "route": "#/woodart/accounts/banks",
+      "enabled": true
+    },
+    {
+      "id": "cash",
+      "label": "Manage Cash",
+      "route": "#/woodart/accounts/cash",
+      "enabled": true
+    },
+    {
+      "id": "journals",
+      "label": "Journals",
+      "route": "#/woodart/accounts/journals",
+      "enabled": true
+    },
+    {
+      "id": "schedules",
+      "label": "Schedules",
+      "route": "#/woodart/accounts/schedules",
+      "enabled": true
+    }
   ],
-  "stores": ["acc_entries"],
-  "reads": ["wa_purchases", "wa_projects", "wa_estimates", "wa_movements", "wa_materials", "banks"],
+  "stores": [
+    "acc_entries",
+    "wa_recurring"
+  ],
+  "reads": [
+    "wa_purchases",
+    "wa_projects",
+    "wa_estimates",
+    "wa_movements",
+    "wa_materials",
+    "banks",
+    "acc_schedules",
+    "gl_entries"
+  ],
   "files": {
     "template": "frontend/template.html",
     "api": "frontend/api.js",

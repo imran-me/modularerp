@@ -9,7 +9,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  WOODART · ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.\n  Nothing here is built by JavaScript. No <script> tag, no <template> tag —\n  standing owner rule (companies/woodart/MODULE-STANDARD.md §2.1).\n\n  THE HOOKS the logic uses:\n    [data-shell]  reusable chrome (head bar, tab band)   → shell('x')\n    [data-screen] a whole screen                          → screen('x')\n    [data-fill]   a slot a built widget drops into\n    [data-k]      a live scalar slot (a KPI number)       → fillK(node,'x',v)\n    [data-tab]    a tab button (logic marks .active, wires, strips the hook)\n    [data-act]    a button the logic wires an action onto\n    [data-when]   a block the logic REMOVES when the condition is false\n    [data-proto]  a hidden prototype cloned once per record\n    [data-slot]   a fill point inside a cloned [data-proto] node\n\n  STYLING: every UTILITY is Tailwind (tw-). The house COMPONENT classes stay\n  (card · kpi-card · btn · page-head · badge · data-row · progress · num).\n  The only inline styles are computed bar widths — values, not utilities.\n  ============================================================================ -->\n\n\n<!-- ============================================================================\n     SHARED CHROME — page-head bar (mirrors EPAL.pageHead) + the 3-tab band.\n     The <h1> inner run stays on ONE line: a newline between those inline tags\n     clones as a real space and shifts pixels.\n     ============================================================================ -->\n<div data-shell=\"head\" class=\"page-head\">\n  <div>\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-cash-stack\"></i></h1>\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\n  </div>\n  <div class=\"page-actions\">\n    <a class=\"btn btn-ghost\" href=\"#/woodart/procurement\"><i class=\"bi bi-cart-fill\"></i> Procurement</a>\n    <button class=\"btn btn-primary\" data-act=\"new\"><i class=\"bi bi-plus-lg\"></i> Record Entry</button>\n  </div>\n</div>\n\n<div data-shell=\"tabs\" class=\"tab-underline mb-3\">\n  <button data-tab=\"register\">Income &amp; Expense</button>\n  <button data-tab=\"payables\">Vendor Payables</button>\n  <button data-tab=\"pnl\">Project P&amp;L</button>\n</div>\n\n\n<!-- ============================================================================\n     SCREEN 1 · REGISTER — what the interiors business earned and spent.\n\n     These rows live in the SHARED `acc_entries` table, scoped to Woodart. The\n     same money shows on the Group's Master Accounts desk; this is the interiors\n     view of one book, not a second book.\n     ============================================================================ -->\n<section data-screen=\"register\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Income</span><span class=\"kpi-ico\"><i class=\"bi bi-graph-up-arrow\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"income\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Expense</span><span class=\"kpi-ico\"><i class=\"bi bi-graph-down-arrow\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"expense\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Net</span><span class=\"kpi-ico\"><i class=\"bi bi-calculator\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"net\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Unpaid Vendors</span><span class=\"kpi-ico\"><i class=\"bi bi-people\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"unpaidVendors\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Outstanding</span><span class=\"kpi-ico\"><i class=\"bi bi-hourglass-split\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"outstanding\">—</div>\n    </div>\n  </div>\n\n  <!-- Shown only when money is owed to a vendor. -->\n  <div class=\"build-banner\" data-when=\"owing\">\n    <i class=\"bi bi-exclamation-diamond\"></i>\n    <div><strong data-k=\"owingInline\">0</strong> purchase order(s) still unpaid.\n      <button class=\"link-btn\" data-act=\"goPayables\">Open vendor payables</button>.</div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-journal-text\"></i> Income &amp; Expense Register</h3>\n      <span class=\"card-sub\">Newest first — every rupee in and out, with its project or order</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 2 · VENDOR PAYABLES — what Woodart owes, per purchase order.\n\n     Two mutually exclusive states, BOTH authored here; the logic removes one.\n     ============================================================================ -->\n<section data-screen=\"payables\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Outstanding</span><span class=\"kpi-ico\"><i class=\"bi bi-hourglass-split\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"outstanding\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Vendors Owed</span><span class=\"kpi-ico\"><i class=\"bi bi-people-fill\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"vendors\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Oldest Unpaid</span><span class=\"kpi-ico\"><i class=\"bi bi-clock-history\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"oldest\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Orders Settled</span><span class=\"kpi-ico\"><i class=\"bi bi-check2-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"settled\">—</div>\n    </div>\n  </div>\n\n  <!-- STATE A · nothing owed -->\n  <div class=\"empty-state\" data-when=\"clear\">\n    <i class=\"bi bi-check2-circle\"></i>\n    <h3>Every order is settled</h3>\n    <p class=\"tw-text-ink-dim\">No vendor is waiting on Woodart. New goods receipts will raise a payable here.</p>\n  </div>\n\n  <!-- STATE B · money is owed -->\n  <div data-when=\"some\">\n    <div class=\"build-banner\">\n      <i class=\"bi bi-info-circle\"></i>\n      <div>A goods receipt raises <strong>2000 Accounts Payable</strong>. Paying an\n        order here clears it and moves the money out of the account you name —\n        register, ledger and bank balance together.</div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-receipt\"></i> Vendor Payables</h3>\n        <span class=\"card-sub\">Unpaid first, oldest at the top — click an order to settle it</span>\n      </div>\n      <div class=\"card-body\" data-fill=\"register\"></div>\n    </div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 3 · PROJECT P&L — the screen no other company can show.\n\n     Contract value against committed cost against the approved BOQ budget.\n     `variance` is budget minus material actually issued from the stock ledger:\n     NEGATIVE means the job is eating more material than it was quoted for, and\n     that is the single number this whole module exists to surface.\n     ============================================================================ -->\n<section data-screen=\"pnl\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Portfolio Value</span><span class=\"kpi-ico\"><i class=\"bi bi-easel2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"value\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Committed Cost</span><span class=\"kpi-ico\"><i class=\"bi bi-briefcase\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cost\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Margin</span><span class=\"kpi-ico\"><i class=\"bi bi-graph-up\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"margin\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Billed To Date</span><span class=\"kpi-ico\"><i class=\"bi bi-receipt-cutoff\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"billed\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Over Budget</span><span class=\"kpi-ico\"><i class=\"bi bi-fire\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"over\">—</div>\n    </div>\n  </div>\n\n  <!-- Shown only when at least one job has consumed more than its BOQ allowed. -->\n  <div class=\"build-banner\" data-when=\"over\">\n    <i class=\"bi bi-exclamation-triangle\"></i>\n    <div><strong data-k=\"overInline\">0</strong> project(s) have issued more material\n      than the approved BOQ budgeted. The variance column shows by how much.</div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-clipboard-data\"></i> Project Profit &amp; Loss</h3>\n      <span class=\"card-sub\">Value vs cost vs the approved bill of quantities</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  WOODART · ACCOUNTS · MARKUP\n  ----------------------------------------------------------------------------\n  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.\n  Nothing here is built by JavaScript. No <script> tag, no <template> tag —\n  standing owner rule (companies/woodart/MODULE-STANDARD.md §2.1).\n\n  THE HOOKS the logic uses:\n    [data-shell]  reusable chrome (head bar, tab band)   → shell('x')\n    [data-screen] a whole screen                          → screen('x')\n    [data-fill]   a slot a built widget drops into\n    [data-k]      a live scalar slot (a KPI number)       → fillK(node,'x',v)\n    [data-tab]    a tab button (logic marks .active, wires, strips the hook)\n    [data-act]    a button the logic wires an action onto\n    [data-when]   a block the logic REMOVES when the condition is false\n\n  TAB SET — matches Travels Accounts (owner directive 2026-07-28), plus the two\n  screens only an interiors business can show. Payroll and Manage Cash mount the\n  SHARED desks (EPAL.payrollDesk / EPAL.cashDesk), which already take a company\n  id, so those two tabs are the same code Travels runs — not a copy of it.\n\n  STYLING: every UTILITY is Tailwind (tw-). The house COMPONENT classes stay\n  (card · kpi-card · btn · page-head · badge · data-row · progress · num).\n  ============================================================================ -->\n\n\n<!-- ============================================================================\n     SHARED CHROME — page-head bar (mirrors EPAL.pageHead) + the tab band.\n     The <h1> inner run stays on ONE line: a newline between those inline tags\n     clones as a real space and shifts pixels.\n     ============================================================================ -->\n<div data-shell=\"head\" class=\"page-head\">\n  <div>\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-cash-stack\"></i></h1>\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\n  </div>\n  <div class=\"page-actions\">\n    <a class=\"btn btn-ghost\" href=\"#/woodart/ledgers\"><i class=\"bi bi-journal-text\"></i> Ledgers</a>\n    <button class=\"btn btn-primary\" data-act=\"new\"><i class=\"bi bi-plus-lg\"></i> New Entry</button>\n  </div>\n</div>\n\n<div data-shell=\"tabs\" class=\"tab-underline tabs-dense mb-3\">\n  <button data-tab=\"overview\">Overview</button>\n  <button data-tab=\"income\">Income</button>\n  <button data-tab=\"expenses\">Expenses</button>\n  <button data-tab=\"payables\">Payables</button>\n  <button data-tab=\"pnl\">Project P&amp;L</button>\n  <button data-tab=\"payroll\">Payroll</button>\n  <button data-tab=\"recurring\">Recurring</button>\n  <button data-tab=\"banks\">Banks</button>\n  <button data-tab=\"cash\">Manage Cash</button>\n  <button data-tab=\"journals\">Journals</button>\n  <button data-tab=\"schedules\">Schedules</button>\n</div>\n\n\n<!-- ============================================================================\n     SCREEN 1 · OVERVIEW — the money at a glance, and what needs attention.\n     ============================================================================ -->\n<section data-screen=\"overview\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Income</span><span class=\"kpi-ico\"><i class=\"bi bi-graph-up-arrow\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"income\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Expenses</span><span class=\"kpi-ico\"><i class=\"bi bi-graph-down-arrow\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"expense\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Net Result</span><span class=\"kpi-ico\"><i class=\"bi bi-calculator\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"net\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Cash &amp; Bank</span><span class=\"kpi-ico\"><i class=\"bi bi-bank\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cash\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Payables</span><span class=\"kpi-ico\"><i class=\"bi bi-hourglass-split\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"outstanding\">—</div>\n      <div class=\"kpi-foot\" data-k=\"outstandingFoot\"></div>\n    </div>\n  </div>\n\n  <div class=\"section-label\">ACTION CENTER — NEEDS ATTENTION</div>\n  <div class=\"card\">\n    <div class=\"card-body\" data-fill=\"actions\"></div>\n  </div>\n\n  <div class=\"section-label\">CASH MOVEMENT</div>\n  <div class=\"grid-2\">\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-activity\"></i> Income vs Expense — monthly</h3>\n        <span class=\"card-sub\">last 8 months</span>\n      </div>\n      <div class=\"card-body\"><div style=\"height: 250px; position: relative;\"><canvas data-canvas=\"trend\"></canvas></div></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-pie-chart-fill\"></i> Expense by Head</h3>\n        <span class=\"card-sub\">where the money goes</span>\n      </div>\n      <div class=\"card-body\"><div style=\"height: 250px; position: relative;\"><canvas data-canvas=\"mix\"></canvas></div></div>\n    </div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 2 · INCOME — what the interiors business earned.\n     ============================================================================ -->\n<section data-screen=\"income\">\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Total Income</span><span class=\"kpi-ico\"><i class=\"bi bi-graph-up-arrow\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"total\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Entries</span><span class=\"kpi-ico\"><i class=\"bi bi-receipt\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"count\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Biggest Head</span><span class=\"kpi-ico\"><i class=\"bi bi-fire\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"top\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Billed to Projects</span><span class=\"kpi-ico\"><i class=\"bi bi-easel2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"projects\">—</div>\n    </div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-graph-up-arrow\"></i> Income Register</h3>\n      <span class=\"card-sub\">Newest first — project billings, design fees and everything else</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 3 · EXPENSES — what it cost to run the workshop.\n     ============================================================================ -->\n<section data-screen=\"expenses\">\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Total Expenses</span><span class=\"kpi-ico\"><i class=\"bi bi-graph-down-arrow\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"total\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Entries</span><span class=\"kpi-ico\"><i class=\"bi bi-receipt-cutoff\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"count\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Biggest Head</span><span class=\"kpi-ico\"><i class=\"bi bi-fire\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"top\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Paid to Vendors</span><span class=\"kpi-ico\"><i class=\"bi bi-truck\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"vendors\">—</div>\n    </div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-graph-down-arrow\"></i> Expense Register</h3>\n      <span class=\"card-sub\">Newest first — every cost, with its project or purchase order</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 4 · VENDOR PAYABLES — what Woodart owes, per purchase order.\n     Two mutually exclusive states, BOTH authored here; the logic removes one.\n     ============================================================================ -->\n<section data-screen=\"payables\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Outstanding</span><span class=\"kpi-ico\"><i class=\"bi bi-hourglass-split\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"outstanding\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Vendors Owed</span><span class=\"kpi-ico\"><i class=\"bi bi-people-fill\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"vendors\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Oldest Unpaid</span><span class=\"kpi-ico\"><i class=\"bi bi-clock-history\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"oldest\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Orders Settled</span><span class=\"kpi-ico\"><i class=\"bi bi-check2-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"settled\">—</div>\n    </div>\n  </div>\n\n  <!-- STATE A · nothing owed -->\n  <div class=\"empty-state\" data-when=\"clear\">\n    <i class=\"bi bi-check2-circle\"></i>\n    <h3>Every order is settled</h3>\n    <p class=\"tw-text-ink-dim\">No vendor is waiting on Woodart. New goods receipts will raise a payable here.</p>\n  </div>\n\n  <!-- STATE B · money is owed -->\n  <div data-when=\"some\">\n    <div class=\"build-banner\">\n      <i class=\"bi bi-info-circle\"></i>\n      <div>A goods receipt raises <strong>2000 Accounts Payable</strong>. Paying an\n        order here clears it and moves the money out of the account you name —\n        register, ledger and bank balance together.</div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-receipt\"></i> Vendor Payables</h3>\n        <span class=\"card-sub\">Unpaid first, oldest at the top — click an order to settle it</span>\n      </div>\n      <div class=\"card-body\" data-fill=\"register\"></div>\n    </div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 5 · PROJECT P&L — the screen no other company can show.\n\n     `variance` is BOQ budget minus material actually issued from the stock\n     ledger: NEGATIVE means the job is eating more material than it was quoted\n     for, and that is the single number this module exists to surface.\n     ============================================================================ -->\n<section data-screen=\"pnl\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Portfolio Value</span><span class=\"kpi-ico\"><i class=\"bi bi-easel2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"value\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Committed Cost</span><span class=\"kpi-ico\"><i class=\"bi bi-briefcase\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cost\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Margin</span><span class=\"kpi-ico\"><i class=\"bi bi-graph-up\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"margin\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Billed To Date</span><span class=\"kpi-ico\"><i class=\"bi bi-receipt-cutoff\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"billed\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Over Budget</span><span class=\"kpi-ico\"><i class=\"bi bi-fire\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"over\">—</div>\n    </div>\n  </div>\n\n  <div class=\"build-banner\" data-when=\"over\">\n    <i class=\"bi bi-exclamation-triangle\"></i>\n    <div><strong data-k=\"overInline\">0</strong> project(s) have issued more material\n      than the approved BOQ budgeted. The variance column shows by how much.</div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-clipboard-data\"></i> Project Profit &amp; Loss</h3>\n      <span class=\"card-sub\">Value vs cost vs the approved bill of quantities</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 6 · RECURRING — standing costs that repeat every month.\n     ============================================================================ -->\n<section data-screen=\"recurring\">\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Active</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-repeat\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"active\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Monthly Commitment</span><span class=\"kpi-ico\"><i class=\"bi bi-calendar-check\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"monthly\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Due This Month</span><span class=\"kpi-ico\"><i class=\"bi bi-hourglass-split\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"due\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Paused</span><span class=\"kpi-ico\"><i class=\"bi bi-pause-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"paused\">—</div>\n    </div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-arrow-repeat\"></i> Recurring Costs</h3>\n      <span class=\"card-sub\">Workshop rent, utilities, retainers — the bills that come every month</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 7 · BANKS — Woodart's own accounts and what is in them.\n     ============================================================================ -->\n<section data-screen=\"banks\">\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Accounts</span><span class=\"kpi-ico\"><i class=\"bi bi-bank\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"count\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Total Balance</span><span class=\"kpi-ico\"><i class=\"bi bi-wallet2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"total\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Largest</span><span class=\"kpi-ico\"><i class=\"bi bi-safe2\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"largest\">—</div>\n    </div>\n  </div>\n\n  <div class=\"build-banner\">\n    <i class=\"bi bi-info-circle\"></i>\n    <div>Accounts are group master data — add or edit them on\n      <a href=\"#/group/master-accounts/banks\">Master Accounts › Manage Banks</a>.\n      This screen is Woodart's view of the ones that belong to this concern.</div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-bank\"></i> Woodart Accounts</h3>\n      <span class=\"card-sub\">Balance and last movement per account</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 8 · JOURNALS — the double entry behind every screen above.\n     ============================================================================ -->\n<section data-screen=\"journals\">\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Journals</span><span class=\"kpi-ico\"><i class=\"bi bi-journal-text\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"count\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Total Debits</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-down-left\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"dr\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Total Credits</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-up-right\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cr\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Balanced</span><span class=\"kpi-ico\"><i class=\"bi bi-check2-square\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"balanced\">—</div>\n    </div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-journal-text\"></i> Journal Entries</h3>\n      <span class=\"card-sub\">Every posting this concern has made — newest first</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 9 · SCHEDULES — money promised for a future date.\n     ============================================================================ -->\n<section data-screen=\"schedules\">\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Open</span><span class=\"kpi-ico\"><i class=\"bi bi-calendar2-week\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"open\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Scheduled Out</span><span class=\"kpi-ico\"><i class=\"bi bi-arrow-up-right\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"out\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Overdue</span><span class=\"kpi-ico\"><i class=\"bi bi-exclamation-diamond\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"overdue\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Due in 7 Days</span><span class=\"kpi-ico\"><i class=\"bi bi-hourglass-split\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"soon\">—</div>\n    </div>\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-calendar2-week\"></i> Payment Schedules</h3>\n      <span class=\"card-sub\">What is promised, to whom, and when</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 10/11 · PAYROLL and MANAGE CASH mount the SHARED desks, which\n     already take a company id (EPAL.payrollDesk / EPAL.cashDesk). Woodart runs\n     the SAME code Travels runs rather than a copy of it — so a fix to the cash\n     book reaches both concerns at once. These hosts exist only to give the desk\n     somewhere to render, and to say so honestly if the kit is missing.\n     ============================================================================ -->\n<section data-screen=\"desk\">\n  <div data-fill=\"desk\"></div>\n  <div class=\"empty-state\" data-when=\"missing\">\n    <i class=\"bi bi-plug\"></i>\n    <h3>Desk unavailable</h3>\n    <p class=\"tw-text-ink-dim\">The shared desk did not load. Check the script order in index.html.</p>\n  </div>\n</section>\n";
   var MODULE_CSS = null;
   if (MODULE_CSS && !document.querySelector('style[data-module-style="woodart/accounts"]')) {
     var st = document.createElement('style');
@@ -55,6 +55,7 @@ var PROJECTS  = 'wa_projects';   /* read-only: owned by Projects               *
 var ESTIMATES = 'wa_estimates';  /* read-only: the BOQ that IS the budget      */
 var MOVEMENTS = 'wa_movements';  /* read-only: owned by Materials              */
 var MATERIALS = 'wa_materials';  /* read-only: for unit cost                   */
+var RECURRING = 'wa_recurring';  /* OURS — standing monthly costs              */
 
 var CID = 'woodart';
 var TODAY = '2026-07-05';        /* the demo clock — same anchor as every module */
@@ -243,6 +244,108 @@ var Books = {
     }).sort(function (a, b) { return String(a.project).localeCompare(String(b.project)); });
   },
 
+  /* ---- the split registers ---------------------------------------------- */
+
+  income:   function () { return this.register().filter(function (e) { return e.kind === INCOME; }); },
+  expenses: function () { return this.register().filter(function (e) { return e.kind === EXPENSE; }); },
+
+  /** Totals per category, biggest first — feeds the "biggest head" KPIs. */
+  byHead: function (kind) {
+    var bag = {};
+    this.all().forEach(function (e) {
+      if (e.kind !== kind) return;
+      var k = e.category || 'Uncategorised';
+      bag[k] = num(bag[k]) + num(e.amount);
+    });
+    return Object.keys(bag)
+      .map(function (k) { return { head: k, total: bag[k] }; })
+      .sort(function (a, b) { return b.total - a.total; });
+  },
+
+  /**
+   * Income vs expense for the last `n` months, oldest first.
+   *
+   * Months are walked back from the DEMO CLOCK, not from the real today, so the
+   * chart tells the same story on every machine and in every screenshot.
+   */
+  monthly: function (n) {
+    n = n || 8;
+    var end = new Date(TODAY + 'T00:00:00');
+    var out = [];
+    for (var i = n - 1; i >= 0; i--) {
+      var d = new Date(end.getFullYear(), end.getMonth() - i, 1);
+      var ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      out.push({ ym: ym, label: d.toLocaleString('en', { month: 'short' }), income: 0, expense: 0 });
+    }
+    var index = {};
+    out.forEach(function (r) { index[r.ym] = r; });
+
+    this.all().forEach(function (e) {
+      var row = index[String(e.date || '').slice(0, 7)];
+      if (!row) return;
+      if (e.kind === INCOME) row.income += num(e.amount); else row.expense += num(e.amount);
+    });
+    return out;
+  },
+
+  /* ---- the shared books this desk also reads ---------------------------- */
+
+  /** Woodart's own accounts. `banks` is group master data, scoped here. */
+  banks: function () {
+    return db.col('banks').filter(function (b) {
+      return String(b.companyId) === CID || +b.companyId === 6;
+    });
+  },
+
+  cashBalance: function () {
+    return this.banks().reduce(function (t, b) { return t + num(b.balance); }, 0);
+  },
+
+  /**
+   * The double entry behind every other screen.
+   *
+   * Read from the shared LEDGER ENGINE rather than a store of our own — the
+   * whole point of this desk is that Woodart's postings are the group's
+   * postings. If this ever needs its own table, something has gone wrong.
+   */
+  journals: function () {
+    if (!(EPAL.ledger && EPAL.ledger.entries)) return [];
+    try { return EPAL.ledger.entries({ companyId: CID }) || []; } catch (e) { return []; }
+  },
+
+  /** Money promised for a future date — shared store, company-scoped. */
+  schedules: function () {
+    return db.col('acc_schedules').filter(function (s) { return s.companyId === CID; });
+  },
+
+  /** Standing monthly costs. Woodart's own store, mirroring travels' tv_recurring. */
+  recurring: function () {
+    return db.col(RECURRING).filter(function (r) { return r.companyId === CID; });
+  },
+
+  /**
+   * Is this standing cost still to fall due in the current (demo) month?
+   *
+   * Compared against the DEMO CLOCK's day-of-month, not the real one, so the
+   * "due this month" count is stable in screenshots and does not quietly change
+   * meaning as the wall clock passes the 5th.
+   */
+  isDueThisMonth: function (rec) {
+    if (!rec || rec.status === 'Paused') return false;
+    var day = +rec.dayOfMonth || 0;
+    if (!day) return false;
+    return day >= +TODAY.slice(8, 10);
+  },
+
+  saveRecurring: function (rec) {
+    rec.companyId = CID;
+    rec.amount = Math.abs(num(rec.amount));
+    if (!rec.id) rec.id = 'REC-WA' + String(Date.now()).slice(-5);
+    return db.save(RECURRING, rec);
+  },
+
+  removeRecurring: function (id) { db.remove(RECURRING, id); },
+
   /* ---- option lists (the seam owns every store name, including these) ---- */
 
   /**
@@ -328,13 +431,23 @@ var Books = {
 /* ============================================================================
  * WOODART · ACCOUNTS · LOGIC
  * ----------------------------------------------------------------------------
- * BEHAVIOUR ONLY. Every container, card, KPI tile, banner and bar is real HTML
- * in frontend/template.html, handed to this file by tools/build/build-module.mjs
- * as TEMPLATE_HTML. This file is NOT an IIFE and declares no 'use strict' of its
- * own — the build wraps it.
+ * BEHAVIOUR ONLY. Every container, card, KPI tile, banner and canvas is real
+ * HTML in frontend/template.html, handed to this file by
+ * tools/build/build-module.mjs as TEMPLATE_HTML. This file is NOT an IIFE and
+ * declares no 'use strict' of its own — the build wraps it.
  *
  * WHERE THE DATA COMES FROM: frontend/api.js — the seam. This file never names
  * `acc_entries` and never names a URL. Grep it: neither is here.
+ *
+ * THE TAB SET matches Travels Accounts (owner directive 2026-07-28) so a person
+ * who knows one concern's books knows them all, plus the two screens only an
+ * interiors business can show — Vendor Payables and Project P&L.
+ *
+ * PAYROLL and MANAGE CASH mount the SHARED desks. `EPAL.payrollDesk(page, cid)`
+ * and `EPAL.cashDesk(page, cid)` already take a company id, so Woodart runs the
+ * SAME code Travels runs rather than a copy of it — a fix to the cash book
+ * reaches both concerns at once. Re-implementing them here would have been the
+ * expensive way to get a second thing to keep in sync.
  *
  * ==> LARAVEL MAPPING: register = GET|POST /api/woodart/accounts/register,
  *     payables = GET .../payables, pay = POST .../payables/{po}/pay,
@@ -364,18 +477,36 @@ function when(root, name, keep) {
   return n;
 }
 
+/** Give a template canvas a unique id so Chart.js can find it after mounting. */
+function canvasId(root, name) {
+  var c = root.querySelector('[data-canvas="' + name + '"]');
+  if (!c) return null;
+  var id = 'wa-acc-' + name + '-' + ui.uid();
+  c.id = id;
+  c.removeAttribute('data-canvas');
+  return id;
+}
+
 /* ---- shared chrome ------------------------------------------------------- */
 
 var TAB_COPY = {
-  register: ['Income & Expense', 'Every rupee the interiors business earned and spent.'],
-  payables: ['Vendor Payables', 'What Woodart owes, per purchase order — oldest first.'],
-  pnl:      ['Project P&L', 'Value against cost against the approved bill of quantities.']
+  overview:  ['Accounts', 'Income, expenses, journals and payment schedules for Woodart Interiors.'],
+  income:    ['Income', 'Project billings, design fees and everything else the business earned.'],
+  expenses:  ['Expenses', 'Every cost of running the workshop, with its project or order.'],
+  payables:  ['Vendor Payables', 'What Woodart owes, per purchase order — oldest first.'],
+  pnl:       ['Project P&L', 'Value against cost against the approved bill of quantities.'],
+  payroll:   ['Payroll', 'Salary run, payslips, loans & advances — posted to the ledger.'],
+  recurring: ['Recurring', 'Standing monthly costs — rent, utilities, retainers.'],
+  banks:     ['Banks', "Woodart's own accounts and what is in them."],
+  cash:      ['Manage Cash', 'Cash book, petty cash and cheques.'],
+  journals:  ['Journals', 'The double entry behind every screen in this module.'],
+  schedules: ['Payment Schedules', 'Money promised for a future date, and what is overdue.']
 };
 
 function head(sub) {
-  var copy = TAB_COPY[sub] || TAB_COPY.register;
+  var copy = TAB_COPY[sub] || TAB_COPY.overview;
   var h = shell('head');
-  fill(h, 'eyebrow').textContent = sub === 'register' ? 'Woodart Interiors' : 'Woodart › Accounts';
+  fill(h, 'eyebrow').textContent = sub === 'overview' ? 'Woodart Interiors' : 'Woodart › Accounts';
   fill(h, 'title').appendChild(document.createTextNode(copy[0]));
   var s = fill(h, 'sub');
   s.textContent = copy[1];
@@ -393,7 +524,7 @@ function tabs(sub) {
     if (key === sub) btn.classList.add('active');
     btn.removeAttribute('data-tab');
     btn.addEventListener('click', function () {
-      EPAL.router.navigate(ROUTE + (key === 'register' ? '' : '/' + key));
+      EPAL.router.navigate(ROUTE + (key === 'overview' ? '' : '/' + key));
     });
   });
   return band;
@@ -405,12 +536,12 @@ function canDelete() { return !EPAL.perm || EPAL.perm.can(CID, 'accounts', 'dele
 
 var KIND_TONE = { Income: 'good', Expense: '' };
 
-/** Money, always with its sign carried by the KIND rather than the number. */
+/** Money, with the sign carried by the KIND rather than by the number. */
 function signed(e) {
   return (e.kind === 'Income' ? '+' : '−') + ui.money(Math.abs(+e.amount || 0));
 }
 
-/** A ref that points at a record which no longer exists is kept, and flagged. */
+/** A ref pointing at a record that no longer exists is KEPT, and flagged. */
 function refCell(r) {
   if (!r.ref) return '<span class="text-mute">—</span>';
   var known = Books.projectOptions().some(function (o) { return o.value === r.ref; })
@@ -420,57 +551,164 @@ function refCell(r) {
     : '<span class="badge badge-warn" title="No matching project or order">' + ui.escapeHtml(r.ref) + ' · orphan</span>';
 }
 
+/** The register columns, shared by Income and Expenses so they cannot drift. */
+function registerColumns(showKind) {
+  var cols = [
+    { key: 'id', label: 'Voucher', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.id) + '</span>'; } },
+    { key: 'date', label: 'Date', date: true }
+  ];
+  if (showKind) cols.push({ key: 'kind', label: 'Kind', badge: KIND_TONE });
+  return cols.concat([
+    { key: 'category', label: 'Category' },
+    { key: 'desc', label: 'Description' },
+    { key: 'ref', label: 'Against', render: refCell },
+    { key: 'method', label: 'Method', render: function (r) { return '<span class="badge">' + ui.escapeHtml(r.method || '—') + '</span>'; } },
+    { key: 'amount', label: 'Amount', num: true,
+      sortVal: function (r) { return +r.amount || 0; },
+      render: function (r) {
+        return '<span class="' + (r.kind === 'Income' ? 'text-good' : '') + '">' + signed(r) + '</span>';
+      } }
+  ]);
+}
+
+function registerTable(rows, name, showKind) {
+  return EPAL.table({
+    columns: registerColumns(showKind),
+    rows: rows,
+    searchKeys: ['id', 'category', 'desc', 'ref', 'party'],
+    filters: [{ key: 'category', label: 'Category' }, { key: 'method', label: 'Method' }],
+    onRow: function (r) { editEntry(Books.find(r.id)); },
+    actions: canDelete() ? [{ icon: 'trash', title: 'Void entry', danger: true, onClick: voidEntry }] : null,
+    exportName: name,
+    pageSize: 12,
+    empty: { icon: 'journal-text', title: 'Nothing recorded yet', hint: 'Record the first entry.' }
+  }).el;
+}
+
 /* ============================================================================
-   SCREEN 1 · REGISTER
+   SCREEN · OVERVIEW
    ========================================================================= */
-function registerScreen(page) {
-  var s = screen('register');
+function overviewScreen(page) {
+  var s = screen('overview');
   var sum = Books.summary();
 
   fillK(s, 'income', ui.compact(sum.income));
   fillK(s, 'expense', ui.compact(sum.expense));
   fillK(s, 'net', ui.compact(sum.net));
-  fillK(s, 'unpaidVendors', sum.unpaidVendors);
+  fillK(s, 'cash', ui.compact(Books.cashBalance()));
   fillK(s, 'outstanding', ui.compact(sum.outstanding));
+  fillK(s, 'outstandingFoot', sum.unpaidVendors + ' vendor(s) unpaid');
 
-  var owing = Books.openOrders().length;
-  var banner = when(s, 'owing', owing > 0);
-  if (banner) {
-    fillK(banner, 'owingInline', owing);
-    banner.querySelector('[data-act="goPayables"]')
-      .addEventListener('click', function () { EPAL.router.navigate(ROUTE + '/payables'); });
+  /* The action center — only real, actionable facts. An empty list here means
+   * nothing needs a decision, which is worth showing rather than hiding. */
+  var acts = [];
+  var pay = Books.payables();
+  pay.data.filter(function (p) { return p.due > 0 && p.days > 30; }).slice(0, 4).forEach(function (p) {
+    acts.push({ icon: 'exclamation-diamond', tone: 'bad',
+      text: p.vendor + ' payable ' + ui.money(p.due) + ' overdue by ' + p.days + 'd',
+      go: ROUTE + '/payables' });
+  });
+  Books.projectPnl().filter(function (r) { return r.budget > 0 && r.variance < 0; }).slice(0, 3).forEach(function (r) {
+    acts.push({ icon: 'fire', tone: 'bad',
+      text: r.project + ' has issued ' + ui.money(Math.abs(r.variance)) + ' more material than its BOQ budgeted',
+      go: ROUTE + '/pnl' });
+  });
+  var topHead = Books.byHead('Expense')[0];
+  if (topHead) {
+    acts.push({ icon: 'pie-chart-fill', tone: '',
+      text: 'Biggest expense head: ' + topHead.head + ' · ' + ui.money(topHead.total),
+      go: ROUTE + '/expenses' });
+  }
+  if (Books.cashBalance() < 0) {
+    acts.push({ icon: 'wallet2', tone: 'bad', text: 'Cash & bank position is negative — review upcoming payables.', go: ROUTE + '/banks' });
   }
 
-  fill(s, 'register').appendChild(EPAL.table({
-    columns: [
-      { key: 'id', label: 'Voucher', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.id) + '</span>'; } },
-      { key: 'date', label: 'Date', date: true },
-      { key: 'kind', label: 'Kind', badge: KIND_TONE },
-      { key: 'category', label: 'Category' },
-      { key: 'desc', label: 'Description' },
-      { key: 'ref', label: 'Against', render: refCell },
-      { key: 'method', label: 'Method', render: function (r) { return '<span class="badge">' + ui.escapeHtml(r.method || '—') + '</span>'; } },
-      { key: 'amount', label: 'Amount', num: true,
-        sortVal: function (r) { return (r.kind === 'Income' ? 1 : -1) * (+r.amount || 0); },
-        render: function (r) {
-          return '<span class="' + (r.kind === 'Income' ? 'text-good' : '') + '">' + signed(r) + '</span>';
-        } }
-    ],
-    rows: Books.register(),
-    searchKeys: ['id', 'category', 'desc', 'ref', 'party'],
-    filters: [{ key: 'kind', label: 'Kind' }, { key: 'category', label: 'Category' }, { key: 'method', label: 'Method' }],
-    onRow: function (r) { editEntry(Books.find(r.id)); },
-    actions: canDelete() ? [{ icon: 'trash', title: 'Void entry', danger: true, onClick: voidEntry }] : null,
-    exportName: 'woodart-register.csv',
-    pageSize: 12,
-    empty: { icon: 'journal-text', title: 'Nothing recorded yet', hint: 'Record the first income or expense.' }
-  }).el);
+  var box = fill(s, 'actions');
+  if (!acts.length) {
+    box.appendChild(el('div.empty-state', null, [
+      el('i.bi.bi-check2-circle'), el('h3', { text: 'Nothing needs attention' }),
+      el('p.tw-text-ink-dim', { text: 'No overdue payables, no job over its BOQ budget.' })
+    ]));
+  } else {
+    acts.forEach(function (a) {
+      box.appendChild(el('button.data-row.row-link', {
+        onclick: function () { EPAL.router.navigate(a.go); }
+      }, [
+        el('span.row-ico' + (a.tone ? '.tone-' + a.tone : ''), { html: ui.icon(a.icon) }),
+        el('span.row-text', { text: a.text }),
+        el('i.bi.bi-chevron-right.row-chev')
+      ]));
+    });
+  }
 
+  var trendId = canvasId(s, 'trend');
+  var mixId = canvasId(s, 'mix');
+
+  mountScreen(page, s);
+
+  /* Charts draw AFTER the screen is in the document — Chart.js measures its
+   * canvas, and a detached node has no size. */
+  requestAnimationFrame(function () {
+    var months = Books.monthly(8);
+    var c1 = trendId && document.getElementById(trendId);
+    if (c1) EPAL.charts.bar(c1, {
+      labels: months.map(function (m) { return m.label; }), legend: true,
+      datasets: [
+        { label: 'Income', data: months.map(function (m) { return m.income; }), color: '#23c17e' },
+        { label: 'Expense', data: months.map(function (m) { return m.expense; }), color: '#f0506e' }
+      ]
+    });
+    var mix = Books.byHead('Expense').slice(0, 7);
+    var c2 = mixId && document.getElementById(mixId);
+    if (c2 && mix.length) EPAL.charts.doughnut(c2, {
+      labels: mix.map(function (m) { return m.head; }),
+      data: mix.map(function (m) { return m.total; })
+    });
+  });
+}
+
+/* ============================================================================
+   SCREEN · INCOME
+   ========================================================================= */
+function incomeScreen(page) {
+  var s = screen('income');
+  var rows = Books.income();
+  var total = rows.reduce(function (t, r) { return t + (+r.amount || 0); }, 0);
+  var top = Books.byHead('Income')[0];
+  var projects = rows.filter(function (r) { return r.ref; })
+    .reduce(function (t, r) { return t + (+r.amount || 0); }, 0);
+
+  fillK(s, 'total', ui.compact(total));
+  fillK(s, 'count', rows.length);
+  fillK(s, 'top', top ? top.head : '—');
+  fillK(s, 'projects', ui.compact(projects));
+
+  fill(s, 'register').appendChild(registerTable(rows, 'woodart-income.csv', false));
   mountScreen(page, s);
 }
 
 /* ============================================================================
-   SCREEN 2 · VENDOR PAYABLES
+   SCREEN · EXPENSES
+   ========================================================================= */
+function expensesScreen(page) {
+  var s = screen('expenses');
+  var rows = Books.expenses();
+  var total = rows.reduce(function (t, r) { return t + (+r.amount || 0); }, 0);
+  var top = Books.byHead('Expense')[0];
+  var vendors = rows.filter(function (r) { return r.category === 'Vendor Payment'; })
+    .reduce(function (t, r) { return t + (+r.amount || 0); }, 0);
+
+  fillK(s, 'total', ui.compact(total));
+  fillK(s, 'count', rows.length);
+  fillK(s, 'top', top ? top.head : '—');
+  fillK(s, 'vendors', ui.compact(vendors));
+
+  fill(s, 'register').appendChild(registerTable(rows, 'woodart-expenses.csv', false));
+  mountScreen(page, s);
+}
+
+/* ============================================================================
+   SCREEN · VENDOR PAYABLES
    ========================================================================= */
 function payablesScreen(page) {
   var s = screen('payables');
@@ -519,7 +757,7 @@ function payablesScreen(page) {
 }
 
 /* ============================================================================
-   SCREEN 3 · PROJECT P&L
+   SCREEN · PROJECT P&L
    ========================================================================= */
 function pnlScreen(page) {
   var s = screen('pnl');
@@ -572,6 +810,198 @@ function pnlScreen(page) {
 
   mountScreen(page, s);
 }
+
+/* ============================================================================
+   SCREEN · RECURRING
+   ========================================================================= */
+function recurringScreen(page) {
+  var s = screen('recurring');
+  var rows = Books.recurring();
+  var active = rows.filter(function (r) { return r.status !== 'Paused'; });
+  var monthly = active.reduce(function (t, r) { return t + (+r.amount || 0); }, 0);
+  var dueThis = active.filter(function (r) { return Books.isDueThisMonth(r); }).length;
+
+  fillK(s, 'active', active.length);
+  fillK(s, 'monthly', ui.compact(monthly));
+  fillK(s, 'due', dueThis);
+  fillK(s, 'paused', rows.length - active.length);
+
+  fill(s, 'register').appendChild(EPAL.table({
+    columns: [
+      { key: 'id', label: 'Ref', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.id) + '</span>'; } },
+      { key: 'name', label: 'What' },
+      { key: 'category', label: 'Head' },
+      { key: 'party', label: 'Paid To' },
+      { key: 'dayOfMonth', label: 'Day', num: true,
+        render: function (r) { return r.dayOfMonth ? 'day ' + r.dayOfMonth : '—'; } },
+      { key: 'method', label: 'Method', render: function (r) { return '<span class="badge">' + ui.escapeHtml(r.method || '—') + '</span>'; } },
+      { key: 'status', label: 'Status', badge: { Active: 'good', Paused: 'warn' } },
+      { key: 'amount', label: 'Amount', num: true, render: function (r) { return ui.money(r.amount); } }
+    ],
+    rows: rows,
+    searchKeys: ['id', 'name', 'category', 'party'],
+    filters: [{ key: 'status', label: 'Status' }, { key: 'category', label: 'Head' }],
+    onRow: function (r) { editRecurring(r); },
+    actions: canDelete() ? [{ icon: 'trash', title: 'Delete', danger: true, onClick: deleteRecurring }] : null,
+    exportName: 'woodart-recurring.csv',
+    pageSize: 12,
+    empty: { icon: 'arrow-repeat', title: 'No recurring costs', hint: 'Add the workshop rent, utilities or a retainer.' }
+  }).el);
+
+  mountScreen(page, s);
+}
+
+/* ============================================================================
+   SCREEN · BANKS
+   ========================================================================= */
+function banksScreen(page) {
+  var s = screen('banks');
+  var rows = Books.banks();
+  var total = rows.reduce(function (t, b) { return t + (+b.balance || 0); }, 0);
+  var largest = rows.slice().sort(function (a, b) { return (+b.balance || 0) - (+a.balance || 0); })[0];
+
+  fillK(s, 'count', rows.length);
+  fillK(s, 'total', ui.compact(total));
+  fillK(s, 'largest', largest ? largest.name : '—');
+
+  fill(s, 'register').appendChild(EPAL.table({
+    columns: [
+      { key: 'name', label: 'Account', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.name || '—') + '</span>'; } },
+      { key: 'accountName', label: 'Held By' },
+      { key: 'accountNumber', label: 'Number' },
+      { key: 'branchName', label: 'Branch' },
+      { key: 'type', label: 'Type', render: function (r) { return '<span class="badge">' + ui.escapeHtml(r.type || r.accountType || '—') + '</span>'; } },
+      { key: 'balance', label: 'Balance', num: true,
+        render: function (r) {
+          var v = +r.balance || 0;
+          return '<span class="' + (v < 0 ? 'text-bad strong' : '') + '">' + ui.money(v) + '</span>';
+        } }
+    ],
+    rows: rows,
+    searchKeys: ['name', 'accountName', 'accountNumber', 'branchName'],
+    exportName: 'woodart-banks.csv',
+    pageSize: 12,
+    empty: { icon: 'bank', title: 'No accounts', hint: 'Add one on Master Accounts › Manage Banks.' }
+  }).el);
+
+  mountScreen(page, s);
+}
+
+/* ============================================================================
+   SCREEN · JOURNALS
+   ========================================================================= */
+function journalsScreen(page) {
+  var s = screen('journals');
+  var rows = Books.journals();
+
+  var dr = 0, cr = 0;
+  rows.forEach(function (j) {
+    (j.lines || []).forEach(function (l) { dr += +l.dr || 0; cr += +l.cr || 0; });
+  });
+
+  fillK(s, 'count', rows.length);
+  fillK(s, 'dr', ui.compact(dr));
+  fillK(s, 'cr', ui.compact(cr));
+  /* Rounded to the paisa before comparing: a float sum of many postings is
+   * never exactly equal, and reporting "No" for a 0.0000001 drift would send
+   * somebody hunting a bug that is not there. */
+  fillK(s, 'balanced', Math.abs(dr - cr) < 0.01 ? 'Yes' : 'No');
+
+  fill(s, 'register').appendChild(EPAL.table({
+    columns: [
+      { key: 'id', label: 'Journal', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.id || r.ref || '—') + '</span>'; } },
+      { key: 'date', label: 'Date', date: true },
+      { key: 'source', label: 'Source', render: function (r) { return '<span class="badge">' + ui.escapeHtml(r.source || 'manual') + '</span>'; } },
+      { key: 'memo', label: 'Narration' },
+      { key: 'party', label: 'Party' },
+      { key: 'amount', label: 'Amount', num: true,
+        sortVal: function (r) { return journalTotal(r); },
+        render: function (r) { return ui.money(journalTotal(r)); } }
+    ],
+    rows: rows,
+    searchKeys: ['id', 'ref', 'memo', 'party', 'source'],
+    filters: [{ key: 'source', label: 'Source' }],
+    exportName: 'woodart-journals.csv',
+    pageSize: 12,
+    empty: { icon: 'journal-text', title: 'No journals yet', hint: 'Postings appear here as soon as money moves.' }
+  }).el);
+
+  mountScreen(page, s);
+}
+
+/** One side of a balanced entry IS the entry's value — summing both doubles it. */
+function journalTotal(j) {
+  return (j.lines || []).reduce(function (t, l) { return t + (+l.dr || 0); }, 0);
+}
+
+/* ============================================================================
+   SCREEN · SCHEDULES
+   ========================================================================= */
+function schedulesScreen(page) {
+  var s = screen('schedules');
+  var rows = Books.schedules();
+  var today = Books.today();
+
+  var open = rows.filter(function (r) { return r.status !== 'Paid' && r.status !== 'Cancelled'; });
+  var out = open.reduce(function (t, r) { return t + (+r.amount || 0); }, 0);
+  var overdue = open.filter(function (r) { return r.dueDate && r.dueDate < today; });
+  var soon = open.filter(function (r) {
+    if (!r.dueDate || r.dueDate < today) return false;
+    return (Date.parse(r.dueDate) - Date.parse(today)) / 86400000 <= 7;
+  });
+
+  fillK(s, 'open', open.length);
+  fillK(s, 'out', ui.compact(out));
+  fillK(s, 'overdue', overdue.length);
+  fillK(s, 'soon', soon.length);
+
+  fill(s, 'register').appendChild(EPAL.table({
+    columns: [
+      { key: 'id', label: 'Ref', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.id) + '</span>'; } },
+      { key: 'title', label: 'What', render: function (r) { return ui.escapeHtml(r.title || r.desc || '—'); } },
+      { key: 'party', label: 'Party' },
+      { key: 'dueDate', label: 'Due', date: true },
+      { key: 'age', label: 'When', sortVal: function (r) { return r.dueDate || ''; },
+        render: function (r) {
+          if (!r.dueDate) return '<span class="text-mute">—</span>';
+          var d = Math.round((Date.parse(r.dueDate) - Date.parse(today)) / 86400000);
+          if (r.status === 'Paid') return '<span class="text-good">paid</span>';
+          if (d < 0) return '<span class="text-bad">' + Math.abs(d) + 'd overdue</span>';
+          if (d <= 7) return '<span class="text-warn">' + d + 'd away</span>';
+          return '<span class="text-mute">' + d + 'd away</span>';
+        } },
+      { key: 'status', label: 'Status', badge: { Paid: 'good', Pending: 'warn', Cancelled: '' } },
+      { key: 'amount', label: 'Amount', num: true, render: function (r) { return ui.money(r.amount); } }
+    ],
+    rows: rows,
+    searchKeys: ['id', 'title', 'desc', 'party'],
+    filters: [{ key: 'status', label: 'Status' }],
+    exportName: 'woodart-schedules.csv',
+    pageSize: 12,
+    empty: { icon: 'calendar2-week', title: 'Nothing scheduled', hint: 'Promised payments appear here.' }
+  }).el);
+
+  mountScreen(page, s);
+}
+
+/* ============================================================================
+   SCREENS · PAYROLL and MANAGE CASH — the SHARED desks.
+
+   Both already take a company id, so Woodart runs the same code Travels runs.
+   If the kit is missing the screen says so rather than rendering an empty page
+   that looks like "no data".
+   ========================================================================= */
+function deskScreen(page, deskFn) {
+  var s = screen('desk');
+  var host = fill(s, 'desk');
+  var ok = typeof deskFn === 'function';
+  when(s, 'missing', !ok);
+  if (ok) deskFn(host, CID);
+  mountScreen(page, s);
+}
+
+function payrollScreen(page) { deskScreen(page, EPAL.payrollDesk); }
+function cashScreen(page) { deskScreen(page, EPAL.cashDesk); }
 
 /* ============================================================================
    ACTIONS
@@ -663,20 +1093,71 @@ function payOrder(row) {
   });
 }
 
+function editRecurring(rec) {
+  var isNew = !rec;
+  EPAL.formModal({
+    title: isNew ? 'New Recurring Cost' : 'Edit · ' + rec.id,
+    icon: 'arrow-repeat',
+    size: 'md',
+    record: rec || { status: 'Active', method: 'Bank', dayOfMonth: 1 },
+    fields: [
+      { key: 'name', label: 'What', type: 'text', required: true, placeholder: 'e.g. Workshop rent — Tejgaon' },
+      { key: 'category', label: 'Head', type: 'select', required: true, col2: true, searchable: true,
+        options: Books.categories('Expense') },
+      { key: 'amount', label: 'Amount (৳)', type: 'number', required: true, min: 1, col2: true },
+      { key: 'party', label: 'Paid To', type: 'text', col2: true },
+      { key: 'dayOfMonth', label: 'Day of Month', type: 'number', min: 1, max: 31, col2: true,
+        hint: 'Which day the bill falls due.' },
+      { key: 'method', label: 'Method', type: 'select', col2: true, options: Books.methods() },
+      { key: 'status', label: 'Status', type: 'select', col2: true, options: ['Active', 'Paused'],
+        hint: 'Paused keeps the record but stops counting it in the monthly commitment.' }
+    ],
+    saveLabel: isNew ? 'Add' : 'Save Changes',
+    onSave: function (v) {
+      Books.saveRecurring(v);
+      ui.toast(isNew ? 'Recurring cost added' : v.id + ' updated', 'success');
+      EPAL.router.render();
+      return true;
+    }
+  });
+}
+
+function deleteRecurring(row) {
+  ui.confirm({
+    title: 'Delete ' + row.id + '?',
+    body: 'The standing cost "' + (row.name || '') + '" will be removed. Entries already ' +
+      'recorded against it stay in the register — this only stops it being counted as a ' +
+      'future commitment.',
+    confirmLabel: 'Delete'
+  }).then(function (ok) {
+    if (!ok) return;
+    Books.removeRecurring(row.id);
+    ui.toast(row.id + ' deleted', 'success');
+    EPAL.router.render();
+  });
+}
+
 /* ============================================================================
    ROUTE
    ========================================================================= */
+var SCREENS = {
+  overview: overviewScreen, income: incomeScreen, expenses: expensesScreen,
+  payables: payablesScreen, pnl: pnlScreen, payroll: payrollScreen,
+  recurring: recurringScreen, banks: banksScreen, cash: cashScreen,
+  journals: journalsScreen, schedules: schedulesScreen
+};
+
 EPAL.view(ROUTE, {
   title: function () { return 'Accounts'; },
   render: function (ctx) {
-    var sub = ctx.subId || 'register';
-    if (!TAB_COPY[sub]) sub = 'register';
+    var sub = ctx.subId || 'overview';
+    if (!SCREENS[sub]) sub = 'overview';
 
     var page = el('div.page');
     page.appendChild(head(sub));
     page.appendChild(tabs(sub));
 
-    ({ register: registerScreen, payables: payablesScreen, pnl: pnlScreen }[sub])(page);
+    SCREENS[sub](page);
 
     ctx.mount.appendChild(page);
   }

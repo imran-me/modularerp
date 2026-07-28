@@ -303,6 +303,20 @@ var Books = {
     return db.col(RECURRING).filter(function (r) { return r.companyId === CID; });
   },
 
+  /**
+   * Is this standing cost still to fall due in the current (demo) month?
+   *
+   * Compared against the DEMO CLOCK's day-of-month, not the real one, so the
+   * "due this month" count is stable in screenshots and does not quietly change
+   * meaning as the wall clock passes the 5th.
+   */
+  isDueThisMonth: function (rec) {
+    if (!rec || rec.status === 'Paused') return false;
+    var day = +rec.dayOfMonth || 0;
+    if (!day) return false;
+    return day >= +TODAY.slice(8, 10);
+  },
+
   saveRecurring: function (rec) {
     rec.companyId = CID;
     rec.amount = Math.abs(num(rec.amount));

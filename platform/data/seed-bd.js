@@ -240,6 +240,27 @@
         client: rnd() > 0.5 ? pick(CORPORATES) : pick(PEOPLE), items: ri(4, 28), value: ri(2, 60) * 100000,
         status: pick(['Draft','Sent','Sent','Approved','Approved','Rejected']), validTill: future(45), created: dt() };
     });
+    /* Woodart RECURRING COSTS — the bills that arrive every month whether or not
+     * a project is running. Deliberately NOT random: these are the same heads the
+     * seeded register already carries (Workshop rent Tejgaon, workshop power,
+     * design-team salaries), so the Recurring tab and the Expense register
+     * describe one business rather than two. A standing cost with no matching
+     * history would read as a data-entry error the first time anyone checked. */
+    gen('wa_recurring', 6, function (i) {
+      var rows = [
+        { name: 'Workshop rent — Tejgaon',    category: 'Office Rent',      amount: 180000, party: 'Tejgaon Industrial Estate', dayOfMonth: 5,  method: 'Bank', status: 'Active' },
+        { name: 'Workshop power & utilities', category: 'Utilities',        amount: 64200,  party: 'DESCO',                     dayOfMonth: 12, method: 'Bank', status: 'Active' },
+        { name: 'Design team salaries',       category: 'Salaries',         amount: 385000, party: 'Payroll',                   dayOfMonth: 28, method: 'Bank', status: 'Active' },
+        { name: 'Site crew salaries',         category: 'Salaries',         amount: 268000, party: 'Payroll',                   dayOfMonth: 28, method: 'Bank', status: 'Active' },
+        { name: 'Delivery van lease',         category: 'Fuel & Transport', amount: 42000,  party: 'Rangs Motors',              dayOfMonth: 8,  method: 'Bank', status: 'Active' },
+        { name: 'CNC service retainer',       category: 'Tools & Equipment',amount: 25000,  party: 'Homag Bangladesh',          dayOfMonth: 20, method: 'Cheque', status: 'Paused' }
+      ];
+      var r = rows[i];
+      return { id: 'REC-WA' + String(i + 1).padStart(3, '0'), companyId: 'woodart',
+        name: r.name, category: r.category, amount: r.amount, party: r.party,
+        dayOfMonth: r.dayOfMonth, method: r.method, status: r.status, created: '2026-01-05' };
+    });
+
     /* Woodart CLIENTS — DERIVED, not invented. Every client here is a name that
      * actually appears on a Woodart project or estimate above, so the Clients
      * module's portfolio join finds real work against real people. Seeding a

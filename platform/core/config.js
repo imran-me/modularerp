@@ -176,7 +176,16 @@
     m('procurement',  'Procurement',      'cart-fill', { desc:'Vendors, purchase orders, GRN.',
         subs:[['orders','Purchase Orders'],['vendors','Vendors'],['spend','Spend']], sectionEnd:true }),
     m('accounts',     'Accounts',         'cash-stack', { desc:'Income, expenses, vendor payables & project P&L.',
-        subs:[['register','Income & Expense'],['payables','Vendor Payables'],['pnl','Project P&L']] }),
+        /* SAME TAB SET AS TRAVELS ACCOUNTS (owner directive 2026-07-28) so a
+         * person who knows one concern's books knows them all — plus the two
+         * screens only an interiors business can show. Payroll and Manage Cash
+         * mount the SHARED desks (EPAL.payrollDesk / EPAL.cashDesk), which
+         * already take a company id, so Woodart runs the same code Travels
+         * runs rather than a second copy to keep in sync. */
+        subs:[['overview','Overview'],['income','Income'],['expenses','Expenses'],
+              ['payables','Payables'],['pnl','Project P&L'],['payroll','Payroll'],
+              ['recurring','Recurring'],['banks','Banks'],['cash','Manage Cash'],
+              ['journals','Journals'],['schedules','Schedules']] }),
     m('payroll',     'Payroll',      'cash-coin', { desc:'Salary sheet, loans, payslips & advances — tabs at the top.' }),
     m('ledgers',      'Ledgers',          'journal-text', { desc:'General & client ledgers.' }),
     m('hrm',          'HRM',              'people-fill', { desc:'Designers, carpenters, site crew.' }),

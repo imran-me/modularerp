@@ -272,20 +272,68 @@
       "enabled": true,
       "subs": [
         {
-          "id": "register",
-          "label": "Income & Expense",
+          "id": "overview",
+          "label": "Overview",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "income",
+          "label": "Income",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "expenses",
+          "label": "Expenses",
           "icon": "dot",
           "enabled": true
         },
         {
           "id": "payables",
-          "label": "Vendor Payables",
+          "label": "Payables",
           "icon": "dot",
           "enabled": true
         },
         {
           "id": "pnl",
           "label": "Project P&L",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "payroll",
+          "label": "Payroll",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "recurring",
+          "label": "Recurring",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "banks",
+          "label": "Banks",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "cash",
+          "label": "Manage Cash",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "journals",
+          "label": "Journals",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
+          "id": "schedules",
+          "label": "Schedules",
           "icon": "dot",
           "enabled": true
         }
