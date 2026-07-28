@@ -240,6 +240,107 @@
         client: rnd() > 0.5 ? pick(CORPORATES) : pick(PEOPLE), items: ri(4, 28), value: ri(2, 60) * 100000,
         status: pick(['Draft','Sent','Sent','Approved','Approved','Rejected']), validTill: future(45), created: dt() };
     });
+    /* Woodart COST CONTROL — codes, per-code budgets and phases.
+     *
+     * MIRRORS the backend CostCodeSeeder / BudgetSeeder exactly, so demo mode
+     * and a migrated host describe ONE cost structure. See
+     * companies/woodart/PROJECT-PROFILE-PLAN.md and Assets/MUNSHI-VILLA-SHEET.md.
+     *
+     * The code list is derived from the REAL working spreadsheet, so it spans a
+     * job WITH civil work and one that is pure joinery. `kind:'overhead'`
+     * separates site costs from work packages — mixing them manufactures
+     * overruns that never happened. */
+    if (localStorage.getItem(S.namespace + 'wa_cost_codes') === null) {
+      var WA_CODES = [
+        ['Design Fee','Design & Consultancy','Design','direct'],
+        ['3D & Visualisation','3D Design / Visualisation','Design','direct'],
+        ['Drawings & Approval','Drawings & Approvals','Design','direct'],
+        ['Bricks & Breaking','Bricks & Breaking','Structure','direct'],
+        ['Cement','Cement','Structure','direct'],
+        ['Rod','Steel / Rod','Structure','direct'],
+        ['Sand & Bali','Sand / Bali','Structure','direct'],
+        ['Soil & Excavation','Soil Excavation & Fill','Structure','direct'],
+        ['Boards & Ply','Boards, Ply & MDF','Joinery','direct'],
+        ['Laminates & Veneer','Laminates & Veneer','Joinery','direct'],
+        ['Hardware','Hardware & Fittings','Joinery','direct'],
+        ['Adhesives','Adhesives & Consumables','Joinery','direct'],
+        ['Finishes','Lacquer, Polish & Finish','Joinery','direct'],
+        ['Fabric & Foam','Fabric, Foam & Upholstery','Joinery','direct'],
+        ['Wood Work','Wood Work (contracted)','Joinery','direct'],
+        ['Electrical','Electrical','Services','direct'],
+        ['Sanitary','Sanitary & Plumbing','Services','direct'],
+        ['HVAC','HVAC & Ventilation','Services','direct'],
+        ['Tiles Work','Tiles & Stone','Finishes','direct'],
+        ['Paint','Paint & Wall Finish','Finishes','direct'],
+        ['Metal','Metal Work','Finishes','direct'],
+        ['Aluminium','Aluminium & Glazing','Finishes','direct'],
+        ['False Ceiling','False Ceiling','Finishes','direct'],
+        ['Contractor','Contractor (Rajmistri)','Site','direct'],
+        ['Extra Labour','Extra Labour','Site','direct'],
+        ['Installation','Delivery & Installation','Site','direct'],
+        ['Transport & Visit','Transport & Site Visits','Overheads','overhead'],
+        ['Site Expense','Site Allowance & Sundries','Overheads','overhead'],
+        ['Vendor Payment','Vendor Payment (on account)','Overheads','overhead'],
+        ['Salaries','Salaries','Overheads','overhead'],
+        ['Office Rent','Workshop / Office Rent','Overheads','overhead'],
+        ['Utilities','Utilities','Overheads','overhead'],
+        ['Tools & Equipment','Tools & Equipment','Overheads','overhead'],
+        ['Other Expense','Extra / Others','Overheads','overhead']
+      ];
+      S.set('wa_cost_codes', WA_CODES.map(function (c, i) {
+        return { id: c[0], code: c[0], label: c[1], phase: c[2], kind: c[3], sort: i, active: true, companyId: 'woodart' };
+      }));
+    }
+
+    /* Budgets DERIVED from the approved BOQ, grouped by the cost code each
+     * material belongs to via the Materials register's own category — so the
+     * budget and the quotation it was won on cannot disagree. A project with no
+     * approved BOQ gets no rows, which is correct: the Munshi sheet budgets only
+     * 6 of its 18 heads. */
+    if (localStorage.getItem(S.namespace + 'wa_budget_lines') === null) {
+      var CAT2CODE = { Board:'Boards & Ply', Laminate:'Laminates & Veneer', Hardware:'Hardware',
+                       Adhesive:'Adhesives', Finish:'Finishes', Fabric:'Fabric & Foam' };
+      var codeOf = {};
+      S.list('wa_materials').forEach(function (m) { codeOf[m.name] = CAT2CODE[m.category] || 'Other Expense'; });
+
+      var budget = [];
+      S.list('wa_estimates').forEach(function (e) {
+        if (e.status !== 'Approved' && e.status !== 'Sent') return;
+        if (!e.project) return;
+        var bag = {};
+        (e.lines || []).forEach(function (l) {
+          var code = codeOf[l.item] || 'Other Expense';
+          bag[code] = (bag[code] || 0) + (+l.qty || 0) * (+l.unitCost || 0);
+        });
+        Object.keys(bag).forEach(function (code) {
+          budget.push({ id: e.project + '::' + code, companyId: 'woodart', project: e.project,
+            code: code, budget: Math.round(bag[code]), source: 'boq', note: 'From ' + e.id });
+        });
+      });
+      S.set('wa_budget_lines', budget);
+    }
+
+    /* Phases as PARALLEL rows. Status is DERIVED from the project's headline
+     * stage, so the phase strip agrees with the stage badge instead of
+     * contradicting it. Structure is skipped for anything that is not civil
+     * work — an empty "Structure 0%" row on a fit-out is noise. */
+    if (localStorage.getItem(S.namespace + 'wa_phases') === null) {
+      var PHASES = ['Design','Structure','Joinery','Services','Finishes','Site'];
+      var STAGE2PHASE = { Design:'Design', Production:'Joinery', Installation:'Site', Handover:'Site', Completed:'Site' };
+      var rows = [];
+      S.list('wa_projects').forEach(function (p) {
+        var cur = STAGE2PHASE[p.stage] || 'Design';
+        var ci = PHASES.indexOf(cur); if (ci < 0) ci = 0;
+        PHASES.forEach(function (name, i) {
+          if (name === 'Structure' && p.type !== 'Civil') return;
+          rows.push({ id: p.id + '::' + name, companyId: 'woodart', project: p.id, name: name, sort: i,
+            status: i < ci ? 'Complete' : (i === ci ? 'Active' : 'Not started'),
+            start: i <= ci ? p.start : null, finish: i < ci ? p.start : null });
+        });
+      });
+      S.set('wa_phases', rows);
+    }
+
     /* Woodart RECURRING COSTS — the bills that arrive every month whether or not
      * a project is running. Deliberately NOT random: these are the same heads the
      * seeded register already carries (Workshop rent Tejgaon, workshop power,

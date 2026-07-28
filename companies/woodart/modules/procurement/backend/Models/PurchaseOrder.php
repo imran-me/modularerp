@@ -18,7 +18,7 @@ class PurchaseOrder extends Model
     protected $table = 'wa_purchases';
 
     protected $fillable = [
-        'ext_id', 'company_id', 'supplier', 'items', 'amount', 'status', 'date', 'created_on',
+        'ext_id', 'company_id', 'supplier', 'project', 'items', 'amount', 'status', 'date', 'created_on',
     ];
 
     protected $casts = [

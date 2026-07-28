@@ -52,24 +52,25 @@ class ProcurementSeeder extends Seeder
         }
 
         $orders = [
-            // [ext_id, supplier, items, amount, status, date]
-            ['WPO-001', 'Timber World BD', 8,  340000, 'Received', '2026-04-02'],
-            ['WPO-002', 'Akij Board',      5,  186000, 'Received', '2026-04-19'],
-            ['WPO-003', 'RFL Hardware',   12,   96000, 'Partial',  '2026-05-06'],
-            ['WPO-004', 'Partex Star',     4,  128000, 'Ordered',  '2026-05-21'],
-            ['WPO-005', 'Hatil Trade',     6,  212000, 'Received', '2026-06-03'],
-            ['WPO-006', 'Timber World BD', 9,  405000, 'Ordered',  '2026-06-18'],
-            ['WPO-007', 'RFL Hardware',    7,   74000, 'Received', '2026-06-29'],
+            // [ext_id, supplier, project, items, amount, status, date]
+            ['WPO-001', 'Timber World BD', 'WAP-102',8,  340000, 'Received', '2026-04-02'],
+            ['WPO-002', 'Akij Board', 'WAP-102',     5,  186000, 'Received', '2026-04-19'],
+            ['WPO-003', 'RFL Hardware', 'WAP-101',  12,   96000, 'Partial',  '2026-05-06'],
+            ['WPO-004', 'Partex Star', 'WAP-101',    4,  128000, 'Ordered',  '2026-05-21'],
+            ['WPO-005', 'Hatil Trade', 'WAP-103',    6,  212000, 'Received', '2026-06-03'],
+            ['WPO-006', 'Timber World BD', 'WAP-102',9,  405000, 'Ordered',  '2026-06-18'],
+            ['WPO-007', 'RFL Hardware', null,   7,   74000, 'Received', '2026-06-29'],
             // Deliberately raised on a supplier with NO vendor record, so the
             // "unlisted" path has data. Money left the business either way.
-            ['WPO-008', 'Dhaka Glass Co',  3,   58000, 'Ordered',  '2026-07-01'],
+            ['WPO-008', 'Dhaka Glass Co', 'WAP-004', 3,   58000, 'Ordered',  '2026-07-01'],
         ];
 
-        foreach ($orders as [$extId, $supplier, $items, $amount, $status, $date]) {
+        foreach ($orders as [$extId, $supplier, $project, $items, $amount, $status, $date]) {
             PurchaseOrder::updateOrCreate(
                 ['company_id' => 'woodart', 'ext_id' => $extId],
                 [
                     'supplier'   => $supplier,
+                    'project'    => $project,
                     'items'      => $items,
                     'amount'     => $amount,
                     'status'     => $status,
