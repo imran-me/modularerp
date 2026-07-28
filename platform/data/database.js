@@ -642,7 +642,7 @@
         var arAcct = null, cash = false;
         S.list('gl_entries').forEach(function (e) {
           if (e.source === 'sale' && e.ref === ref) (e.lines || []).forEach(function (l) {
-            if (l.dr > 0) { if (l.account === '1200' || l.account === '1150') arAcct = l.account; if (l.account === '1010') cash = true; }
+            if (l.dr > 0) { if (l.account === '1200' || l.account === '1150') arAcct = l.account; if (EPAL.ledger.isCashAccount(l.account)) cash = true; }
           });
         });
         if (!arAcct || cash || !(+amount > 0)) return;

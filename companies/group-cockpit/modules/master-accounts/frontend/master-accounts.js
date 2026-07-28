@@ -272,7 +272,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
     var rows = [];
     if (EPAL.ledger && EPAL.ledger.entries) EPAL.ledger.entries(scope).forEach(function (e) {
       var d = 0, c = 0;
-      (e.lines || []).forEach(function (l) { if (l.account === '1000' || l.account === '1010') { d += +l.dr || 0; c += +l.cr || 0; } });
+      (e.lines || []).forEach(function (l) { if (EPAL.ledger.isCashAccount(l.account)) { d += +l.dr || 0; c += +l.cr || 0; } });
       if (d === 0 && c === 0) return;
       rows.push({ id: e.id, date: e.date, memo: e.memo || '', source: e.source || '', net: d - c });
     });
@@ -400,7 +400,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       var b = bankFromMemo(e.memo); if (!b) return;               // can't attribute → skip
       var din = 0, dout = 0;
       (e.lines || []).forEach(function (l) {
-        if (l.account === '1000' || l.account === '1010') { din += +l.dr || 0; dout += +l.cr || 0; }
+        if (EPAL.ledger.isCashAccount(l.account)) { din += +l.dr || 0; dout += +l.cr || 0; }
       });
       if (!din && !dout) return;
       var isIn = din >= dout, amt = isIn ? din : dout;
@@ -680,7 +680,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         [ el('div.text-mute.xs.mb-1', { html: ui.icon('diagram-3') + ' ' + sel.length + ' concerns × ' + ui.money(Math.floor(amt / sel.length)) + ' — head ' + head + ' · ' + esc(v.category || '') }) ].concat(rows)) ]));
       var payerShare = shares[sel.map(function (p) { return p.id; }).indexOf(payer)] || 0, recv = amt - payerShare;
       var src = EPAL.pay.resolve(v.source);
-      var pay = src.gl + (src.gl === '1000' ? ' Cash' : ' Bank') + (src.bank ? ' · ' + src.bank.name : '');
+      var pay = src.gl + (EPAL.ledger.isUnder(src.gl, '1000') ? ' Cash' : ' Bank') + (src.bank ? ' · ' + src.bank.name : '');
       var jl = el('div.ma-shr-jl');
       jl.appendChild(el('div.text-mute.xs.mb-1', { html: ui.icon('journal-text') + ' Journal — ' + coName(payer) + ' pays the full ' + ui.money(amt) }));
       if (payerShare > 0) jl.appendChild(el('div.ma-shr-row.sm', null, [el('span', { text: 'DR ' + head + ' · ' + coName(payer) + ' share' }), el('span.num', { text: ui.money(payerShare) })]));
@@ -1914,7 +1914,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       if (EPAL.ledger && EPAL.ledger.entries) {
         EPAL.ledger.entries(scope).forEach(function (e) {
           if (!e.date) return;
-          if (!(e.lines || []).some(function (l) { return l.account === '1000' || l.account === '1010'; })) return;
+          if (!(e.lines || []).some(function (l) { return EPAL.ledger.isCashAccount(l.account); })) return;
           ledgerN++;
           if (!lastE || e.date >= lastE.date) lastE = e;   // array is chronological → later wins on date ties
         });
@@ -1929,7 +1929,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       var useLedger = lastE && (!bt || lastE.date >= bt.date);
       if (useLedger) {
         var dr = 0, cr = 0;
-        (lastE.lines || []).forEach(function (l) { if (l.account === '1000' || l.account === '1010') { dr += +l.dr || 0; cr += +l.cr || 0; } });
+        (lastE.lines || []).forEach(function (l) { if (EPAL.ledger.isCashAccount(l.account)) { dr += +l.dr || 0; cr += +l.cr || 0; } });
         var net = dr - cr;
         lastInfo = { entry: lastE, id: lastE.ref || lastE.id, memo: lastE.memo || '', date: lastE.date, net: net, closing: gl, opening: gl - net };
       } else if (bt) {
@@ -2022,7 +2022,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       if (EPAL.ledger && EPAL.ledger.entries) EPAL.ledger.entries(scope).forEach(function (e) {
         if (!e.date || e.date < startK || e.date > endK) return;
         var din = 0, dout = 0;
-        (e.lines || []).forEach(function (l) { if (l.account === '1000' || l.account === '1010') { din += +l.dr || 0; dout += +l.cr || 0; } });
+        (e.lines || []).forEach(function (l) { if (EPAL.ledger.isCashAccount(l.account)) { din += +l.dr || 0; dout += +l.cr || 0; } });
         if (inD[e.date] === undefined) return;
         inD[e.date] += din; outD[e.date] += dout; totIn += din; totOut += dout;
       });
@@ -2339,6 +2339,34 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
           var to = all.filter(function (b) { return b.id === v.to; })[0];
           if (!from || !to) { ui.toast('Account not found', 'error'); return false; }
           var tid = 'BT-' + Date.now().toString(36).toUpperCase();
+          // ON THE BOOKS TOO (owner 2026-07-28). This used to move the two
+          // registers and post nothing: with every bank collapsed into one 1010
+          // line a bank→bank transfer really did net to zero, but a CASH BOX →
+          // BANK transfer moved 1000 → 1010 and the ledger never heard about it,
+          // while the same movement made from Manage Cash did post. Now each
+          // account has its own code, so one journal is right in every case —
+          // between two banks it nets to zero at the 1010 control account, and
+          // between a drawer and a bank it moves exactly what it should.
+          var fromGl = EPAL.pay.glAcctOf(from), toGl = EPAL.pay.glAcctOf(to);
+          var fromCo = from.companyId || 'group', toCo = to.companyId || 'group';
+          var note = 'Transfer · ' + from.name + ' → ' + to.name + (v.memo ? ' — ' + v.memo : '');
+          try {
+            if (fromCo === toCo) {
+              EPAL.ledger.post({ id: 'GL-' + tid, date: v.date || TODAY_STR, companyId: fromCo,
+                ref: tid, source: 'bank', memo: note,
+                lines: [ { account: toGl, dr: amt, cr: 0 }, { account: fromGl, dr: 0, cr: amt } ] });
+            } else {
+              // money moving BETWEEN concerns is a loan between them, not a sale:
+              // the sender is owed it (1300) and the receiver owes it (2400), which
+              // is exactly the pair the consolidated trial balance eliminates.
+              EPAL.ledger.post({ id: 'GL-' + tid + '-S', date: v.date || TODAY_STR, companyId: fromCo,
+                ref: tid, source: 'intercompany', party: coName(toCo), memo: note + ' · funded ' + coName(toCo),
+                lines: [ { account: '1300', dr: amt, cr: 0 }, { account: fromGl, dr: 0, cr: amt } ] });
+              EPAL.ledger.post({ id: 'GL-' + tid + '-R', date: v.date || TODAY_STR, companyId: toCo,
+                ref: tid, source: 'intercompany', party: coName(fromCo), memo: note + ' · funded by ' + coName(fromCo),
+                lines: [ { account: toGl, dr: amt, cr: 0 }, { account: '2400', dr: 0, cr: amt } ] });
+            }
+          } catch (e) { ui.toast(e.message || 'Ledger posting failed', 'error'); return false; }
           bankTxnApply(from, 'transfer-out', amt, v.date, 'Transfer to ' + to.name + (v.memo ? ' — ' + v.memo : ''), tid);
           bankTxnApply(to, 'transfer-in', amt, v.date, 'Transfer from ' + from.name + (v.memo ? ' — ' + v.memo : ''), tid);
           S.upsert('bank_transfers', { id: tid, from: from.id, fromName: from.name, to: to.id, toName: to.name, amount: amt, date: v.date, memo: v.memo || '' });

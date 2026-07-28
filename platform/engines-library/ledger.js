@@ -119,6 +119,7 @@
   function withNormal(row) {
     return { code: row.code, name: row.name, type: row.type,
              normal: row.normal || normalFor(row.type), group: row.group || '',
+             parent: row.parent ? String(row.parent) : '',
              intercompany: !!row.intercompany };
   }
 
@@ -133,14 +134,78 @@
     return null;
   }
 
-  function ensureAccount(code, name, type) {
+  function ensureAccount(code, name, type, opts) {
     code = String(code);
     var existing = account(code);
     if (existing) return existing;
-    var row = withNormal({ code: code, name: name || code, type: type || 'asset', group: 'Other' });
-    S.upsert(COA_KEY, row);
+    opts = opts || {};
+    var row = withNormal({ code: code, name: name || code, type: type || 'asset',
+      group: opts.group || 'Other', parent: opts.parent || '' });
+    // NOT S.upsert: it matches on `id`, and a chart row is keyed by `code` and
+    // carries no id — so `undefined === undefined` matched ROW ZERO and every
+    // new account silently overwrote 1000 Cash. (Latent since the helper was
+    // written; nothing called it with a new code until sub-accounts did.)
+    var list = accounts();
+    var at = -1;
+    for (var i = 0; i < list.length; i++) if (list[i].code === code) { at = i; break; }
+    if (at >= 0) list[at] = row; else list.push(row);
+    S.set(COA_KEY, list);
+    bus.emit('data:changed', { store: COA_KEY, action: 'create', record: row });
     return row;
   }
+
+  /* ==========================================================================
+   * SUB-ACCOUNTS  (owner 2026-07-28 — "do it a more perfect way than them")
+   * --------------------------------------------------------------------------
+   * An account may name a `parent`. Real accounts hang UNDER a control account:
+   * every bank and cash box gets its own code below 1010 / 1000, so the ledger
+   * itself knows which account holds the money instead of trusting a register
+   * to stay in step.
+   *
+   * WHY A CONTROL ACCOUNT AND NOT A FLAT LIST (which is what the reference ERP
+   * does): a flat chart puts eleven bank lines in the trial balance and the
+   * balance sheet, and every report that used to read 1010 has to learn a new
+   * list of codes. Rolling children into their parent keeps every existing
+   * total and every existing screen exactly as it is — `balance('1010')` still
+   * answers "all the money in the bank" — while the detail sits one level down,
+   * ready for the drill-down. Same books, more truth, nothing to re-learn.
+   *
+   * The rules, applied consistently below:
+   *   · balance / ledgerFor / valueOnNormal  → parent INCLUDES its children
+   *   · trialBalance / balanceSheet / pnl    → top-level rows only (rolled up),
+   *                                            so the statements never change
+   *   · posting                              → always to the leaf
+   * ========================================================================*/
+  function childrenOf(code) {
+    code = String(code);
+    return accounts().filter(function (a) { return a.parent === code; });
+  }
+  // the account plus every descendant, as a code list (self first)
+  function familyOf(code) {
+    code = String(code);
+    var out = [code], queue = [code];
+    while (queue.length) {
+      var c = queue.shift();
+      childrenOf(c).forEach(function (k) { if (out.indexOf(k.code) < 0) { out.push(k.code); queue.push(k.code); } });
+    }
+    return out;
+  }
+  function isTopLevel(acc) { return !acc.parent; }
+  /* Is `code` this control account, or anything under it? Every screen that used
+   * to ask `l.account === '1010'` asks this instead, so a per-bank sub-account
+   * still counts as bank money. */
+  function isUnder(code, ancestor) {
+    code = String(code); ancestor = String(ancestor);
+    var guard = 0;
+    while (code && guard++ < 20) {
+      if (code === ancestor) return true;
+      var a = account(code);
+      code = a && a.parent ? a.parent : '';
+    }
+    return false;
+  }
+  // hard cash or bank money, whichever account it actually sits in
+  function isCashAccount(code) { return isUnder(code, '1000') || isUnder(code, '1010'); }
 
   /* ==========================================================================
    * POSTING
@@ -251,10 +316,15 @@
     return a.date < b.date ? -1 : 1;
   }
 
-  // net {dr,cr} for one account over a filtered set of entries
+  /* net {dr,cr} for one account over a filtered set of entries.
+   * A control account answers for its whole family (see SUB-ACCOUNTS above);
+   * pass { own: true } for the account's OWN postings only. */
   function accountTotals(code, opts) {
     opts = opts || {};
     code = String(code);
+    var want = {};
+    if (opts.own) want[code] = true;
+    else familyOf(code).forEach(function (c) { want[c] = true; });
     var rows = S.list(GL_KEY), dr = 0, cr = 0;
     for (var i = 0; i < rows.length; i++) {
       var e = rows[i];
@@ -263,7 +333,7 @@
       if (opts.from && e.date < opts.from) continue;
       if (opts.to && e.date > opts.to) continue;
       for (var j = 0; j < e.lines.length; j++) {
-        if (e.lines[j].account === code) { dr += (+e.lines[j].dr || 0); cr += (+e.lines[j].cr || 0); }
+        if (want[e.lines[j].account]) { dr += (+e.lines[j].dr || 0); cr += (+e.lines[j].cr || 0); }
       }
     }
     return { dr: dr, cr: cr };
@@ -281,13 +351,16 @@
   // (V2, 2026-07-26). Omitted → the all-time TB, byte-identical to before.
   function trialBalance(companyId, opts) {
     opts = opts || {};
-    var coa = accounts(), out = [];
+    // control accounts answer for their children (SUB-ACCOUNTS): listing both
+    // would count every bank twice. opts.detail → the children as their own rows.
+    var coa = accounts().filter(function (a) { return opts.detail ? true : isTopLevel(a); }), out = [];
     for (var i = 0; i < coa.length; i++) {
       var acc = coa[i];
-      var t = accountTotals(acc.code, { companyId: companyId, asOf: opts.asOf, from: opts.from, to: opts.to });
+      var t = accountTotals(acc.code, { companyId: companyId, asOf: opts.asOf, from: opts.from, to: opts.to,
+        own: !!opts.detail });
       var net = t.dr - t.cr;                 // + => net debit, - => net credit
       if (Math.abs(net) < 0.5 && t.dr === 0 && t.cr === 0) continue; // untouched
-      out.push({ code: acc.code, name: acc.name, type: acc.type,
+      out.push({ code: acc.code, name: acc.name, type: acc.type, parent: acc.parent || '',
         debit: net > 0 ? net : 0, credit: net < 0 ? -net : 0 });
     }
     return out;
@@ -324,7 +397,7 @@
    * of every inter-company pair are finally in the same table. */
   function consolidatedTrialBalance() {
     var comps = consolidatedEntities();
-    var coa = accounts(), rows = [];
+    var coa = accounts().filter(isTopLevel), rows = [];   // children roll into their control account
     comps.forEach(function (c) { c._dr = 0; c._cr = 0; });
     var groupDr = 0, groupCr = 0;
     for (var i = 0; i < coa.length; i++) {
@@ -403,7 +476,11 @@
     code = String(code);
     var acc = account(code);
     var normal = acc ? acc.normal : normalFor('asset');
-    return runningRows(function (ln) { return ln.account === code; }, normal, opts.companyId);
+    // a control account's ledger shows every movement of its family, so "the
+    // Bank ledger" still means all the banks (SUB-ACCOUNTS); { own: true } for
+    // just this code, which is what a per-account drill-down asks for.
+    var fam = {}; (opts.own ? [code] : familyOf(code)).forEach(function (c) { fam[c] = true; });
+    return runningRows(function (ln) { return !!fam[ln.account]; }, normal, opts.companyId);
   }
 
   // AR/AP subledger accounts
@@ -506,7 +583,7 @@
   function pnl(companyId, opts) {
     opts = opts || {};
     var q = { companyId: companyId, from: opts.from, to: opts.to };
-    var coa = accounts();
+    var coa = accounts().filter(isTopLevel);      // children roll into their parent
     var revenue = 0, cogs = 0, expenses = 0, lines = [];
     for (var i = 0; i < coa.length; i++) {
       var a = coa[i];
@@ -611,7 +688,7 @@
     opts = opts || {};
     var ents = consolidatedEntities();
     var elim = intercompanyPnlElimination(opts);
-    var coa = accounts(), rows = [];
+    var coa = accounts().filter(isTopLevel), rows = [];   // children roll into their control account
     var totals = { per: {}, elimination: { revenue: 0, expense: 0 },
       group: { revenue: 0, cogs: 0, gross: 0, expense: 0, net: 0 } };
     ents.forEach(function (e) { totals.per[e.id] = { revenue: 0, cogs: 0, expense: 0, net: 0 }; });
@@ -716,7 +793,8 @@
   // omitted → the latest position, byte-identical to before.
   function balanceSheet(companyId, opts) {
     opts = opts || {};
-    var coa = accounts();
+    // top level only — a control account already carries its children (SUB-ACCOUNTS)
+    var coa = accounts().filter(isTopLevel);
     var assets = [], liabilities = [], equity = [];
     var totAssets = 0, totLiab = 0, totEquity = 0;
     var income = 0, expense = 0;
@@ -755,6 +833,10 @@
     accounts: accounts,
     account: account,
     ensureAccount: ensureAccount,
+    childrenOf: childrenOf,          // sub-accounts of a control account
+    familyOf: familyOf,              // a code plus every descendant
+    isUnder: isUnder,                // '1010-BNK-04' is under '1010'
+    isCashAccount: isCashAccount,    // hard cash or bank, whichever account it sits in
     post: post,
     entries: entries,
     balance: balance,

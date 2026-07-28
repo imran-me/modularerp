@@ -124,8 +124,34 @@
 
     byId: function (id) { return db().col('banks').filter(function (b) { return b.id === id; })[0] || null; },
 
-    /** A cash box IS hard cash on the books (1000); everything else is bank (1010). */
-    glAcctOf: function (bank) { return (bank && bank.type === 'Cash Box') ? '1000' : '1010'; },
+    /* THE ACCOUNT AN ACCOUNT POSTS TO (owner 2026-07-28).
+     * Every real bank and cash box now has its OWN code on the chart, hanging
+     * under the control account it belongs to: a cash box under 1000 Cash, any
+     * other account under 1010 Bank. Code is 1010-<bank id>, created the first
+     * time the account is used and named after it.
+     *
+     * WHY: until now every bank collapsed into a single 1010 line, so the
+     * ledger could not say WHICH account held the money — only the register
+     * could, and the two were kept in step by hand. A transfer between two
+     * accounts posted nothing at all, because on the books it moved nothing.
+     * Now the ledger itself carries the detail. Nothing on screen changes:
+     * ledger.balance('1010') still answers for every bank, because a control
+     * account includes its children (see SUB-ACCOUNTS in ledger.js).
+     *
+     * Postings made before this stayed on the bare control account and are
+     * still counted — the roll-up sees both. */
+    controlAcctOf: function (bank) { return (bank && bank.type === 'Cash Box') ? '1000' : '1010'; },
+    glAcctOf: function (bank) {
+      var control = Pay.controlAcctOf(bank);
+      if (!bank || !bank.id) return control;
+      var L = EPAL.ledger;
+      if (!L || !L.ensureAccount) return control;
+      var code = control + '-' + bank.id;
+      var parent = L.account ? L.account(control) : null;
+      L.ensureAccount(code, bank.name || bank.id, 'asset',
+        { parent: control, group: (parent && parent.group) || 'Current Assets' });
+      return code;
+    },
 
     /** "Cash Box · Travels Petty Cash · Gulshan — ৳ 40K" */
     label: function (b) {
@@ -260,7 +286,7 @@
     var bal = 0;
     var rows = entries.map(function (e) {
       var dr = 0, cr = 0;
-      (e.lines || []).forEach(function (l) { if (l.account === '1000') { dr += (+l.dr || 0); cr += (+l.cr || 0); } });
+      (e.lines || []).forEach(function (l) { if (EPAL.ledger.isUnder(l.account, '1000')) { dr += (+l.dr || 0); cr += (+l.cr || 0); } });
       bal += dr - cr;
       return { id: e.id, date: e.date, companyId: e.companyId || 'group', ref: e.ref || '',
         memo: e.memo || '', party: e.party || '', source: e.source || '', dr: dr, cr: cr, after: bal };

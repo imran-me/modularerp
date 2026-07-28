@@ -718,7 +718,7 @@ function glRole(g) {
   var cash = null, ar = null, ap = null, ic = null, head = null;
   (g.lines || []).forEach(function (l) {
     var c = String(l.account), dr = +l.dr || 0;
-    if (c === '1000' || c === '1010') cash = { code: c, dr: dr };
+    if (EPAL.ledger.isCashAccount(c)) cash = { code: c, dr: dr };
     else if (c === '1200' || c === '1150') ar = { code: c, dr: dr };
     else if (c === '2000' || c === '2050') ap = { code: c };
     else if (c === '1300' || c === '2400') ic = { code: c };
@@ -1012,7 +1012,7 @@ function expenseEntry() {
     if (!sel.cat) { live.innerHTML = ''; return; }
     var v = details.values(); var amt = +v.amount || 0;
     var src = resolveSource(v.source);
-    var pay = src.gl + (src.gl === '1000' ? ' Cash' : ' Bank') + (src.bank ? ' · ' + src.bank.name : '');
+    var pay = src.gl + (EPAL.ledger.isUnder(src.gl, '1000') ? ' Cash' : ' Bank') + (src.bank ? ' · ' + src.bank.name : '');
     var funder = (v.fundedBy && v.fundedBy !== 'travels') ? v.fundedBy : null;
     var drLine = '<span>DR ' + sel.cat.head + ' · ' + esc(sel.cat.name) + (sel.sub ? ' <span class="text-mute">(' + esc(sel.sub) + ')</span>' : '') + '</span><span class="num">' + ui.money(amt) + '</span>';
     live.innerHTML = '';
@@ -1677,7 +1677,7 @@ function cashBookView(page) {
   var rows = [], bal = 0, inflow = 0, outflow = 0;
   EPAL.ledger.entries({ companyId: CID }).forEach(function (e) {
     var d = 0, c = 0;
-    e.lines.forEach(function (l) { if (l.account === '1000' || l.account === '1010') { d += (+l.dr || 0); c += (+l.cr || 0); } });
+    e.lines.forEach(function (l) { if (EPAL.ledger.isCashAccount(l.account)) { d += (+l.dr || 0); c += (+l.cr || 0); } });
     if (d === 0 && c === 0) return;
     bal += d - c; inflow += d; outflow += c;
     rows.push({ id: e.id, date: e.date, ref: e.ref || e.id, memo: e.memo || '', party: e.party || '', inflow: d, outflow: c, balance: bal, reconciled: !!recon[e.id] });
