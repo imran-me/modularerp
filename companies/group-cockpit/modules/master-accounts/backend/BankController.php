@@ -53,11 +53,38 @@ class BankController
         return $map[$slug] ?? null;
     }
 
+    /**
+     * The CHART ACCOUNT a bank posts to, when the production schema links one
+     * (banks.account_id — 2026-07-28).
+     *
+     * This install's imported chart already carries an account per bank ("1001 Brac
+     * Bank Ltd (Travels)", "1005 Dutch-Bangla (Travels)"), which is exactly the
+     * detail the SPA wanted when it started deriving 1010-<id> sub-accounts. Handing
+     * the real code over means the browser posts to the account the business already
+     * keeps, instead of inventing a parallel one — and a host without the column
+     * simply gets '' and keeps the old control-account behaviour.
+     */
+    private function glAccountOf(object $b): string
+    {
+        static $codeById = null;
+        if (! property_exists($b, 'account_id') || ! $b->account_id) {
+            return '';
+        }
+        if ($codeById === null) {
+            try { $codeById = DB::table('accounts')->whereNull('deleted_at')->pluck('code', 'id'); }
+            catch (\Throwable) { $codeById = collect(); }
+        }
+
+        return (string) ($codeById[$b->account_id] ?? '');
+    }
+
     private function present(object $b): array
     {
         return [
             'id'          => (string) $b->id,
             'name'        => $b->name,
+            // the account this bank posts to on the real chart, when it names one
+            'glAccount'   => $this->glAccountOf($b),
             'branch'      => $b->branch_name,
             'accountName' => $b->account_name,
             'accType'     => ucfirst((string) $b->account_type),

@@ -135,6 +135,15 @@
   function ensureCashBox(owner) {
     if (!owner || cashBoxChecked[owner]) return;
     cashBoxChecked[owner] = true;
+    /* NEVER INVENT MASTER DATA ON A LIVE DATABASE (live fix 2026-07-28).
+     * Creating a drawer here is a WRITE, and `banks` is a writable store — so
+     * rendering any picker fired one POST per company at the host. Under load the
+     * host answers "Operation not permitted" (its connection cap, see api.js) and
+     * the screen filled with "Not saved" toasts. A convenience must never write to
+     * a real database behind the user's back: on live the drawer is added once, on
+     * purpose, in Manage Banks. In demo mode nothing is at stake, so it still
+     * appears by itself. */
+    if (EPAL.api && EPAL.api.live) return;
     try {
       var mine = db().col('banks').filter(function (b) { return (b.companyId || 'group') === owner; });
       if (mine.some(function (b) { return b.type === 'Cash Box'; })) return;
@@ -205,17 +214,34 @@
       var code = control + '-' + id;
       var have = L.account ? L.account(code) : null;
       if (have && !have.pending) return code;                 // the books know it
+      /* ON A LIVE DATABASE, DON'T CREATE IT AT ALL (live fix 2026-07-28).
+       * `coa` is a writable store, so ensureAccount() here fired a POST per bank
+       * per render — a burst the host refuses under load, and the screen filled
+       * with "Not saved" toasts. The real chart on a production install already
+       * carries an account per bank anyway (1001 Brac Bank, 1005 Dutch-Bangla…),
+       * so inventing 1010-<id> was solving a problem that host does not have. Post
+       * to the control account, which is always there and always right. */
+      if (EPAL.api && EPAL.api.live) return control;
       if (!have) {
         var parent = L.account ? L.account(control) : null;
         L.ensureAccount(code, name || code, (parent && parent.type) || 'asset',
-          { parent: control, group: group || (parent && parent.group) || 'Current Assets',
-            pending: !!(EPAL.api && EPAL.api.live) });
+          { parent: control, group: group || (parent && parent.group) || 'Current Assets' });
       }
-      return (EPAL.api && EPAL.api.live) ? control : code;
+      return code;
     },
     glAcctOf: function (bank) {
       var control = Pay.controlAcctOf(bank);
       if (!bank || !bank.id) return control;
+      /* THE ACCOUNT THE BUSINESS ALREADY KEEPS COMES FIRST (2026-07-28).
+       * A production chart links each bank to its own head (banks.account_id →
+       * "1001 Brac Bank Ltd (Travels)"), and the API now hands that code over as
+       * `glAccount`. Using it means the browser posts where this company's books
+       * have always posted, instead of a parallel code invented in the browser.
+       * Only when there is no such link do we fall back — to a derived
+       * sub-account in demo mode, or the control account on a live database. */
+      if (bank.glAccount && EPAL.ledger && EPAL.ledger.account && EPAL.ledger.account(bank.glAccount)) {
+        return String(bank.glAccount);
+      }
       return Pay.subAcct(control, bank.id, bank.name || bank.id, 'Current Assets');
     },
 
