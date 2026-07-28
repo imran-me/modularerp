@@ -359,3 +359,27 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
   Passport Mgmt / Analytics — pushed.
 - Frontend rebuild: Marketing module → template + logic, parity 8/8 — pushed (cddc157).
 - New machine bring-up (Node/Git), repo reconnected to origin.
+
+## 🆕 QUEUED 2026-07-28
+- **Woodart Accounts (module #8)** — IN PROGRESS. Model + AccountsService committed
+  (`AccEntry` model, register / payables / project-P&L). Remaining: controller, routes,
+  Request, Resource, module.json, README, context.md, frontend (template/api/logic),
+  registration in platform/core/config.js + index.html. Blocked point: the income leg
+  must go through the RIGHT kernel service — ExpensePostingService covers expenses,
+  income is ReceiptPostingService or SalePostingService. Wrong pick posts revenue to
+  the wrong account in LIVE books, so read both before wiring.
+- **Interiors layout + style to match Travels** — owner request 2026-07-28.
+  SCOPE CONFIRMED by the owner, three of four:
+    1. **Page chrome & layout** — page head, breadcrumb, tab band, KPI row, card grid
+       rebuilt to the exact Travels markup structure.
+    2. **Density & typography** — font sizes, row heights, card padding, spacing.
+       Woodart currently reads larger/airier than Travels.
+    3. **Colour & accents** — badges, KPI icon tiles, progress bars, chart palette,
+       aligned to how Travels uses the shared brand tokens.
+  ❌ **NOT the background atmosphere** — the owner keeps the Woodart interior scene
+     (cornice, pendant rail, drifting swatches). Do not touch `app/atmosphere/`.
+  Method: this is a CONVERGENCE onto `platform/design-system/UI-CONTRACT.md`, not a
+  redesign — the contract already mandates one universal look, so the work is finding
+  where Woodart diverged. Travels is the reference implementation. Take a before-shot
+  of every Woodart screen first; the parity harness proves only what we intend to
+  change actually changed. Do AFTER accounts #8.
