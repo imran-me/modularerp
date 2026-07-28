@@ -1114,7 +1114,8 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       var tbl = EPAL.table({
         columns: cols, rows: rows, searchKeys: ['party', 'desc'], quickFilter: 'status', filterPanel: true,
         filters: [{ key: 'priority', label: 'Priority' }].concat(selCo === 'all' ? [{ key: 'companyId', label: 'Company' }] : []),
-        dateKey: 'due', totalKey: 'amount', pageSize: 10,
+        // a schedule is a QUEUE, not history — soonest due first (see datatable.js)
+        sortDefault: 'asc', dateKey: 'due', totalKey: 'amount', pageSize: 10,
         exportName: kind.toLowerCase() + '-schedules.csv', pdfTitle: kind + ' Schedules — ' + coName(selCo),
         onRow: function (s) { masterScheduleDetail(s); },
         actions: canCreate() ? [

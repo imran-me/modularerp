@@ -1462,7 +1462,8 @@ function schedulesView(page) {
           return '<span class="' + tone + '">' + ui.date(s.due) + (s.status !== 'Paid' && d < 0 ? ' · ' + Math.abs(d) + 'd late' : '') + '</span>'; } },
       { key: 'status', label: 'Status', badge: { Paid: 'good', Partial: 'warn', Pending: 'bad' } }
     ],
-    rows: list, dateKey: 'due', totalKey: 'amount',
+    // a schedule is a QUEUE, not history — soonest due first (see datatable.js)
+    rows: list, sortDefault: 'asc', dateKey: 'due', totalKey: 'amount',
     quickFilter: 'kind', filterPanel: true, filters: [{ key: 'status', label: 'Status' }],
     searchKeys: ['id', 'party', 'desc'], pageSize: 12, exportName: 'travels-schedules.csv', pdfTitle: 'Travels Payment Schedules',
     onRow: function (s) { scheduleDetail(s); },

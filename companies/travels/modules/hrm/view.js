@@ -726,7 +726,11 @@ function moneyForm(e, type) {
       { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 0 },
       type === 'loan' ? { key: 'emiMonths', label: 'Repay over (months)', type: 'number', min: 0, default: 0, hint: '0 = manual repayment' } : null,
       { key: 'date', label: 'Date', type: 'date', default: TODAY_STR },
-      { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Cheque'], default: 'Bank' },
+      // WHICH ACCOUNT the money moves through (audit 2026-07-28) — a real one, so
+      // handing an employee an advance actually leaves an account and lands in its
+      // history, instead of moving an abstract 1010 and nothing else
+      { key: 'method', label: type === 'loan-repay' ? 'Received into' : 'Paid from', type: 'select', required: true, searchable: true,
+        options: (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(CID) : ['Bank', 'Cash'] },
       { key: 'memo', label: 'Note', type: 'text', placeholder: meta[2] }
     ].filter(Boolean),
     saveLabel: meta[0],

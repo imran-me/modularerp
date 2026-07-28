@@ -509,7 +509,11 @@ function moneyForm(emp, type) {
       { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 0 },
       type === 'loan' ? { key: 'emiMonths', label: 'Repay over (months)', type: 'number', min: 0, default: 0 } : null,
       { key: 'date', label: 'Date', type: 'date', default: today() },
-      { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Cheque'], default: 'Bank' },
+      // WHICH ACCOUNT the money moves through (audit 2026-07-28) — a real one, so
+      // handing an employee an advance actually leaves an account and lands in its
+      // history, instead of moving an abstract 1010 and nothing else
+      { key: 'method', label: type === 'loan-repay' ? 'Received into' : 'Paid from', type: 'select', required: true, searchable: true,
+        options: (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(CID) : ['Bank', 'Cash'] },
       { key: 'memo', label: 'Note', type: 'text', placeholder: meta[2] }
     ].filter(Boolean),
     saveLabel: meta[0],
@@ -619,6 +623,16 @@ function simpleTbl(rows, label) {
 }
 function payEncashFlow(e) {
   var ls = PR().leaveState(e);
+  // it names the account it is paid from (audit 2026-07-28), so the payout leaves a
+  // real balance and shows in that account's history like every other payment
+  if (EPAL.pay && EPAL.pay.ask) {
+    EPAL.pay.ask({ title: 'Pay leave encashment · ' + e.name, icon: 'cash-coin', owner: CID,
+      amount: ls.value, saveLabel: 'Pay Encashment', onPick: function (src) {
+        try { PR().payEncashment(e.id, { method: src && src.bank ? 'bank:' + src.bank.id : 'Bank' });
+          ui.toast('Encashment paid' + (src && src.bank ? ' from ' + src.bank.name : ''), 'success'); EPAL.router.render(); }
+        catch (x) { ui.toast(x.message || 'Failed', 'error'); } } });
+    return;
+  }
   ui.confirm({ title: 'Pay leave encashment — ' + e.name + '?', text: 'Pays ' + ls.encashableDays.toFixed(2) + ' accrued days = ' + ui.money(ls.value) + ' (DR Leave-Encash Payable / CR Bank) and resets the accrual.', confirmLabel: 'Pay Encashment' })
     .then(function (ok) { if (!ok) return; try { PR().payEncashment(e.id); ui.toast('Encashment paid', 'success'); EPAL.router.render(); } catch (x) { ui.toast(x.message || 'Failed', 'error'); } });
 }

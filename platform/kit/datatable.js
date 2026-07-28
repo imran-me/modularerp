@@ -40,8 +40,33 @@
   var ui = EPAL.ui, el = ui.el;
 
   EPAL.table = function (opts) {
-    var state = { q: '', sortKey: null, sortDir: 1, page: 0, filters: {}, dateFrom: '', dateTo: '', datePreset: null };
     var cols = opts.columns || [];
+
+    /* NEWEST FIRST, EVERYWHERE (owner 2026-07-28: "in all kind of history —
+     * whether its sell, income, expense, transaction movements, across accounts,
+     * reports, master accounts, everywhere — these data should maintain newest
+     * first").
+     *
+     * Done here rather than screen by screen: a history table is a history table,
+     * and every one of them should open on what happened last. A table sorts by
+     * its date column, descending, unless it says otherwise:
+     *   opts.sortKey / opts.sortDir — an explicit default (a chart by code, a
+     *                                 trial balance, a ranking by amount)
+     *   opts.sortDefault: 'none'    — leave the caller's row order alone
+     *   opts.sortDefault: 'asc'     — soonest FIRST, which is right for things
+     *                                 still to come: payment schedules, ticketing
+     *                                 deadlines, an EMI plan. Those are not
+     *                                 history; they are a queue.
+     * Dates here are ISO strings, so a plain string compare orders them right. */
+    function firstDateKey() {
+      if (opts.dateKey) return opts.dateKey;
+      var c = cols.filter(function (x) { return x.date && x.sort !== false; })[0];
+      return c ? c.key : null;
+    }
+    var autoKey = opts.sortDefault === 'none' ? null : (opts.sortKey || firstDateKey());
+    var autoDir = opts.sortDir != null ? opts.sortDir : (opts.sortDefault === 'asc' ? 1 : -1);
+    var state = { q: '', sortKey: autoKey, sortDir: autoKey ? autoDir : 1,
+      page: 0, filters: {}, dateFrom: '', dateTo: '', datePreset: null };
     var pageSize = opts.pageSize || 10;
 
     var root = el('div.dt');

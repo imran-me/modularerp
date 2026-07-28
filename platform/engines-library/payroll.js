@@ -436,32 +436,65 @@
   function empName(empId) { var e = db().employee ? db().employee(empId) : null; return e ? e.name : empId; }
   function compOf(empId) { var e = db().employee ? db().employee(empId) : null; return (e && e.companyId) || 'travels'; }
 
+  /* WHICH ACCOUNT THE MONEY MOVES THROUGH (audit 2026-07-28).
+   * pay() has named a real account since the July review; advance, staff loan,
+   * loan repayment, bonus and leave encashment did not — they all posted to the
+   * abstract 1010 and moved no register, so handing an employee ৳20,000 changed
+   * the ledger and left every bank balance and every account history untouched.
+   * One helper now does for all of them what pay() does: resolve 'bank:<id>' to
+   * a real account, post to THAT account's own code, and move its register.
+   *   opts.method — 'bank:<id>' names a real account; 'Cash' → 1000; else 1010
+   *   dir         — 'out' money leaves the account · 'in' money arrives */
+  function payThrough(opts, dir, amount, ref, label, empId, cid, glId) {
+    var method = (opts && opts.method) || '';
+    var src = (EPAL.pay && EPAL.pay.resolve && String(method).indexOf('bank:') === 0)
+      ? EPAL.pay.resolve(method) : null;
+    var acct = src ? src.gl : (method === 'Cash' ? '1000' : '1010');
+    if (src && src.bank && amount > 0 && EPAL.pay.syncRegister) {
+      EPAL.pay.syncRegister({ id: glId, bankId: src.bank.id, kind: dir === 'in' ? 'Income' : 'Expense',
+        amount: amount, category: label, party: empName(empId) || empId, ref: ref,
+        date: (opts && opts.date) || today(), companyId: cid, glId: glId }, null);
+    }
+    return { account: acct, name: src && src.bank ? src.bank.name : '' };
+  }
   function advance(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
-    glPost(null, opts.date || today(), cid, 'ADV-' + empId, 'Advance salary · ' + empName(empId), 'payroll', empId,
-      [{ account: '1250', dr: amount, cr: 0 }, { account: '1010', dr: 0, cr: amount }]);
+    var glId = 'GL-ADV-' + empId + '-' + ((txnsFor(empId).filter(function (t) { return t.type === 'advance'; }).length) + 1);
+    var src = payThrough(opts, 'out', amount, 'ADV-' + empId, 'Advance salary', empId, cid, glId);
+    glPost(glId, opts.date || today(), cid, 'ADV-' + empId,
+      'Advance salary · ' + empName(empId) + (src.name ? ' · ' + src.name : ''), 'payroll', empId,
+      [{ account: '1250', dr: amount, cr: 0 }, { account: src.account, dr: 0, cr: amount }]);
     return txn({ type: 'advance', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Advance salary' });
   }
   function loan(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
-    glPost(null, opts.date || today(), cid, 'LOAN-' + empId, 'Staff loan · ' + empName(empId), 'payroll', empId,
-      [{ account: '1260', dr: amount, cr: 0 }, { account: '1010', dr: 0, cr: amount }]);
+    var glId = 'GL-LOAN-' + empId + '-' + ((txnsFor(empId).filter(function (t) { return t.type === 'loan'; }).length) + 1);
+    var src = payThrough(opts, 'out', amount, 'LOAN-' + empId, 'Staff loan', empId, cid, glId);
+    glPost(glId, opts.date || today(), cid, 'LOAN-' + empId,
+      'Staff loan · ' + empName(empId) + (src.name ? ' · ' + src.name : ''), 'payroll', empId,
+      [{ account: '1260', dr: amount, cr: 0 }, { account: src.account, dr: 0, cr: amount }]);
     return txn({ type: 'loan', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Staff loan', emiMonths: +opts.emiMonths || 0 });
   }
   function repayLoan(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
-    glPost(null, opts.date || today(), cid, 'LREP-' + empId, 'Loan repayment · ' + empName(empId), 'payroll', empId,
-      [{ account: '1010', dr: amount, cr: 0 }, { account: '1260', dr: 0, cr: amount }]);
+    var glId = 'GL-LREP-' + empId + '-' + ((txnsFor(empId).filter(function (t) { return t.type === 'loan-repay'; }).length) + 1);
+    var src = payThrough(opts, 'in', amount, 'LREP-' + empId, 'Staff loan repayment', empId, cid, glId);
+    glPost(glId, opts.date || today(), cid, 'LREP-' + empId,
+      'Loan repayment · ' + empName(empId) + (src.name ? ' · ' + src.name : ''), 'payroll', empId,
+      [{ account: src.account, dr: amount, cr: 0 }, { account: '1260', dr: 0, cr: amount }]);
     return txn({ type: 'loan-repay', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Loan repayment' });
   }
   function bonus(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
-    glPost(null, opts.date || today(), cid, 'BON-' + empId, 'Bonus · ' + empName(empId), 'payroll', empId,
-      [{ account: '5100', dr: amount, cr: 0 }, { account: '1010', dr: 0, cr: amount }]);
+    var glId = 'GL-BON-' + empId + '-' + ((txnsFor(empId).filter(function (t) { return t.type === 'bonus'; }).length) + 1);
+    var src = payThrough(opts, 'out', amount, 'BON-' + empId, 'Bonus', empId, cid, glId);
+    glPost(glId, opts.date || today(), cid, 'BON-' + empId,
+      'Bonus · ' + empName(empId) + (src.name ? ' · ' + src.name : ''), 'payroll', empId,
+      [{ account: '5100', dr: amount, cr: 0 }, { account: src.account, dr: 0, cr: amount }]);
     return txn({ type: 'bonus', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Bonus' });
   }
 
@@ -574,8 +607,11 @@
     var emp = db().employee(empId); if (!emp) throw new Error('Employee not found');
     var ls = leaveState(emp); if (ls.value <= 0) throw new Error('No leave encashment accrued to pay.');
     var cid = emp.companyId || 'travels';
-    glPost(null, opts.date || today(), cid, 'ENCP-' + empId, 'Leave encashment payout · ' + emp.name, 'payroll', empId,
-      [{ account: '2150', dr: ls.value, cr: 0 }, { account: '1010', dr: 0, cr: ls.value }]);
+    var encGl = 'GL-ENCP-' + empId + '-' + today().slice(0, 4);
+    var encSrc = payThrough(opts, 'out', ls.value, 'ENCP-' + empId, 'Leave encashment', empId, cid, encGl);
+    glPost(encGl, opts.date || today(), cid, 'ENCP-' + empId,
+      'Leave encashment payout · ' + emp.name + (encSrc.name ? ' · ' + encSrc.name : ''), 'payroll', empId,
+      [{ account: '2150', dr: ls.value, cr: 0 }, { account: encSrc.account, dr: 0, cr: ls.value }]);
     txn({ type: 'encash-paid', empId: empId, empName: emp.name, companyId: cid, date: opts.date || today(), amount: ls.value, memo: 'Leave encashment payout (' + ls.encashableDays.toFixed(2) + ' days)' });
     // reset the year's accrual: record the encashed days as consumed leave
     S.upsert('tv_leaves', { id: 'LV-ENC-' + empId + '-' + today().slice(0, 4), empId: empId, empName: emp.name, type: 'Annual', status: 'Approved', from: today(), to: today(), days: ls.encashableDays, reason: 'Leave encashment paid out', applied: today() });

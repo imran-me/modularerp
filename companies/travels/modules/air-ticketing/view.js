@@ -1375,7 +1375,14 @@ function navBtn(label, active, onClick) { var b = frag('nav-btn'); if (active) b
 
     function draw() {
       var q = search.value.toLowerCase();
-      var t = tickets().filter(function (x){ return !q || (x.passenger+' '+x.pnr+' '+x.route+' '+x.id).toLowerCase().indexOf(q)>=0; });
+      // newest sale first (owner 2026-07-28) — this ledger is hand-built, so it
+      // sorts here rather than inheriting the shared table's default
+      var t = tickets().filter(function (x){ return !q || (x.passenger+' '+x.pnr+' '+x.route+' '+x.id).toLowerCase().indexOf(q)>=0; })
+        .slice().sort(function (a, b) {
+          var ad = a.purchaseDate || a.created || '', bd = b.purchaseDate || b.created || '';
+          if (ad !== bd) return ad < bd ? 1 : -1;
+          return String(b.id).localeCompare(String(a.id));
+        });
       var all = tickets();
       var totalCost=0,totalSale=0,totalComm=0;
       all.forEach(function(x){ totalCost+=x.cost||0; totalSale+=x.sale||0; totalComm+=x.commission||0; });
