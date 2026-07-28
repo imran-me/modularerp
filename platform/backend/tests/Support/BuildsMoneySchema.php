@@ -61,6 +61,7 @@ trait BuildsMoneySchema
             $t->unsignedBigInteger('company_id')->nullable();
             $t->date('date')->nullable();
             $t->string('source', 40)->nullable();
+            $t->string('source_id', 64)->nullable()->index();  // migration 2026_07_28_005000
             $t->string('party', 255)->nullable()->index();   // migration 2026_07_27_004000
             $t->string('reference')->nullable()->index();
             $t->text('description')->nullable();
@@ -74,6 +75,7 @@ trait BuildsMoneySchema
             $t->unsignedBigInteger('account_id');
             $t->decimal('debit', 15, 2)->default(0);
             $t->decimal('credit', 15, 2)->default(0);
+            $t->string('party', 255)->nullable()->index();   // migration 2026_07_28_005000
             $t->softDeletes();
             $t->timestamps();
         });

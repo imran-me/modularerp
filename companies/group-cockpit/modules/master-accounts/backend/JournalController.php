@@ -67,6 +67,10 @@ class JournalController
                     'account' => (string) ($codeById[$it->account_id] ?? $it->account_id),
                     'dr'      => (float) $it->debit,
                     'cr'      => (float) $it->credit,
+                    // the LINE's own counterparty, when it has one: one entry can settle
+                    // three vendors, and each must see only its own line on its statement
+                    // (migration 2026_07_28_005000; '' on a host that has not run it)
+                    'party'   => (string) ($it->party ?? ''),
                 ];
             })->values();
 
@@ -81,6 +85,9 @@ class JournalController
                 // on read, which left the Party Ledger, AR/AP ageing and the
                 // inter-company balances card blank in API mode (2026_07_27_004000).
                 'party'     => $e->party ?? '',
+                // WHICH document produced this journal, so the client can link back to
+                // it and the voucher print can name it (migration 2026_07_28_005000)
+                'sourceId'  => (string) ($e->source_id ?? ''),
                 'lines'     => $lines,
             ];
         })->values();

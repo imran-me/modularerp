@@ -16,11 +16,16 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * (see platform/engines-library/ledger.js), so a client can drop a posted journal
  * straight into its cache without translating:
  *
- *   { id, date, companyId, ref, memo, source, party,
- *     lines: [ { account: '<code>', dr: number, cr: number } ] }
+ *   { id, date, companyId, ref, memo, source, sourceId, party,
+ *     lines: [ { account: '<code>', dr: number, cr: number, party } ] }
  *
  * `lines` carries account CODES, never database ids — the ledger keys everything by
  * code, and an id would be meaningless to the client.
+ *
+ * `sourceId` names the DOCUMENT behind the journal, and a line may carry its OWN
+ * party so one entry can span several counterparties (2026-07-28). Both are
+ * emitted as empty strings when absent, which is what the SPA already treats as
+ * "not set" — so a host that has not run the migration reads the same as before.
  */
 class JournalResource extends JsonResource
 {
@@ -35,11 +40,13 @@ class JournalResource extends JsonResource
             'ref'       => (string) ($j['ref'] ?? ''),
             'memo'      => (string) ($j['memo'] ?? ''),
             'source'    => (string) ($j['source'] ?? 'manual'),
+            'sourceId'  => (string) ($j['sourceId'] ?? ''),
             'party'     => (string) ($j['party'] ?? ''),
             'lines'     => array_map(fn ($l) => [
                 'account' => (string) ($l['account'] ?? ''),
                 'dr'      => round((float) ($l['dr'] ?? 0), 2),
                 'cr'      => round((float) ($l['cr'] ?? 0), 2),
+                'party'   => (string) ($l['party'] ?? ''),
             ], $j['lines'] ?? []),
         ];
     }

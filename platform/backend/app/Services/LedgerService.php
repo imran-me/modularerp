@@ -106,6 +106,12 @@ class LedgerService
             if ($this->hasPartyColumn()) {
                 $head['party'] = ((string) ($entry['party'] ?? '')) ?: null;
             }
+            // WHICH document made this journal — `source` is the kind, this is the one
+            // (migration 2026_07_28_005000), so a posting can be traced back to the
+            // ticket, slip or voucher that caused it.
+            if ($this->hasSourceIdColumn()) {
+                $head['source_id'] = ((string) ($entry['sourceId'] ?? '')) ?: null;
+            }
             if (! is_numeric($frontId) && $frontId !== '') {
                 $head['reference'] = $frontId;   // keep a stored string id
             }
@@ -121,15 +127,23 @@ class LedgerService
                     'created_at' => $now,
                 ]);
             }
+            $lineParty = $this->hasLinePartyColumn();
             foreach ($items as $it) {
-                DB::table('journal_items')->insert([
+                $row = [
                     'journal_entry_id' => $id,
                     'account_id'       => $it['account_id'],
                     'debit'            => $it['debit'],
                     'credit'           => $it['credit'],
                     'created_at'       => $now,
                     'updated_at'       => $now,
-                ]);
+                ];
+                // the LINE's own counterparty, when it has one — one entry can settle
+                // three vendors, and each of them must see only its own line on its
+                // statement (migration 2026_07_28_005000)
+                if ($lineParty) {
+                    $row['party'] = ((string) ($it['party'] ?? '')) ?: null;
+                }
+                DB::table('journal_items')->insert($row);
             }
 
             return $id;
@@ -173,6 +187,9 @@ class LedgerService
                 'account' => (string) ($codeById[$it->account_id] ?? $it->account_id),
                 'dr'      => (float) $it->credit,      // swapped — that IS the reversal
                 'cr'      => (float) $it->debit,
+                // the reversal answers to the same counterparty as the line it undoes,
+                // so a party's statement nets to zero rather than keeping a stray debit
+                'party'   => (string) ($it->party ?? ''),
             ])->all();
         if (count($lines) < 2) {
             return null;
@@ -233,6 +250,35 @@ class LedgerService
         return $this->partyColumn;
     }
 
+    /** Does journal_ITEMS carry `party` — the per-line counterparty, so one entry
+     *  can settle three vendors and each sees only its own line?
+     *  (migration 2026_07_28_005000) */
+    private ?bool $linePartyColumn = null;
+
+    public function hasLinePartyColumn(): bool
+    {
+        if ($this->linePartyColumn === null) {
+            try { $this->linePartyColumn = \Illuminate\Support\Facades\Schema::hasColumn('journal_items', 'party'); }
+            catch (\Throwable $e) { $this->linePartyColumn = false; }
+        }
+
+        return $this->linePartyColumn;
+    }
+
+    /** Does journal_entries carry `source_id` — WHICH document made this journal?
+     *  (migration 2026_07_28_005000) */
+    private ?bool $sourceIdColumn = null;
+
+    public function hasSourceIdColumn(): bool
+    {
+        if ($this->sourceIdColumn === null) {
+            try { $this->sourceIdColumn = \Illuminate\Support\Facades\Schema::hasColumn('journal_entries', 'source_id'); }
+            catch (\Throwable $e) { $this->sourceIdColumn = false; }
+        }
+
+        return $this->sourceIdColumn;
+    }
+
     /** True when this account code exists on the chart. */
     public function hasAccount(string $code): bool
     {
@@ -274,6 +320,8 @@ class LedgerService
                 'account_id' => (int) $idByCode[$code],
                 'debit'      => (float) ($ln['dr'] ?? 0),
                 'credit'     => (float) ($ln['cr'] ?? 0),
+                // carried through so post() can store it when the column exists
+                'party'      => (string) ($ln['party'] ?? ''),
             ];
         }
 

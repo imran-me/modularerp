@@ -171,6 +171,75 @@ class LedgerServiceTest extends TestCase
         $this->assertSame(0, DB::table('accounts')->where('code', '9999-4')->count());
     }
 
+    /**
+     * PER-LINE PARTY (2026-07-28). One journal can settle three vendors at once, so
+     * a line may name its own counterparty. Each of them must see only their own
+     * line — which is what a party statement and an ageing bucket are read from.
+     */
+    public function test_each_line_keeps_its_own_party(): void
+    {
+        $this->entry([
+            ['account' => '2000', 'dr' => 10000, 'cr' => 0, 'party' => 'Vendor Alpha'],
+            ['account' => '2000', 'dr' => 25000, 'cr' => 0, 'party' => 'Vendor Beta'],
+            ['account' => '2000', 'dr' => 15000, 'cr' => 0, 'party' => 'Vendor Gamma'],
+            ['account' => '1010', 'dr' => 0, 'cr' => 50000],
+        ]);
+
+        $partyOf = function (float $debit) {
+            return DB::table('journal_items')
+                ->join('journal_entries', 'journal_entries.id', '=', 'journal_items.journal_entry_id')
+                ->where('journal_entries.reference', 'GL-T1')
+                ->where('journal_items.debit', $debit)
+                ->value('journal_items.party');
+        };
+        $this->assertSame('Vendor Alpha', $partyOf(10000));
+        $this->assertSame('Vendor Beta', $partyOf(25000));
+        $this->assertSame('Vendor Gamma', $partyOf(15000));
+        // the bank line names nobody — and NULL, not '', so the column reads honestly
+        $this->assertNull($partyOf(0));
+        $this->assertTrue($this->booksBalance());
+    }
+
+    /** The reversal of a split entry answers to the SAME parties, so each party's
+     *  statement nets to zero instead of keeping a stray debit. */
+    public function test_a_reversal_carries_the_line_parties_back(): void
+    {
+        $this->entry([
+            ['account' => '2000', 'dr' => 8000, 'cr' => 0, 'party' => 'Vendor Alpha'],
+            ['account' => '1010', 'dr' => 0, 'cr' => 8000],
+        ]);
+        $rev = app(\App\Services\LedgerService::class)->reverse('GL-T1', 'audit');
+        $this->assertNotNull($rev);
+
+        // post() stores the client id as `reference`, so the reversal is GL-REV-GL-T1
+        $party = DB::table('journal_items')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_items.journal_entry_id')
+            ->where('journal_entries.reference', 'GL-REV-GL-T1')
+            ->where('journal_items.credit', '>', 0)
+            ->value('journal_items.party');
+        $this->assertSame('Vendor Alpha', $party);
+        $this->assertTrue($this->booksBalance());
+    }
+
+    /** WHICH document made the journal — `source` is the kind, `source_id` the one. */
+    public function test_the_source_document_is_recorded(): void
+    {
+        app(\App\Services\LedgerService::class)->post([
+            'id' => 'GL-SRC-1', 'date' => '2026-07-28', 'companyId' => 'travels',
+            'ref' => 'TK-88101', 'memo' => 'Air ticket sale', 'source' => 'sale',
+            'sourceId' => 'TK-88101',
+            'lines' => [
+                ['account' => '1200', 'dr' => 5000, 'cr' => 0],
+                ['account' => '4010', 'dr' => 0, 'cr' => 5000],
+            ],
+        ], null);
+
+        $row = DB::table('journal_entries')->where('reference', 'GL-SRC-1')->first();
+        $this->assertNotNull($row);
+        $this->assertSame('sale', $row->source);
+        $this->assertSame('TK-88101', $row->source_id);
+    }
+
     /** …but a code that is NOT on the standard chart must still be refused: a typo
      *  must not quietly invent an account. */
     public function test_a_non_standard_code_is_still_refused(): void
