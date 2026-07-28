@@ -104,7 +104,11 @@
     // seeded projects sitting in MySQL behind no route — the state that made a
     // migrated host show "No projects yet".
     wa_projects:   'woodart/projects/portfolio',
-    wa_estimates:  'woodart/projects/estimates'
+    wa_estimates:  'woodart/projects/estimates',
+    // CONDITIONAL (see below): brand-new table, so a host that has pulled the
+    // code but not run the migration keeps its seeded rows instead of being
+    // blanked by an endpoint that honestly has nothing to give yet.
+    wa_recurring:  'woodart/accounts/recurring'
   };
 
   /* Stores with a WRITE endpoint (subset of HYDRATE — safe master data only;
@@ -193,7 +197,8 @@
     wa_drawings:  'woodart/design/drawings',
     wa_revisions: 'woodart/design/revisions',
     wa_movements: 'woodart/materials/movements',
-    wa_locations: 'woodart/materials/locations'
+    wa_locations: 'woodart/materials/locations',
+    wa_recurring: 'woodart/accounts/recurring'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()

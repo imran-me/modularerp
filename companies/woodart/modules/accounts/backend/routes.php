@@ -20,6 +20,7 @@
  */
 
 use Epal\Modules\Woodart\Accounts\AccountsController;
+use Epal\Modules\Woodart\Accounts\RecurringController;
 use Illuminate\Support\Facades\Route;
 
 /* The register — income and expense, over the SHARED `acc_entries` table.
@@ -42,3 +43,10 @@ Route::post('woodart/accounts/payables/{po}/pay', [AccountsController::class, 'p
  * quantities, so no other company can say whether a job is eating more material
  * than it was quoted for. */
 Route::get('woodart/accounts/project-pnl', [AccountsController::class, 'projectPnl']);
+
+/* Recurring — the ONE table this module owns. Everything above reads shared
+ * books; a standing cost is not a posting but a reminder that one is due, and
+ * no shared table holds that concept. Ordinary CRUD, hence its own controller. */
+Route::get('woodart/accounts/recurring', [RecurringController::class, 'index']);
+Route::post('woodart/accounts/recurring', [RecurringController::class, 'store']);
+Route::delete('woodart/accounts/recurring/{id}', [RecurringController::class, 'destroy']);
