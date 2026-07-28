@@ -116,6 +116,61 @@ class LedgerServiceTest extends TestCase
         $this->assertTrue($this->booksBalance());
     }
 
+    /**
+     * THE LIVE FAILURE, 2026-07-28. Every bank and cash box now has its OWN code
+     * under its control account — 1010-4 is bank account 4 under 1010 Bank — so the
+     * ledger says which account holds the money instead of trusting a register to
+     * stay in step. The API refused those codes and dev.epal.com.bd answered
+     * "Save failed: Unknown account code: 1010-4" on the first ticket sale.
+     * A code DERIVED from a standard head is topped up, parented correctly.
+     */
+    public function test_a_bank_sub_account_is_topped_up_and_parented(): void
+    {
+        $this->assertSame(0, DB::table('accounts')->where('code', '1010-4')->count());
+
+        $this->entry([
+            ['account' => '1010-4', 'dr' => 12000, 'cr' => 0],
+            ['account' => '4000', 'dr' => 0, 'cr' => 12000],
+        ]);
+
+        $sub = DB::table('accounts')->where('code', '1010-4')->first();
+        $this->assertNotNull($sub);
+        $this->assertSame('asset', $sub->type);
+        $parentId = DB::table('accounts')->where('code', '1010')->value('id');
+        $this->assertSame((int) $parentId, (int) $sub->parent_id);
+        $this->assertSame(12000.0, $this->lineOn('GL-T1', '1010-4', 'debit'));
+        $this->assertTrue($this->booksBalance());
+    }
+
+    /** A portal wallet is the same shape: 1180-<portal id> under 1180. */
+    public function test_a_portal_wallet_sub_account_is_topped_up(): void
+    {
+        $this->entry([
+            ['account' => '1180-PRT-2', 'dr' => 500000, 'cr' => 0],
+            ['account' => '1010', 'dr' => 0, 'cr' => 500000],
+        ]);
+
+        $sub = DB::table('accounts')->where('code', '1180-PRT-2')->first();
+        $this->assertNotNull($sub);
+        $this->assertSame('asset', $sub->type);
+        $this->assertTrue($this->booksBalance());
+    }
+
+    /** A dash does NOT make anything acceptable: the prefix must be a real head. */
+    public function test_a_sub_account_of_an_unknown_parent_is_refused(): void
+    {
+        try {
+            $this->entry([
+                ['account' => '9999-4', 'dr' => 100, 'cr' => 0],
+                ['account' => '1010', 'dr' => 0, 'cr' => 100],
+            ]);
+            $this->fail('expected a LedgerException');
+        } catch (LedgerException $e) {
+            $this->assertStringContainsString('9999-4', $e->getMessage());
+        }
+        $this->assertSame(0, DB::table('accounts')->where('code', '9999-4')->count());
+    }
+
     /** …but a code that is NOT on the standard chart must still be refused: a typo
      *  must not quietly invent an account. */
     public function test_a_non_standard_code_is_still_refused(): void

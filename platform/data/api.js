@@ -363,6 +363,12 @@
      * on failure the temp record is rolled back and the user is told. */
     wireWrites: function () {
       var S = EPAL.store;
+      // SAY OUT LOUD that this browser is talking to a real database. Code that
+      // may only use data the SERVER already knows about has to be able to ask:
+      // the chart of accounts is hydrated from the host, so inventing a code the
+      // host has never heard of gets the whole journal refused (live 2026-07-28,
+      // "Save failed: Unknown account code: 1010-4"). See EPAL.pay.subAcct.
+      EPAL.api.live = true;
       // one notice per store, not one per save — a bookkeeper entering twenty
       // expenses should not be told twenty times that the table needs migrating
       var warned = {};

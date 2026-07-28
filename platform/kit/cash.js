@@ -141,16 +141,44 @@
      * Postings made before this stayed on the bare control account and are
      * still counted — the roll-up sees both. */
     controlAcctOf: function (bank) { return (bank && bank.type === 'Cash Box') ? '1000' : '1010'; },
+
+    /* THE SUB-ACCOUNT, SAFELY (live fix 2026-07-28).
+     *
+     * A journal may only name codes the BOOKS already know. On a real database
+     * the chart is hydrated from the host and the host refuses any code it has
+     * never heard of — so the first sale after this feature shipped died with
+     * "Save failed: Unknown account code: 1010-4". Correct of the server: a typo
+     * must not quietly create an account.
+     *
+     * So the rule is ask, don't assume:
+     *   · the chart already has the sub-account  → post to it
+     *   · it doesn't                             → create it (which, in API mode,
+     *     pushes it to the host like any other chart head) and post THIS entry to
+     *     the CONTROL account, which is exactly where it went before sub-accounts
+     *     existed and is never refused
+     * Nothing fails, nothing is lost, and once the host confirms the account the
+     * next posting starts using it. `pending` is what "not confirmed yet" looks
+     * like locally; hydration replaces the chart wholesale, so the flag survives
+     * only until the server answers — and if the server rejected it, the account
+     * is simply gone and we keep using the control account. */
+    subAcct: function (control, id, name, group) {
+      var L = EPAL.ledger;
+      if (!L || !L.ensureAccount || !id) return control;
+      var code = control + '-' + id;
+      var have = L.account ? L.account(code) : null;
+      if (have && !have.pending) return code;                 // the books know it
+      if (!have) {
+        var parent = L.account ? L.account(control) : null;
+        L.ensureAccount(code, name || code, (parent && parent.type) || 'asset',
+          { parent: control, group: group || (parent && parent.group) || 'Current Assets',
+            pending: !!(EPAL.api && EPAL.api.live) });
+      }
+      return (EPAL.api && EPAL.api.live) ? control : code;
+    },
     glAcctOf: function (bank) {
       var control = Pay.controlAcctOf(bank);
       if (!bank || !bank.id) return control;
-      var L = EPAL.ledger;
-      if (!L || !L.ensureAccount) return control;
-      var code = control + '-' + bank.id;
-      var parent = L.account ? L.account(control) : null;
-      L.ensureAccount(code, bank.name || bank.id, 'asset',
-        { parent: control, group: (parent && parent.group) || 'Current Assets' });
-      return code;
+      return Pay.subAcct(control, bank.id, bank.name || bank.id, 'Current Assets');
     },
 
     /* ==========================================================================
@@ -176,12 +204,8 @@
     /** The wallet's own account on the chart, created the first time it is used. */
     portalAcctOf: function (portal) {
       if (!portal || !portal.id) return '1180';
-      var L = EPAL.ledger;
-      if (!L || !L.ensureAccount) return '1180';
-      var code = '1180-' + portal.id;
-      L.ensureAccount(code, (portal.name || portal.id) + ' wallet', 'asset',
-        { parent: '1180', group: 'Current Assets' });
-      return code;
+      // same ask-don't-assume rule as a bank sub-account (see subAcct)
+      return Pay.subAcct('1180', portal.id, (portal.name || portal.id) + ' wallet', 'Current Assets');
     },
 
     /** One wallet movement: the GL leg, the portal balance, and the register row.

@@ -34,7 +34,39 @@
   function comps() { return EPAL.config.companies.filter(function (c) { return c.type === 'company' && c.enabled !== false; }); }
   function coName(cid) { if (cid === 'all') return 'All companies'; if (cid === 'group') return 'Group HQ'; var c = EPAL.config.company(cid); return c ? c.short : cid; }
   function canCreate() { return !EPAL.perm || EPAL.perm.can('group', 'master-accounts', 'create'); }
-  function cats() { return S.list('exp_categories'); }
+  /* THE STANDARD EXPENSE HEADS — the one list every screen offers.
+   *
+   * SELF-HEALING, and it has to be (live bug, owner 2026-07-28: the Set Budget
+   * form opened with an EMPTY Category dropdown). The list was written with
+   * seedOnce, which only fills a key that has never been written — but in API
+   * mode boot HYDRATES exp_categories from the server, and the host's table is
+   * empty, so hydration wrote [] over the top and the seed could never refill
+   * it. Result: a required dropdown with nothing in it, and no way to add a
+   * budget or file an expense against a head.
+   *
+   * So the rule is not "seed once" but "never empty": an empty list is not a
+   * valid state for this store, in any mode, and asking for the categories
+   * restores the standard heads if something blanked them. Anything the owner
+   * has added or renamed survives, because a non-empty list is left alone. */
+  var STANDARD_CATEGORIES = [
+    { id: 'CAT-OFF', name: 'Office Management', subs: ['Stationery', 'Cleaning', 'Repair & Maintenance', 'Furniture'] },
+    { id: 'CAT-FOOD', name: 'Food & Entertainment', subs: ['Staff Lunch', 'Guest Entertainment', 'Tea & Snacks'] },
+    { id: 'CAT-UTIL', name: 'Utilities', subs: ['Electricity', 'Water', 'Gas', 'Internet', 'Phone'] },
+    { id: 'CAT-RENT', name: 'Office Rent', subs: [] },
+    { id: 'CAT-SAL', name: 'Staff Salary', subs: ['Salary', 'Bonus', 'Overtime'] },
+    { id: 'CAT-MKT', name: 'Marketing', subs: ['Facebook Ads', 'Boosting', 'Design', 'Print', 'SMS Campaign'] },
+    { id: 'CAT-FEES', name: 'Fees & Charges', subs: ['Bank Charge', 'Trade License', 'Software', 'IATA Fee'] },
+    { id: 'CAT-CONV', name: 'Conveyance & Travel', subs: ['Local Transport', 'Fuel'] },
+    { id: 'CAT-MISC', name: 'Miscellaneous', subs: [] }
+  ];
+  function cats() {
+    var list = S.list('exp_categories');
+    if (!list || !list.length) {
+      S.set('exp_categories', STANDARD_CATEGORIES.map(function (c) { return { id: c.id, name: c.name, subs: c.subs.slice() }; }));
+      list = S.list('exp_categories');
+    }
+    return list;
+  }
   // the expense register, scoped to one company (or all)
   function entriesFor(kind, cid) {
     return db().col('acc_entries').filter(function (e) {
@@ -393,6 +425,10 @@
     budget: function (page, cid) { budgetView(page, cid); },
     // opts.onBack — what the host's "Back to Expenses" button should do
     report: function (page, cid, opts) { goBack = (opts && opts.onBack) || function () { EPAL.router.render(); }; reportView(page, cid); },
-    categories: function (page, cid, opts) { categoriesView(page, cid, opts); }
+    categories: function (page, cid, opts) { categoriesView(page, cid, opts); },
+    // the heads themselves, for anything that needs the list (and the seed that
+    // used to keep its own copy of it)
+    heads: function () { return cats(); },
+    standardCategories: function () { return STANDARD_CATEGORIES.map(function (c) { return { id: c.id, name: c.name, subs: c.subs.slice() }; }); }
   };
 })(window.EPAL);

@@ -141,6 +141,10 @@
     opts = opts || {};
     var row = withNormal({ code: code, name: name || code, type: type || 'asset',
       group: opts.group || 'Other', parent: opts.parent || '' });
+    // `pending` = created here but not yet confirmed by the database this browser
+    // is talking to. Nothing may POST to a pending code (EPAL.pay.subAcct), and
+    // the flag cannot outlive a hydration, which replaces the chart wholesale.
+    if (opts.pending) row.pending = true;
     // NOT S.upsert: it matches on `id`, and a chart row is keyed by `code` and
     // carries no id — so `undefined === undefined` matched ROW ZERO and every
     // new account silently overwrote 1000 Cash. (Latent since the helper was

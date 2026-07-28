@@ -97,17 +97,12 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
 
   /* ---- seeds -------------------------------------------------------------*/
   EPAL.registerEngine({ name: 'master-accounts-seed', seed: function () {
-    S.seedOnce('exp_categories', [
-      { id: 'CAT-OFF', name: 'Office Management', subs: ['Stationery', 'Cleaning', 'Repair & Maintenance', 'Furniture'] },
-      { id: 'CAT-FOOD', name: 'Food & Entertainment', subs: ['Staff Lunch', 'Guest Entertainment', 'Tea & Snacks'] },
-      { id: 'CAT-UTIL', name: 'Utilities', subs: ['Electricity', 'Water', 'Gas', 'Internet', 'Phone'] },
-      { id: 'CAT-RENT', name: 'Office Rent', subs: [] },
-      { id: 'CAT-SAL', name: 'Staff Salary', subs: ['Salary', 'Bonus', 'Overtime'] },
-      { id: 'CAT-MKT', name: 'Marketing', subs: ['Facebook Ads', 'Boosting', 'Design', 'Print', 'SMS Campaign'] },
-      { id: 'CAT-FEES', name: 'Fees & Charges', subs: ['Bank Charge', 'Trade License', 'Software', 'IATA Fee'] },
-      { id: 'CAT-CONV', name: 'Conveyance & Travel', subs: ['Local Transport', 'Fuel'] },
-      { id: 'CAT-MISC', name: 'Miscellaneous', subs: [] }
-    ]);
+    // the standard heads live with the screens that use them, in
+    // platform/kit/expenses.js — ONE copy, and that kit keeps the list from ever
+    // being empty (an API-mode boot hydrating an empty table used to blank it,
+    // leaving the Set Budget form with no Category to pick — owner 2026-07-28)
+    S.seedOnce('exp_categories', (EPAL.expenseViews && EPAL.expenseViews.standardCategories)
+      ? EPAL.expenseViews.standardCategories() : []);
     S.seedOnce('party_types', [
       { id: 'PT-1', name: 'Customer' }, { id: 'PT-2', name: 'Vendor' }, { id: 'PT-3', name: 'Sub-Agent' },
       { id: 'PT-4', name: 'Officer' }, { id: 'PT-5', name: 'Staff' }, { id: 'PT-6', name: 'Bank' }, { id: 'PT-7', name: 'Other' }

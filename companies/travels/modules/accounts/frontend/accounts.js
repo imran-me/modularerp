@@ -534,6 +534,7 @@ function salesAsIncome() {
 function kindRegister(page, kind, heads, color) {
   var list = entries().filter(function (e) { return e.kind === kind; });
   if (kind === 'Income') list = list.concat(salesAsIncome());
+  if (kind === 'Expense') list = list.concat(ledgerAsExpense());
   var total = list.reduce(function (a, e) { return a + (+e.amount || 0); }, 0);
   var thisMonth = monthSum(list, curYm(), kind);
   var heads2 = groupBy(list, 'category');
@@ -585,6 +586,73 @@ function fromSaleGuard(e, verb) {
   ui.toast('This is a sale from its own module — it must be ' + verb + ' there, not in the register', 'error');
   return true;
 }
+/* Money spent through a desk that posts STRAIGHT to the ledger — Manage Cash's
+ * Cash Out, a Debit Journal, a petty-cash settlement — has no voucher of its own
+ * to edit or delete here. It is shown, not owned. */
+function fromLedgerGuard(e, verb) {
+  if (!e || !e.fromGl) return false;
+  ui.toast('Posted from ' + (e.method || 'another desk') + ' — it must be ' + verb + ' there, not in this register', 'error');
+  return true;
+}
+
+/* ---- SPENDING THAT NEVER PASSED THROUGH A VOUCHER ------------------------
+ * The register lists acc_entries — the vouchers this desk writes. But money also
+ * leaves through desks that post a journal DIRECTLY: Manage Cash ▸ Cash Out,
+ * Master Accounts ▸ Debit Journal, a petty-cash settlement, a schedule payment.
+ * Those never created a voucher, so this screen showed ৳0 while Manage Cash
+ * showed the very same taka going out — the owner's report, 2026-07-28.
+ *
+ * Fixed the way sales are folded into the Income register (salesAsIncome): read
+ * side only, no duplicated data. An entry is folded in when it debits an expense
+ * head and nothing else already speaks for it:
+ *   · 5000 Cost of Sales is skipped — that belongs to the sale that caused it,
+ *     and it is already in the sales books and the product P&L
+ *   · `sale` and `payroll` journals are skipped — the ticketing modules and the
+ *     Payroll tab own those, and folding them in would double-read them here
+ *   · anything that already HAS a voucher is skipped, matched both by this
+ *     desk's id convention (GL-ACC-* / GL-ACF-*) and by the voucher's own glId,
+ *     so a real expense can never be counted twice
+ * Each row is tagged with the desk it came from and cannot be edited here. */
+function ledgerAsExpense() {
+  if (!(EPAL.ledger && EPAL.ledger.entries)) return [];
+  var SKIP_SOURCE = { sale: 1, payroll: 1 };
+  var out = [];
+  try {
+    // every voucher-backed journal, by id and by the glId a voucher points at
+    var spoken = {};
+    db.col('acc_entries').forEach(function (v) {
+      if (v.companyId !== CID) return;
+      spoken['GL-ACC-' + v.id] = 1; spoken['GL-ACF-' + v.id] = 1;
+      if (v.glId) spoken[v.glId] = 1;
+    });
+    EPAL.ledger.entries({ companyId: CID }).forEach(function (e) {
+      if (SKIP_SOURCE[e.source]) return;
+      if (spoken[e.id]) return;
+      var amt = 0, head = '';
+      (e.lines || []).forEach(function (l) {
+        if (String(l.account) === '5000') return;                 // a sale's own cost
+        var a = EPAL.ledger.account ? EPAL.ledger.account(l.account) : null;
+        if (a && a.type === 'expense') { amt += (+l.dr || 0) - (+l.cr || 0); head = head || a.name; }
+      });
+      if (amt <= 0.5) return;                                     // not a spend (or a reversal)
+      // which account paid for it, so the row reads like every other expense
+      var from = '';
+      (e.lines || []).forEach(function (l) {
+        if ((+l.cr || 0) <= 0 || !EPAL.ledger.isCashAccount(l.account)) return;
+        var acc = accountById(String(l.account).split('-').slice(1).join('-'));
+        from = from || (acc ? acc.name : (EPAL.ledger.isUnder(l.account, '1000') ? 'Cash' : 'Bank'));
+      });
+      out.push({ id: e.id, companyId: CID, kind: 'Expense', amount: amt,
+        category: head || 'Other expense', date: e.date, party: e.party || '',
+        ref: e.ref || '', desc: e.memo || '', payAcct: from,
+        method: SOURCE_DESK[e.source] || 'Ledger', fromGl: true });
+    });
+  } catch (x) {}
+  return out;
+}
+// which desk a directly-posted journal came from, for the Method column
+var SOURCE_DESK = { cash: 'Manage Cash', bank: 'Manage Banks', manual: 'Journal',
+  payment: 'Payment', intercompany: 'Inter-company', opening: 'Opening' };
 
 // The entries datatable — chips by head, filter card, PDF, row-click rich detail,
 // canonical row actions (edit · delete │ print). Returns the table instance.
@@ -614,8 +682,8 @@ function entriesTable(rows, kind) {
     // posted with its register row gone. So those two actions send you to the
     // module that owns it; printing the voucher still works.
     actions: ui.actions({
-      edit:  canCreate() ? function (e) { if (fromSaleGuard(e, 'edited')) return; entryForm(e); } : null,
-      del:   canDelete() ? function (e) { if (fromSaleGuard(e, 'deleted')) return; deleteEntry(e); } : null,
+      edit:  canCreate() ? function (e) { if (fromSaleGuard(e, 'edited') || fromLedgerGuard(e, 'edited')) return; entryForm(e); } : null,
+      del:   canDelete() ? function (e) { if (fromSaleGuard(e, 'deleted') || fromLedgerGuard(e, 'deleted')) return; deleteEntry(e); } : null,
       print: function (e) { printEntry(e); }
     }),
     empty: { icon: 'journal', title: 'No entries yet', hint: 'Record income or an expense to start the register.' }

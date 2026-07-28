@@ -44,9 +44,16 @@ trait BuildsMoneySchema
 
         Schema::create('accounts', function ($t) {
             $t->id();
-            $t->string('code', 20)->index();
+            // 20 was too short the moment banks got their own codes: '1180-PRT-2'
+            // is a sub-account of 1180, and production allows the length
+            $t->string('code', 40)->index();
             $t->string('name');
             $t->string('type', 20)->default('expense');
+            // production carries these; the fixture must too, or a test passes on a
+            // table simpler than the one the code actually runs against
+            $t->unsignedBigInteger('parent_id')->nullable();
+            $t->decimal('opening_balance', 15, 2)->default(0);
+            $t->boolean('status')->default(true);
             $t->softDeletes();
         });
         Schema::create('journal_entries', function ($t) {

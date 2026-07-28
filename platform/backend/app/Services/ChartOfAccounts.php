@@ -37,6 +37,9 @@ class ChartOfAccounts
         '1000' => ['Cash', 'asset'],
         '1010' => ['Bank', 'asset'],
         '1150' => ['Sub-Agent Receivable', 'asset'],
+        // money prepaid to a GDS / booking portal is OURS until a booking spends it
+        // — a prepayment asset, one sub-account per portal (SPA 2026-07-28)
+        '1180' => ['Portal & GDS Wallets', 'asset'],
         '1200' => ['Accounts Receivable', 'asset'],
         '1250' => ['Employee Advances', 'asset'],
         '1260' => ['Staff Loans', 'asset'],
@@ -89,6 +92,44 @@ class ChartOfAccounts
     }
 
     /**
+     * Is this code a SUB-ACCOUNT of a standard head — '1010-4', '1180-PRT-2'?
+     *
+     * Only a code whose prefix (up to the first dash) is itself a standard account
+     * qualifies, and only when the remainder looks like an id rather than prose.
+     * Returns [parentCode, name, type] or null.
+     */
+    private function subAccountOf(string $code): ?array
+    {
+        $dash = strpos($code, '-');
+        if ($dash === false || $dash === 0) {
+            return null;
+        }
+        $parent = substr($code, 0, $dash);
+        $suffix = substr($code, $dash + 1);
+        if (! isset(self::STANDARD[$parent]) || $suffix === '') {
+            return null;
+        }
+        if (! preg_match('/^[A-Za-z0-9_-]{1,40}$/', $suffix)) {
+            return null;                         // not an id — do not invent it
+        }
+        [$parentName, $type] = self::STANDARD[$parent];
+
+        return [$parent, $parentName . ' · ' . $suffix, $type];
+    }
+
+    /** The row id of a code, or null. */
+    private function idOf(string $code): ?int
+    {
+        try {
+            $id = DB::table('accounts')->where('code', $code)->whereNull('deleted_at')->value('id');
+
+            return $id ? (int) $id : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * Make sure this head exists, and say whether it does now.
      * Only tops up codes on the STANDARD chart; anything else is left to fail loudly.
      * INSERT only — no DDL — so it works on a host that denies schema changes at
@@ -100,10 +141,23 @@ class ChartOfAccounts
         if ($this->exists($code)) {
             return true;
         }
-        if (! isset(self::STANDARD[$code])) {
+
+        $parentCode = null;
+        if (isset(self::STANDARD[$code])) {
+            [$name, $type] = self::STANDARD[$code];
+        } elseif ($sub = $this->subAccountOf($code)) {
+            // A SUB-ACCOUNT OF A STANDARD HEAD — '1010-4' is bank account 4 under
+            // 1010 Bank, '1180-PRT-2' is one portal wallet under 1180. The SPA gives
+            // every real bank, cash box and portal wallet its own code so the ledger
+            // says WHICH account holds the money; those codes are derived, not typed,
+            // so topping them up is safe in a way inventing an arbitrary code is not.
+            // (Live 2026-07-28: every save failed with "Unknown account code: 1010-4"
+            // until this existed.) The name is a placeholder — the SPA pushes the real
+            // account name through the chart-of-accounts endpoint.
+            [$parentCode, $name, $type] = $sub;
+        } else {
             return false;                       // not ours to invent
         }
-        [$name, $type] = self::STANDARD[$code];
 
         try {
             if (! Schema::hasTable('accounts')) {
@@ -116,7 +170,9 @@ class ChartOfAccounts
             foreach ([
                 'status' => 1,
                 'opening_balance' => 0,
-                'parent_id' => null,
+                // a derived sub-account hangs under its control account, so the
+                // production chart carries the same tree the SPA shows
+                'parent_id' => $parentCode ? $this->idOf($parentCode) : null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ] as $col => $val) {
