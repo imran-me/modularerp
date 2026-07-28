@@ -385,7 +385,9 @@ function monthSeries(limit) {
     m.heads++; m.gross += s.earnedGross || 0; m.adds += addOf(s); m.deds += dedOf(s);
     m.net += PR().slipPayable(s); m.encash += s.encashAmt || 0;
     m.paid += s.paid || 0; m.due += dueOf(s);
-    if ((s.paid || 0) > 0) m.paidHeads++;
+    // FULLY paid, not merely part-paid: six people each given a token amount
+    // must not read as "6 / 6 staff paid" while the month is still owed.
+    if ((s.paid || 0) > 0 && dueOf(s) === 0) m.paidHeads++;
     if (s.status === 'draft') m.drafts++;
   });
   // pay_runs is the OTHER half of the union: a run can exist before any payslip
@@ -435,50 +437,79 @@ var PURPOSE = { salary: 'Salary', advance: 'Advance', loan: 'Staff loan',
 // the counter-built glId prefix per pay_txns type (see note 1 above)
 var GL_PREFIX = { advance: 'GL-ADV-', loan: 'GL-LOAN-', 'loan-repay': 'GL-LREP-', bonus: 'GL-BON-' };
 
+// the `ref` the engine stamps on each kind of journal — used to prove a journal
+// found by a rebuilt id is really the RIGHT one (see glEntryFor)
+var GL_REF = { advance: 'ADV-', loan: 'LOAN-', 'loan-repay': 'LREP-', bonus: 'BON-', 'encash-paid': 'ENCP-', settlement: 'SETL-' };
+var EMI_MEMO = 'EMI auto-deducted from ';
+
 function acctName(code) {
   if (!code) return '';
   var a = (EPAL.ledger && EPAL.ledger.account) ? EPAL.ledger.account(code) : null;
   return a ? a.name : String(code);
 }
 // A stored method string is one of: 'bank:<id>' (a real account), 'm:<Method>'
-// (a generic with no account behind it), or a legacy plain 'Bank' / 'Cash'.
-// There is no helper for this anywhere in the repo — EPAL.pay.resolve() answers
-// with the bank RECORD, and a deleted bank must say so rather than silently
-// reading as a generic 'Bank'.
+// (a generic with no account behind it), or a LEGACY PLAIN 'Bank' / 'Cash' /
+// 'bKash'. There is no helper for this anywhere in the repo, and EPAL.pay
+// .resolve() cannot be used as one: handed a plain 'Cash' it falls through to
+// its 'Bank' default, so every legacy cash payment would read as a bank
+// payment. The plain case is therefore answered BEFORE resolve() is consulted.
 function paidFrom(method) {
   var m = String(method || '');
-  if (EPAL.pay && EPAL.pay.resolve) {
-    var src = EPAL.pay.resolve(m);
+  if (m.indexOf('bank:') === 0) {
+    var src = (EPAL.pay && EPAL.pay.resolve) ? EPAL.pay.resolve(m) : null;
     if (src && src.bank) return src.bank.name + (src.bank.branch && src.bank.branch !== '—' ? ' · ' + src.bank.branch : '');
-    if (m.indexOf('bank:') === 0) return 'Account no longer on file';
-    return (src && src.method) || 'Bank';
+    return 'Account no longer on file';           // the bank record was deleted — say so
   }
-  if (m.indexOf('m:') === 0) return m.slice(2);
-  if (m.indexOf('bank:') === 0) return 'Account no longer on file';
-  return m || 'Bank';
+  if (m.indexOf('m:') === 0) return m.slice(2) || 'Bank';
+  return m || 'Bank';                             // legacy plain label, kept verbatim
 }
 function findGl(id) {
   var rows = payEntries();
   for (var i = 0; i < rows.length; i++) if (rows[i].id === id) return rows[i];
   return null;
 }
-// the cash leg of a journal: which account, and how much actually left it
+/* The cash leg of a journal. SIGNED on purpose: a credit to a cash account is
+ * money LEAVING (positive), a debit is money ARRIVING (negative) — a loan
+ * repayment is DR cash / CR 1260, so treating its cash as an outflow would add
+ * money coming in to the total that left the bank. */
 function entryCash(e) {
-  var acct = null, out = 0;
+  var acct = null, net = 0;
   (e.lines || []).forEach(function (l) {
     if (!EPAL.ledger.isCashAccount(l.account)) return;
-    var v = (+l.cr || 0) - (+l.dr || 0);          // credit = money leaving the account
-    if (v !== 0) { acct = l.account; out += v; }
+    var v = (+l.cr || 0) - (+l.dr || 0);
+    if (v !== 0) { acct = l.account; net += v; }
   });
-  return { account: acct, out: out };
+  return { account: acct, out: net };
 }
 function entryTotal(e) { var t = 0; (e.lines || []).forEach(function (l) { t += +l.dr || 0; }); return t; }
+// an auto-deducted EMI is a LINE inside a salary payment, never its own journal
+function isAutoEmi(t) { return t.type === 'loan-repay' && String(t.memo || '').indexOf(EMI_MEMO) === 0; }
+// the final-settlement journal that cleared this employee on this date, if any
+function settlementOn(empId, date) {
+  if (!date) return null;
+  var e = findGl('GL-SETL-' + empId);
+  return (e && e.date === date) ? e : null;
+}
 
-/* Find the journal behind a pay_txns row. The deterministic id is tried first;
- * if it is absent (an auto-deducted EMI has no journal of its own — it is a LINE
- * inside the salary payment) we fall back to a strictly UNIQUE match on party +
- * date + amount, and give up rather than guess when more than one fits. */
+/* Find the journal behind a pay_txns row — and PROVE it is the right one.
+ *
+ * The id has to be rebuilt from a counter (pay_txns stores none), and that
+ * counter is not stable: unpay() DELETES the auto-EMI rows it created, which
+ * shifts every later loan-repay's position. A rebuilt id can therefore land on
+ * a real journal that belongs to a DIFFERENT transaction — printing the wrong
+ * voucher, which is worse than printing none. So every candidate is validated
+ * against the row (employee, kind-of-document via its ref, and amount) and a
+ * failure falls through to a strictly unique party+date+amount match that is
+ * itself kind-checked. Reversals (GL-UNPAY-) are never eligible. */
+function glMatches(e, t) {
+  if (!e || String(e.id).indexOf('GL-UNPAY-') === 0) return false;
+  if (e.party !== t.empId) return false;
+  if (Math.abs(entryTotal(e) - (+t.amount || 0)) >= 1) return false;
+  var wantRef = GL_REF[t.type];
+  return !wantRef || String(e.ref || '').indexOf(wantRef) === 0;
+}
 function glEntryFor(t) {
+  if (isAutoEmi(t)) return null;                  // by construction it has no journal
   var e = null;
   if (t.type === 'encash-paid') e = findGl('GL-ENCP-' + t.empId + '-' + String(t.date || '').slice(0, 4));
   else if (t.type === 'settlement') e = findGl('GL-SETL-' + t.empId);
@@ -488,48 +519,96 @@ function glEntryFor(t) {
     for (var i = 0; i < peers.length; i++) if (peers[i].id === t.id) { n = i + 1; break; }
     if (n) e = findGl(GL_PREFIX[t.type] + t.empId + '-' + n);
   }
-  if (e) return e;
-  var hits = payEntries().filter(function (x) {
-    return x.party === t.empId && x.date === t.date && Math.abs(entryTotal(x) - (+t.amount || 0)) < 1;
-  });
+  if (glMatches(e, t)) return e;
+  var hits = payEntries().filter(function (x) { return x.date === t.date && glMatches(x, t); });
   return hits.length === 1 ? hits[0] : null;
 }
 
-/* EVERY payroll transaction in one month, newest first. */
+/* EVERY payroll transaction in one month, newest first.
+ *
+ * Each row carries a DIRECTION, because a payroll month contains three
+ * different kinds of movement and summing them as if they were one number is
+ * how a payroll report starts lying:
+ *   out       money left an account (salary, advance, loan, bonus, encashment)
+ *   in        money came back (a loan repayment)
+ *   internal  nothing moved — an advance or a loan EMI recovered out of the
+ *             same salary payment, which is real and worth listing but is
+ *             already inside the salary figure above it. */
 function monthTxns(ym) {
   var out = [];
   PR().slipsFor(CID, ym).forEach(function (s) {
-    var found = 0;
+    var covered = 0;
     for (var n = 1; n <= (s.payCount || 0); n++) {
       var e = findGl('GL-PAYP-' + s.empId + '-' + ym + '-' + n);
       if (!e) continue;
-      found++;
+      // A REVERSED payment is still on the books (unpay posts the opposite entry
+      // and deliberately keeps payCount so reversal ids stay unique). Listing it
+      // would show money that was taken back — and after Reopen-Draft → Pay All
+      // the same salary would appear twice.
+      if (findGl('GL-UNPAY-' + s.empId + '-' + ym + '-' + n)) continue;
       var cash = entryCash(e), amt = entryTotal(e);
+      covered += amt;
       out.push({ key: e.id, empId: s.empId, empName: s.empName, purpose: 'Salary', type: 'salary',
-        date: e.date, amount: amt,
-        from: cash.account ? acctName(cash.account) : 'Recovered from advance / loan — no cash',
-        cash: cash.out, memo: e.memo || ('Salary paid · ' + PR().mLabel(ym)),
+        date: e.date, amount: amt, dir: cash.out > 0 ? 'out' : 'internal', cash: Math.max(0, cash.out),
+        from: cash.out > 0 ? acctName(cash.account) : 'Recovered from advance / loan — no cash',
+        memo: e.memo || ('Salary paid · ' + PR().mLabel(ym)),
         ym: ym, slip: s, entry: e, glId: e.id, instalment: n, instalments: s.payCount || 1 });
     }
-    // money that moved with no journal behind it still has to show (see note 3)
-    if (!found && (s.paid || 0) > 0) {
+    // Money the slip says was paid but no live journal accounts for. Measured in
+    // TAKA, not in journal count, so a month where one instalment posted and
+    // another did not still shows the missing money.
+    var gap = (s.paid || 0) - covered;
+    if (gap > 1) {
+      // A RESIGNATION is the honest explanation for most of these: settle()
+      // marks every accrued month paid in one go, without a per-month payment
+      // journal, because the cash left through the settlement journal instead.
+      // Calling that "no journal on file" would be wrong, and counting its cash
+      // here would count the settlement twice.
+      var settled = settlementOn(s.empId, s.paidDate);
       out.push({ key: 'slip-' + s.empId + '-' + ym, empId: s.empId, empName: s.empName, purpose: 'Salary', type: 'salary',
-        date: s.paidDate || (ym + '-01'), amount: s.paid || 0, from: paidFrom(s.payMethod),
-        cash: cashOf(s), memo: 'Salary paid · ' + PR().mLabel(ym) + ' (no journal on file)',
-        ym: ym, slip: s, entry: null, glId: null, instalment: 1, instalments: 1 });
+        date: s.paidDate || (ym + '-01'), amount: gap,
+        dir: settled ? 'internal' : 'out',
+        cash: settled ? 0 : Math.max(0, Math.min(gap, cashOf(s))),
+        from: settled ? 'Cleared in the final settlement below' : paidFrom(s.payMethod) + ' · no journal on file',
+        memo: settled
+          ? 'Cleared when ' + s.empName + ' was settled on ' + ui.date(s.paidDate)
+          : 'Salary paid · ' + PR().mLabel(ym) + ' — recorded on the payslip with no journal behind it',
+        ym: ym, slip: s, entry: settled || null, glId: settled ? settled.id : null, instalment: 1, instalments: 1 });
     }
   });
   S.list('pay_txns').filter(function (t) {
-    return t.companyId === CID && String(t.date || '').slice(0, 7) === ym;
+    if (t.companyId !== CID) return false;
+    // An auto-EMI belongs to the SALARY MONTH it was deducted from, which its
+    // memo names — not to the calendar month it happens to be dated in. A June
+    // salary paid in July would otherwise strand its EMI in July's sheet, away
+    // from the payment it came out of.
+    if (isAutoEmi(t)) return String(t.memo).indexOf(EMI_MEMO + PR().mLabel(ym)) === 0;
+    return String(t.date || '').slice(0, 7) === ym;
   }).forEach(function (t) {
     var e = glEntryFor(t), cash = e ? entryCash(e) : null;
+    var auto = isAutoEmi(t);
+    var dir = auto ? 'internal' : (cash && cash.out < 0 ? 'in' : 'out');
     out.push({ key: t.id, empId: t.empId, empName: t.empName, purpose: PURPOSE[t.type] || cap(t.type || 'Payroll'), type: t.type,
-      date: t.date, amount: +t.amount || 0,
-      from: (cash && cash.account) ? acctName(cash.account) : (e ? 'Recovered from salary — no cash' : paidFrom(t.method)),
-      cash: cash ? Math.abs(cash.out) : 0, memo: t.memo || '', ym: ym, txn: t, entry: e, glId: e ? e.id : null });
+      date: t.date, amount: +t.amount || 0, dir: dir,
+      cash: cash ? Math.abs(cash.out) : 0,
+      from: auto ? 'Recovered from the salary above — no cash'
+        : ((cash && cash.account) ? acctName(cash.account) : paidFrom(t.method)),
+      memo: t.memo || '', ym: ym, txn: t, entry: e, glId: e ? e.id : null });
   });
   out.sort(function (a, b) { return a.date === b.date ? (a.empName < b.empName ? -1 : 1) : (a.date < b.date ? 1 : -1); });
   return out;
+}
+
+/* The three real totals of a month sheet. Kept apart on purpose — see monthTxns. */
+function monthTotals(rows) {
+  var t = { listed: 0, out: 0, inn: 0, internal: 0 };
+  rows.forEach(function (r) {
+    t.listed += r.amount;
+    if (r.dir === 'in') t.inn += r.cash;
+    else if (r.dir === 'out') { t.out += r.cash; t.internal += Math.max(0, r.amount - r.cash); }
+    else t.internal += r.amount;
+  });
+  return t;
 }
 
 /* THE CARD — one row per payroll month, newest first. */
@@ -542,17 +621,30 @@ function payrollHistoryCard() {
     : 'no payroll month has been generated yet');
   box(c, 'body').appendChild(EPAL.table({
     columns: [
-      { key: 'ym', label: 'Month', render: function (m) { return '<span class="strong">' + esc(PR().mLabel(m.ym)) + '</span>'; } },
+      { key: 'ym', label: 'Month', render: function (m) { return '<span class="strong">' + esc(PR().mLabel(m.ym)) + '</span>'; },
+        exportVal: function (m) { return PR().mLabel(m.ym); } },
+      // `staff` is a rendered pair, not a field — without exportVal the CSV and
+      // the PDF would print an empty column (EPAL.table exports row[key]).
       { key: 'staff', label: 'Staff paid', num: true, sortVal: function (m) { return m.paidHeads; },
-        render: function (m) { return '<span class="num">' + m.paidHeads + ' / ' + m.heads + '</span>'; } },
+        render: function (m) { return '<span class="num" title="fully paid / on the payroll">' + m.paidHeads + ' / ' + m.heads + '</span>'; },
+        exportVal: function (m) { return m.paidHeads + ' / ' + m.heads; } },
       { key: 'gross', label: 'Gross', num: true, money: true },
       { key: 'paid', label: 'Net paid', num: true, sortVal: function (m) { return m.paid; },
-        render: function (m) { return m.paid ? '<span class="text-good">' + ui.money(m.paid) + '</span>' : '—'; } },
+        render: function (m) { return m.paid ? '<span class="text-good">' + ui.money(m.paid) + '</span>' : '—'; },
+        exportVal: function (m) { return m.paid; } },
       { key: 'due', label: 'Still outstanding', num: true, sortVal: function (m) { return m.due; },
-        render: function (m) { return m.due ? '<span class="num strong text-bad">' + ui.money(m.due) + '</span>' : '—'; } },
-      { key: 'status', label: 'Run status', badge: { draft: 'warn', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' },
-        // a month with payslips but no pay_runs row has no status of its own
-        render: function (m) { var s = m.status || 'draft'; return '<span class="badge badge-' + (s === 'paid' ? 'good' : s === 'due' ? 'bad' : s === 'draft' ? 'warn' : 'info') + '">' + esc(cap(s)) + '</span>'; } }
+        render: function (m) { return m.due ? '<span class="num strong text-bad">' + ui.money(m.due) + '</span>' : '—'; },
+        exportVal: function (m) { return m.due; } },
+      // A month can exist because it has payslips while carrying NO pay_runs row
+      // — that is exactly why the month list is a union. Such a month has no run
+      // status, and inventing "Draft" for it would be a claim the data does not
+      // make, so it says so instead.
+      { key: 'status', label: 'Run status',
+        render: function (m) {
+          if (!m.status) return '<span class="badge" title="This month has payslips but no payroll run record">No run</span>';
+          return '<span class="badge badge-' + (m.status === 'paid' ? 'good' : m.status === 'due' ? 'bad' : m.status === 'draft' ? 'warn' : 'info') + '">' + esc(cap(m.status)) + '</span>';
+        },
+        exportVal: function (m) { return m.status ? cap(m.status) : 'No run'; } }
     ],
     rows: months, sortKey: 'ym', sortDir: -1, pageSize: 12, totalKey: 'paid',
     exportName: 'payroll-history.csv', pdfTitle: coFull(CID) + ' — Payroll History',
@@ -565,9 +657,7 @@ function payrollHistoryCard() {
 
 /* THE MONTH — every payroll transaction in it, printable as one sheet. */
 function monthTxnsModal(ym) {
-  var rows = monthTxns(ym);
-  var total = sum(rows, function (r) { return r.amount; });
-  var cash = sum(rows, function (r) { return r.cash; });
+  var rows = monthTxns(ym), tot = monthTotals(rows);
   var body = el('div');
   body.appendChild(el('p.text-mute.sm.mb-2', { html:
     rows.length
@@ -587,31 +677,37 @@ function monthTxnsModal(ym) {
     onRow: function (r) { txnDetailModal(r); },
     empty: { icon: 'journal', title: 'No transactions in ' + PR().mLabel(ym) }
   }).el);
-  if (rows.length && Math.abs(cash - total) >= 1) {
-    body.appendChild(el('p.text-mute.xs.mt-2', { text:
-      'Of the ' + ui.money(total) + ' above, ' + ui.money(cash) + ' actually left an account — the rest was recovered internally ' +
-      '(an advance or a loan EMI taken out of the same salary), so it moved between books rather than out of the bank.' }));
-  }
+  if (rows.length) body.appendChild(el('p.text-mute.xs.mt-2', { text: totalsNote(tot) }));
   ui.modal({
     title: 'Payroll transactions — ' + PR().mLabel(ym), icon: 'journal-text', size: 'xl', body: body,
     actions: [
-      { label: 'Print month', icon: 'printer', onClick: function () { printMonthSheet(ym, rows, total, cash); return false; } },
+      { label: 'Print month', icon: 'printer', onClick: function () { printMonthSheet(ym, rows, tot); return false; } },
       { label: 'Close' }
     ]
   });
 }
 
-function printMonthSheet(ym, rows, total, cash) {
+/* The listed total is the sum of the rows, and it is NOT the money that moved:
+ * an advance or an EMI recovered out of a salary is a real transaction that is
+ * also already inside the salary figure above it. Saying so plainly is the only
+ * honest way to print a payroll month on one sheet. */
+function totalsNote(t) {
+  var bits = [ui.money(t.out) + ' left an account'];
+  if (t.inn > 0) bits.push(ui.money(t.inn) + ' came back in');
+  if (t.internal > 0) bits.push(ui.money(t.internal) + ' was recovered inside a salary payment (an advance or a loan EMI), so it is listed but never touched the bank');
+  return 'Of the ' + ui.money(t.listed) + ' listed above: ' + bits.join(' · ') + '.';
+}
+
+function printMonthSheet(ym, rows, tot) {
   var head = '<tr><th>Employee ID</th><th>Employee</th><th>Purpose</th><th>Date</th><th>Paid from</th><th style="text-align:right">Amount</th></tr>';
   var body = rows.map(function (r) {
     return '<tr><td>' + esc(r.empId) + '</td><td>' + esc(r.empName) + '</td><td>' + esc(r.purpose) + '</td><td>' +
       esc(ui.date(r.date)) + '</td><td>' + esc(r.from) + '</td><td style="text-align:right">' + ui.money(r.amount) + '</td></tr>';
   }).join('');
-  var totRow = '<tr><th colspan="5">Total</th><th style="text-align:right">' + ui.money(total) + '</th></tr>';
-  if (Math.abs(cash - total) >= 1) {
-    totRow += '<tr><td colspan="5" style="text-align:right">of which cash actually left an account</td>' +
-      '<td style="text-align:right">' + ui.money(cash) + '</td></tr>';
-  }
+  var totRow = '<tr><th colspan="5">Total listed</th><th style="text-align:right">' + ui.money(tot.listed) + '</th></tr>' +
+    '<tr><td colspan="5" style="text-align:right">of which cash left an account</td><td style="text-align:right">' + ui.money(tot.out) + '</td></tr>';
+  if (tot.inn > 0) totRow += '<tr><td colspan="5" style="text-align:right">cash received back in</td><td style="text-align:right">' + ui.money(tot.inn) + '</td></tr>';
+  if (tot.internal > 0) totRow += '<tr><td colspan="5" style="text-align:right">recovered inside a salary payment — never touched the bank</td><td style="text-align:right">' + ui.money(tot.internal) + '</td></tr>';
   ui.printDoc({
     title: 'Payroll Transactions — ' + PR().mLabel(ym),
     subtitle: coFull(CID) + ' · Payroll',
@@ -632,7 +728,8 @@ function txnDetailModal(r) {
     ['Amount', ui.money(r.amount)],
     ['Date', ui.date(r.date)],
     ['Paid from', r.from],
-    ['Cash that left the account', r.cash ? ui.money(r.cash) : '— nothing left the bank'],
+    [r.dir === 'in' ? 'Cash received into the account' : 'Cash that left the account',
+      r.dir === 'internal' ? 'nothing moved — recovered inside a salary payment' : (r.cash ? ui.money(r.cash) : 'nothing moved')],
     ['Month', PR().mLabel(r.ym)],
     ['Note', r.memo || '—'],
     ['Journal', r.glId || 'no posting on file']

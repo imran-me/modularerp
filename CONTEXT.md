@@ -568,6 +568,66 @@ every tab, opens the month drill and back, searches an employee ID down to one r
 asserts the dashboard row is fully filled at **all four mount points** including a company
 with no payroll history (readable zero-state, never a blank).
 
+### PAYROLL HISTORY (same day, second slice) — and what the data actually said
+
+Owner asked for a **Payroll History** card under the Salary Sheet: one row per month
+(newest first) with staff paid · gross · net paid · outstanding · run status; the row opens
+every payroll transaction that month; a transaction opens its own printable detail, with
+the shared **`EPAL.journalVoucher`** when a posting exists. Built — and **three assumptions
+in the brief turned out to be false**, each verified against
+`platform/engines-library/payroll.js` before a line was written:
+
+1. **`pay_txns` does NOT store a glId.** The engine derives ids from a per-employee,
+   per-type COUNTER at post time (`GL-ADV-<empId>-<n>` …). So the id is REBUILT here and
+   then **checked against the ledger** — and validated (right employee, right amount, right
+   `ref` prefix, never a `GL-UNPAY-` reversal) before it is trusted. `unpay()` **deletes**
+   the auto-EMI rows it created, which SHIFTS every later repayment's ordinal, so an
+   unvalidated rebuild would happily print **another transaction's voucher**. The button
+   only appears when a validated entry is found.
+2. **A payslip carries no bank name** — only a free-text `payMethod`, and only the LAST one.
+   "Paid from" is therefore read from the JOURNAL's own cash line and falls back to the slip
+   only when no journal exists.
+3. **A slip can be paid in instalments**; `pay_slips` keeps totals only. Individual payments
+   live at `GL-PAYP-<empId>-<ym>-<n>`, so salary rows are enumerated from those — a partial
+   payment gets its own dated row, which is the point of a history.
+
+**🐞 THE BUG THAT MATTERED MOST — a reversed payment is still on the books.** `unpay()`
+posts the opposite entry and **deliberately keeps `payCount`** ("reversal ids stay unique").
+Enumerating `n = 1..payCount` therefore lists money that was taken back, and after one
+Reopen-Draft → Pay-All cycle the same salary appears **twice**. Fixed by skipping any
+`GL-PAYP-…-n` that has a matching `GL-UNPAY-…-n`. Proved by a headless test that reverses a
+real payment through `EPAL.payroll.unpay()` and re-pays it: the row disappears, then comes
+back exactly once.
+
+**THREE DIRECTIONS, NOT ONE TOTAL.** A payroll month mixes money that LEFT an account, money
+that CAME BACK (a loan repayment — posted DR cash, so treating its cash as an outflow adds
+inbound money to the outflow total), and money that never moved at all (an advance or a loan
+EMI recovered *inside* the same salary payment, which is a real transaction that is also
+already inside the salary figure above it). Every row carries a direction, and the sheet
+says all three plainly instead of one misleading number:
+*"Of the ৳139,177 listed above: ৳117,511 left an account · ৳21,666 was recovered inside a
+salary payment, so it is listed but never touched the bank."*
+
+Also fixed, each found by the adversarial review and confirmed in the engine source:
+`paidFrom()` rendered every legacy plain method (`'Cash'`, `'bKash'`) as **"Bank"**, because
+`EPAL.pay.resolve()` falls through to a Bank default for unprefixed strings — the plain case
+is now answered before resolve() is consulted; an auto-deducted EMI claimed **"Paid from:
+Bank"** though nothing moved; an auto-EMI was filed by calendar date, orphaning it away from
+the salary it came out of (now filed by the payroll month its memo names); `settle()` marks
+every accrued month paid with **no per-month journal**, which the fallback would have
+reported as a second lot of cash (now labelled as cleared in the settlement); the CSV/PDF
+exported **blank** Staff-paid and Run-status columns (`exportVal` added — `EPAL.table`
+exports `row[key]`, not the rendered cell); a month with payslips but no `pay_runs` row —
+the exact case the month list is a UNION for — was shown as **"Draft"**, a claim the data
+does not make, and now reads **"No run"**; and "Staff paid" counted anyone with a token
+part-payment, so it now counts only heads with nothing still due.
+
+**VERIFIED** — sweep **253/253 × both themes, 0 errors**; tw gate green; trial balance
+balances; plus **20 headless checks** on the feature and **9 more** that drive the real
+engine (reverse a payment, re-pay it, stamp a legacy `'Cash'` method) and read back what the
+history says. `monthSeries()` gained `paidHeads` and stayed the single month-list function,
+so a month can never exist on one payroll screen and be missing from another.
+
 **◻ STILL OWED on payroll:** no backend slice for the new screens — they are read models
 over stores Master Accounts' payroll backend already persists (`pay_runs`/`pay_slips`/
 `pay_txns`/`pay_templates`), so nothing new needs a table, but the Laravel read endpoints

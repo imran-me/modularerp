@@ -440,3 +440,71 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
   already persists.
 - ⏸ **Interiors layout + style to match Travels** (queued 2026-07-28, above) — still
   pending; the owner interrupted with the payroll work.
+
+## 🆕 2026-07-28 — PAYROLL UI/UX RESEARCH → BUILD BACKLOG
+
+Owner asked for research into how other ERPs do payroll UI/UX, a comparison against
+ours, and a list of what to add. Full write-up: **`docs/PAYROLL-UIUX-RESEARCH.md`**
+(SAP PCC · Workday · Oracle Fusion · ADP · Gusto/Rippling/Deel · Keka/greytHR/Zoho ·
+ERPNext). Owner said **"ok"** to queueing Wave 1 and starting it one item at a time.
+
+**Where we already lead** (do NOT regress): the Payroll ↔ Ledger reconciliation card
+with its month-by-month "why?" explainer; the narrated digest; Autopilot as
+proposals-with-buttons that never posts by itself.
+
+**The four waves** (full detail + data-availability tags in the research doc):
+
+- **Wave 1 · free wins** — presentation only, no engine change, using design-system
+  pieces that already exist and chart code already loaded.
+  - ⛔ **1a · rich KPI cards** (sparkline + trend pill + foot line) on Loans, Advance
+    and Reports — they share the `kpi()` helper, so one change lifts three tabs.
+    Reference implementation to copy: `kpiTile()` +`trendFrom()` in
+    `companies/group-cockpit/modules/dashboard/view.js:234`.
+    **BLOCKED 2026-07-28 18:42 — a concurrent session owns `payroll.js`.** It had
+    ~328 uncommitted lines of a **Payroll History** feature in flight (plus a
+    `[data-shell="history"]` block in template.html, `view.js` rebuilt 18:39:23).
+    A `[data-shell="kpitile"]` block was added here and then **backed out
+    surgically** — verified 0 `kpitile` matches, their history block intact.
+    NOT reverted with `git checkout`: their 330 lines are uncommitted and that
+    would have destroyed them. **Owner's call: wait until Payroll History lands,
+    then rebase 1a on top of it.**
+    Design decisions already settled while planning (so 1a can start cold):
+    · exact month-end series ARE derivable for the loan book (`pay_txns` loan /
+      loan-repay / settlement.loanCleared are all dated) and for advances
+      (advance txns dated; recovery is `slip.advanceRecovered`, attributed to
+      `slip.paidDate || slip.ym` — it is not its own transaction);
+    · **no encashment sparkline** — `encashmentLiability()` computes from
+      `leaveState` per employee while the only history available is Σ`slip.encashAmt`,
+      and the two do not reconcile. A tile must not imply a trend it cannot prove;
+    · therefore **no spark band on Reports at all** (2 of its 4 figures have no
+      derivable history, and a half-sparked row reads broken) — trend pills and
+      foot lines there instead. Loans and Advance get the full treatment.
+  - ◻ 1b · department doughnut beside the existing "Where the money goes" table
+  - ◻ 1c · payment-progress `.meter` on the Salary Manage run card
+  - ◻ 1d · column groups (Earnings │ Deductions │ Recovery │ Settlement) + sticky
+    employee column on the 24-column register
+- **Wave 2 · the real gaps** — employee-level variance report · gross→net waterfall ·
+  month-over-month cost bridge · run checklist · pre-finalize validation gates
+- **Wave 3 · control** — approvals (`EPAL.approvals` already ships a
+  `salary-change → MD` rule, payroll references it 0 times) · audit trail
+  (`EPAL.audit`, also 0 references) · bank advice file · YTD columns · bulk actions
+- **Wave 4 · needs an owner decision** — statutory remittance rules (PF 2110 / tax
+  2120 accrue and are never settled) · BD compliance dates · off-cycle / festival
+  bonus run · employer PF for a CTC view · gratuity · the tab regrouping
+
+⚠ **Known trap for anything in Wave 1–2 that adds a chart:** `charts.destroyAll()` is
+called by `router.render()` only (`platform/core/router.js:82`). The embedded desk
+(`EPAL.payrollDesk` → `deskRedraw`) redraws in place with no route change, so charts
+must be tracked locally by the module and destroyed on redraw — a blanket
+`destroyAll()` would also kill the host page's charts.
+
+- ✅ **DONE — Payroll History (owner, same day).** Card under the Salary Sheet: one row per
+  month (newest first) with staff paid / gross / net paid / outstanding / run status; the row
+  opens every payroll transaction that month (salary payments enumerated per INSTALMENT from
+  their journals, plus advances, loans, repayments, bonuses, encashment payouts) with a Print
+  sheet; a transaction opens its own printable detail and the shared `EPAL.journalVoucher`
+  when a validated posting exists. Three assumptions in the brief were false and are written
+  up in CONTEXT.md (pay_txns stores no glId; a slip carries no bank name; a slip can hold
+  several payments). An adversarial review then found a real double-count — `unpay()` keeps
+  `payCount`, so reversed payments were listed and re-payment showed the money twice — plus
+  eight smaller defects, all fixed and regression-tested against the live engine.
