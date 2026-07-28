@@ -36,6 +36,11 @@ function slot(root, name) { return root.querySelector('[data-slot="' + name + '"
 // days passed). Local parts, NOT toISOString(): UTC lands on yesterday in +06.
 var TODAY = (function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
 var RISK_WINDOW = 15;               // days-left threshold for the red alert
+/* the real payment accounts, for "which account did the money move through" —
+ * one shared list (EPAL.pay), so this desk offers exactly what ticketing and the
+ * expense desk do, in the same order */
+function payOptions() { return (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options('travels') : []; }
+function bankIdOf(v) { v = String(v || ''); return v.indexOf('bank:') === 0 ? v.slice(5) : ''; }
 var CATEGORIES = ['Umrah', 'Hajj', 'Tourist', 'Worker', 'Medical', 'Business', 'Student'];
 var CAT_COLOR = {
   Umrah:'#23c17e', Hajj:'#1A43BF', Tourist:'#2f6bff', Worker:'#e2721b',
@@ -306,7 +311,19 @@ function sellSeats(id, done) {
         hint:'Maximum ' + un + ' unsold seat' + (un === 1 ? '' : 's') + ' on this block.' },
       { key:'customer', label:'Customer / Agent', type:'text', required:true, placeholder:'e.g. Al-Madina Hajj Kafela' },
       { key:'salePrice', label:'Sale price / seat', type:'money', required:true, min:1, default:f.saleSeat,
-        hint:'Contract cost is ' + ui.money(f.costSeat) + ' / seat.' }
+        hint:'Contract cost is ' + ui.money(f.costSeat) + ' / seat.' },
+      /* WHERE THE MONEY GOES (audit 2026-07-28). A seat sale used to book straight
+       * to 1200 Receivable and the block cost to 2000 Payable, so selling twelve
+       * seats for cash still read as money owed and the airline as unpaid. Naming
+       * an account puts the money in it and moves its history; leaving the default
+       * keeps it a receivable, which is the right answer for a credit sale. */
+      { type:'section', label:'Money movement — which account' },
+      { key:'receivedInto', label:'Customer paid into', type:'select', searchable:true,
+        options:[['m:Due','Not paid yet — book as Receivable']].concat(payOptions()),
+        default:'m:Due' },
+      { key:'costPaidFrom', label:'Block cost paid from', type:'select', searchable:true,
+        options:[['m:Due','Not paid yet — book as Payable to the airline']].concat(payOptions()),
+        default:'m:Due', hint:'Only the seats sold now — ' + ui.money(f.costSeat) + ' each.' }
     ],
     saveLabel:'Confirm Sale',
     onSave: function (v) {
@@ -322,11 +339,14 @@ function sellSeats(id, done) {
       else if (cur.status !== 'Departed') cur.status = 'Selling';
       db.save('tv_contract_flights', cur);
 
+      var paidInto = bankIdOf(v.receivedInto), paidFrom = bankIdOf(v.costPaidFrom);
       db.postSale('travels', {
         amount: qty * price, cost: qty * (+cur.costSeat || 0),
         ref: cur.id + '-' + Date.now().toString(36), desc:'Contract seats ' + cur.route + ' (' + qty + '×)',
         customer: (v.customer || '').trim(),
-        category: 'contract', vendor: cur.airline || cur.counterparty || ''   // own P&L line (4050) + AP sub-ledger
+        category: 'contract', vendor: cur.airline || cur.counterparty || '',  // own P&L line (4050) + AP sub-ledger
+        paid: !!paidInto, payStatus: paidInto ? 'Paid' : 'Due', bankId: paidInto,
+        costPaid: !!paidFrom, costBankId: paidFrom
       });
 
       ui.toast(qty + ' seat' + (qty === 1 ? '' : 's') + ' sold · ' + ui.money(qty * price), 'success');

@@ -348,10 +348,15 @@
      * no row — the exact drift this whole payment-source change exists to end.
      *   ask({ title, owner, amount, label, onPick(src) })   src = resolve() shape
      */
+    /* opts.allowNone — offer "not paid yet" as the FIRST choice and the default,
+     * for the callers where not-yet-collected is a legitimate answer (a deal just
+     * won, an invoice raised on credit). onPick then gets null, and the caller
+     * books its receivable exactly as it did before naming accounts existed. */
     ask: function (opts) {
       opts = opts || {};
       var owner = opts.owner || 'group';
       var options = Pay.options(owner);
+      if (opts.allowNone) options = [['m:Due', opts.noneLabel || 'Not paid yet']].concat(options);
       EPAL.formModal({
         title: opts.title || 'Which account?', icon: opts.icon || 'bank', size: 'sm',
         record: { source: options.length ? options[0][0] : 'm:Bank' },
@@ -363,7 +368,10 @@
               : 'Its balance moves and the movement shows in its transaction history.' }
         ],
         saveLabel: opts.saveLabel || 'Confirm',
-        onSave: function (v) { opts.onPick(Pay.resolve(v.source)); return true; }
+        onSave: function (v) {
+          opts.onPick(v.source === 'm:Due' ? null : Pay.resolve(v.source));
+          return true;
+        }
       });
     },
 
