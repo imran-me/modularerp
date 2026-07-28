@@ -100,7 +100,13 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
   // should open the same page where I reloaded") — restored from localStorage
   // and re-saved on every render, so a hard refresh keeps the same company +
   // sub-tab instead of dropping back to the Overview.
-  function uiGet(k, d) { try { var v = S.get('ma_ui_' + k, undefined); return v === undefined ? d : v; } catch (e) { return d; } }
+  // S.get() answers NULL for a key that was never written — it only honours the
+  // fallback when you pass one. Checking for `undefined` therefore never fired,
+  // so on a fresh browser selCo came back null and every company-scoped screen
+  // filtered on `companyId === null`: Payment Schedules, Operational Expenses
+  // and Manage Journals all opened EMPTY until you clicked a company chip
+  // (audit 2026-07-28).
+  function uiGet(k, d) { try { var v = S.get('ma_ui_' + k, null); return (v === null || v === undefined) ? d : v; } catch (e) { return d; } }
   var expTab = uiGet('expTab', 'all');                // active button inside Operational Expenses
   var selCo = uiGet('selCo', 'all');                  // the company switcher state
   var banksDash = uiGet('banksDash', true) !== false; // Manage Banks: Overview (card dashboard) vs per-company table
@@ -1213,14 +1219,26 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       ]) : null
     ])]));
   }
+  /* Settling a schedule is a real payment — until this audit (2026-07-28) it only
+   * flipped a badge and wrote a trail note: no journal, no bank balance, no row
+   * in any account's history. ৳25,000 "paid" and every book still showed it.
+   *   Payable    DR 2000 Accounts Payable / CR <the account it left>
+   *   Receivable DR <the account it landed in> / CR 1200 Receivable
+   * Partial payments post their own leg each time (…-P1, …-P2), so the ids stay
+   * stable and a re-save can never double-post. */
   function schedulePayForm(s) {
     var outstanding = (+s.amount || 0) - (+s.paidAmount || 0);
+    var receivable = (s.kind || 'Payable') === 'Receivable';
     EPAL.formModal({
-      title: 'Payment Done — ' + s.party, icon: 'cash-coin', size: 'sm', record: { amount: outstanding, date: TODAY_STR, method: 'Bank' },
+      title: 'Payment Done — ' + s.party, icon: 'cash-coin', size: 'sm',
+      record: { amount: outstanding, date: TODAY_STR, method: EPAL.pay.valueOf(s) },
       fields: [
         { key: 'amount', label: 'Paid amount (৳)', type: 'money', required: true, min: 1, max: outstanding, hint: 'Outstanding ' + ui.money(outstanding) + ' — pay less and a REMAINDER schedule is created automatically.' },
         { key: 'date', label: 'Payment date', type: 'date', default: TODAY_STR },
-        { key: 'method', label: 'Method', type: 'select', options: METHODS, default: 'Bank' },
+        { key: 'method', label: receivable ? 'Received into' : 'Paid from', type: 'select', required: true, searchable: true,
+          options: EPAL.pay.options(s.companyId || 'group'),
+          hint: receivable ? 'The money lands in this account — its balance and history follow.'
+                           : 'The money leaves this account — its balance and history follow.' },
         { key: 'remainderDate', label: 'Remainder due date (if partial)', type: 'date' }
       ],
       saveLabel: 'Payment Done',
@@ -1228,10 +1246,25 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         var amt = Math.min(+v.amount || 0, outstanding);
         if (amt <= 0) { ui.toast('Enter the paid amount', 'error'); return false; }
         var partial = amt < outstanding - 0.001;
-        s.paidAmount = (+s.paidAmount || 0) + amt; s.paidDate = v.date; s.payMethod = v.method;
+        var src = EPAL.pay.resolve(v.method);
+        var leg = (s.payments || 0) + 1, glId = 'GL-SCH-' + s.id + '-P' + leg;
+        try {
+          EPAL.ledger.post({ id: glId, date: v.date || TODAY_STR, companyId: s.companyId || 'group',
+            ref: s.ref || s.id, source: 'payment', party: s.party || '',
+            memo: (receivable ? 'Received from ' : 'Paid to ') + (s.party || '—') + ' · schedule ' + s.id + (src.bank ? ' · ' + src.bank.name : ''),
+            lines: receivable ? [ { account: src.gl, dr: amt, cr: 0 }, { account: '1200', dr: 0, cr: amt } ]
+                              : [ { account: '2000', dr: amt, cr: 0 }, { account: src.gl, dr: 0, cr: amt } ] });
+        } catch (e) { ui.toast(e.message || 'Ledger posting failed', 'error'); return false; }
+        s.payments = leg;
+        s.paidAmount = (+s.paidAmount || 0) + amt; s.paidDate = v.date;
+        EPAL.pay.stamp(s, v.method);                       // method + bankId/bankName
         s.status = 'Paid';
-        schedTrail(s, partial ? 'partial_paid' : 'paid', ui.money(amt) + ' via ' + v.method);
+        schedTrail(s, partial ? 'partial_paid' : 'paid', ui.money(amt) + ' via ' + (s.bankName || s.method));
         db.save('acc_schedules', s);
+        if (s.bankId) EPAL.pay.syncRegister({ id: s.id + '-P' + leg, companyId: s.companyId || 'group',
+          bankId: s.bankId, kind: receivable ? 'Income' : 'Expense', amount: amt,
+          category: 'Payment schedule', party: s.party || '', ref: s.ref || s.id,
+          date: v.date || TODAY_STR, glId: glId }, null);
         if (partial) {
           db.save('acc_schedules', { id: 'SCH-' + ui.uid('').slice(-5).toUpperCase(), companyId: s.companyId, party: s.party, partyType: s.partyType,
             kind: s.kind, amount: Math.round(outstanding - amt), due: v.remainderDate || s.due, status: 'Pending', priority: s.priority || 'medium',
