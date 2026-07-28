@@ -13,7 +13,15 @@
  * The frozen contract for every one of them is in backend/endpoints.md.
  */
 
+/* Every controller this file names MUST be imported. routes.php declares no
+ * namespace, so an un-imported `Foo::class` silently resolves to the global
+ * "Foo" — it does NOT fail at parse time, registers a route quite happily, and
+ * only explodes when that route is dispatched or `route:list` walks it. Both
+ * MovementController and StockLocationController were missing here, which took
+ * out `php artisan route:list` entirely and 500'd the movements endpoint. */
 use Epal\Modules\Woodart\Materials\MaterialController;
+use Epal\Modules\Woodart\Materials\MovementController;
+use Epal\Modules\Woodart\Materials\StockLocationController;
 use Illuminate\Support\Facades\Route;
 
 // The material register — frontend `wa_materials` store (api.js HYDRATE).
