@@ -490,6 +490,75 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-29 · EVERY PAYROLL TRANSACTION SAYS WHERE IT WAS DONE FROM
+
+**The ask** (owner, on the employee file › Accounts tab): *"all transactions across
+payroll should contain from where the transaction has [been] done. Like, Company paid
+from which bank or Cash, Loan Repayment done from Employee salary or Bank / cash etc."*
+
+The full transaction history listed WHAT moved and never WHERE FROM. The screen it was
+asked on is the shared employee file (`platform/kit/emp-profile.js`), which the Payroll
+desk, Master Accounts › Master Payroll and HRM all mount — so one edit answers it in
+every place an employee's money is listed.
+
+**NOTHING NEW IS STORED.** Every movement already knew its account, in one of two
+places, and the engine now reads both (`platform/engines-library/payroll.js`, section
+*WHERE THE MONEY MOVED*): the **journal** is the definitive answer — its cash line names
+the real account — and the transaction's own **`method`** answers for a movement whose
+journal id is rebuilt from a counter that `unpay()` shifts (the trap `payroll.js`
+`monthTxns` documents). `empLedger()` and `loanBook()` stamp `source · sourceKind ·
+sourceDir · sourceCash · sourceOffset · sourceGuess` on every row; the engine formats no
+money, so the view writes the sentence and the two can never drift.
+
+- **Three answers kept apart, because one number would mislead.** An **accrual** is not a
+  payment and says so ("Accrued to Salary Payable — no money moved") instead of naming an
+  account it never used. A **salary deduction** is real money given back with no account
+  moving ("Deducted from the July 2026 salary"). And a payment can be **both** — ৳59,831
+  left Eastern Bank, ৳3,333 was recovered out of the same salary — so the cell prints the
+  two figures rather than one total.
+- **A reversed instalment names no account.** `unpay()` keeps `payCount` so reversal ids
+  stay unique; a `GL-PAYP-…-n` with a matching `GL-UNPAY-…-n` is skipped, or the row would
+  name the bank money was taken back OUT of.
+- **`sourceGuess`** marks the honest case: older/seeded money with no journal behind it,
+  read off the record's own method and labelled as such, never dressed up as a fact.
+- **The reader is one function.** `methodSource()` answers 'bank:<id>' / 'm:<X>' / a
+  legacy plain 'Cash'. `EPAL.pay.resolve()` cannot be used as the reader — handed a plain
+  'Cash' it falls through to its Bank default, so every legacy cash payment would read as
+  a bank payment. The plain case is answered first (same rule `payroll.js` already had).
+
+**AND THE ENTRY POINTS NOW CAPTURE IT.** A source can only be shown if it was recorded,
+and the employee file was the last surface still offering a bare `['Bank','Cash','bKash',
+'Cheque']` list that moved no account — the exact bug the 2026-07-28 audit fixed on the
+payroll desk. Advance · loan · repayment · bonus · pay-from-payslip · **leave-encashment
+payout** · **final settlement** all pick a REAL account now (`EPAL.pay.options` of the
+*employee's own* company, since the engine derives the company from the person).
+`settle()` gained `opts.method` — it was the last movement posting to the abstract 1010
+and moving no register; with no method passed it resolves to exactly 1010, so every
+existing caller posts precisely where it always did. The payslip header and the printed
+payslip now READ `payMethod` too, instead of printing a raw `bank:B-04`.
+
+**🐞 THE DEFECT THE PROBE FOUND:** `loanBook()` builds its `payments` array a second time
+inside the FIFO allocation loop, so the freshly-stamped `source` was dropped and every
+loan payment read `undefined`. Caught by asserting on the *rendered* value, not on the
+function that produced it.
+
+**◻ FLAGGED, NOT CHANGED (needs an owner call):** `empLedger()` has no row for an
+**encashment payout** — the accrual credits the employee but paying it out debits
+nothing, so the running "net due" overstates what is owed by the amount encashed. Adding
+the row changes balances on every screen that reads the ledger, so it is reported rather
+than done quietly.
+
+**VERIFIED** — boot sweep **253/253 routes × both themes, 0 console errors, 0 render
+failures** · tailwind gate green (reproducible, 0 orphans) · routes-imports 46/46 · trial
+balance balances · plus a purpose-built headless probe (**18 checks**): 424 ledger rows
+across 18 employees all name a source with the running balance untouched; a ৳1,500 salary
+payment from a named bank reads back that bank with cash + recovered = the row; a
+reversal leaves no row; a loan, a manual repayment and an auto-EMI each name their own
+side; Σ loan due still equals `loanOutstanding()`; a settlement moves the account it
+names; and the column renders on the screen with no blank cell.
+
+---
+
 ## 🆕 SESSION — 2026-07-29 · SALARY IS PAID MONTH BY MONTH, AND A LOAN ROW SAYS WHAT IS DUE
 
 Two owner asks, landed together (both edit `payroll.js` and the hunks interleave).

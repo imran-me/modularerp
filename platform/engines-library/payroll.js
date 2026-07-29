@@ -861,14 +861,20 @@
         loans.push({ id: x.id, empId: empId, empName: x.empName || empName(empId), companyId: x.companyId,
           date: x.date, principal: amt, due: amt, paid: 0,
           emiMonths: +x.emiMonths || 0, emi: (+x.emiMonths || 0) ? Math.round(amt / (+x.emiMonths)) : 0,
-          method: x.method || '', memo: x.memo || '', seq: loans.length + 1,
+          // WHICH ACCOUNT handed the loan over — see "where the money moved" below
+          method: x.method || '', source: methodSource(x.method), memo: x.memo || '', seq: loans.length + 1,
           closed: false, closedOn: '', lastPaidOn: '', viaSalary: 0, viaCash: 0, payments: [] });
       } else if (x.type === 'loan-repay') {
+        var emi = isEmiMemo(x.memo);
         pays.push({ txnId: x.id, date: x.date, amount: round(x.amount), method: x.method || '',
-          memo: x.memo || '', kind: isEmiMemo(x.memo) ? 'salary' : 'cash' });
+          memo: x.memo || '', kind: emi ? 'salary' : 'cash',
+          // where the money came back FROM: the salary it was deducted out of, or
+          // the account it was received into
+          source: emi ? 'Deducted from the ' + emiFrom(x.memo) : methodSource(x.method) });
       } else if (x.type === 'settlement' && (+x.loanCleared || 0) > 0) {
         pays.push({ txnId: x.id, date: x.date, amount: round(x.loanCleared), method: x.method || '',
-          memo: x.memo || 'Final settlement', kind: 'settlement' });
+          memo: x.memo || 'Final settlement', kind: 'settlement',
+          source: 'Cleared in the final settlement' });
       }
     });
     pays.forEach(function (p) {
@@ -881,7 +887,7 @@
         if (p.kind === 'salary') L.viaSalary += take; else L.viaCash += take;
         L.lastPaidOn = p.date;
         L.payments.push({ txnId: p.txnId, date: p.date, amount: take, kind: p.kind,
-          method: p.method, memo: p.memo, balance: L.due });
+          method: p.method, source: p.source, memo: p.memo, balance: L.due });
         if (L.due <= 0 && !L.closed) { L.closed = true; L.closedOn = p.date; }
       }
     });
@@ -895,6 +901,131 @@
       .reduce(function (a, x) { return a + Math.round(x.amount / x.emiMonths); }, 0);
     return Math.min(emi, loanOutstanding(empId));
   }
+  /* ====================================================== WHERE THE MONEY MOVED
+   * Owner 2026-07-29: "all transactions across payroll should contain from where
+   * the transaction has been done — the company paid from which bank or cash;
+   * a loan repayment was done from the employee's salary, or from bank / cash."
+   *
+   * NOTHING NEW IS STORED. Every payroll movement already knows its account, in
+   * one of two places, and this reads both:
+   *   · the JOURNAL is the definitive answer — its cash line names the real
+   *     account the money moved through, and ONE salary payment can carry a bank
+   *     line AND advance/loan recovery lines. That is the difference between
+   *     "৳17,911 left the bank" and "৳16,000 left the bank, ৳1,911 was recovered
+   *     out of the same payment and never touched an account";
+   *   · the transaction's own `method`, for a movement whose journal cannot be
+   *     addressed by a stable id (advance/loan/bonus ids are rebuilt from a
+   *     counter, and unpay() shifts that counter — see payroll.js monthTxns).
+   *
+   * A stored method is 'bank:<id>' (a real account), 'm:<Method>' (a generic with
+   * no account behind it), or a LEGACY PLAIN 'Bank' / 'Cash' / 'bKash'. EPAL.pay
+   * .resolve() cannot be used as the reader: handed a plain 'Cash' it falls
+   * through to its Bank default, so every legacy cash payment would read as a
+   * bank payment. The plain case is therefore answered BEFORE resolve() is asked.
+   *
+   * The engine never formats money, so a row carries the FIGURES and the view
+   * writes the sentence:
+   *   source        one line naming the account / the salary it came out of
+   *   sourceKind    'account' money moved through a real account · 'salary' it
+   *                 was taken out of a salary and no cash moved · 'accrual'
+   *                 nothing was paid at all · 'internal' recovered, not paid
+   *   sourceDir     'out' left the company · 'in' came back · '' nothing moved
+   *   sourceCash    what actually left/entered an account
+   *   sourceOffset  the part of the row that never touched cash (recovery)
+   *   sourceGuess   true when the answer comes from the record's own method
+   *                 because no journal accounts for it (older / seeded data)
+   * ======================================================================== */
+  function acctLabel(code) {
+    if (!code) return '';
+    var a = (L() && L().account) ? L().account(code) : null;
+    return a ? a.name : String(code);
+  }
+  function methodSource(method) {
+    var m = String(method || '');
+    if (m.indexOf('bank:') === 0) {
+      var src = (EPAL.pay && EPAL.pay.resolve) ? EPAL.pay.resolve(m) : null;
+      if (src && src.bank) return src.bank.name + (src.bank.branch && src.bank.branch !== '—' ? ' · ' + src.bank.branch : '');
+      return 'Account no longer on file';          // the bank record was deleted — say so
+    }
+    if (m.indexOf('m:') === 0) return m.slice(2) || 'Bank';
+    return m || 'Bank';                            // legacy plain label, kept verbatim
+  }
+  function glById(id) {
+    var rows = S.list('gl_entries');
+    for (var i = 0; i < rows.length; i++) if (rows[i].id === id) return rows[i];
+    return null;
+  }
+  /* The cash side of a journal: which accounts, and the SIGNED net. Positive is
+   * money leaving (a credit to cash), negative is money arriving — a loan
+   * repayment is DR cash / CR 1260, so reading its cash as an outflow would add
+   * money that came IN to the money that went OUT. */
+  function glCash(e) {
+    var names = [], net = 0;
+    ((e && e.lines) || []).forEach(function (l) {
+      if (!(L() && L().isCashAccount && L().isCashAccount(l.account))) return;
+      var v = (+l.cr || 0) - (+l.dr || 0);
+      if (!v) return;
+      net += v;
+      var n = acctLabel(l.account);
+      if (n && names.indexOf(n) < 0) names.push(n);
+    });
+    // two accounts in one voucher is legal and worth saying plainly
+    return { names: names, label: names.join(' + '), net: net };
+  }
+  // 'EMI auto-deducted from July 2026 salary' → 'July 2026 salary'
+  function emiFrom(memo) { return String(memo || '').slice('EMI auto-deducted from '.length) || 'the salary'; }
+
+  /* Where ONE salary payment row came from. A month can be paid in instalments,
+   * so every live GL-PAYP journal for the slip is read and the accounts are
+   * merged; a REVERSED instalment (unpay() posts GL-UNPAY and deliberately keeps
+   * payCount so reversal ids stay unique) names no account, because that money
+   * came back. With no journal at all the slip's own last method answers, marked
+   * as a guess rather than dressed up as a fact. */
+  function slipPaidSource(s) {
+    var names = [], cash = 0, found = 0;
+    for (var n = 1; n <= (s.payCount || 0); n++) {
+      var e = glById('GL-PAYP-' + s.empId + '-' + s.ym + '-' + n);
+      if (!e || glById('GL-UNPAY-' + s.empId + '-' + s.ym + '-' + n)) continue;
+      var c = glCash(e);
+      found++; cash += c.net;
+      c.names.forEach(function (x) { if (names.indexOf(x) < 0) names.push(x); });
+    }
+    var recovered = round((s.advanceRecovered || 0) + (s.loanRecovered || 0));
+    if (!found) return { source: methodSource(s.payMethod), sourceKind: 'account', sourceDir: 'out',
+      sourceCash: Math.max(0, round((s.paid || 0) - recovered)), sourceOffset: recovered, sourceGuess: true };
+    cash = round(cash);
+    if (cash <= 0 && recovered > 0) return { source: 'Recovered from advance / loan — no account moved',
+      sourceKind: 'internal', sourceDir: '', sourceCash: 0, sourceOffset: recovered, sourceGuess: false };
+    return { source: names.length ? names.join(' + ') : methodSource(s.payMethod),
+      sourceKind: 'account', sourceDir: 'out', sourceCash: Math.max(0, cash),
+      sourceOffset: recovered, sourceGuess: !names.length };
+  }
+  /* Where one pay_txns row moved its money. */
+  function txnSource(x) {
+    if (x.type === 'loan-repay' && isEmiMemo(x.memo))
+      return { source: 'Deducted from the ' + emiFrom(x.memo), sourceKind: 'salary', sourceDir: '',
+        sourceCash: 0, sourceOffset: round(x.amount), sourceGuess: false };
+    if (x.type === 'settlement') {
+      var c = glCash(glById('GL-SETL-' + x.empId));
+      var cleared = round((+x.advanceCleared || 0) + (+x.loanCleared || 0));
+      return { source: c.label || methodSource(x.method), sourceKind: 'account', sourceDir: 'out',
+        sourceCash: Math.max(0, round(c.net)), sourceOffset: cleared, sourceGuess: !c.label };
+    }
+    return { source: methodSource(x.method), sourceKind: 'account',
+      sourceDir: x.type === 'loan-repay' ? 'in' : 'out',
+      sourceCash: round(x.amount), sourceOffset: 0, sourceGuess: false };
+  }
+  function withSource(row, src) {
+    row.source = src.source; row.sourceKind = src.sourceKind; row.sourceDir = src.sourceDir;
+    row.sourceCash = src.sourceCash; row.sourceOffset = src.sourceOffset; row.sourceGuess = !!src.sourceGuess;
+    return row;
+  }
+  // an accrual is not a payment — it says so instead of naming an account it never used
+  function accrualSource(account) {
+    return { source: 'Accrued to ' + account + ' — no money moved', sourceKind: 'accrual', sourceDir: '',
+      sourceCash: 0, sourceOffset: 0, sourceGuess: false };
+  }
+
   // Salary currently owed to the employee (accrued but unpaid across all months).
   function salaryDue(empId) {
     return S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; })
@@ -958,10 +1089,19 @@
     if (p.advanceOutstanding > 0) lines.push({ account: '1250', dr: 0, cr: p.advanceOutstanding });
     if (p.loanOutstanding > 0) lines.push({ account: '1260', dr: 0, cr: p.loanOutstanding });
     var cash = toEmployee - p.advanceOutstanding - p.loanOutstanding;
-    lines.push({ account: '1010', dr: 0, cr: cash });
-    glPost('GL-SETL-' + empId, today(), cid, 'SETL-' + empId, 'Final settlement · ' + emp.name, 'payroll', empId, lines);
+    /* WHICH ACCOUNT PAYS THE SETTLEMENT (owner 2026-07-29 — "every payroll
+     * transaction must say where it was done from"). The settlement was the last
+     * money movement still posting to the abstract 1010 and moving no register.
+     * With no method passed payThrough() resolves to exactly 1010, so every
+     * existing caller posts precisely where it always did. */
+    var setlGl = 'GL-SETL-' + empId;
+    var setlSrc = payThrough(opts, 'out', cash, 'SETL-' + empId, 'Final settlement', empId, cid, setlGl);
+    lines.push({ account: setlSrc.account, dr: 0, cr: cash });
+    glPost(setlGl, today(), cid, 'SETL-' + empId,
+      'Final settlement · ' + emp.name + (setlSrc.name ? ' · ' + setlSrc.name : ''), 'payroll', empId, lines);
     txn({ type: 'settlement', empId: empId, empName: emp.name, companyId: cid, date: today(), amount: p.net,
-      advanceCleared: p.advanceOutstanding, loanCleared: p.loanOutstanding, memo: 'Final settlement' });
+      advanceCleared: p.advanceOutstanding, loanCleared: p.loanOutstanding,
+      method: opts.method || '', memo: 'Final settlement' });
     // mark any accrued-unpaid slips paid, and the employee resigned
     S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; }).forEach(function (s) { s.paid = slipPayable(s); s.status = 'paid'; s.paidDate = today(); S.upsert('pay_slips', s); });
     emp.status = 'resigned'; emp.resignedDate = today();
@@ -1008,16 +1148,16 @@
     var rows = [];
     S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; }).forEach(function (s) {
       var payable = slipPayable(s);
-      rows.push({ date: s.ym + '-01', ref: s.id, kind: 'Salary earned', memo: mLabel(s.ym) + ' salary (net of tax/PF)', credit: payable, debit: 0 });
-      if (s.encashAmt) rows.push({ date: s.ym + '-01', ref: s.id, kind: 'Leave encashment', memo: mLabel(s.ym) + ' leave accrual', credit: s.encashAmt, debit: 0 });
-      if (s.paid) rows.push({ date: s.paidDate || (s.ym + '-10'), ref: s.id, kind: 'Salary paid', memo: mLabel(s.ym) + ' salary paid', credit: 0, debit: s.paid });
+      rows.push(withSource({ date: s.ym + '-01', ref: s.id, kind: 'Salary earned', memo: mLabel(s.ym) + ' salary (net of tax/PF)', credit: payable, debit: 0 }, accrualSource('Salary Payable')));
+      if (s.encashAmt) rows.push(withSource({ date: s.ym + '-01', ref: s.id, kind: 'Leave encashment', memo: mLabel(s.ym) + ' leave accrual', credit: s.encashAmt, debit: 0 }, accrualSource('Leave Encashment Payable')));
+      if (s.paid) rows.push(withSource({ date: s.paidDate || (s.ym + '-10'), ref: s.id, kind: 'Salary paid', memo: mLabel(s.ym) + ' salary paid', credit: 0, debit: s.paid }, slipPaidSource(s)));
     });
     txnsFor(empId).forEach(function (x) {
-      if (x.type === 'advance') rows.push({ date: x.date, ref: x.id, kind: 'Advance', memo: x.memo, credit: 0, debit: x.amount });
-      else if (x.type === 'loan') rows.push({ date: x.date, ref: x.id, kind: 'Loan', memo: x.memo, credit: 0, debit: x.amount });
-      else if (x.type === 'loan-repay') rows.push({ date: x.date, ref: x.id, kind: 'Loan repaid', memo: x.memo, credit: x.amount, debit: 0 });
-      else if (x.type === 'bonus') rows.push({ date: x.date, ref: x.id, kind: 'Bonus', memo: x.memo, credit: x.amount, debit: 0 });
-      else if (x.type === 'settlement') rows.push({ date: x.date, ref: x.id, kind: 'Final settlement', memo: x.memo, credit: 0, debit: x.amount });
+      if (x.type === 'advance') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Advance', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
+      else if (x.type === 'loan') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Loan', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
+      else if (x.type === 'loan-repay') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Loan repaid', memo: x.memo, credit: x.amount, debit: 0 }, txnSource(x)));
+      else if (x.type === 'bonus') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Bonus', memo: x.memo, credit: x.amount, debit: 0 }, txnSource(x)));
+      else if (x.type === 'settlement') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Final settlement', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
     });
     rows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     var bal = 0;
@@ -1229,6 +1369,9 @@
     encashmentLiability: encashmentLiability, payEncashment: payEncashment, departmentCost: departmentCost,
     previousDue: previousDue, previousDueList: previousDueList, payArrears: payArrears,
     empLedger: empLedger, statement: statement, txnsFor: txnsFor,
+    // where the money moved — ONE reader, so no screen can name the account its
+    // own way (see "WHERE THE MONEY MOVED" above)
+    methodSource: methodSource, txnSource: txnSource, slipPaidSource: slipPaidSource,
     curYm: curYm, today: today, mLabel: mLabel
   };
 

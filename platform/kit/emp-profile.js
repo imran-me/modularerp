@@ -38,6 +38,56 @@
   function cap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
   function money(v) { return EPAL.ui.money(v || 0); }
   function drow(k, v) { return el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: k }), el('div.strong', { text: v == null || v === '' ? '—' : String(v) })]); }
+
+  /* ------------------------------------------------- WHERE THE MONEY MOVED
+   * Owner 2026-07-29: every payroll transaction has to say where it was done
+   * FROM — which bank or cash box the company paid out of, and whether a loan
+   * repayment came out of the employee's salary or out of an account.
+   *
+   * The ENGINE answers (`EPAL.payroll` stamps source / sourceKind / sourceDir /
+   * sourceCash / sourceOffset / sourceGuess on every ledger row and loan
+   * payment); this only writes the sentence, so the employee file, the loan book
+   * and the payroll desk can never name the same account three different ways.
+   *
+   * The three kinds are worth keeping apart: an ACCRUAL is not a payment at all
+   * and must not be dressed up as one; a SALARY DEDUCTION is real money the
+   * employee gave back without any account moving; and a payment can be BOTH —
+   * part cash out of a bank, part recovered out of the same salary — which is
+   * why the figures are shown rather than one total that would mislead. */
+  function sourceCell(r) {
+    var kind = r.sourceKind || 'account';
+    var main = esc(r.source || '—');
+    if (kind === 'accrual') return '<span class="text-mute sm">' + main + '</span>';
+    if (kind === 'salary' || kind === 'internal')
+      return '<span class="badge badge-info">' + (kind === 'salary' ? 'From salary' : 'Recovered') + '</span>' +
+        '<div class="text-mute xs">' + main + '</div>';
+    var note = [];
+    if (r.sourceDir === 'in') note.push('received into this account');
+    if (r.sourceOffset > 0 && r.sourceCash > 0) note.push(money(r.sourceCash) + ' left it · ' + money(r.sourceOffset) + ' recovered from advance / loan');
+    else if (r.sourceOffset > 0 && !r.sourceCash) note.push(money(r.sourceOffset) + ' recovered — no cash moved');
+    if (r.sourceGuess) note.push('taken from the record, no journal on file');
+    return '<span class="strong">' + main + '</span>' +
+      (note.length ? '<div class="text-mute xs">' + esc(note.join(' · ')) + '</div>' : '');
+  }
+  // The account list for a "Paid from" picker — the employee's OWN company's
+  // accounts, because the engine derives the company from the employee.
+  function payOptions(e) {
+    var cid = (e && e.companyId) || 'travels';
+    return (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(cid) : [['m:Bank', 'Bank'], ['m:Cash', 'Cash']];
+  }
+  function payDefault(e) {
+    var o = payOptions(e);
+    return o.length ? o[0][0] : 'm:Bank';
+  }
+  /* A payslip's `payMethod` is whatever pay() was handed — which is now a real
+   * account ('bank:<id>'), so it must be READ, not printed raw. `lower` is the
+   * printed payslip's own convention ('bank', 'cash'); a NAMED account keeps its
+   * own capitalisation there too, because that is how the bank is called. */
+  function methodText(m, lower) {
+    var raw = m || 'Bank';
+    var lbl = (PR() && PR().methodSource) ? PR().methodSource(raw) : raw;
+    return (lower && String(raw).indexOf('bank:') !== 0) ? lbl.toLowerCase() : lbl;
+  }
   function st2(l, v) { return el('div.stat', null, [el('div.stat-label', { text: l }), el('div.stat-value', { text: v })]); }
   function canPay(e) { return !EPAL.perm || EPAL.perm.can(e.companyId || 'travels', 'payroll', 'create'); }
 
@@ -68,7 +118,7 @@
       el('div.flex.items-center.gap-2.flex-wrap.mb-2', null, [
         el('div.flex-1', null, [
           el('div.fw-700', { style: { fontSize: '16px' }, html: esc(emp.name) + ' <span class="text-mute sm">· ' + esc(emp.designation || '') + '</span>' }),
-          el('div.text-mute.sm', { text: 'Payslip #' + s.slipNo + ' · Period ' + ym + ' · ' + (s.payMethod || 'Bank') + ' · Generated ' + ui().date(s.generated) })
+          el('div.text-mute.sm', { text: 'Payslip #' + s.slipNo + ' · Period ' + ym + ' · ' + methodText(s.payMethod) + ' · Generated ' + ui().date(s.generated) })
         ]),
         el('span.badge.badge-' + (s.status === 'paid' ? 'good' : s.status === 'due' ? 'bad' : s.status === 'partial' ? 'warn' : 'info'), { text: cap(s.status) })
       ]),
@@ -157,7 +207,7 @@
         '<td><div class="gl">DESIGNATION</div><div class="gv">' + esc(emp.designation || '—') + '</div></td>' +
         '<td><div class="gl">EMPLOYEE ID</div><div class="gv">' + esc(emp.id || 'N/A') + '</div></td></tr>' +
         '<tr><td><div class="gl">PAY PERIOD</div><div class="gv">' + esc(ym.replace('-', '/')) + '</div></td>' +
-        '<td><div class="gl">PAYMENT METHOD</div><div class="gv">' + esc((s.payMethod || 'Bank').toLowerCase()) + '</div></td>' +
+        '<td><div class="gl">PAYMENT METHOD</div><div class="gv">' + esc(methodText(s.payMethod, true)) + '</div></td>' +
         '<td><div class="gl">GENERATE DATE</div><div class="gv">' + esc(s.generated) + '</div></td></tr></table>' +
       '<table class="cols"><tr><td class="col">' +
         '<div class="sec">EARNINGS</div><table class="lines">' + earn + '</table>' +
@@ -352,6 +402,10 @@
             { key: 'date', label: 'Date', date: true },
             { key: 'kind', label: 'Type', badge: { 'Salary earned': 'good', 'Leave encashment': 'info', 'Salary paid': '', 'Advance': 'warn', 'Loan': 'warn', 'Bonus': 'good', 'Final settlement': 'bad', 'Loan repaid': '' } },
             { key: 'memo', label: 'Detail' },
+            // WHERE IT WAS DONE FROM (owner 2026-07-29) — the bank / cash box the
+            // company paid out of, or the salary a repayment was deducted from
+            { key: 'source', label: 'Paid from / into', sort: false,
+              exportVal: function (r) { return r.source || ''; }, render: sourceCell },
             { key: 'credit', label: 'Owed to emp', num: true, render: function (r) { return r.credit ? '<span class="num text-good">' + money(r.credit) + '</span>' : '—'; }, sortVal: function (r) { return r.credit; } },
             { key: 'debit', label: 'Paid / recovered', num: true, render: function (r) { return r.debit ? '<span class="num">' + money(r.debit) + '</span>' : '—'; }, sortVal: function (r) { return r.debit; } },
             { key: 'balance', label: 'Net due', num: true, render: function (r) { return '<span class="num strong ' + (r.balance >= 0 ? 'text-good' : 'text-bad') + '">' + money(r.balance) + '</span>'; }, sortVal: function (r) { return r.balance; } }
@@ -371,7 +425,11 @@
         accBody.appendChild(EPAL.table({
           columns: [
             { key: 'date', label: 'Taken on', date: true },
-            { key: 'principal', label: 'Loan taken', num: true, money: true },
+            // …and WHICH ACCOUNT handed it over, under the figure
+            { key: 'principal', label: 'Loan taken', num: true, sortVal: function (L) { return L.principal; },
+              exportVal: function (L) { return L.principal; },
+              render: function (L) { return '<span class="num strong">' + money(L.principal) + '</span>' +
+                (L.source ? '<div class="text-mute xs">from ' + esc(L.source) + '</div>' : ''); } },
             { key: 'paid', label: 'Paid till now', num: true, sortVal: function (L) { return L.paid; }, exportVal: function (L) { return L.paid; },
               render: function (L) { return '<span class="num text-good">' + money(L.paid) + '</span>' +
                 '<div class="text-mute xs">' + (L.principal ? Math.round(L.paid / L.principal * 100) : 0) + '%' +
@@ -462,12 +520,18 @@
     var P = PR();
     var meta = { advance: ['Give Advance Salary', 'cash'], loan: ['Give Staff Loan', 'bank'], 'loan-repay': ['Record Loan Repayment', 'arrow-return-left'], bonus: ['Record Bonus', 'gift'] }[type];
     EPAL.formModal({
-      title: meta[0] + ' — ' + e.name, icon: meta[1], size: 'sm', record: { date: P.today(), method: 'Bank' },
+      title: meta[0] + ' — ' + e.name, icon: meta[1], size: 'sm', record: { date: P.today(), method: payDefault(e) },
       fields: [
         { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 0 },
         type === 'loan' ? { key: 'emiMonths', label: 'Repay over (months)', type: 'number', min: 0, default: 0, hint: '0 = manual repayment' } : null,
         { key: 'date', label: 'Date', type: 'date', default: P.today() },
-        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Cheque'], default: 'Bank' },
+        // A REAL ACCOUNT, not a bare word (owner 2026-07-29 — every payroll
+        // transaction must say where it was done from). The generic methods are
+        // still last in the list, so a cheque nobody registered an account for is
+        // recordable; but picking an account makes the money actually leave it —
+        // its balance, its register and its own GL code all move.
+        { key: 'method', label: type === 'loan-repay' ? 'Received into' : 'Paid from', type: 'select',
+          required: true, searchable: true, options: payOptions(e) },
         { key: 'memo', label: 'Note', type: 'text' }
       ].filter(Boolean),
       saveLabel: meta[0],
@@ -482,11 +546,12 @@
   function payFromSlip(e, ym, outstanding) {
     var P = PR();
     EPAL.formModal({
-      title: 'Pay — ' + e.name + ' · ' + P.mLabel(ym), icon: 'cash-coin', size: 'sm', record: { amount: outstanding, method: e.salaryMethod || 'Bank' },
+      title: 'Pay — ' + e.name + ' · ' + P.mLabel(ym), icon: 'cash-coin', size: 'sm', record: { amount: outstanding, method: payDefault(e) },
       fields: [
         { key: 'amount', label: 'Pay now (৳)', type: 'money', required: true, min: 1, max: outstanding,
           hint: 'Payable ' + money(outstanding) + '. Pay e.g. ' + money(Math.max(1, outstanding - 4000)) + ' and ' + money(Math.min(outstanding, 4000)) + ' stays DUE — it appears on this slip and carries to next month.' },
-        { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Nagad', 'Rocket', 'Upay', 'Card', 'Cheque'], default: 'Bank' }
+        // the account the salary leaves — the payslip then names it instead of a bare word
+        { key: 'method', label: 'Paid from', type: 'select', required: true, searchable: true, options: payOptions(e) }
       ],
       saveLabel: 'Post Payment',
       onSave: function (v) {
@@ -495,14 +560,31 @@
       }
     });
   }
+  /* An encashment payout is real money leaving the company, so it has to name the
+   * account it leaves (owner 2026-07-29). It used to be a bare confirm, which
+   * could not ask — hence the form; the amount is the engine's, not a typed one,
+   * so nothing about WHAT is paid moves. */
   function payEncash(e) {
     var P = PR(), ls = P.leaveState(e);
-    ui().confirm({ title: 'Pay leave encashment — ' + e.name + '?', text: ls.encashableDays.toFixed(2) + ' accrued days = ' + money(ls.value) + '. Pays out and resets the accrual.', confirmLabel: 'Pay Encashment' })
-      .then(function (ok) { if (!ok) return; try { P.payEncashment(e.id); ui().toast('Encashment paid', 'success'); EPAL.router.render(); } catch (x) { ui().toast(x.message || 'Failed', 'error'); } });
+    EPAL.formModal({
+      title: 'Pay leave encashment — ' + e.name, icon: 'piggy-bank', size: 'sm', record: { method: payDefault(e) },
+      fields: [
+        { key: 'method', label: 'Paid from', type: 'select', required: true, searchable: true, options: payOptions(e),
+          hint: ls.encashableDays.toFixed(2) + ' accrued days = ' + money(ls.value) + '. Pays out and resets the accrual.' }
+      ],
+      saveLabel: 'Pay Encashment',
+      onSave: function (v) {
+        try { P.payEncashment(e.id, { method: v.method }); ui().toast('Encashment paid', 'success'); EPAL.router.render(); return true; }
+        catch (x) { ui().toast(x.message || 'Failed', 'error'); return false; }
+      }
+    });
   }
   function settlement(e, parentModal) {
     var P = PR(), p = P.settlementPreview(e), body = el('div');
     var m2 = ui().modal({ title: 'Final Settlement — ' + e.name, icon: 'box-arrow-right', size: 'md', body: body, footer: false });
+    // WHICH ACCOUNT PAYS IT (owner 2026-07-29). The settlement was the last payroll
+    // movement still posting to the abstract 1010 and moving no account's register.
+    var srcSel = el('select.input', null, payOptions(e).map(function (o) { return el('option', { value: o[0], text: o[1] }); }));
     body.appendChild(el('div.card', null, [el('div.card-body', null, [
       el('div.data-list', null, [
         drow('Unpaid salary due', money(p.salaryDue)), drow('Last month salary', money(p.lastSalary)),
@@ -511,10 +593,13 @@
         el('div.divider'),
         el('div.data-row', null, [el('div.strong.flex-1', { text: 'Net settlement' }), el('div.strong.text-good', { text: money(p.net) })])
       ]),
+      el('div.mt-3', null, [
+        el('label.text-mute.sm', { text: 'Paid from', style: { display: 'block', marginBottom: '3px' } }), srcSel
+      ]),
       el('div.flex.gap-1.justify-between.mt-3.flex-wrap', null, [
         el('button.btn.btn-ghost', { text: 'Cancel', onclick: function () { m2.close(); } }),
         el('button.btn.btn-primary.text-bad', { html: ui().icon('box-arrow-right') + ' Confirm Settlement', onclick: function () {
-          try { P.settle(e.id); ui().toast('Settlement posted · ' + e.name + ' resigned', 'success'); m2.close(); if (parentModal) parentModal.close(); EPAL.router.render(); } catch (x) { ui().toast(x.message || 'Failed', 'error'); }
+          try { P.settle(e.id, { method: srcSel.value }); ui().toast('Settlement posted · ' + e.name + ' resigned', 'success'); m2.close(); if (parentModal) parentModal.close(); EPAL.router.render(); } catch (x) { ui().toast(x.message || 'Failed', 'error'); }
         } })
       ])
     ])]));
@@ -556,6 +641,9 @@
     open(id);
   }, true);
 
-  EPAL.people = { open: open, statement: statement, payslipPrint: payslipPrint, payslipHtml: payslipHtml, linkify: linkify, resolve: resolve, attendanceForm: attendanceForm };
+  EPAL.people = { open: open, statement: statement, payslipPrint: payslipPrint, payslipHtml: payslipHtml, linkify: linkify, resolve: resolve, attendanceForm: attendanceForm,
+    // the "where the money moved" cell — shared, so every screen that lists an
+    // employee's transactions names the account the same way
+    sourceCell: sourceCell, payOptions: payOptions, methodText: methodText };
 
 })(window.EPAL = window.EPAL || {});

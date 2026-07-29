@@ -708,6 +708,10 @@ function empAccountsSection(e) {
       { key: 'date', label: 'Date', date: true },
       { key: 'kind', label: 'Type', badge: { 'Salary earned': 'good', 'Leave encashment': 'info', 'Salary paid': '', 'Advance': 'warn', 'Loan': 'warn', 'Bonus': 'good', 'Final settlement': 'bad', 'Loan repaid': '' } },
       { key: 'memo', label: 'Detail' },
+      // WHERE IT WAS DONE FROM (owner 2026-07-29) — the same cell the employee
+      // file draws, off the same engine fields, so the two can never disagree
+      { key: 'source', label: 'Paid from / into', sort: false,
+        exportVal: function (r) { return r.source || ''; }, render: ledgerSource },
       { key: 'credit', label: 'Owed to emp', num: true, render: function (r) { return r.credit ? '<span class="num text-good">' + ui.money(r.credit) + '</span>' : '—'; }, sortVal: function (r) { return r.credit; } },
       { key: 'debit', label: 'Paid / recovered', num: true, render: function (r) { return r.debit ? '<span class="num">' + ui.money(r.debit) + '</span>' : '—'; }, sortVal: function (r) { return r.debit; } },
       { key: 'balance', label: 'Net due', num: true, render: function (r) { return '<span class="num strong ' + (r.balance >= 0 ? 'text-good' : 'text-bad') + '">' + ui.money(r.balance) + '</span>'; }, sortVal: function (r) { return r.balance; } }
@@ -717,6 +721,11 @@ function empAccountsSection(e) {
   });
   b.appendChild(tbl.el);
   return card;
+}
+// ONE cell, drawn by the employee-profile kit — this screen must not grow its own
+// wording for the same fact (falls back to the plain line if the kit is absent).
+function ledgerSource(r) {
+  return (EPAL.people && EPAL.people.sourceCell) ? EPAL.people.sourceCell(r) : esc(r.source || '—');
 }
 function moneyForm(e, type) {
   var meta = { advance: ['Give Advance Salary', 'cash', 'Advance salary'], loan: ['Give Staff Loan', 'bank', 'Staff loan'], 'loan-repay': ['Record Loan Repayment', 'arrow-return-left', 'Loan repayment'], bonus: ['Record Bonus', 'gift', 'Bonus / allowance'] }[type];
@@ -743,6 +752,8 @@ function moneyForm(e, type) {
 }
 function settlementFlow(e) {
   var p = PR().settlementPreview(e), body = el('div');
+  var setlOpts = (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(e.companyId || CID) : [['m:Bank', 'Bank'], ['m:Cash', 'Cash']];
+  var setlSrc = el('select.input', null, setlOpts.map(function (o) { return el('option', { value: o[0], text: o[1] }); }));
   var m = ui.modal({ title: 'Final Settlement — ' + e.name, icon: 'box-arrow-right', size: 'md', body: body, footer: false });
   body.appendChild(el('div.card', null, [ el('div.card-body', null, [
     el('p.text-mute.sm.mb-2', { text: 'Marks ' + e.name + ' resigned and pays the final dues: unpaid salary + last month + accrued leave encashment, less any outstanding advance/loan.' }),
@@ -759,9 +770,12 @@ function settlementFlow(e) {
       el('button.btn.btn-sm.btn-outline', { html: ui.icon('patch-check') + ' Clearance Certificate', onclick: function () { clearanceCertificate(e); } }),
       el('button.btn.btn-sm.btn-outline', { html: ui.icon('file-earmark-text') + ' Experience Letter', onclick: function () { experienceLetter(e); } })
     ]),
+    // WHICH ACCOUNT PAYS IT (owner 2026-07-29) — the settlement now names its
+    // source like every other payroll movement, and moves that account's register
+    el('div.mb-2', null, [ el('label.text-mute.sm', { text: 'Paid from', style: { display: 'block', marginBottom: '3px' } }), setlSrc ]),
     el('div.flex.gap-1.justify-between.mt-3', null, [ el('button.btn.btn-ghost', { text: 'Cancel', onclick: function () { m.close(); } }),
       el('button.btn.btn-primary.text-bad', { html: ui.icon('box-arrow-right') + ' Confirm Settlement', onclick: function () {
-        try { PR().settle(e.id); ui.toast('Settlement posted · ' + e.name + ' resigned', 'success'); m.close(); EPAL.router.render(); } catch (x) { ui.toast(x.message || 'Failed', 'error'); } } }) ])
+        try { PR().settle(e.id, { method: setlSrc.value }); ui.toast('Settlement posted · ' + e.name + ' resigned', 'success'); m.close(); EPAL.router.render(); } catch (x) { ui.toast(x.message || 'Failed', 'error'); } } }) ])
   ]) ]));
 }
 /* ---- resignation documents (spec E8) ----------------------------------*/
