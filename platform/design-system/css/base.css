@@ -189,12 +189,32 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    gives up 8px of its own side padding instead. Nothing in the table changes. */
 .card-body.tbl-snug { padding-left: 8px; padding-right: 8px; }
 .tbl-snug table.tbl { font-size: calc(var(--fs-small) * 0.9); }
-.tbl-snug .tbl thead th { padding: 5px 3px; letter-spacing: 0; font-size: var(--fs-micro); }
-.tbl-snug .tbl tbody td { padding: 5px 3px; color: var(--text); }
+/* THE HEADER IS A BAND, NOT FOURTEEN LABELS (2026-07-29 polish). Header words
+   wrap here — "DESIG-/NATION", "LEAVE/ENCASH", "LAST/PAID" — and they used to
+   hang from the TOP of the band, so a two-line label and a one-line label began
+   at different heights and the whole strip read as ragged. Bottom-aligned, every
+   label sits on one baseline: the line directly above the first row of data.
+   The band closes with a stronger rule than the row separators, so the eye
+   reads header-then-data instead of fifteen equal stripes. */
+.tbl-snug .tbl thead th {
+  /* letter-spacing stays 0 (NOT the house .04em, and not even .02em): tracking
+     on a header is width, and these headers ARE the width of half the columns —
+     .02em across fourteen labels measured ~25px and pushed the last action
+     button out past the card edge. */
+  padding: 7px 3px 6px; letter-spacing: 0; font-size: var(--fs-micro);
+  vertical-align: bottom; color: var(--text-mute);
+  border-bottom: 1.5px solid var(--border-strong);
+}
+/* AIR COMES FROM THE ROW HEIGHT, NOT THE COLUMN WIDTH. The sheet is at its width
+   limit — every horizontal pixel spent is a pixel of wrapping somewhere — but
+   vertical space is free, and cramped LEADING is most of what made this look
+   like a spreadsheet dump. 5px → 7px top and bottom with 1.34 line-height gives
+   each row its own block of air; the sides stay at 3px, so not one column moves. */
+.tbl-snug .tbl tbody td { padding: 7px 3px; color: var(--text); line-height: 1.34; }
 .tbl-snug .tbl td.num, .tbl-snug .tbl th.num { padding-left: 2px; padding-right: 3px; }
 /* the identity column keeps normal breathing room — it is the one every row is
    read from, and it is the column that freezes when a narrow window does scroll */
-.tbl-snug .tbl thead th:first-child, .tbl-snug .tbl tbody td:first-child { padding-left: 7px; }
+.tbl-snug .tbl thead th:first-child, .tbl-snug .tbl tbody td:first-child { padding-left: 8px; }
 /* the id is a reference, not prose — one step down from the row keeps its column
    to the width of the code itself */
 .tbl-snug .tbl td .mono { font-size: var(--fs-micro); }
@@ -228,37 +248,71 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 .tbl-snug .tbl tbody td { overflow-wrap: normal; }
 .tbl-snug .tbl tbody td .mono { overflow-wrap: anywhere; }
 .tbl-snug .tbl td .badge { padding: 2px 6px; gap: 4px; }
-/* the three row-action buttons were the single widest column in the row (88px
-   for icons); at 26px with no gap they give the money columns their width back
-   and still clear the 24px comfortable-tap floor */
-.tbl-snug .tbl td.dt-actions { padding-left: 2px; padding-right: 2px; }
-.tbl-snug .dt-actions .row-actions { gap: 1px; }
-/* THE ROW ACTIONS MUST BE SEEN (owner 2026-07-29: "the action buttons are not
-   visible, pure white"). The house style is deliberately calm — .row-act sits at
-   --text-mute and opacity .7 so it recedes until hover — which works on a roomy
-   row and disappears on this one: three 24px glyphs at 70% of the palest text
-   colour, in the last column, against white. Here they get full opacity, the
-   readable --text-dim, and a surface + border so each one reads as a button at
-   rest instead of only under the pointer. Scoped to .tbl-snug: every other
-   table keeps the calm treatment. */
+/* THE ROW ACTIONS — 45% SMALLER, 30% LESS VISIBLE (owner 2026-07-29, second
+   pass on the same column). The first pass answered "the action buttons are not
+   visible, pure white" by giving each glyph full opacity, a surface and a
+   border — and three little buttons then became the loudest thing in a row of
+   figures, in the column you scan last.
+   So the BUTTON shrinks 45% (24px → 13.2px) and sits 30% quieter (opacity .7,
+   --text-mute, no chrome at rest) — but the TARGET does not move. Each one
+   carries a transparent ::after pad that restores a ~25px hit box, and the gap
+   is set so neighbouring pads tile edge-to-edge instead of overlapping onto the
+   next glyph: less ink on screen, exactly the same thing to click.
+   The glyph itself only drops 13px → 11px. Shrinking a button is not the same
+   as shrinking its icon — at 45% the icon would be a smudge — so the icon keeps
+   its legibility and the button around it does the giving-way.
+   Visibility comes back on approach, which is what the first pass really wanted:
+   hovering ANYWHERE on the row lifts its actions to full strength, and hovering
+   one gives it the accent and its pill back. Scoped to .tbl-snug. */
+.tbl-snug .tbl td.dt-actions { padding-left: 2px; padding-right: 0; }
+.tbl-snug .dt-actions .row-actions { gap: 6px; }
+/* the divider between "things that move money" and "print" keeps its meaning at
+   1px of margin — the 6px gaps either side already separate the two groups */
+.tbl-snug .dt-actions .row-act-sep { margin: 0 1px; }
 .tbl-snug .row-act {
-  opacity: 1; color: var(--text-dim); background: var(--surface-2); border-color: var(--border);
+  /* padding:0 is load-bearing: a <button> carries Chrome's UA `padding: 1px 6px`,
+     which at 24px merely stole a quarter-pixel but at 13.2px left a 1.2px content
+     box — the glyph was pushed clean out of the right of its own button (and the
+     last one out of the table, which is where the phantom scrollbar came from). */
+  width: 13.2px; height: 13.2px; padding: 0; border-radius: 4px; position: relative;
+  opacity: .7; color: var(--text-mute); background: transparent; border-color: transparent;
 }
-.tbl-snug .row-act:hover { color: var(--accent); background: var(--surface-3, var(--surface-2)); }
-.tbl-snug .row-act i { font-size: 13px; }
+.tbl-snug .row-act i { font-size: 11px; }
+/* the pad paints nothing — it only widens what the pointer counts as this
+   button. inset -6px against a 6px gap means the two pads meet in the middle of
+   the gap and neither reaches into the other's glyph. */
+.tbl-snug .row-act::after { content: ''; position: absolute; inset: -6px; border-radius: 7px; }
+/* …but it stops at the ends of the group. The pad is a real box: on the LAST
+   button it was 6px of scrollable overflow, which gave the card a horizontal
+   scrollbar over nothing, and on the FIRST it reached back into the Status cell
+   and would have swallowed a click meant for the row. */
+.tbl-snug .row-actions .row-act:first-child::after { left: 0; }
+.tbl-snug .row-actions .row-act:last-child::after { right: 0; }
+.tbl-snug .tbl tbody tr:hover .row-act { opacity: 1; color: var(--text-dim); }
+.tbl-snug .row-act:hover { opacity: 1; color: var(--accent); background: var(--surface-3, var(--surface-2)); }
 
 /* DEPT + DESIGNATION, 25% SMALLER (owner 2026-07-29) — the two descriptive
    columns, deliberately below the 11px floor the rest of the sheet respects,
    because they are labels you scan rather than figures you read. */
-.tbl-snug .tbl .c-dept, .tbl-snug .tbl .c-desig { font-size: calc(var(--fs-small) * 0.9 * 0.75); }
-.tbl-snug .tbl td.c-dept .badge { font-size: inherit; padding: 2px 5px; }
+.tbl-snug .tbl .c-dept, .tbl-snug .tbl .c-desig, .tbl-snug .tbl .c-role { font-size: calc(var(--fs-small) * 0.9 * 0.75); }
+.tbl-snug .tbl td.c-dept .badge, .tbl-snug .tbl td.c-role .badge { font-size: inherit; padding: 2px 5px; }
+/* THE MERGED ROLE CELL (owner 2026-07-29): designation on the first row, the
+   department chip on the second. Two short labels stacked read as one fact about
+   the person and take one column's width instead of two. */
+.tbl-snug .tbl td.c-role { line-height: 1.3; }
+.tbl-snug .tbl td.c-role .c-role-dept { margin-top: 3px; }
 
-/* COLUMN RULES (owner 2026-07-29, drawn on the screenshot): a line between every
-   column, 1.5px, black at 75%. Taken from --text rather than hard-coded black so
-   the dark theme gets the same 75%-of-foreground line instead of an invisible
-   one. The header row carries it too, so the rule runs the full height. */
+/* COLUMN RULES (owner 2026-07-29, drawn on the screenshot — then softened the
+   same day: "this table looks so nasty"). The rule STAYS: fourteen money columns
+   need something to run the eye down. It just stops shouting. At 1.5px and 75%
+   of the foreground it drew a black cage over the sheet — the lines were the
+   first thing the eye landed on and the figures the second, which is the exact
+   inversion of what a register is for. At 1px and 9% they are the graph paper
+   UNDER the numbers: there when you look for a column edge, gone when you are
+   reading a row. Still mixed from --text, so the dark theme keeps the same
+   relationship rather than a hard-coded grey. */
 .tbl-snug .tbl thead th + th,
-.tbl-snug .tbl tbody td + td { border-left: 1.5px solid color-mix(in srgb, var(--text) 75%, transparent); }
+.tbl-snug .tbl tbody td + td { border-left: 1px solid color-mix(in srgb, var(--text) 9%, transparent); }
 
 /* FROZEN IDENTITY COLUMN (2026-07-29). The rule above is "fit, don't scroll" — but
    it cannot always win: the Salary Register carries 24 columns, and at a narrow
@@ -284,6 +338,62 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    row-hover the rest of the row gets */
 .tbl-dense .tbl tbody tr:hover td:first-child,
 .tbl-snug .tbl tbody tr:hover td:first-child { background: var(--surface-2); }
+
+/* FROZEN ACTION COLUMN — the same idea at the other end of the row (2026-07-29).
+   The actions cell is `width: 1%`, i.e. shrink-to-fit, so it is the column that
+   gets pushed off the edge when the sheet is a few pixels too wide for the card:
+   the print button was being sliced in half by the card's own rounded corner,
+   with nothing to say why. Pinned right it survives that — WHOEVER the row is
+   about, whatever the window, the three things you can DO to a person stay on
+   screen. Like the identity column, it is purely progressive: while the sheet
+   fits, sticky costs nothing and nothing moves. */
+.tbl-snug .tbl thead th.dt-actions, .tbl-snug .tbl tbody td.dt-actions { position: sticky; right: 0; }
+.tbl-snug .tbl tbody td.dt-actions { z-index: 2; background: var(--surface); box-shadow: -1px 0 0 var(--border); }
+.tbl-snug .tbl thead th.dt-actions { z-index: 3; background: var(--surface-2); box-shadow: -1px 0 0 var(--border); }
+
+/* ============================ SNUG · THE ROW RESPONDS (2026-07-29 polish) ====
+   Owner: "make it beautiful, dynamic, clean — without removing any rows and
+   columns". Nothing below removes anything; it is all presentation. With the
+   cage gone (see the softened column rules above) the sheet needs its structure
+   back from somewhere, and on a register the honest source is the ROW: the unit
+   you actually read is one person, left to right. So the row — not a border —
+   becomes the thing that reacts. A tinted band the width of the table, an accent
+   edge on the identity cell that says "this line is live", the person's name
+   turning into a link under the pointer, and the row's actions coming up to full
+   strength. One 120ms transition, no movement, nothing reflows: the sheet must
+   never twitch while you read down a column of money.
+   These come AFTER the frozen-column block on purpose — that block paints the
+   first cell's background itself, so the hover tint has to be restated here or
+   the identity cell sits out the highlight it is supposed to lead. */
+.tbl-snug .tbl tbody tr { transition: background var(--t-fast); }
+.tbl-snug .tbl tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.tbl-snug .tbl tbody tr:hover td:first-child {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  box-shadow: inset 2px 0 0 var(--accent), 1px 0 0 var(--border);
+}
+/* the pinned action cell paints its own background too — same reason, other end */
+.tbl-snug .tbl tbody tr:hover td.dt-actions {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+/* THE NAME. EPAL.people.linkify hard-codes a dotted underline inline, so every
+   name in the sheet carried a permanent dashed line under it — fourteen columns
+   of clean figures led by a column that looked like unfinished text. The whole
+   row already opens the person's file (onRow), so the underline is not the
+   affordance; it is noise at rest and an invitation on approach. !important is
+   the only lever against an inline style, and it is scoped to this table. */
+.tbl-snug .tbl td .emp-link { text-decoration: none !important; color: var(--text); }
+.tbl-snug .tbl tbody tr:hover .emp-link {
+  color: var(--accent);
+  text-decoration: underline dotted !important; text-underline-offset: 3px;
+}
+/* THE DEPARTMENT CHIP is a label you scan, not a status you act on, so it drops
+   the pill shape and the grey slab for a soft tint of the company accent — the
+   same ink as the rest of the sheet, at a weight that lets Status keep the only
+   real colour in the row (green/amber/red mean something; a department does not). */
+.tbl-snug .tbl td.c-dept .badge, .tbl-snug .tbl td.c-role .badge {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--text-dim); border-radius: 5px; font-weight: 600; letter-spacing: 0;
+}
 /* Any inline number/money span is atomic too — never break a figure. */
 .num, .mono { white-space: nowrap; }
 
