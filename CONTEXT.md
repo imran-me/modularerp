@@ -634,6 +634,58 @@ previewed before the button was pressed.
 
 ---
 
+## 🆕 SESSION — 2026-07-29 · "ALL COMPANIES" ON MASTER PAYROLL — THE GROUP AS ONE PAYROLL
+
+**The ask** (owner screenshot of Master Payroll ▸ Loans, six arrows at the company
+switcher): *"the group acts as a company now in the payroll, as group has its
+employees. So make another button before group, 'All Company', so every nav's
+switcher gives us a combined view. I am in the Loan section and switch to All
+Companies, so I see all loan employees with their loan taken, paid, due as of — the
+loan-related transaction history of all companies."*
+
+**The button was already in the markup and was being DELETED.** `[data-co="all"]`
+has always been the first button in `[data-shell="switcher"]`, before Group HQ,
+exactly where the owner asked for it. THREE places threw it away, and finding only
+two cost a debugging round: the switcher wiring removed the button on payroll; ten
+lines above it `if (sub === 'payroll' && selCo === 'all') selCo = 'travels';`
+silently rewrote the scope; and `payrollView` rewrote it a third time on the way
+into the desk. All three are gone — `selCo` now reaches the desk untouched.
+
+**ONE SENTINEL, ONE SCOPE LAYER.** `CID` carries `'all'`, and nothing in the desk
+compares `CID` to a company id any more. Every read goes through `inScope(companyId)`
+· `scopeCids()` · `scoped(store)` · `slipsIn(ym)` · `runInfo(ym)` · `deptCost()` ·
+`payOptions(cid)`, each of which reduces to exactly the old code on a single company,
+so a company desk did not move by a pixel or a taka. **Group HQ is one of the scoped
+companies** — that was the owner's first sentence. Every list gains a Company column
+and a Company filter in all-mode ONLY (`withCo(cols, get, at)` returns the array it
+was handed when the scope is one company, so the existing column order is untouched).
+
+**WHAT IT DELIBERATELY WILL NOT DO: post a RUN.** Generate · Finalize · Reopen ·
+Pay All and the salary STRUCTURE write records keyed by company id, and `'all'` is
+not a company: `generate('all', ym)` would create a `pay_runs` row against a company
+that does not exist, and `EPAL.pay.accountsOf('all')` would *invent a cash box* for
+it (`ensureCashBox` creates on read — the trap that shaped `payOptions()`). Those
+controls are replaced by a note naming the concerns, and the AUTOPILOT becomes a
+board read-out saying WHICH company is behind and by how much. Everything keyed by an
+EMPLOYEE keeps working — loan, advance, repayment, payslip, payment, punishment —
+because the engine derives the company from the person (`compOf(empId)`,
+`slip.companyId`). **"Paid from" follows the employee**, so a Woodart loan can never
+be paid out of a Travels account. Salary Template shows every company's structure
+side by side, read-only, instead of an editable one that would belong to nobody.
+A month that six companies are at different stages of reads **Mixed** — never one
+company's status borrowed for the group.
+
+**VERIFIED** — sweep **253/253 × both themes, 0 console errors** · tw gate green ·
+trial balance balances · a purpose-built driver **31/31**: it clicks the button,
+walks all eight tabs, opens an *IT Solutions* loan out of the combined register,
+proves the account list re-fills when the employee's company changes, asserts the run
+controls are absent and Print Sheet is not, asserts **nothing was ever written
+against a company called "all"**, and asserts a single company still reads exactly as
+before. The loan proof is the real one: the screen's "Still due" column sums to
+Σ `loanOutstanding()` over EVERY company (৳1,68,837) rather than Travels' ৳92,000.
+
+---
+
 ## 🆕 SESSION — 2026-07-29 · SALARY TEMPLATES: A SAVED PACKAGE PER EMPLOYEE, AND IT IS THE PAY
 
 **The ask** (owner screenshot of the group's existing *Salary Templates List*): the saved

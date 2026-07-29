@@ -26,6 +26,52 @@
 
 ## ⏭️ STILL OPEN
 
+### T-ALLCO-PAYROLL — an "All Company" button before Group, giving a combined view ✅ (2026-07-29)
+Owner, with a screenshot of Master Accounts ▸ Master Payroll ▸ Loans and six red
+arrows drawn at the company switcher: *"the company switcher works fine, I am
+grateful to you. But the group acts as a company now in the payroll, as group has
+its employees. So, make another button before group, "All Company". So that, every
+nav's all-company switcher gives us a combined view. Like, I am in the Loan
+section, and switched All Companies, so I will see all loan employee list, with
+their loan amount taken, paid, due as of, the loan related transaction history of
+all companies…"*
+
+- ✅ **The button was already in the markup and was being DELETED on payroll** —
+  `[data-co="all"]` sits first in `[data-shell="switcher"]`, before Group HQ, exactly
+  where the owner asked for it. Two lines removed it: a filter in the switcher wiring
+  and, ten lines above, `if (sub === 'payroll' && selCo === 'all') selCo = 'travels';`
+  — a SECOND guard that silently rewrote the scope and cost a debugging round when
+  only the first was found. `payrollView` also rewrote 'all' → 'travels' on the way
+  into the desk. All three are gone; `selCo` reaches the desk untouched.
+- ✅ **The desk answers the 'all' sentinel on all EIGHT tabs.** Nothing compares
+  `CID` to a company id any more: every read goes through `inScope(companyId)` /
+  `scopeCids()` / `scoped(store)` / `slipsIn(ym)` / `runInfo(ym)` / `deptCost()`,
+  which in single-company mode reduce to exactly what the code did before. **Group HQ
+  is one of the scoped companies** — which is what the owner's first sentence was
+  about. Every list gains a Company column (and a Company filter) in all-mode only.
+- ✅ **LOANS, the tab the owner was standing on:** one book across six payrolls —
+  who holds a loan, taken · paid so far · still due · repaid via · monthly EMI per
+  person, the per-loan register, the EMI deduction history and the full loan
+  transaction trail, every row naming its company. Proven by a driver that sums the
+  screen's "Still due" column and compares it to Σ `loanOutstanding()` over EVERY
+  company: ৳1,68,837, not Travels' ৳92,000.
+- ⚠ **WHAT ALL-MODE DELIBERATELY WILL NOT DO: post a RUN.** Generate / Finalize /
+  Reopen / Pay All and the salary STRUCTURE write records keyed by company id, and
+  'all' is not a company — `generate('all', ym)` would create a `pay_runs` row against
+  a company that does not exist. Those controls are replaced by a note naming the
+  concerns; the Autopilot turns into a board read-out saying WHICH company is behind.
+  Everything keyed by an EMPLOYEE keeps working (loan · advance · repayment · payslip
+  · payment · punishment), because the engine derives the company from the person —
+  and "Paid from" now follows the employee, so a Woodart loan can never be paid out of
+  a Travels account. Salary Template shows every company's structure side by side,
+  read-only.
+- ✅ **VERIFIED** — sweep **253/253 × both themes, 0 console errors** · tw gate green ·
+  trial balance balances · a purpose-built driver, **31/31**, that clicks the button,
+  walks all eight tabs, opens an IT Solutions loan out of the combined register,
+  proves the account list re-fills when the employee's company changes, asserts the
+  run controls are absent, asserts **nothing was written against a company called
+  "all"**, and asserts a single company still reads exactly as before.
+
 ### T-LOAN-ROWS — every loan row says taken · taken on · paid till now · still due ✅ (2026-07-29)
 Owner, with a screenshot of Payroll ▸ Loans (EMI Deduction History + Loan
 transactions, both showing only an amount): *"the loan section in payroll needs

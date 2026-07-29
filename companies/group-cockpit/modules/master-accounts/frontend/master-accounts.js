@@ -423,7 +423,9 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       var page = frag('page');
       if (sub === 'loans' && selCo === 'all') { /* the loan desk reads 'all' fine */ }
       var titles = {}; SECTIONS.forEach(function (s) { titles[s[0]] = s[1]; });
-      if (sub === 'payroll' && (selCo === 'all')) selCo = 'travels';
+      // (Master Payroll used to force 'all' → 'travels' here, because the payroll
+      // desk was scoped to one company id. It reads 'all' now — owner 2026-07-29 —
+      // so the scope survives, and the switcher shows the All Companies button.)
       // page-head bar — real HTML (template.html · [data-shell="head"]); fill the
       // live route title (a text node, exactly like the old pageHead produced).
       var head = shell('head');
@@ -447,7 +449,14 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       // everywhere else it is its own row under the tabs.
       // company-switcher bar — real HTML ([data-shell="switcher"], all buttons written
       // out). JS shows/marks/wires: Overview only on Banks; drop a removed-folder
-      // company (discovery) and 'all' on payroll; mark the active company primary.
+      // company (discovery); mark the active company primary.
+      //
+      // ALL COMPANIES ON MASTER PAYROLL (owner 2026-07-29: "make another button
+      // before Group, All Company, so every nav's switcher gives us a combined
+      // view"). It used to be REMOVED on payroll, because the payroll desk was
+      // scoped to exactly one company id. The desk now answers the 'all' sentinel
+      // on every one of its eight tabs, so the button stays where the markup
+      // always had it — first, before Group HQ.
       var swWrap = shell('switcher');
       var presentIds = {}; comps().forEach(function (c) { presentIds[c.id] = 1; });
       var ov = swWrap.querySelector('[data-co="__overview"]');
@@ -458,7 +467,7 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
       Array.prototype.forEach.call(swWrap.querySelectorAll('[data-co]'), function (b) {
         var co = b.getAttribute('data-co');
         if (co === '__overview') return;
-        if ((sub === 'payroll' && co === 'all') || (co !== 'all' && co !== 'group' && !presentIds[co])) { b.parentNode.removeChild(b); return; }
+        if (co !== 'all' && co !== 'group' && !presentIds[co]) { b.parentNode.removeChild(b); return; }
         var active = (selCo === co) && !(sub === 'banks' && banksDash);
         if (active) b.className = 'btn btn-sm btn-primary';
         b.addEventListener('click', function () { selCo = co; if (sub === 'banks') banksDash = false; EPAL.router.render(); });
@@ -1388,8 +1397,12 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
   /* ======================================================= MASTER PAYROLL */
   var pendingSwitcher = null;                          // set by render for payroll
   function payrollView(page) {
-    // the company switcher rides in the desk's section row (owner mark)
-    if (EPAL.payrollDesk) EPAL.payrollDesk(page, selCo === 'all' ? 'travels' : selCo, { rightEl: pendingSwitcher });
+    // the company switcher rides in the desk's section row (owner mark).
+    // `selCo` goes through UNCHANGED, 'all' included: the desk reads every
+    // present company at once and says so on each row (owner 2026-07-29). It
+    // used to be rewritten to 'travels', which silently showed one concern's
+    // payroll under a button that said All Companies.
+    if (EPAL.payrollDesk) EPAL.payrollDesk(page, selCo, { rightEl: pendingSwitcher });
     else page.appendChild(el('div.card', null, [el('div.card-body', { text: 'Payroll desk unavailable.' })]));
     pendingSwitcher = null;
   }

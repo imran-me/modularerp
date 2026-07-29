@@ -8,7 +8,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · PAYROLL · MARKUP  (company-agnostic — registered for every concern)\n  ----------------------------------------------------------------------------\n  The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +\n  filled at runtime via [data-tpl] / [data-slot] hooks.\n\n  The desk is mounted EMBEDDED — in Master Accounts and in each company's Accounts\n  module, via EPAL.payrollDesk. Its sections are the tabs listed in the TABS array\n  in payroll.js (not restated here — a count in a comment goes stale).\n  ⚠ The #/<cid>/payroll/… standalone routes 404: `payroll` is not a module in\n  platform/core/config.js. Embedded-only is the owner's decision (2026-07-29) —\n  see payroll.js's header and modules/payroll/module.json.\n\n  Every modal/form (manage-salary, correction/\n  edit, print-sheet, pay, money, encashment) keeps its legacy el()-built DOM, as\n  do the compound-styled leaf helpers formField() and field() (label+control rows\n  with inline padding/width — impractical as utilities). STYLING = the house\n  design system; the only new tw util is tw-max-w-[230px] (the run's month\n  select). The salary-sheet body keeps its .tbl-dense modifier (owner: fit\n  without h-scroll).\n\n  TWO STYLES LIVE HERE, on purpose:\n   · the [data-tpl] fragments below are the ORIGINAL screens, kept exactly as\n     they were so their proven-identical pixels do not move;\n   · everything under \"REAL-HTML BLOCKS\" is the current FRONTEND BUILD LAW —\n     whole screens written out as plain HTML. All NEW work goes there.\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section band ----------------------------------------------->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid + one KPI card + a two-column row ------------------------------>\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<!-- the flat [data-tpl=\"kpi\"] tile (label · icon · figure, nothing else) was retired\n     2026-07-29 — every caller now builds [data-shell=\"kpitile\"] below, which adds the\n     trend pill, the context foot line and the sparkline. The grid itself is unchanged. -->\n<template data-tpl=\"two-col\"><div class=\"two-col\"></div></template>\n\n<!-- generic cards: plain (body), register (head+sub+body), head-only -------->\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"head-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n\n<!-- Salary Manage: the run-control card + the .tbl-dense salary sheet -------->\n<template data-tpl=\"run-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex justify-between items-center flex-wrap gap-2\"><div class=\"flex items-center gap-2 flex-wrap\" data-slot=\"left\"></div><div class=\"flex gap-1 flex-wrap\" data-slot=\"actions\"></div></div><div class=\"text-mute sm mt-2\" data-slot=\"status\"></div></div></div></template>\n<template data-tpl=\"salary-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body tbl-dense\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"grid-auto-compact\"><div class=\"grid-auto kpi-compact\"></div></template>\n<template data-tpl=\"pay-tier-card\"><div class=\"card tier-card\"><div class=\"card-pad\"><div class=\"fw-700\" data-slot=\"name\"></div><div class=\"text-mute sm\" data-slot=\"out\"></div><span class=\"badge\" data-slot=\"badge\"></span></div></div></template>\n\n<!-- Payslip: the employee/month/view-statement picker row ------------------->\n<template data-tpl=\"pick-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex gap-2 flex-wrap items-end\" data-slot=\"row\"></div></div></div></template>\n\n<!-- a plain \"New …\" button row (loans/advance disburse) -------------------->\n<template data-tpl=\"btn-row\"><div class=\"mb-3\"><button class=\"btn btn-primary\" data-slot=\"btn\"></button></div></template>\n\n\n<!-- ============================================================================\n  ▼▼ REAL-HTML BLOCKS (FRONTEND BUILD LAW, owner 2026-07-28) ▼▼\n  Everything below is the screen written out as plain HTML — not cloned\n  fragments, not el(). JS only fills the [data-k] placeholders, clones the\n  [data-proto] rows (0..N of them is DATA, not layout) and wires [data-act].\n\n  LEGEND\n    [data-shell=\"…\"]  a shared bar/panel used by more than one screen\n    [data-screen=\"…\"] one whole screen; mountScreen() moves its children onto the page\n    [data-k=\"…\"]      a text/HTML placeholder JS writes into\n    [data-fill=\"…\"]   a container JS appends a built widget (table/SVG) into\n    [data-proto=\"…\"]  a hidden prototype row — cloned once per record\n    [data-el=\"…\"]     an element JS needs a handle on (to hide, or to click-wire)\n    [data-act=\"…\"]    a click target JS binds a navigation/action to\n\n  ⚠ CLASS NAMES: the dashboard row deliberately reuses the `bank-*` component\n  vocabulary from components.css. That block is the house SUMMARY-IDENTITY-PANEL\n  design (hero figure · drill facts · last-event mini-statement · mirrored\n  sparkline · reconciliation · mini stack); Manage Banks was simply its first\n  caller. Reusing it means Payroll is pixel-consistent with Manage Banks for\n  free and forks not a single rule. The extra `pay-*` classes carry no styling —\n  they are semantic hooks for anything payroll ever needs to override.\n  ============================================================================ -->\n\n<!-- ---------------------------------------------------------------------------\n  RICH KPI TILE — the house KPI card at full strength (owner 2026-07-29, from the\n  payroll UI/UX research in docs/PAYROLL-UIUX-RESEARCH.md): the figure, a trend\n  pill against last month, a context foot line, and a sparkline bled into the\n  card's bottom edge.\n\n  It replaces the flat [data-tpl=\"kpi\"] fragment on Loan Management and Advance\n  Salary, which carried a label, an icon and a number and nothing else — you\n  could not tell whether ৳4,20,000 of loans out was climbing or clearing.\n\n  Deliberately the SAME markup as the group dashboard's kpiTile()\n  (companies/group-cockpit/modules/dashboard/view.js) so the two cannot drift.\n\n  ⚠ [data-el=\"trend\"] and [data-el=\"spark\"] are REMOVED, never hidden, when a card\n  has no honest history behind it — both because of the [hidden] trap documented\n  in payroll.js, and because a tile must never imply a trend it cannot prove.\n  (Payroll Reports is exactly that case: see reportsView.)\n--------------------------------------------------------------------------- -->\n<!-- ---------------------------------------------------------------------------\n  PAYMENT PROGRESS — appended into the Salary Manage run card (owner 2026-07-29).\n  The card already states the net and the outstanding as two separate figures;\n  this makes the RELATIONSHIP between them readable at a glance — how much of the\n  month's payroll has actually reached staff.\n\n  It is appended by JS rather than added to the [data-tpl=\"run-card\"] fragment\n  above, because that fragment is one of the ORIGINALS whose pixels must not move.\n\n  The .meter lvl-* vocabulary is risk-coloured (low = green), and that is exactly\n  right here read the right way round: the risk being metered is UNPAID SALARY.\n  Fully paid = lvl-low = green; nothing paid = lvl-high = red.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"paymeter\" class=\"pay-progress\">\n  <div class=\"pay-progress-top\">\n    <span class=\"text-mute sm\" data-k=\"label\"></span>\n    <span class=\"sm fw-600\" data-k=\"pct\"></span>\n  </div>\n  <div class=\"meter\"><span data-el=\"bar\"></span></div>\n</div>\n\n<div data-shell=\"kpitile\" class=\"kpi-card\">\n  <div class=\"kpi-top\">\n    <span class=\"kpi-label\" data-k=\"label\"></span>\n    <span class=\"kpi-ico\" data-k=\"ico\"></span>\n  </div>\n  <div class=\"kpi-value\" data-k=\"value\"></div>\n  <div class=\"kpi-foot\">\n    <span class=\"kpi-trend\" data-el=\"trend\"></span>\n    <span class=\"text-muted\" data-k=\"foot\"></span>\n  </div>\n  <div class=\"kpi-spark\" data-el=\"spark\"><canvas data-el=\"canvas\"></canvas></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  DASHBOARD ROW — the four same-height cards that head both Payroll Overview\n  and Salary Manage. ONE shell, filled with different numbers by each caller:\n\n    1  identity panel  company · hero figure · 3 clickable drill facts ·\n                       the last payroll event (direction · amount · reference ·\n                       opening → closing of what we owe staff)\n    2  flow card       a mirrored 2-colour sparkline + its two totals\n    3  reconciliation  a 2×2 of control figures + a variance badge + \"why?\"\n    4  mini stack      two small click-through cards\n--------------------------------------------------------------------------- -->\n<div data-shell=\"dash\" class=\"bank-cards-row pay-cards-row\">\n\n  <div class=\"bank-summary pay-summary\" data-el=\"panel\">\n    <div class=\"bank-summary-in\">\n      <div class=\"bank-summary-body\">\n        <div class=\"bank-summary-left\">\n          <div class=\"bank-summary-head\">\n            <div class=\"bank-summary-ico\" data-k=\"ico\"></div>\n            <div class=\"bank-summary-id\">\n              <div class=\"bank-summary-co\" data-k=\"co\"></div>\n              <div class=\"bank-summary-sub\" data-k=\"co-sub\"></div>\n            </div>\n          </div>\n          <div class=\"bank-summary-hero clik\" data-act=\"hero\">\n            <div class=\"bank-summary-bal\" data-k=\"hero\"></div>\n            <div class=\"bank-summary-ballabel\" data-k=\"hero-label\"></div>\n          </div>\n        </div>\n        <div class=\"bank-summary-last\" data-el=\"last\">\n          <div class=\"bank-summary-last-top\">\n            <span class=\"bank-summary-last-lbl\" data-k=\"last-label\"></span>\n            <span class=\"bank-summary-dir\" data-k=\"dir\"></span>\n          </div>\n          <div class=\"bank-summary-last-row\">\n            <span class=\"bank-summary-last-amt\" data-k=\"amt\"></span>\n            <span class=\"bank-summary-last-date\" data-k=\"when\"></span>\n          </div>\n          <div class=\"bank-summary-last-ref\" data-k=\"ref\"></div>\n          <div class=\"bank-summary-last-oc\">\n            <div class=\"oc-open\" data-k=\"oc-open\"></div>\n            <div class=\"oc-close\" data-k=\"oc-close\"></div>\n          </div>\n        </div>\n      </div>\n      <div class=\"bank-summary-facts\">\n        <div class=\"bank-summary-fact clik\" data-act=\"f1\"><div class=\"k\" data-k=\"f1k\"></div><div class=\"v\" data-k=\"f1v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f2\"><div class=\"k\" data-k=\"f2k\"></div><div class=\"v\" data-k=\"f2v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f3\"><div class=\"k\" data-k=\"f3k\"></div><div class=\"v\" data-k=\"f3v\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-flow pay-flow\" data-el=\"flow\">\n    <div class=\"bank-flow-head\">\n      <div>\n        <div class=\"bank-flow-title\" data-k=\"flow-title\"></div>\n        <div class=\"bank-flow-sub\" data-k=\"flow-sub\"></div>\n      </div>\n      <span class=\"bank-flow-net\" data-k=\"flow-net\"></span>\n    </div>\n    <div class=\"bank-flow-spark\" data-fill=\"spark\"></div>\n    <div class=\"bank-flow-foot\">\n      <span><span class=\"bank-flow-dot in\"></span><span data-k=\"flow-in\"></span></span>\n      <span><span class=\"bank-flow-dot out\"></span><span data-k=\"flow-out\"></span></span>\n    </div>\n  </div>\n\n  <div class=\"card bank-recon bank-recon-clik pay-recon\" data-el=\"recon\">\n    <!-- no head badge: inside .bank-cards-row components.css hides it, because\n         the verdict already reads in the 4th stat (coloured + its \"why?\"). -->\n    <div class=\"card-head\">\n      <h3 data-k=\"recon-title\"></h3>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"bank-recon-2x2\">\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r1k\"></div><div class=\"stat-value num\" data-k=\"r1v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r2k\"></div><div class=\"stat-value num\" data-k=\"r2v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r3k\"></div><div class=\"stat-value num\" data-k=\"r3v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r4k\"></div><div class=\"stat-value num\" data-k=\"r4v\"></div>\n          <button class=\"float-why\" type=\"button\" data-el=\"why\" hidden></button>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-ministack pay-ministack\">\n    <div class=\"card bank-mini\" data-el=\"m1\">\n      <div class=\"fw-600 sm\" data-k=\"m1t\"></div>\n      <div class=\"strong num\" data-k=\"m1v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m1s\"></div>\n    </div>\n    <div class=\"card bank-mini\" data-el=\"m2\">\n      <div class=\"fw-600 sm\" data-k=\"m2t\"></div>\n      <div class=\"strong num\" data-k=\"m2v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m2s\"></div>\n    </div>\n  </div>\n\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL OVERVIEW — the payroll command centre (new tab, owner 2026-07-28).\n  Reads only what the payroll engine and the general ledger already hold; it\n  never posts by itself. Every automation is a PROPOSAL with a button (owner:\n  automation lives on the overview/summary and asks before it moves money).\n--------------------------------------------------------------------------- -->\n<section data-screen=\"overview\">\n\n  <!-- 1 · the four-card dashboard row (cloned from [data-shell=\"dash\"]) -->\n  <div data-fill=\"dash\"></div>\n\n  <!-- 2 · the narrated digest — every figure computed live from the books -->\n  <div class=\"brief-hero\">\n    <div class=\"brief-date\" data-k=\"digest-date\"></div>\n    <h2 data-k=\"digest-title\"></h2>\n    <div class=\"brief-narrative\" data-k=\"digest-text\"></div>\n  </div>\n\n  <!-- 3 · Autopilot (what should happen next) + Radar (what looks wrong) -->\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"auto-title\"></h3>\n        <span class=\"card-sub\" data-k=\"auto-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"auto\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"radar-title\"></h3>\n        <span class=\"card-sub\" data-k=\"radar-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"radar\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n  </div>\n\n  <!-- 4 · the last 12 payroll months, and where the money goes by department -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"trend-title\"></h3>\n      <span class=\"card-sub\" data-k=\"trend-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"trend\"></div>\n  </div>\n\n  <!-- Where the money goes: the doughnut carries the PROPORTION, the table the\n       precise figures. No chart legend — the table beside it already names every\n       department and its share, so a legend would print each label twice. -->\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3 data-k=\"dept-title\"></h3>\n      <span class=\"card-sub\" data-k=\"dept-sub\"></span>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"pay-dept-split\">\n        <div class=\"pay-dept-ring\" data-el=\"ring\"><canvas data-el=\"deptcanvas\"></canvas></div>\n        <div class=\"pay-dept-tbl\" data-fill=\"dept\"></div>\n      </div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL HISTORY — sits directly under the Salary Sheet on Salary Manage (owner\n  2026-07-28). One row per payroll month, newest first; the row opens a modal\n  listing EVERY payroll transaction that month, and a transaction opens its own\n  printable detail. The month list is built from pay_runs UNION the distinct ym\n  values in pay_slips, so a month with payslips but no run row still appears.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"history\" class=\"card mt-3\">\n  <div class=\"card-head\">\n    <h3 data-k=\"title\"></h3>\n    <span class=\"card-sub\" data-k=\"sub\"></span>\n  </div>\n  <div class=\"card-body tbl-dense\" data-fill=\"body\"></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  ONE MONTH, IN FULL — the drill behind a row of the Monthly Register (owner\n  2026-07-28: \"if I click on January, it should show me how many transactions\n  happened … all their accounts summary of January in a table — gross, net,\n  deductions, additions, overtime, late, bonus\"). Everything that touched\n  payroll in that month, on one screen:\n    · the month's dashboard row (same four cards, month-scoped)\n    · the SALARY REGISTER — every employee, every component, additions and\n      deductions broken out and subtotalled, exportable and printable\n    · the month's EMPLOYEE MONEY MOVEMENTS (advance · loan · repayment · bonus ·\n      encashment payout) and every LEDGER POSTING payroll wrote that month\n--------------------------------------------------------------------------- -->\n<section data-screen=\"month\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"flex justify-between items-center flex-wrap gap-2\">\n        <div class=\"flex items-center gap-2 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"back\"></button>\n          <select class=\"input tw-max-w-[230px]\" data-el=\"mpick\"></select>\n          <span class=\"badge\" data-k=\"status\"></span>\n        </div>\n        <div class=\"flex gap-1 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"print\"></button>\n          <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"open-run\"></button>\n        </div>\n      </div>\n      <div class=\"text-mute sm mt-2\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n  <div data-fill=\"dash\"></div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"reg-title\"></h3>\n      <span class=\"card-sub\" data-k=\"reg-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"reg\"></div>\n  </div>\n\n  <div class=\"two-col\">\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"txn-title\"></h3>\n        <span class=\"card-sub\" data-k=\"txn-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"txns\"></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"post-title\"></h3>\n        <span class=\"card-sub\" data-k=\"post-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"posts\"></div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  SALARY TEMPLATE — the tab, in two halves (owner 2026-07-29):\n\n  1 · SALARY TEMPLATES LIST — the saved package per employee: the five components\n      as fixed taka, the standing bonus, the total, whether overtime is allowed\n      and any standing fine. Add · edit · punish · delete. It is the top half\n      because it is the half people work in daily.\n  2 · STRUCTURE + LIVE PREVIEW — the company's STATUTORY rules (percentages, tax,\n      PF, leave, working days, the pay-by and correction days). Unchanged: they\n      still compute everyone who is NOT on a package, and they still govern tax,\n      PF, absence and encashment for everyone who is. Built by JS below this block.\n\n  The [data-fill=\"list\"] table is EPAL.table (a data grid — the law's live-data\n  carve-out); everything around it is markup.\n--------------------------------------------------------------------------- -->\n<!-- ---------------------------------------------------------------------------\n  ADVANCE REQUESTS — the decision queue on the Advance Salary tab (owner\n  2026-07-29: \"employees' advance salary request option will appear, boss will\n  allow or disallow, also can customize the amount. For which month advanced,\n  that should indicate.\").\n\n  One card, two parts: the asks still waiting on a decision, then everything\n  already decided. The pending card is REMOVED when the queue is empty — an empty\n  decision queue is not a screen anyone needs to look at, and leaving it there\n  makes the tab look like it is asking for something when it is not.\n\n  Each waiting row states who, how much, WHICH MONTH the advance is against, and\n  why — then Approve (which opens a form where the amount can be changed) and\n  Decline (which insists on a reason).\n--------------------------------------------------------------------------- -->\n<div data-shell=\"advreq\" class=\"card mb-3\">\n  <div class=\"card-head\">\n    <h3 data-k=\"title\"></h3>\n    <span class=\"card-sub\" data-k=\"sub\"></span>\n  </div>\n  <div class=\"card-body\" data-fill=\"rows\">\n    <div class=\"adv-req\" hidden data-proto=\"row\">\n      <div class=\"adv-req-who\">\n        <div class=\"fw-700\" data-k=\"name\"></div>\n        <div class=\"text-mute xs\" data-k=\"when\"></div>\n      </div>\n      <div class=\"adv-req-ask\">\n        <div class=\"strong num\" data-k=\"amount\"></div>\n        <span class=\"badge badge-info\" data-k=\"forym\"></span>\n      </div>\n      <div class=\"adv-req-why text-mute sm\" data-k=\"reason\"></div>\n      <div class=\"adv-req-do\">\n        <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"approve\"></button>\n        <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"reject\"></button>\n      </div>\n    </div>\n  </div>\n</div>\n\n<section data-screen=\"salary-templates\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"title\"></h3>\n      <!-- ⚠ the button is REMOVED by the logic when the user cannot create, never\n           hidden: [hidden] and .btn{display:inline-flex} have the same specificity\n           and the class wins (the trap documented in payroll.js). -->\n      <div class=\"flex items-center gap-2\">\n        <span class=\"card-sub\" data-k=\"sub\"></span>\n        <button class=\"btn btn-primary btn-sm\" type=\"button\" data-act=\"new\"></button>\n      </div>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"list\"></div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"text-mute sm\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ===========================================================================\n  EMPLOYEE FILE — the whole person, UNDER the table (owner 2026-07-29:\n  \"clicking a staff's name opens a modal card … I want it to open another\n  structure, in the below of the page, not on a pop up card\").\n\n  Two sections, mounted in two different places, on purpose:\n\n  · [data-screen=\"emp-file\"]      the page chrome — the identity band and the six\n                                  money tiles — plus [data-fill=\"file\"], where the\n                                  SHARED kit (platform/kit/emp-profile.js) renders\n                                  the tab bar and the five tab bodies it already\n                                  owns (Overview · Accounts · Payslips ·\n                                  Attendance · All Details). The kit is called\n                                  with {host, head:false}: same file, no modal,\n                                  and its own header card suppressed because the\n                                  band below IS the header.\n\n  · [data-screen=\"emp-analytics\"] the reference stack from the owner's screenshots\n                                  — profile details, task tiles, the two task\n                                  charts, attendance, leave, salary & loan. It is\n                                  handed to the kit as `overviewExtra`, so it is\n                                  appended INSIDE the Overview tab: it must come\n                                  and go with that tab, not sit under all five.\n\n  Every figure here is read from data the app already holds — tasks\n  (db.tasksFor), attendance (att_monthly), leave (tv_leaves), payslips / loans /\n  advances (EPAL.payroll). Nothing is invented; where the reference app showed a\n  number we cannot honestly derive (clock-in/out \"Working Hour\", \"Late Time\"),\n  the card shows the days we DO record and says so.\n============================================================================ -->\n<section data-screen=\"emp-file\">\n\n  <div class=\"card emp-file mb-3\">\n    <!-- The identity band. Dark by design — the reference header is a solid band,\n         and it is what makes a file read as a FILE rather than as one more card.\n         It takes the COMPANY accent gradient, so Woodart's file is green and\n         Travels' is blue: the same per-company identity rule as everywhere else. -->\n    <div class=\"emp-band\">\n      <span class=\"emp-band-av\" data-k=\"avatar\"></span>\n      <div class=\"emp-band-who\">\n        <div class=\"emp-band-name\" data-k=\"name\"></div>\n        <div class=\"emp-band-meta\" data-k=\"meta\"></div>\n      </div>\n      <div class=\"emp-band-chips\" data-k=\"chips\"></div>\n      <div class=\"emp-band-do\">\n        <button class=\"btn btn-sm emp-band-btn\" type=\"button\" data-act=\"payslip\"></button>\n        <button class=\"btn btn-sm emp-band-btn\" type=\"button\" data-act=\"close\"></button>\n      </div>\n    </div>\n\n    <!-- the six money facts, in the order they get asked about -->\n    <div class=\"stat-row stat-compact\">\n      <div class=\"stat\"><div class=\"stat-label\">Salary</div><div class=\"stat-value num\" data-k=\"t-salary\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\" data-k=\"t-owes-l\"></div><div class=\"stat-value num\" data-k=\"t-owes\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Salary due</div><div class=\"stat-value num\" data-k=\"t-due\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Advance out</div><div class=\"stat-value num\" data-k=\"t-adv\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Loan out</div><div class=\"stat-value num\" data-k=\"t-loan\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Leave encash</div><div class=\"stat-value num\" data-k=\"t-encash\"></div></div>\n    </div>\n  </div>\n\n  <div data-fill=\"file\"></div>\n\n</section>\n\n\n<section data-screen=\"emp-analytics\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"pd-title\"></h3>\n      <span class=\"card-sub\" data-k=\"pd-sub\"></span>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"emp-facts\">\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Email</div><div class=\"emp-fact-v\" data-k=\"p-email\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Phone</div><div class=\"emp-fact-v\" data-k=\"p-phone\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Company</div><div class=\"emp-fact-v\" data-k=\"p-company\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Department</div><div class=\"emp-fact-v\" data-k=\"p-dept\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Designation</div><div class=\"emp-fact-v\" data-k=\"p-desig\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Employment type</div><div class=\"emp-fact-v\" data-k=\"p-type\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Employee ID</div><div class=\"emp-fact-v\" data-k=\"p-id\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Join date</div><div class=\"emp-fact-v\" data-k=\"p-join\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <!-- TASKS — the board totals for this person (db.tasksFor). \"Pending\" counts\n       everything not done and not cancelled: a cancelled task is closed, and\n       counting it as outstanding work would overstate the queue. -->\n  <div class=\"stat-row stat-compact mb-3\">\n    <div class=\"stat\"><div class=\"stat-label\">Task total</div><div class=\"stat-value\" data-k=\"k-tasks\"></div><div class=\"text-mute xs\" data-k=\"k-tasks-f\"></div></div>\n    <div class=\"stat\"><div class=\"stat-label\">Completed</div><div class=\"stat-value text-good\" data-k=\"k-done\"></div><div class=\"text-mute xs\" data-k=\"k-done-f\"></div></div>\n    <div class=\"stat\"><div class=\"stat-label\">Pending</div><div class=\"stat-value text-warn\" data-k=\"k-pending\"></div><div class=\"text-mute xs\" data-k=\"k-pending-f\"></div></div>\n  </div>\n\n  <div class=\"two-col mb-3\">\n    <div class=\"card\">\n      <div class=\"card-head\"><h3 data-k=\"wk-title\"></h3><span class=\"card-sub\" data-k=\"wk-sub\"></span></div>\n      <div class=\"card-body\"><div class=\"emp-chart\"><canvas data-el=\"wk\"></canvas></div></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\"><h3 data-k=\"mn-title\"></h3><span class=\"card-sub\" data-k=\"mn-sub\"></span></div>\n      <div class=\"card-body\"><div class=\"emp-chart\"><canvas data-el=\"mn\"></canvas></div></div>\n    </div>\n  </div>\n\n  <!-- ATTENDANCE — what att_monthly actually records: DAYS. The reference app\n       printed \"Working Hour 174.03 hr\" and \"Late Time 862.52 min\"; there is no\n       clock-in / clock-out anywhere in this system, so neither can be derived and\n       neither is shown as if it could be. The note under the chart says so. -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"att-title\"></h3><span class=\"card-sub\" data-k=\"att-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"stat-row stat-compact mb-3\">\n        <div class=\"stat\"><div class=\"stat-label\">Present days</div><div class=\"stat-value text-good\" data-k=\"a-present\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Absent days</div><div class=\"stat-value\" data-k=\"a-absent\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Late</div><div class=\"stat-value\" data-k=\"a-late\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Early leave</div><div class=\"stat-value\" data-k=\"a-early\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">On leave</div><div class=\"stat-value\" data-k=\"a-leave\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Overtime</div><div class=\"stat-value\" data-k=\"a-ot\"></div></div>\n      </div>\n      <div class=\"emp-chart\"><canvas data-el=\"att\"></canvas></div>\n      <div class=\"text-mute sm mt-2\" data-k=\"att-note\"></div>\n    </div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"lv-title\"></h3><span class=\"card-sub\" data-k=\"lv-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"stat-row stat-compact\">\n        <div class=\"stat\"><div class=\"stat-label\">Approved</div><div class=\"stat-value text-good\" data-k=\"l-approved\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Pending</div><div class=\"stat-value text-warn\" data-k=\"l-pending\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Rejected</div><div class=\"stat-value text-bad\" data-k=\"l-rejected\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Used leave days</div><div class=\"stat-value\" data-k=\"l-used\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Still to take</div><div class=\"stat-value\" data-k=\"l-left\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"sl-title\"></h3><span class=\"card-sub\" data-k=\"sl-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"two-col\">\n        <div>\n          <div class=\"section-label\">Salary</div>\n          <div class=\"data-list\">\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Paid records</div><div class=\"strong\" data-k=\"s-paid\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Pending records</div><div class=\"strong\" data-k=\"s-pending\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\" data-k=\"s-total-l\"></div><div class=\"strong num\" data-k=\"s-total\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\" data-k=\"s-latest-l\"></div><div class=\"strong num\" data-k=\"s-latest\"></div></div>\n          </div>\n        </div>\n        <div>\n          <div class=\"section-label\">Loan &amp; advance</div>\n          <div class=\"data-list\">\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Running loans</div><div class=\"strong\" data-k=\"ln-running\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Completed loans</div><div class=\"strong\" data-k=\"ln-done\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Loan remaining</div><div class=\"strong num\" data-k=\"ln-remaining\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Advance pending decision</div><div class=\"strong num\" data-k=\"ln-advpending\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Advance to recover</div><div class=\"strong num\" data-k=\"ln-advout\"></div></div>\n          </div>\n          <!-- every loan, one row each: taken + taken on / paid / still due -->\n          <div class=\"data-list mt-2\" data-el=\"ln-loans\"></div>\n        </div>\n      </div>\n    </div>\n  </div>\n\n</section>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · PAYROLL · MARKUP  (company-agnostic — registered for every concern)\n  ----------------------------------------------------------------------------\n  The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +\n  filled at runtime via [data-tpl] / [data-slot] hooks.\n\n  The desk is mounted EMBEDDED — in Master Accounts and in each company's Accounts\n  module, via EPAL.payrollDesk. Its sections are the tabs listed in the TABS array\n  in payroll.js (not restated here — a count in a comment goes stale).\n  ⚠ The #/<cid>/payroll/… standalone routes 404: `payroll` is not a module in\n  platform/core/config.js. Embedded-only is the owner's decision (2026-07-29) —\n  see payroll.js's header and modules/payroll/module.json.\n\n  Every modal/form (manage-salary, correction/\n  edit, print-sheet, pay, money, encashment) keeps its legacy el()-built DOM, as\n  do the compound-styled leaf helpers formField() and field() (label+control rows\n  with inline padding/width — impractical as utilities). STYLING = the house\n  design system; the only new tw util is tw-max-w-[230px] (the run's month\n  select). The salary-sheet body keeps its .tbl-dense modifier (owner: fit\n  without h-scroll).\n\n  TWO STYLES LIVE HERE, on purpose:\n   · the [data-tpl] fragments below are the ORIGINAL screens, kept exactly as\n     they were so their proven-identical pixels do not move;\n   · everything under \"REAL-HTML BLOCKS\" is the current FRONTEND BUILD LAW —\n     whole screens written out as plain HTML. All NEW work goes there.\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section band ----------------------------------------------->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid + one KPI card + a two-column row ------------------------------>\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<!-- the flat [data-tpl=\"kpi\"] tile (label · icon · figure, nothing else) was retired\n     2026-07-29 — every caller now builds [data-shell=\"kpitile\"] below, which adds the\n     trend pill, the context foot line and the sparkline. The grid itself is unchanged. -->\n<template data-tpl=\"two-col\"><div class=\"two-col\"></div></template>\n\n<!-- generic cards: plain (body), register (head+sub+body), head-only -------->\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"head-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n\n<!-- Salary Manage: the run-control card + the .tbl-dense salary sheet -------->\n<template data-tpl=\"run-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex justify-between items-center flex-wrap gap-2\"><div class=\"flex items-center gap-2 flex-wrap\" data-slot=\"left\"></div><div class=\"flex gap-1 flex-wrap\" data-slot=\"actions\"></div></div><div class=\"text-mute sm mt-2\" data-slot=\"status\"></div></div></div></template>\n<template data-tpl=\"salary-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body tbl-dense\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"grid-auto-compact\"><div class=\"grid-auto kpi-compact\"></div></template>\n<template data-tpl=\"pay-tier-card\"><div class=\"card tier-card\"><div class=\"card-pad\"><div class=\"fw-700\" data-slot=\"name\"></div><div class=\"text-mute sm\" data-slot=\"out\"></div><span class=\"badge\" data-slot=\"badge\"></span></div></div></template>\n\n<!-- Payslip: the employee/month/view-statement picker row ------------------->\n<template data-tpl=\"pick-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex gap-2 flex-wrap items-end\" data-slot=\"row\"></div></div></div></template>\n\n<!-- a plain \"New …\" button row (loans/advance disburse) -------------------->\n<template data-tpl=\"btn-row\"><div class=\"mb-3\"><button class=\"btn btn-primary\" data-slot=\"btn\"></button></div></template>\n\n\n<!-- ============================================================================\n  ▼▼ REAL-HTML BLOCKS (FRONTEND BUILD LAW, owner 2026-07-28) ▼▼\n  Everything below is the screen written out as plain HTML — not cloned\n  fragments, not el(). JS only fills the [data-k] placeholders, clones the\n  [data-proto] rows (0..N of them is DATA, not layout) and wires [data-act].\n\n  LEGEND\n    [data-shell=\"…\"]  a shared bar/panel used by more than one screen\n    [data-screen=\"…\"] one whole screen; mountScreen() moves its children onto the page\n    [data-k=\"…\"]      a text/HTML placeholder JS writes into\n    [data-fill=\"…\"]   a container JS appends a built widget (table/SVG) into\n    [data-proto=\"…\"]  a hidden prototype row — cloned once per record\n    [data-el=\"…\"]     an element JS needs a handle on (to hide, or to click-wire)\n    [data-act=\"…\"]    a click target JS binds a navigation/action to\n\n  ⚠ CLASS NAMES: the dashboard row deliberately reuses the `bank-*` component\n  vocabulary from components.css. That block is the house SUMMARY-IDENTITY-PANEL\n  design (hero figure · drill facts · last-event mini-statement · mirrored\n  sparkline · reconciliation · mini stack); Manage Banks was simply its first\n  caller. Reusing it means Payroll is pixel-consistent with Manage Banks for\n  free and forks not a single rule. The extra `pay-*` classes carry no styling —\n  they are semantic hooks for anything payroll ever needs to override.\n  ============================================================================ -->\n\n<!-- ---------------------------------------------------------------------------\n  RICH KPI TILE — the house KPI card at full strength (owner 2026-07-29, from the\n  payroll UI/UX research in docs/PAYROLL-UIUX-RESEARCH.md): the figure, a trend\n  pill against last month, a context foot line, and a sparkline bled into the\n  card's bottom edge.\n\n  It replaces the flat [data-tpl=\"kpi\"] fragment on Loan Management and Advance\n  Salary, which carried a label, an icon and a number and nothing else — you\n  could not tell whether ৳4,20,000 of loans out was climbing or clearing.\n\n  Deliberately the SAME markup as the group dashboard's kpiTile()\n  (companies/group-cockpit/modules/dashboard/view.js) so the two cannot drift.\n\n  ⚠ [data-el=\"trend\"] and [data-el=\"spark\"] are REMOVED, never hidden, when a card\n  has no honest history behind it — both because of the [hidden] trap documented\n  in payroll.js, and because a tile must never imply a trend it cannot prove.\n  (Payroll Reports is exactly that case: see reportsView.)\n--------------------------------------------------------------------------- -->\n<!-- ---------------------------------------------------------------------------\n  PAYMENT PROGRESS — appended into the Salary Manage run card (owner 2026-07-29).\n  The card already states the net and the outstanding as two separate figures;\n  this makes the RELATIONSHIP between them readable at a glance — how much of the\n  month's payroll has actually reached staff.\n\n  It is appended by JS rather than added to the [data-tpl=\"run-card\"] fragment\n  above, because that fragment is one of the ORIGINALS whose pixels must not move.\n\n  The .meter lvl-* vocabulary is risk-coloured (low = green), and that is exactly\n  right here read the right way round: the risk being metered is UNPAID SALARY.\n  Fully paid = lvl-low = green; nothing paid = lvl-high = red.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"paymeter\" class=\"pay-progress\">\n  <div class=\"pay-progress-top\">\n    <span class=\"text-mute sm\" data-k=\"label\"></span>\n    <span class=\"sm fw-600\" data-k=\"pct\"></span>\n  </div>\n  <div class=\"meter\"><span data-el=\"bar\"></span></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  ALL-COMPANIES NOTE (owner 2026-07-29) — shown only when the switcher is on\n  \"All Companies\". It says which concerns the figures above it add up, and, where\n  a control is missing, WHY: a payroll run and a salary structure belong to one\n  company, so they are asked for from a company rather than guessed at from six.\n\n  It reuses .brief-exc (the autopilot/radar row) deliberately — same voice, same\n  spacing, and not one new CSS rule.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"scopenote\" class=\"card mb-3\">\n  <div class=\"card-body\">\n    <div class=\"brief-exc\">\n      <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n      <div class=\"brief-exc-body\">\n        <strong data-k=\"title\"></strong>\n        <span data-k=\"why\"></span>\n      </div>\n    </div>\n  </div>\n</div>\n\n<div data-shell=\"kpitile\" class=\"kpi-card\">\n  <div class=\"kpi-top\">\n    <span class=\"kpi-label\" data-k=\"label\"></span>\n    <span class=\"kpi-ico\" data-k=\"ico\"></span>\n  </div>\n  <div class=\"kpi-value\" data-k=\"value\"></div>\n  <div class=\"kpi-foot\">\n    <span class=\"kpi-trend\" data-el=\"trend\"></span>\n    <span class=\"text-muted\" data-k=\"foot\"></span>\n  </div>\n  <div class=\"kpi-spark\" data-el=\"spark\"><canvas data-el=\"canvas\"></canvas></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  DASHBOARD ROW — the four same-height cards that head both Payroll Overview\n  and Salary Manage. ONE shell, filled with different numbers by each caller:\n\n    1  identity panel  company · hero figure · 3 clickable drill facts ·\n                       the last payroll event (direction · amount · reference ·\n                       opening → closing of what we owe staff)\n    2  flow card       a mirrored 2-colour sparkline + its two totals\n    3  reconciliation  a 2×2 of control figures + a variance badge + \"why?\"\n    4  mini stack      two small click-through cards\n--------------------------------------------------------------------------- -->\n<div data-shell=\"dash\" class=\"bank-cards-row pay-cards-row\">\n\n  <div class=\"bank-summary pay-summary\" data-el=\"panel\">\n    <div class=\"bank-summary-in\">\n      <div class=\"bank-summary-body\">\n        <div class=\"bank-summary-left\">\n          <div class=\"bank-summary-head\">\n            <div class=\"bank-summary-ico\" data-k=\"ico\"></div>\n            <div class=\"bank-summary-id\">\n              <div class=\"bank-summary-co\" data-k=\"co\"></div>\n              <div class=\"bank-summary-sub\" data-k=\"co-sub\"></div>\n            </div>\n          </div>\n          <div class=\"bank-summary-hero clik\" data-act=\"hero\">\n            <div class=\"bank-summary-bal\" data-k=\"hero\"></div>\n            <div class=\"bank-summary-ballabel\" data-k=\"hero-label\"></div>\n          </div>\n        </div>\n        <div class=\"bank-summary-last\" data-el=\"last\">\n          <div class=\"bank-summary-last-top\">\n            <span class=\"bank-summary-last-lbl\" data-k=\"last-label\"></span>\n            <span class=\"bank-summary-dir\" data-k=\"dir\"></span>\n          </div>\n          <div class=\"bank-summary-last-row\">\n            <span class=\"bank-summary-last-amt\" data-k=\"amt\"></span>\n            <span class=\"bank-summary-last-date\" data-k=\"when\"></span>\n          </div>\n          <div class=\"bank-summary-last-ref\" data-k=\"ref\"></div>\n          <div class=\"bank-summary-last-oc\">\n            <div class=\"oc-open\" data-k=\"oc-open\"></div>\n            <div class=\"oc-close\" data-k=\"oc-close\"></div>\n          </div>\n        </div>\n      </div>\n      <div class=\"bank-summary-facts\">\n        <div class=\"bank-summary-fact clik\" data-act=\"f1\"><div class=\"k\" data-k=\"f1k\"></div><div class=\"v\" data-k=\"f1v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f2\"><div class=\"k\" data-k=\"f2k\"></div><div class=\"v\" data-k=\"f2v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f3\"><div class=\"k\" data-k=\"f3k\"></div><div class=\"v\" data-k=\"f3v\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-flow pay-flow\" data-el=\"flow\">\n    <div class=\"bank-flow-head\">\n      <div>\n        <div class=\"bank-flow-title\" data-k=\"flow-title\"></div>\n        <div class=\"bank-flow-sub\" data-k=\"flow-sub\"></div>\n      </div>\n      <span class=\"bank-flow-net\" data-k=\"flow-net\"></span>\n    </div>\n    <div class=\"bank-flow-spark\" data-fill=\"spark\"></div>\n    <div class=\"bank-flow-foot\">\n      <span><span class=\"bank-flow-dot in\"></span><span data-k=\"flow-in\"></span></span>\n      <span><span class=\"bank-flow-dot out\"></span><span data-k=\"flow-out\"></span></span>\n    </div>\n  </div>\n\n  <div class=\"card bank-recon bank-recon-clik pay-recon\" data-el=\"recon\">\n    <!-- no head badge: inside .bank-cards-row components.css hides it, because\n         the verdict already reads in the 4th stat (coloured + its \"why?\"). -->\n    <div class=\"card-head\">\n      <h3 data-k=\"recon-title\"></h3>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"bank-recon-2x2\">\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r1k\"></div><div class=\"stat-value num\" data-k=\"r1v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r2k\"></div><div class=\"stat-value num\" data-k=\"r2v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r3k\"></div><div class=\"stat-value num\" data-k=\"r3v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r4k\"></div><div class=\"stat-value num\" data-k=\"r4v\"></div>\n          <button class=\"float-why\" type=\"button\" data-el=\"why\" hidden></button>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-ministack pay-ministack\">\n    <div class=\"card bank-mini\" data-el=\"m1\">\n      <div class=\"fw-600 sm\" data-k=\"m1t\"></div>\n      <div class=\"strong num\" data-k=\"m1v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m1s\"></div>\n    </div>\n    <div class=\"card bank-mini\" data-el=\"m2\">\n      <div class=\"fw-600 sm\" data-k=\"m2t\"></div>\n      <div class=\"strong num\" data-k=\"m2v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m2s\"></div>\n    </div>\n  </div>\n\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL OVERVIEW — the payroll command centre (new tab, owner 2026-07-28).\n  Reads only what the payroll engine and the general ledger already hold; it\n  never posts by itself. Every automation is a PROPOSAL with a button (owner:\n  automation lives on the overview/summary and asks before it moves money).\n--------------------------------------------------------------------------- -->\n<section data-screen=\"overview\">\n\n  <!-- 1 · the four-card dashboard row (cloned from [data-shell=\"dash\"]) -->\n  <div data-fill=\"dash\"></div>\n\n  <!-- 2 · the narrated digest — every figure computed live from the books -->\n  <div class=\"brief-hero\">\n    <div class=\"brief-date\" data-k=\"digest-date\"></div>\n    <h2 data-k=\"digest-title\"></h2>\n    <div class=\"brief-narrative\" data-k=\"digest-text\"></div>\n  </div>\n\n  <!-- 3 · Autopilot (what should happen next) + Radar (what looks wrong) -->\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"auto-title\"></h3>\n        <span class=\"card-sub\" data-k=\"auto-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"auto\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"radar-title\"></h3>\n        <span class=\"card-sub\" data-k=\"radar-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"radar\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n  </div>\n\n  <!-- 4 · the last 12 payroll months, and where the money goes by department -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"trend-title\"></h3>\n      <span class=\"card-sub\" data-k=\"trend-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"trend\"></div>\n  </div>\n\n  <!-- Where the money goes: the doughnut carries the PROPORTION, the table the\n       precise figures. No chart legend — the table beside it already names every\n       department and its share, so a legend would print each label twice. -->\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3 data-k=\"dept-title\"></h3>\n      <span class=\"card-sub\" data-k=\"dept-sub\"></span>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"pay-dept-split\">\n        <div class=\"pay-dept-ring\" data-el=\"ring\"><canvas data-el=\"deptcanvas\"></canvas></div>\n        <div class=\"pay-dept-tbl\" data-fill=\"dept\"></div>\n      </div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL HISTORY — sits directly under the Salary Sheet on Salary Manage (owner\n  2026-07-28). One row per payroll month, newest first; the row opens a modal\n  listing EVERY payroll transaction that month, and a transaction opens its own\n  printable detail. The month list is built from pay_runs UNION the distinct ym\n  values in pay_slips, so a month with payslips but no run row still appears.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"history\" class=\"card mt-3\">\n  <div class=\"card-head\">\n    <h3 data-k=\"title\"></h3>\n    <span class=\"card-sub\" data-k=\"sub\"></span>\n  </div>\n  <div class=\"card-body tbl-dense\" data-fill=\"body\"></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  ONE MONTH, IN FULL — the drill behind a row of the Monthly Register (owner\n  2026-07-28: \"if I click on January, it should show me how many transactions\n  happened … all their accounts summary of January in a table — gross, net,\n  deductions, additions, overtime, late, bonus\"). Everything that touched\n  payroll in that month, on one screen:\n    · the month's dashboard row (same four cards, month-scoped)\n    · the SALARY REGISTER — every employee, every component, additions and\n      deductions broken out and subtotalled, exportable and printable\n    · the month's EMPLOYEE MONEY MOVEMENTS (advance · loan · repayment · bonus ·\n      encashment payout) and every LEDGER POSTING payroll wrote that month\n--------------------------------------------------------------------------- -->\n<section data-screen=\"month\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"flex justify-between items-center flex-wrap gap-2\">\n        <div class=\"flex items-center gap-2 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"back\"></button>\n          <select class=\"input tw-max-w-[230px]\" data-el=\"mpick\"></select>\n          <span class=\"badge\" data-k=\"status\"></span>\n        </div>\n        <div class=\"flex gap-1 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"print\"></button>\n          <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"open-run\"></button>\n        </div>\n      </div>\n      <div class=\"text-mute sm mt-2\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n  <div data-fill=\"dash\"></div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"reg-title\"></h3>\n      <span class=\"card-sub\" data-k=\"reg-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"reg\"></div>\n  </div>\n\n  <div class=\"two-col\">\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"txn-title\"></h3>\n        <span class=\"card-sub\" data-k=\"txn-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"txns\"></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"post-title\"></h3>\n        <span class=\"card-sub\" data-k=\"post-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"posts\"></div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  SALARY TEMPLATE — the tab, in two halves (owner 2026-07-29):\n\n  1 · SALARY TEMPLATES LIST — the saved package per employee: the five components\n      as fixed taka, the standing bonus, the total, whether overtime is allowed\n      and any standing fine. Add · edit · punish · delete. It is the top half\n      because it is the half people work in daily.\n  2 · STRUCTURE + LIVE PREVIEW — the company's STATUTORY rules (percentages, tax,\n      PF, leave, working days, the pay-by and correction days). Unchanged: they\n      still compute everyone who is NOT on a package, and they still govern tax,\n      PF, absence and encashment for everyone who is. Built by JS below this block.\n\n  The [data-fill=\"list\"] table is EPAL.table (a data grid — the law's live-data\n  carve-out); everything around it is markup.\n--------------------------------------------------------------------------- -->\n<!-- ---------------------------------------------------------------------------\n  ADVANCE REQUESTS — the decision queue on the Advance Salary tab (owner\n  2026-07-29: \"employees' advance salary request option will appear, boss will\n  allow or disallow, also can customize the amount. For which month advanced,\n  that should indicate.\").\n\n  One card, two parts: the asks still waiting on a decision, then everything\n  already decided. The pending card is REMOVED when the queue is empty — an empty\n  decision queue is not a screen anyone needs to look at, and leaving it there\n  makes the tab look like it is asking for something when it is not.\n\n  Each waiting row states who, how much, WHICH MONTH the advance is against, and\n  why — then Approve (which opens a form where the amount can be changed) and\n  Decline (which insists on a reason).\n--------------------------------------------------------------------------- -->\n<div data-shell=\"advreq\" class=\"card mb-3\">\n  <div class=\"card-head\">\n    <h3 data-k=\"title\"></h3>\n    <span class=\"card-sub\" data-k=\"sub\"></span>\n  </div>\n  <div class=\"card-body\" data-fill=\"rows\">\n    <div class=\"adv-req\" hidden data-proto=\"row\">\n      <div class=\"adv-req-who\">\n        <div class=\"fw-700\" data-k=\"name\"></div>\n        <div class=\"text-mute xs\" data-k=\"when\"></div>\n      </div>\n      <div class=\"adv-req-ask\">\n        <div class=\"strong num\" data-k=\"amount\"></div>\n        <span class=\"badge badge-info\" data-k=\"forym\"></span>\n      </div>\n      <div class=\"adv-req-why text-mute sm\" data-k=\"reason\"></div>\n      <div class=\"adv-req-do\">\n        <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"approve\"></button>\n        <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"reject\"></button>\n      </div>\n    </div>\n  </div>\n</div>\n\n<section data-screen=\"salary-templates\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"title\"></h3>\n      <!-- ⚠ the button is REMOVED by the logic when the user cannot create, never\n           hidden: [hidden] and .btn{display:inline-flex} have the same specificity\n           and the class wins (the trap documented in payroll.js). -->\n      <div class=\"flex items-center gap-2\">\n        <span class=\"card-sub\" data-k=\"sub\"></span>\n        <button class=\"btn btn-primary btn-sm\" type=\"button\" data-act=\"new\"></button>\n      </div>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"list\"></div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"text-mute sm\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ===========================================================================\n  EMPLOYEE FILE — the whole person, UNDER the table (owner 2026-07-29:\n  \"clicking a staff's name opens a modal card … I want it to open another\n  structure, in the below of the page, not on a pop up card\").\n\n  Two sections, mounted in two different places, on purpose:\n\n  · [data-screen=\"emp-file\"]      the page chrome — the identity band and the six\n                                  money tiles — plus [data-fill=\"file\"], where the\n                                  SHARED kit (platform/kit/emp-profile.js) renders\n                                  the tab bar and the five tab bodies it already\n                                  owns (Overview · Accounts · Payslips ·\n                                  Attendance · All Details). The kit is called\n                                  with {host, head:false}: same file, no modal,\n                                  and its own header card suppressed because the\n                                  band below IS the header.\n\n  · [data-screen=\"emp-analytics\"] the reference stack from the owner's screenshots\n                                  — profile details, task tiles, the two task\n                                  charts, attendance, leave, salary & loan. It is\n                                  handed to the kit as `overviewExtra`, so it is\n                                  appended INSIDE the Overview tab: it must come\n                                  and go with that tab, not sit under all five.\n\n  Every figure here is read from data the app already holds — tasks\n  (db.tasksFor), attendance (att_monthly), leave (tv_leaves), payslips / loans /\n  advances (EPAL.payroll). Nothing is invented; where the reference app showed a\n  number we cannot honestly derive (clock-in/out \"Working Hour\", \"Late Time\"),\n  the card shows the days we DO record and says so.\n============================================================================ -->\n<section data-screen=\"emp-file\">\n\n  <div class=\"card emp-file mb-3\">\n    <!-- The identity band. Dark by design — the reference header is a solid band,\n         and it is what makes a file read as a FILE rather than as one more card.\n         It takes the COMPANY accent gradient, so Woodart's file is green and\n         Travels' is blue: the same per-company identity rule as everywhere else. -->\n    <div class=\"emp-band\">\n      <span class=\"emp-band-av\" data-k=\"avatar\"></span>\n      <div class=\"emp-band-who\">\n        <div class=\"emp-band-name\" data-k=\"name\"></div>\n        <div class=\"emp-band-meta\" data-k=\"meta\"></div>\n      </div>\n      <div class=\"emp-band-chips\" data-k=\"chips\"></div>\n      <div class=\"emp-band-do\">\n        <button class=\"btn btn-sm emp-band-btn\" type=\"button\" data-act=\"payslip\"></button>\n        <button class=\"btn btn-sm emp-band-btn\" type=\"button\" data-act=\"close\"></button>\n      </div>\n    </div>\n\n    <!-- the six money facts, in the order they get asked about -->\n    <div class=\"stat-row stat-compact\">\n      <div class=\"stat\"><div class=\"stat-label\">Salary</div><div class=\"stat-value num\" data-k=\"t-salary\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\" data-k=\"t-owes-l\"></div><div class=\"stat-value num\" data-k=\"t-owes\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Salary due</div><div class=\"stat-value num\" data-k=\"t-due\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Advance out</div><div class=\"stat-value num\" data-k=\"t-adv\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Loan out</div><div class=\"stat-value num\" data-k=\"t-loan\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Leave encash</div><div class=\"stat-value num\" data-k=\"t-encash\"></div></div>\n    </div>\n  </div>\n\n  <div data-fill=\"file\"></div>\n\n</section>\n\n\n<section data-screen=\"emp-analytics\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"pd-title\"></h3>\n      <span class=\"card-sub\" data-k=\"pd-sub\"></span>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"emp-facts\">\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Email</div><div class=\"emp-fact-v\" data-k=\"p-email\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Phone</div><div class=\"emp-fact-v\" data-k=\"p-phone\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Company</div><div class=\"emp-fact-v\" data-k=\"p-company\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Department</div><div class=\"emp-fact-v\" data-k=\"p-dept\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Designation</div><div class=\"emp-fact-v\" data-k=\"p-desig\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Employment type</div><div class=\"emp-fact-v\" data-k=\"p-type\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Employee ID</div><div class=\"emp-fact-v\" data-k=\"p-id\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Join date</div><div class=\"emp-fact-v\" data-k=\"p-join\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <!-- TASKS — the board totals for this person (db.tasksFor). \"Pending\" counts\n       everything not done and not cancelled: a cancelled task is closed, and\n       counting it as outstanding work would overstate the queue. -->\n  <div class=\"stat-row stat-compact mb-3\">\n    <div class=\"stat\"><div class=\"stat-label\">Task total</div><div class=\"stat-value\" data-k=\"k-tasks\"></div><div class=\"text-mute xs\" data-k=\"k-tasks-f\"></div></div>\n    <div class=\"stat\"><div class=\"stat-label\">Completed</div><div class=\"stat-value text-good\" data-k=\"k-done\"></div><div class=\"text-mute xs\" data-k=\"k-done-f\"></div></div>\n    <div class=\"stat\"><div class=\"stat-label\">Pending</div><div class=\"stat-value text-warn\" data-k=\"k-pending\"></div><div class=\"text-mute xs\" data-k=\"k-pending-f\"></div></div>\n  </div>\n\n  <div class=\"two-col mb-3\">\n    <div class=\"card\">\n      <div class=\"card-head\"><h3 data-k=\"wk-title\"></h3><span class=\"card-sub\" data-k=\"wk-sub\"></span></div>\n      <div class=\"card-body\"><div class=\"emp-chart\"><canvas data-el=\"wk\"></canvas></div></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\"><h3 data-k=\"mn-title\"></h3><span class=\"card-sub\" data-k=\"mn-sub\"></span></div>\n      <div class=\"card-body\"><div class=\"emp-chart\"><canvas data-el=\"mn\"></canvas></div></div>\n    </div>\n  </div>\n\n  <!-- ATTENDANCE — what att_monthly actually records: DAYS. The reference app\n       printed \"Working Hour 174.03 hr\" and \"Late Time 862.52 min\"; there is no\n       clock-in / clock-out anywhere in this system, so neither can be derived and\n       neither is shown as if it could be. The note under the chart says so. -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"att-title\"></h3><span class=\"card-sub\" data-k=\"att-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"stat-row stat-compact mb-3\">\n        <div class=\"stat\"><div class=\"stat-label\">Present days</div><div class=\"stat-value text-good\" data-k=\"a-present\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Absent days</div><div class=\"stat-value\" data-k=\"a-absent\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Late</div><div class=\"stat-value\" data-k=\"a-late\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Early leave</div><div class=\"stat-value\" data-k=\"a-early\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">On leave</div><div class=\"stat-value\" data-k=\"a-leave\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Overtime</div><div class=\"stat-value\" data-k=\"a-ot\"></div></div>\n      </div>\n      <div class=\"emp-chart\"><canvas data-el=\"att\"></canvas></div>\n      <div class=\"text-mute sm mt-2\" data-k=\"att-note\"></div>\n    </div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"lv-title\"></h3><span class=\"card-sub\" data-k=\"lv-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"stat-row stat-compact\">\n        <div class=\"stat\"><div class=\"stat-label\">Approved</div><div class=\"stat-value text-good\" data-k=\"l-approved\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Pending</div><div class=\"stat-value text-warn\" data-k=\"l-pending\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Rejected</div><div class=\"stat-value text-bad\" data-k=\"l-rejected\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Used leave days</div><div class=\"stat-value\" data-k=\"l-used\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Still to take</div><div class=\"stat-value\" data-k=\"l-left\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"sl-title\"></h3><span class=\"card-sub\" data-k=\"sl-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"two-col\">\n        <div>\n          <div class=\"section-label\">Salary</div>\n          <div class=\"data-list\">\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Paid records</div><div class=\"strong\" data-k=\"s-paid\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Pending records</div><div class=\"strong\" data-k=\"s-pending\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\" data-k=\"s-total-l\"></div><div class=\"strong num\" data-k=\"s-total\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\" data-k=\"s-latest-l\"></div><div class=\"strong num\" data-k=\"s-latest\"></div></div>\n          </div>\n        </div>\n        <div>\n          <div class=\"section-label\">Loan &amp; advance</div>\n          <div class=\"data-list\">\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Running loans</div><div class=\"strong\" data-k=\"ln-running\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Completed loans</div><div class=\"strong\" data-k=\"ln-done\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Loan remaining</div><div class=\"strong num\" data-k=\"ln-remaining\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Advance pending decision</div><div class=\"strong num\" data-k=\"ln-advpending\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Advance to recover</div><div class=\"strong num\" data-k=\"ln-advout\"></div></div>\n          </div>\n          <!-- every loan, one row each: taken + taken on / paid / still due -->\n          <div class=\"data-list mt-2\" data-el=\"ln-loans\"></div>\n        </div>\n      </div>\n    </div>\n  </div>\n\n</section>\n";
   var MODULE_CSS = "/* ============================================================================\n * TRAVELS · PAYROLL · MODULE STYLESHEET\n * ----------------------------------------------------------------------------\n * The few rules the shared design system does not already express. Picked up\n * automatically by tools/build/build-module.mjs (it compiles frontend/<id>.css\n * into view.js as MODULE_CSS and injects it once into <head> as\n * <style data-module-style=\"travels/payroll\">), so nothing in\n * platform/design-system/ has to fork for one screen.\n *\n * Everything else on this desk uses the house vocabulary — .kpi-card, .meter,\n * .card, .bank-* for the dashboard row — on purpose: reusing them means Payroll\n * stays pixel-consistent with Manage Banks and the group dashboard for free.\n * Only add here what genuinely has no house equivalent.\n * ========================================================================== */\n\n/* WHERE THE MONEY GOES — the department doughnut beside its table.\n   The ring carries the PROPORTION, the table the precise figures; the chart runs\n   with its legend switched off because the table beside it already names every\n   department and its share, and a legend would print each label a second time.\n   min-width:0 on the table column matters: a flex child defaults to\n   min-width:auto, and a wide table would otherwise refuse to shrink and push the\n   ring off the card. */\n.pay-dept-split { display: flex; gap: 18px; align-items: center; }\n.pay-dept-ring { flex: none; width: 190px; height: 190px; position: relative; }\n.pay-dept-tbl { flex: 1; min-width: 0; }\n@media (max-width: 720px) {\n  .pay-dept-split { flex-direction: column; align-items: stretch; }\n  .pay-dept-ring { width: 100%; height: 170px; }\n}\n\n/* ADVANCE REQUESTS — one waiting row. Four columns on a desk (who · how much and\n   for which month · why · the two buttons), stacking to a readable block on a\n   phone. The left rail is the house \"needs a decision\" cue, the same idea as the\n   severity stripe on an Autopilot row. */\n.adv-req {\n  display: grid; grid-template-columns: minmax(150px, 1.1fr) auto minmax(0, 1.6fr) auto;\n  gap: 14px; align-items: center;\n  padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--r-md);\n  border-left: 3px solid var(--warn); background: var(--surface-2); margin-bottom: 9px;\n}\n.adv-req:last-child { margin-bottom: 0; }\n.adv-req-ask { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }\n.adv-req-why { min-width: 0; overflow-wrap: anywhere; }\n.adv-req-do { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }\n@media (max-width: 860px) {\n  .adv-req { grid-template-columns: 1fr auto; }\n  .adv-req-why { grid-column: 1 / -1; }\n  .adv-req-do { grid-column: 1 / -1; justify-content: flex-start; }\n}\n\n/* PAYMENT PROGRESS — appended under the Salary Manage run card's status line.\n   The card already prints the net and the outstanding as two separate figures;\n   this makes the relationship between them readable without doing the division\n   in your head. Uses the house .meter; only the label row above it is new. */\n.pay-progress { margin-top: 10px; }\n.pay-progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 5px; }\n\n/* ============== HOW THIS MONTH IS MADE UP (owner 2026-07-29) ================\n   The month's arithmetic, compact. Three ANCHORS — gross, net payable, cash to\n   hand out — run full width as rules across the card; between them the movement\n   sits in two columns, additions beside deductions, each with its subtotal in its\n   own heading. The house .data-list was the previous shape and cost ~41px a row\n   for up to fourteen rows; this halves the card and puts each label next to its\n   figure instead of a card-width away from it.\n\n   No house equivalent exists: .detail-cols is label→value facts with no subtotal\n   heading, tinted body or signed money, and .two-col is a 1.6fr/1fr page split. */\n.makeup { display: flex; flex-direction: column; }\n\n/* an anchor — the figures the columns have to add up TO. Heavier than a line and\n   ruled off, so the eye can stop on it while scanning the detail. */\n.makeup-anchor {\n  display: flex; align-items: baseline; gap: 12px;\n  padding: 9px 2px; border-bottom: 1px solid var(--border); font-weight: 700;\n}\n.makeup-anchor .makeup-v { font-size: var(--fs-body); }\n/* the last figure on the card is the one the owner acts on — it keeps the accent\n   and loses the rule, because nothing follows it to be separated from */\n.makeup-anchor.is-cash { border-bottom: none; color: var(--accent); padding-bottom: 2px; }\n\n/* THE PAIR. Equal halves with a hairline between them, so neither side reads as\n   the main column. One column on a phone, where two would set ~9 chars a line. */\n.makeup-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }\n.makeup-col { min-width: 0; padding: 9px 0 10px; }\n.makeup-col.is-add { padding-right: 16px; border-right: 1px solid var(--border); }\n.makeup-col.is-ded { padding-left: 16px; }\n.makeup-colhead {\n  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 5px;\n}\n.makeup-coltitle {\n  font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .06em;\n  font-weight: 700; color: var(--text-mute);\n}\n.makeup-coltotal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--fs-small); }\n.is-add .makeup-coltotal { color: var(--good); }\n.is-ded .makeup-coltotal { color: var(--bad); }\n.makeup-none { font-size: var(--fs-micro); color: var(--text-mute); padding: 3px 0; }\n\n/* a detail line. Dense on purpose — these are read as a list of names against a\n   column of figures, not as rows to be clicked. */\n.makeup-lines { display: flex; flex-direction: column; }\n.makeup-line { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; }\n.makeup-k { flex: 1; min-width: 0; font-size: var(--fs-small); color: var(--text-dim); overflow-wrap: anywhere; }\n.makeup-v { margin-left: auto; white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-small); }\n.makeup-anchor .makeup-k { color: var(--text); font-size: var(--fs-body); font-weight: 700; }\n\n/* the recoveries — money that comes back out of the salary, so they belong under\n   the net rather than in either column. Indented to read as a sub-step of it. */\n.makeup-recov { padding: 7px 0 8px 14px; border-bottom: 1px solid var(--border); }\n\n@media (max-width: 720px) {\n  .makeup-cols { grid-template-columns: 1fr; }\n  .makeup-col.is-add { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border); }\n  .makeup-col.is-ded { padding-left: 0; }\n}\n\n/* ============================== THE EMPLOYEE FILE (owner 2026-07-29) ========\n   The person's whole file, opened UNDER the Staff Accounts table instead of in\n   a pop-up card. Only three things here have no house equivalent: the identity\n   BAND, the facts GRID and a chart BOX of a fixed height. Everything else on the\n   file is house vocabulary (.card, .stat-row, .data-list, .badge, .two-col) on\n   purpose — the file has to look like the rest of the desk, not like a guest. */\n\n/* the file sits away from the table it belongs to, so the two never read as one\n   long sheet; the top rule is the seam between \"the list\" and \"this person\" */\n.emp-file-host { margin-top: 18px; }\n.emp-file-host:empty { margin-top: 0; }\n\n/* THE BAND. Dark, full-bleed across the card head, carrying the COMPANY accent\n   gradient — Woodart's file is green, Travels' is blue, the same per-company\n   identity the rest of the app uses. It is the one place on the desk where text\n   sits on the accent, so everything inside is locked to white rather than to the\n   theme's --text (which would vanish on the gradient in light mode). */\n.emp-band {\n  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;\n  padding: 16px 20px; color: #fff;\n  /* mixed from the LIVE company accent, not from --epal-deep: that token is the\n     group's dark blue everywhere, so a Woodart file came out blue while its own\n     tabs, buttons and chips were green. Darkening the accent towards the brand\n     ink keeps the band deep enough for white text in either theme. */\n  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 72%, #00072D), var(--accent));\n  border-radius: var(--r-lg) var(--r-lg) 0 0;\n}\n.emp-band-av.avatar { width: 52px; height: 52px; font-size: 18px; flex: none; background-size: cover; background-position: center; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }\n.emp-band-who { min-width: 180px; flex: 1; }\n.emp-band-name { font-family: var(--font-display); font-size: var(--fs-h3); font-weight: 700; line-height: 1.2; }\n.emp-band-meta { font-size: var(--fs-small); color: rgba(255,255,255,.78); margin-top: 2px; }\n.emp-band-chips { display: flex; gap: 6px; flex-wrap: wrap; }\n/* the chips are on the accent, so they cannot use the tinted --*-soft palettes */\n.emp-band-chips .badge { background: rgba(255,255,255,.16); color: #fff; }\n.emp-band-do { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }\n.emp-band-btn { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.28); }\n.emp-band-btn:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.45); }\n/* the six money tiles butt straight onto the band — one block, no seam */\n.emp-file .stat-row { border-radius: 0 0 var(--r-lg) var(--r-lg); }\n/* the sixth tile carries two facts (\"13.4d · ৳32,208\") and .num is nowrap, so it\n   ran out over the card edge. The tile wraps; the figures inside stay atomic. */\n.emp-file .stat { min-width: 0; }\n.emp-file .stat-value.num { white-space: normal; overflow-wrap: normal; }\n\n/* PROFILE DETAILS — label over value, three across, wrapping to two and then to\n   one. A .data-list would have been the house default, but these are eight short\n   facts that read far faster side by side than as eight full-width rows. */\n.emp-facts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }\n.emp-fact { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 9px 12px; background: var(--surface-2); min-width: 0; }\n.emp-fact-l { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .05em; color: var(--text-mute); }\n.emp-fact-v { font-size: var(--fs-small); font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }\n\n/* A chart needs a height its canvas can be measured against — Chart.js reads the\n   parent box, and an unsized parent collapses to nothing on first paint. */\n.emp-chart { position: relative; height: 230px; }\n.emp-chart canvas { width: 100% !important; height: 100% !important; }\n@media (max-width: 720px) { .emp-chart { height: 190px; } }\n\n/* ============================================================================\n * MANAGE SALARY — the extended panels (owner 2026-07-29)\n * ----------------------------------------------------------------------------\n * The modal that opens from the money-bag icon on Salary Manage keeps everything\n * it had (identity, the four stats, the button row) and gains, beneath it, the\n * salary RECORD read out in full plus the ALLOCATOR that pays several months in\n * one posting. Nothing here restyles the part that was already there.\n *\n * The fact tiles reuse .emp-facts / .emp-fact from the profile above — same grid,\n * same border, same label-over-value rhythm — so the modal reads as one system.\n * These rules only add the tone (a deduction is red, an addition green) and the\n * small hint line under a value (\"Auto: Overtime + Bonus + Adjustment\").\n * ==========================================================================*/\n.sal-facts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }\n.sal-fact-h { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 3px; overflow-wrap: anywhere; }\n.emp-fact.is-ded .emp-fact-v { color: var(--bad); }\n.emp-fact.is-add .emp-fact-v { color: var(--good); }\n.emp-fact.is-key { background: var(--surface-3); border-color: var(--accent); }\n.emp-fact.is-key .emp-fact-v { font-size: var(--fs-body); color: var(--accent); }\n/* a tile whose figure is nil is still printed — a missing tile reads as \"we do\n   not track this\", which is a different statement from \"none this month\" */\n.emp-fact.is-nil .emp-fact-v { color: var(--text-mute); font-weight: 600; }\n\n/* THE ALLOCATOR — one row per month the employee is still owed for, each with\n   its own box. The grid is month · owed · pay · left, collapsing to two columns\n   on a phone so the input never shrinks below a thumb. */\n.alloc { display: flex; flex-direction: column; }\n.alloc-row {\n  display: grid; grid-template-columns: 1fr auto 120px auto; gap: 10px;\n  align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border);\n}\n.alloc-row:last-of-type { border-bottom: none; }\n.alloc-m { min-width: 0; }\n.alloc-mn { font-size: var(--fs-small); font-weight: 700; overflow-wrap: anywhere; }\n.alloc-ms { font-size: var(--fs-micro); color: var(--text-mute); }\n.alloc-owed, .alloc-left {\n  font-family: var(--font-mono); font-variant-numeric: tabular-nums;\n  font-size: var(--fs-small); white-space: nowrap; text-align: right;\n}\n.alloc-left { min-width: 92px; color: var(--text-mute); }\n.alloc-left.is-clear { color: var(--good); }\n.alloc-left.is-owing { color: var(--warn); }\n.alloc-in { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }\n.alloc-foot {\n  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;\n  flex-wrap: wrap; margin-top: 8px; padding-top: 9px; border-top: 2px solid var(--border);\n}\n.alloc-foot-v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; }\n.alloc-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }\n@media (max-width: 640px) {\n  .alloc-row { grid-template-columns: 1fr 110px; row-gap: 4px; }\n  .alloc-owed { text-align: left; grid-column: 1; }\n  .alloc-left { text-align: right; }\n}\n";
   if (MODULE_CSS && !document.querySelector('style[data-module-style="travels/payroll"]')) {
     var st = document.createElement('style');
@@ -100,6 +100,153 @@ function killCharts() { myCharts.forEach(function (c) { try { c.destroy(); } cat
 // COMPANY-AGNOSTIC payroll desk: CID is stamped at render time.
 var CID = 'travels';
 function PR() { return EPAL.payroll; }
+
+/* ============================================================================
+ * ALL COMPANIES — the same desk read as ONE group payroll (owner 2026-07-29)
+ * ----------------------------------------------------------------------------
+ * "Make another button before Group, 'All Company', so every nav's company
+ * switcher gives us a combined view. I am in the Loan section and switch to All
+ * Companies, so I see all loan employees with their loan taken, paid, due — and
+ * the loan transaction history of all companies."
+ *
+ * CID carries the sentinel 'all'. NOTHING in this desk compares CID to a company
+ * id any more: every read asks `inScope(companyId)` or `scopeCids()`, which
+ * answer with the one selected company in normal mode and with every PRESENT
+ * company in all-companies mode. Group HQ is one of them — the group employs
+ * people, which is exactly why the owner asked for a button BEFORE it. In
+ * single-company mode every helper below reduces to what the code did before, so
+ * nothing on a company desk moves by a pixel or a taka.
+ *
+ * ⚠ WHAT ALL-MODE DELIBERATELY DOES NOT DO: post a RUN. A payroll run, and the
+ * salary STRUCTURE it is computed from, belong to ONE company —
+ * generate/finalize/reopen/Pay-All write `pay_runs` rows keyed by company id, and
+ * 'all' is not a company. Handing them the sentinel would create records against
+ * a company that does not exist and silently corrupt the books. So those controls
+ * are replaced by a note naming the companies and asking for one. Everything
+ * keyed by EMPLOYEE keeps working untouched — a loan, an advance, a repayment, a
+ * payslip, a payment, a punishment — because the engine derives the company from
+ * the employee (loan/advance/bonus call compOf(empId); pay/adjustSlip read
+ * slip.companyId). That is the line: read across all six, write through a person.
+ * ==========================================================================*/
+var ALL = 'all';
+function isAll() { return CID === ALL; }
+// memoised per CID: inScope() runs inside filters over every payslip/journal, so
+// rebuilding the list on each row would turn a scan into a nested loop
+var _scopeIds = null, _scopeMap = null, _scopeFor = null;
+function scopeCids() {
+  if (_scopeFor !== CID) {
+    var list = (EPAL.config && EPAL.config.companies) ? EPAL.config.companies : [];
+    // discovery has already pruned EPAL.config.companies, so a deleted company
+    // folder is out of the group total here exactly as it is everywhere else
+    _scopeIds = isAll()
+      ? list.filter(function (c) { return c.enabled !== false; }).map(function (c) { return c.id; })
+      : [CID];
+    _scopeMap = {};
+    _scopeIds.forEach(function (c) { _scopeMap[c] = 1; });
+    _scopeFor = CID;
+  }
+  return _scopeIds;
+}
+function inScope(cid) { scopeCids(); return !!_scopeMap[cid]; }
+// every row of a company-stamped store that this scope owns — ONE definition, so
+// slips, runs and transactions can never be scoped three slightly different ways
+function scoped(store) { return S.list(store).filter(function (r) { return inScope(r.companyId); }); }
+function slipsIn(ym) { return scoped('pay_slips').filter(function (s) { return s.ym === ym; }); }
+
+/* Who the screen says it is speaking for. */
+function scopeShort() { return isAll() ? 'All Companies' : coShort(CID); }
+function scopeFull() { return isAll() ? 'Epal Group · All Companies' : coFull(CID); }
+function scopeMeta() { return isAll() ? { accent: 'var(--accent)', icon: 'grid-3x3-gap-fill' } : coMeta(CID); }
+function scopeNames() { return scopeCids().map(coShort).join(' · '); }
+
+/* THE MONTH, ACROSS THE SCOPE. A run belongs to one company, so in all-mode a
+ * month is 0..6 runs that need not agree: the status is the shared one when they
+ * all say the same thing and 'mixed' when they do not — never a guess. The
+ * correction / pay-by dates are the LATEST of them, because that is the date by
+ * which the whole group is settled, and the correction window is open if it is
+ * open anywhere (something can still be corrected). In single-company mode this
+ * is exactly `getRun(CID, ym)` with its status, so every caller reads alike. */
+function runsIn(ym) {
+  var out = [];
+  scopeCids().forEach(function (c) { var r = PR().getRun(c, ym); if (r) out.push(r); });
+  return out;
+}
+function runInfo(ym) {
+  var rs = runsIn(ym), st = null, cu = '', da = '', win = false;
+  rs.forEach(function (r) {
+    st = (st === null || st === r.status) ? r.status : 'mixed';
+    if ((r.correctionUntil || '') > cu) cu = r.correctionUntil || '';
+    if ((r.dueAfter || '') > da) da = r.dueAfter || '';
+  });
+  scopeCids().forEach(function (c) { if (PR().inCorrectionWindow(c, ym)) win = true; });
+  return { runs: rs, n: rs.length, has: rs.length > 0, run: rs[0] || null,
+    status: st || 'draft', mixed: st === 'mixed',
+    correctionUntil: cu, dueAfter: da, inWindow: win };
+}
+
+/* THE COMPANY COLUMN — added to every list only in all-mode, where six payrolls
+ * share one table and a name alone no longer says whose employee this is. Same
+ * shape Master Accounts uses on its own all-companies tables (a coloured badge,
+ * the raw id in the filter), so the two screens read identically. */
+function coCell(cid) {
+  var c = (EPAL.config && EPAL.config.company) ? EPAL.config.company(cid) : null;
+  return '<span class="badge"' + (c ? ' style="color:' + c.accent + '"' : '') + '>' + esc(coShort(cid)) + '</span>';
+}
+function coCol(get) {
+  get = get || function (r) { return r.companyId; };
+  return { key: 'companyId', label: 'Company', sortVal: function (r) { return coShort(get(r)); },
+    exportVal: function (r) { return coShort(get(r)); },
+    render: function (r) { return coCell(get(r)); } };
+}
+/* Inserted right AFTER whoever the row is about — "who, and from where" is the
+ * order the eye reads it in. `at` moves it when the identity spans two columns
+ * (name + employee id). The existing column ORDER is never disturbed: in
+ * single-company mode this returns the very same array it was handed, so a
+ * company desk is pixel-identical to what it was. */
+function withCo(cols, get, at) {
+  if (!isAll()) return cols;
+  var i = (at == null) ? 1 : at;
+  return cols.slice(0, i).concat([coCol(get)], cols.slice(i));
+}
+function coFilter() { return isAll() ? [{ key: 'companyId', label: 'Company' }] : []; }
+
+/* Department cost, merged across the scope — the engine answers one company at a
+ * time and "Sales" exists in more than one of them, so the group's Sales line is
+ * their sum rather than six rows with the same name. Same shape and the same
+ * biggest-first order the engine returns, so both callers (the ring and the
+ * table) keep reading it identically. */
+function deptCost() {
+  if (!isAll()) return PR().departmentCost(CID);
+  var by = {};
+  scopeCids().forEach(function (c) {
+    PR().departmentCost(c).forEach(function (r) { by[r.dept] = (by[r.dept] || 0) + r.cost; });
+  });
+  return Object.keys(by).map(function (k) { return { dept: k, cost: by[k] }; })
+    .sort(function (a, b) { return b.cost - a.cost; });
+}
+
+/* "Paid from" options for a real company — NEVER for the 'all' sentinel.
+ * EPAL.pay.accountsOf() calls ensureCashBox(owner), which CREATES the owner's
+ * cash drawer: handed 'all' it would invent a cash box for a company that does
+ * not exist. Every caller therefore passes the company of the row it is acting
+ * on (an employee's, a request's), which is also the correct answer — it is that
+ * company's account the money leaves. */
+function payOptions(cid) {
+  var c = (cid && cid !== ALL) ? cid : scopeCids()[0];
+  return (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(c) : [['m:Bank', 'Bank'], ['m:Cash', 'Cash']];
+}
+function empCo(empId) { var e = empById(empId); return (e && e.companyId) || (isAll() ? scopeCids()[0] : CID); }
+
+/* The panel that says what all-mode is showing and what it deliberately will not
+ * do. It is a note, not a disabled button: the control has not been taken away,
+ * it has been told which question it belongs to. */
+function scopeNote(title, why) {
+  var n = shell('scopenote');
+  fillH(n, 'ico', ui.icon('info-circle'));
+  fillK(n, 'title', title);
+  fillK(n, 'why', why);
+  return n;
+}
 /* TAB LABELS (owner 2026-07-29: "why scroll bar in the nav???? I said to make
  * fit in 100% and 90% windows"). Measured on the real screen: eight tabs plus
  * the six-company switcher wanted 1078px of a 960px row at 100% zoom on a 1366
@@ -121,17 +268,39 @@ var payYm = null;
  * the books have to say the same thing, and if they don't you should see it here
  * rather than at audit. */
 var ACC = { exp: '5100', encashExp: '5150', payable: '2100', pf: '2110', tax: '2120', encashPay: '2150', adv: '1250', loan: '1260' };
-function glBal(code) { return (EPAL.ledger && EPAL.ledger.balance) ? EPAL.ledger.balance(code, { companyId: CID }) : 0; }
+function glBal(code) {
+  if (!(EPAL.ledger && EPAL.ledger.balance)) return 0;
+  return scopeCids().reduce(function (a, c) { return a + EPAL.ledger.balance(code, { companyId: c }); }, 0);
+}
 // every journal the payroll engine writes carries source:'payroll'
 function payEntries(ym) {
   if (!EPAL.ledger || !EPAL.ledger.entries) return [];
-  var rows = EPAL.ledger.entries({ companyId: CID, source: 'payroll' });
+  var rows;
+  if (isAll()) {
+    // entries() answers one company at a time and CHRONOLOGICALLY — payableAsOf()
+    // and lastEventCfg() both walk this list in order, so the concatenation is
+    // re-sorted by date. The sort is stable, so postings that share a date keep
+    // their per-company order rather than being shuffled.
+    rows = [];
+    scopeCids().forEach(function (c) { rows = rows.concat(EPAL.ledger.entries({ companyId: c, source: 'payroll' }) || []); });
+    rows.sort(function (a, b) { return String(a.date || '') < String(b.date || '') ? -1 : (String(a.date || '') > String(b.date || '') ? 1 : 0); });
+  } else rows = EPAL.ledger.entries({ companyId: CID, source: 'payroll' });
   return ym ? rows.filter(function (e) { return String(e.date || '').slice(0, 7) === ym; }) : rows;
 }
 
-function team() { return (db.employees ? db.employees({ companyId: CID }) : []).slice().sort(function (a, b) { return (a.name || '') < (b.name || '') ? -1 : 1; }); }
+function team() {
+  var rows = isAll()
+    ? (db.employees ? db.employees({}) : []).filter(function (e) { return inScope(e.companyId); })
+    : (db.employees ? db.employees({ companyId: CID }) : []);
+  return rows.slice().sort(function (a, b) { return (a.name || '') < (b.name || '') ? -1 : 1; });
+}
 function empById(id) { return team().filter(function (e) { return e.id === id; })[0] || (db.employee ? db.employee(id) : null); }
-function canCreate() { return !EPAL.perm || EPAL.perm.can(CID, 'payroll', 'create'); }
+// in all-mode the desk is as writable as the most permissive company on it — the
+// row's own company still governs, because every write goes through an employee
+function canCreate() {
+  if (!EPAL.perm) return true;
+  return scopeCids().some(function (c) { return EPAL.perm.can(c, 'payroll', 'create'); });
+}
 function esc(s) { return ui.escapeHtml(String(s == null ? '' : s)); }
 function cap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
 function today() { return PR() ? PR().today() : '2026-07-05'; }
@@ -208,7 +377,7 @@ function sectionNav(sub, cid) {
 ['travels', 'woodart', 'it', 'shop', 'construction'].forEach(function (cid) {
   EPAL.view(cid + '/payroll', {
     render: function (ctx) {
-      if (CID !== cid) { payYm = null; ovMonth = null; }   // reset only when switching company
+      if (CID !== cid) { payYm = null; ovMonth = null; openEmp = null; }   // reset only when switching company
       CID = cid;
       deskRedraw = null;                       // standalone: a tab click is a route change
       var sub = ctx.subId || 'overview';
@@ -224,7 +393,10 @@ function sectionNav(sub, cid) {
       page.appendChild(EPAL.pageHead({ eyebrow: coShort(cid) + ' › Payroll', icon: 'cash-coin', title: titles[sub], sub: subs[sub] }));
       page.appendChild(sectionNav(sub, cid));
       if (!PR()) { page.appendChild(card('Payroll engine unavailable.')); ctx.mount.appendChild(page); return; }
+      deskFileOpen = null;               // the section about to draw claims it if it holds the file
+      deskChanged(sub);
       VIEWS[sub](page);
+      ensureEmpFile(page);               // …and if it did not, every name on it still opens the file
       ctx.mount.appendChild(page);
     }
   });
@@ -268,7 +440,10 @@ EPAL.payrollDesk = function (page, cid, opts) {
     host.appendChild(row);
     if (!PR()) { host.appendChild(card('Payroll engine unavailable.')); return; }
     var section = el('div');
+    deskFileOpen = null;               // …same on the embedded desk (Master Payroll)
+    deskChanged(deskTab);
     (VIEWS[deskTab] || VIEWS.overview)(section);
+    ensureEmpFile(section);
     host.appendChild(section);
   }
   draw();
@@ -453,20 +628,26 @@ function lastEventCfg(ym, label) {
  * overview, the digest, the autopilot and the radar. */
 function position() {
   var t = team();
-  var slips = S.list('pay_slips').filter(function (s) { return s.companyId === CID; });
+  var slips = scoped('pay_slips');
   var live = slips.filter(function (s) { return s.status !== 'draft'; });
   var sheetOwed = sum(live, dueOf);
   var advOut = sum(t, function (e) { return PR().advanceOutstanding(e.id); });
   var loanOut = sum(t, function (e) { return PR().loanOutstanding(e.id); });
+  // MONTHS, not run rows: in all-mode six companies each open January, and
+  // "Payroll months: 6" for one month would be a lie. One run per company per
+  // month means this is identical to runs.length on a single company.
+  var runMonths = {};
+  scoped('pay_runs').forEach(function (r) { runMonths[r.ym] = 1; });
   return {
+    runMonths: Object.keys(runMonths).length,
     team: t, slips: slips, live: live,
     sheetOwed: sheetOwed,
     glPayable: glBal(ACC.payable),
     glStatutory: glBal(ACC.pf) + glBal(ACC.tax) + glBal(ACC.encashPay),
     glAdvLoan: glBal(ACC.adv) + glBal(ACC.loan),
     advOut: advOut, loanOut: loanOut,
-    encashLiability: PR().encashmentLiability(CID),
-    runs: S.list('pay_runs').filter(function (r) { return r.companyId === CID; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; })
+    encashLiability: scopeCids().reduce(function (a, c) { return a + PR().encashmentLiability(c); }, 0),
+    runs: scoped('pay_runs').sort(function (a, b) { return a.ym < b.ym ? 1 : -1; })
   };
 }
 
@@ -481,7 +662,7 @@ function blankMonth(ym) {
 }
 function monthSeries(limit) {
   var byYm = {};
-  S.list('pay_slips').filter(function (s) { return s.companyId === CID; }).forEach(function (s) {
+  scoped('pay_slips').forEach(function (s) {
     var m = byYm[s.ym] || (byYm[s.ym] = blankMonth(s.ym));
     m.heads++; m.gross += s.earnedGross || 0; m.adds += addOf(s); m.deds += dedOf(s);
     m.net += PR().slipPayable(s); m.encash += s.encashAmt || 0;
@@ -494,9 +675,15 @@ function monthSeries(limit) {
   // pay_runs is the OTHER half of the union: a run can exist before any payslip
   // does, and a month with payslips can have no run row — Payroll History has to
   // list both, so the month list is built from both.
-  S.list('pay_runs').filter(function (r) { return r.companyId === CID; }).forEach(function (r) {
+  // In all-mode a month is up to six runs that need not agree. The status is the
+  // shared one when every company says the same and 'mixed' when they do not —
+  // reporting the last company's status as the group's would be a claim the data
+  // does not make.
+  scoped('pay_runs').forEach(function (r) {
     if (!byYm[r.ym]) byYm[r.ym] = blankMonth(r.ym);
-    byYm[r.ym].status = r.status;
+    var m = byYm[r.ym];
+    m.status = (m.status == null || m.status === r.status) ? r.status : 'mixed';
+    m.runs = (m.runs || 0) + 1;
   });
   var out = Object.keys(byYm).sort().map(function (k) { return byYm[k]; });
   return limit ? out.slice(-limit) : out;
@@ -725,7 +912,7 @@ function glEntryFor(t) {
  *             already inside the salary figure above it. */
 function monthTxns(ym) {
   var out = [];
-  PR().slipsFor(CID, ym).forEach(function (s) {
+  slipsIn(ym).forEach(function (s) {
     var covered = 0;
     for (var n = 1; n <= (s.payCount || 0); n++) {
       var e = findGl('GL-PAYP-' + s.empId + '-' + ym + '-' + n);
@@ -737,7 +924,7 @@ function monthTxns(ym) {
       if (findGl('GL-UNPAY-' + s.empId + '-' + ym + '-' + n)) continue;
       var cash = entryCash(e), amt = entryTotal(e);
       covered += amt;
-      out.push({ key: e.id, empId: s.empId, empName: s.empName, purpose: 'Salary', type: 'salary',
+      out.push({ key: e.id, empId: s.empId, empName: s.empName, companyId: s.companyId, purpose: 'Salary', type: 'salary',
         date: e.date, amount: amt, dir: cash.out > 0 ? 'out' : 'internal', cash: Math.max(0, cash.out),
         from: cash.out > 0 ? acctName(cash.account) : 'Recovered from advance / loan — no cash',
         memo: e.memo || ('Salary paid · ' + PR().mLabel(ym)),
@@ -754,7 +941,7 @@ function monthTxns(ym) {
       // Calling that "no journal on file" would be wrong, and counting its cash
       // here would count the settlement twice.
       var settled = settlementOn(s.empId, s.paidDate);
-      out.push({ key: 'slip-' + s.empId + '-' + ym, empId: s.empId, empName: s.empName, purpose: 'Salary', type: 'salary',
+      out.push({ key: 'slip-' + s.empId + '-' + ym, empId: s.empId, empName: s.empName, companyId: s.companyId, purpose: 'Salary', type: 'salary',
         date: s.paidDate || (ym + '-01'), amount: gap,
         dir: settled ? 'internal' : 'out',
         cash: settled ? 0 : Math.max(0, Math.min(gap, cashOf(s))),
@@ -766,7 +953,7 @@ function monthTxns(ym) {
     }
   });
   S.list('pay_txns').filter(function (t) {
-    if (t.companyId !== CID) return false;
+    if (!inScope(t.companyId)) return false;
     // An auto-EMI belongs to the SALARY MONTH it was deducted from, which its
     // memo names — not to the calendar month it happens to be dated in. A June
     // salary paid in July would otherwise strand its EMI in July's sheet, away
@@ -777,7 +964,7 @@ function monthTxns(ym) {
     var e = glEntryFor(t), cash = e ? entryCash(e) : null;
     var auto = isAutoEmi(t);
     var dir = auto ? 'internal' : (cash && cash.out < 0 ? 'in' : 'out');
-    out.push({ key: t.id, empId: t.empId, empName: t.empName, purpose: PURPOSE[t.type] || cap(t.type || 'Payroll'), type: t.type,
+    out.push({ key: t.id, empId: t.empId, empName: t.empName, companyId: t.companyId, purpose: PURPOSE[t.type] || cap(t.type || 'Payroll'), type: t.type,
       date: t.date, amount: +t.amount || 0, dir: dir,
       cash: cash ? Math.abs(cash.out) : 0,
       from: auto ? 'Recovered from the salary above — no cash'
@@ -806,7 +993,7 @@ function payrollHistoryCard() {
   var c = shell('history');
   fillH(c, 'title', ui.icon('clock-history') + ' Payroll History');
   fillK(c, 'sub', months.length
-    ? 'every payroll month · click one for all its transactions'
+    ? 'every payroll month · click one for all its transactions' + (isAll() ? ' across ' + scopeCids().length + ' companies' : '')
     : 'no payroll month has been generated yet');
   box(c, 'body').appendChild(EPAL.table({
     columns: [
@@ -831,12 +1018,13 @@ function payrollHistoryCard() {
       { key: 'status', label: 'Run status',
         render: function (m) {
           if (!m.status) return '<span class="badge" title="This month has payslips but no payroll run record">No run</span>';
+          if (m.status === 'mixed') return '<span class="badge" title="The companies on this month are not all at the same stage — open a company to see which">Mixed · ' + (m.runs || 0) + ' runs</span>';
           return '<span class="badge badge-' + (m.status === 'paid' ? 'good' : m.status === 'due' ? 'bad' : m.status === 'draft' ? 'warn' : 'info') + '">' + esc(cap(m.status)) + '</span>';
         },
         exportVal: function (m) { return m.status ? cap(m.status) : 'No run'; } }
     ],
     rows: months, sortKey: 'ym', sortDir: -1, pageSize: 12, totalKey: 'paid',
-    exportName: 'payroll-history.csv', pdfTitle: coFull(CID) + ' — Payroll History',
+    exportName: 'payroll-history.csv', pdfTitle: scopeFull() + ' — Payroll History',
     onRow: function (m) { monthTxnsModal(m.ym); },
     actions: [{ icon: 'list-ul', title: 'Every transaction in this month', onClick: function (m) { monthTxnsModal(m.ym); } }],
     empty: { icon: 'clock-history', title: 'No payroll history yet', hint: 'Generating a month in Salary Manage starts the history.' }
@@ -853,14 +1041,14 @@ function monthTxnsModal(ym) {
       ? esc(String(rows.length)) + ' transaction(s) in <b>' + esc(PR().mLabel(ym)) + '</b> — salary payments (each instalment separately), advances, staff loans, repayments, bonuses and encashment payouts. Click any row for its detail and voucher.'
       : 'Nothing was paid or recorded in <b>' + esc(PR().mLabel(ym)) + '</b>. Salary that is accrued but unpaid does not appear here — it is money owed, not money moved.' }));
   body.appendChild(EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'empId', label: 'Employee ID', render: function (r) { return '<span class="mono xs">' + esc(r.empId) + '</span>'; } },
       { key: 'empName', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.empName) + '</span>'; } },
       { key: 'purpose', label: 'Purpose', badge: { Salary: 'good', Advance: 'warn', 'Staff loan': 'warn', 'Loan repayment': 'info', Bonus: 'good', 'Leave encashment': 'info', 'Final settlement': 'bad' } },
       { key: 'date', label: 'Date', date: true },
       { key: 'from', label: 'Paid from' },
       { key: 'amount', label: 'Amount', num: true, money: true }
-    ],
+    ], null, 2),
     rows: rows, searchKeys: ['empName', 'empId', 'purpose', 'from', 'memo'], pageSize: 12,
     totalKey: 'amount', exportName: 'payroll-transactions-' + ym + '.csv',
     onRow: function (r) { txnDetailModal(r); },
@@ -888,18 +1076,24 @@ function totalsNote(t) {
 }
 
 function printMonthSheet(ym, rows, tot) {
-  var head = '<tr><th>Employee ID</th><th>Employee</th><th>Purpose</th><th>Date</th><th>Paid from</th><th style="text-align:right">Amount</th></tr>';
+  // one extra column, and therefore one wider colspan, when six payrolls share
+  // the sheet — a printed group month with no company on it is unreadable
+  var co = isAll(), span = co ? 6 : 5;
+  var head = '<tr><th>Employee ID</th><th>Employee</th>' + (co ? '<th>Company</th>' : '') +
+    '<th>Purpose</th><th>Date</th><th>Paid from</th><th style="text-align:right">Amount</th></tr>';
   var body = rows.map(function (r) {
-    return '<tr><td>' + esc(r.empId) + '</td><td>' + esc(r.empName) + '</td><td>' + esc(r.purpose) + '</td><td>' +
+    return '<tr><td>' + esc(r.empId) + '</td><td>' + esc(r.empName) + '</td>' +
+      (co ? '<td>' + esc(coShort(r.companyId)) + '</td>' : '') +
+      '<td>' + esc(r.purpose) + '</td><td>' +
       esc(ui.date(r.date)) + '</td><td>' + esc(r.from) + '</td><td style="text-align:right">' + ui.money(r.amount) + '</td></tr>';
   }).join('');
-  var totRow = '<tr><th colspan="5">Total listed</th><th style="text-align:right">' + ui.money(tot.listed) + '</th></tr>' +
-    '<tr><td colspan="5" style="text-align:right">of which cash left an account</td><td style="text-align:right">' + ui.money(tot.out) + '</td></tr>';
-  if (tot.inn > 0) totRow += '<tr><td colspan="5" style="text-align:right">cash received back in</td><td style="text-align:right">' + ui.money(tot.inn) + '</td></tr>';
-  if (tot.internal > 0) totRow += '<tr><td colspan="5" style="text-align:right">recovered inside a salary payment — never touched the bank</td><td style="text-align:right">' + ui.money(tot.internal) + '</td></tr>';
+  var totRow = '<tr><th colspan="' + span + '">Total listed</th><th style="text-align:right">' + ui.money(tot.listed) + '</th></tr>' +
+    '<tr><td colspan="' + span + '" style="text-align:right">of which cash left an account</td><td style="text-align:right">' + ui.money(tot.out) + '</td></tr>';
+  if (tot.inn > 0) totRow += '<tr><td colspan="' + span + '" style="text-align:right">cash received back in</td><td style="text-align:right">' + ui.money(tot.inn) + '</td></tr>';
+  if (tot.internal > 0) totRow += '<tr><td colspan="' + span + '" style="text-align:right">recovered inside a salary payment — never touched the bank</td><td style="text-align:right">' + ui.money(tot.internal) + '</td></tr>';
   ui.printDoc({
     title: 'Payroll Transactions — ' + PR().mLabel(ym),
-    subtitle: coFull(CID) + ' · Payroll',
+    subtitle: scopeFull() + ' · Payroll',
     meta: rows.length + ' transaction(s) · generated ' + ui.date(today()),
     footer: 'System-generated payroll transaction sheet — Confidential',
     bodyHtml: '<table>' + head + body + totRow + '</table>'
@@ -913,6 +1107,9 @@ function txnDetailModal(r) {
   var body = el('div');
   var rows = [
     ['Employee', r.empName], ['Employee ID', r.empId],
+    // whose payroll this movement belongs to — only worth a line when the screen
+    // is showing more than one company, otherwise it repeats the page head
+    isAll() ? ['Company', coFull(r.companyId)] : null,
     ['Purpose', r.purpose + (r.instalments > 1 ? '  ·  instalment ' + r.instalment + ' of ' + r.instalments : '')],
     ['Amount', ui.money(r.amount)],
     ['Date', ui.date(r.date)],
@@ -922,7 +1119,7 @@ function txnDetailModal(r) {
     ['Month', PR().mLabel(r.ym)],
     ['Note', r.memo || '—'],
     ['Journal', r.glId || 'no posting on file']
-  ];
+  ].filter(Boolean);
   body.appendChild(el('div.card', null, [el('div.card-body', null, [
     el('div.data-list', null, rows.map(function (p) { return drow(p[0], p[1]); }))
   ])]));
@@ -942,8 +1139,10 @@ function txnDetailModal(r) {
   var acts = [{ label: 'Print', icon: 'printer', onClick: function () { printTxn(r, rows); return false; } }];
   // EPAL.journalVoucher wants the whole ledger ENTRY (there is no id lookup on
   // the engine), and its 2nd argument is a display NAME, not a company id.
+  // the voucher names the company that POSTED it (r.companyId), never the desk's
+  // scope — 'All Companies' is not who signed the journal
   if (r.entry) acts.push({ label: 'Print voucher', icon: 'file-earmark-text', variant: 'primary',
-    onClick: function () { EPAL.journalVoucher(r.entry, coFull(CID)); return false; } });
+    onClick: function () { EPAL.journalVoucher(r.entry, coFull(r.companyId || CID)); return false; } });
   if (r.slip) acts.push({ label: 'Payslip', icon: 'receipt',
     onClick: function () { var e = empById(r.empId); if (e) statement(e, r.ym); return true; } });
   acts.push({ label: 'Close' });
@@ -953,7 +1152,7 @@ function txnDetailModal(r) {
 function printTxn(r, rows) {
   ui.printDoc({
     title: r.purpose + ' — ' + r.empName,
-    subtitle: coFull(CID) + ' · Payroll · ' + PR().mLabel(r.ym),
+    subtitle: coFull(r.companyId || CID) + ' · Payroll · ' + PR().mLabel(r.ym),
     meta: (r.glId ? 'journal ' + r.glId + ' · ' : '') + 'generated ' + ui.date(today()),
     footer: 'System-generated payroll transaction record — Confidential',
     bodyHtml: '<table>' + rows.map(function (p) {
@@ -971,7 +1170,7 @@ var ovMonth = null;                 // set → the Monthly Register drill is ope
 function overviewView(page) {
   if (ovMonth) { monthView(page); return; }
   var s = screen('overview');
-  var P = position(), meta = coMeta(CID), ym = payYm || PR().curYm();
+  var P = position(), meta = scopeMeta(), ym = payYm || PR().curYm();
   var series = monthSeries(12);
 
   /* ---- 1 · the dashboard row -------------------------------------------- */
@@ -982,12 +1181,13 @@ function overviewView(page) {
     // SHORT name on the panel (as Manage Banks does) — the full legal name is
     // 30+ characters and ellipsises inside a four-card row; it reads in full on
     // the digest below.
-    hue: meta.accent, icon: meta.icon, co: coShort(CID), coSub: 'Payroll position · ' + PR().mLabel(ym),
+    hue: meta.accent, icon: meta.icon, co: scopeShort(),
+    coSub: (isAll() ? scopeCids().length + ' companies · ' : '') + 'Payroll position · ' + PR().mLabel(ym),
     hero: ui.money(P.sheetOwed), heroBad: P.sheetOwed > 0, heroLabel: 'Owed to staff',
     heroTitle: 'Open the salary sheet', heroOn: function () { goTab('manage'); },
     facts: [
-      { k: 'Headcount', v: String(P.team.length), title: 'Every employee on this payroll', on: function () { goTab('staff'); } },
-      { k: 'Payroll months', v: String(P.runs.length), title: 'Every month ever run', on: function () { goTab('manage'); } },
+      { k: 'Headcount', v: String(P.team.length), title: isAll() ? 'Everyone on every payroll in the group' : 'Every employee on this payroll', on: function () { goTab('staff'); } },
+      { k: 'Payroll months', v: String(P.runMonths), title: 'Every month ever run', on: function () { goTab('manage'); } },
       { k: 'Postings', v: String(payEntries().length), title: 'Journals payroll has written', on: function () { EPAL.router.navigate('group/master-accounts/journals'); } }
     ],
     last: lastEventCfg(null, 'Last payroll event'),
@@ -1033,12 +1233,15 @@ function overviewView(page) {
   box(s, 'trend').appendChild(registerTable(monthSeries()));
 
   fillH(s, 'dept-title', ui.icon('diagram-3') + ' Where the money goes');
-  fillK(s, 'dept-sub', 'monthly salary cost by department');
-  var dc = PR().departmentCost(CID);          // read ONCE — ring and table must agree
+  fillK(s, 'dept-sub', 'monthly salary cost by department' + (isAll() ? ' · every company merged' : ''));
+  var dc = deptCost();                        // read ONCE — ring and table must agree
   box(s, 'dept').appendChild(deptTable(P, dc));
   deptRing(s, dc);
 
   mountScreen(page, s);
+  // the note goes FIRST on the page, above the dashboard row it explains
+  if (isAll()) page.insertBefore(scopeNote('Combined payroll — ' + scopeNames(),
+    'Every figure on this tab adds up ' + scopeCids().length + ' payrolls at once. Generating, finalizing and paying a month belong to one company, so those controls appear when you pick one from the switcher; everything driven by a person — a loan, an advance, a repayment, a payslip, a payment — works from here.'), page.firstChild);
 }
 
 /* Fill an autopilot/radar card: one cloned [data-proto] row per finding, or the
@@ -1079,8 +1282,8 @@ function rowsInto(host, items, clearText) {
 /* THE DIGEST — plain English over live figures. Every number below is read from
  * the payslips and the ledger at render time, so it cannot drift from source. */
 function digest(s, P, ym, series) {
-  var run = PR().getRun(CID, ym), st = run ? run.status : 'draft';
-  var slips = PR().slipsFor(CID, ym);
+  var R = runInfo(ym), st = R.status;
+  var slips = slipsIn(ym);
   var gross = sum(slips, function (x) { return x.earnedGross; });
   var net = sum(slips, function (x) { return PR().slipPayable(x); });
   var paid = sum(slips, function (x) { return x.paid || 0; });
@@ -1101,10 +1304,15 @@ function digest(s, P, ym, series) {
    * exists by the time it reads one; Overview only READS — correctly, a dashboard
    * must not create records as a side effect of being looked at. So it says what
    * is true instead: the month has not been started. */
-  lines.push(!run
+  lines.push(!R.has
     ? PR().mLabel(ym) + ' has not been opened yet — generate it on ' + b('Salary Manage') + ' to create this month’s payslips.'
+    : st === 'mixed'
+      // all-mode only: the concerns are at different stages, and naming one of
+      // them as "the" status would be a claim the data does not make
+      ? R.n + ' companies have opened ' + b(PR().mLabel(ym)) + ' and they are ' + b('not at the same stage') +
+        ' — ' + b(ui.money(paid)) + ' is paid and ' + b(ui.money(Math.max(0, due))) + ' is still owed across them. Pick a company to see and run its own month.'
     : st === 'draft'
-      ? 'The month is still a ' + b('draft') + (PR().inCorrectionWindow(CID, ym) ? ' and the correction window is open until ' + b(ui.date(run.correctionUntil)) + '.' : ' — the correction window closed on ' + b(ui.date(run.correctionUntil)) + ', so nothing is on the books yet.')
+      ? 'The month is still a ' + b('draft') + (R.inWindow ? ' and the correction window is open until ' + b(ui.date(R.correctionUntil)) + '.' : ' — the correction window closed on ' + b(ui.date(R.correctionUntil)) + ', so nothing is on the books yet.')
       : 'The month is ' + b(cap(st)) + ' — accrued to the ledger, ' + b(ui.money(paid)) + ' paid and ' + b(ui.money(Math.max(0, due))) + ' still owed.');
   if (P.advOut || P.loanOut) lines.push('Staff hold ' + b(ui.money(P.advOut)) + ' of advances and ' + b(ui.money(P.loanOut)) + ' of loans, recovered automatically from future pay.');
   if (P.encashLiability > 0) lines.push('Leave encashment has built a ' + b(ui.money(P.encashLiability)) + ' liability.');
@@ -1114,7 +1322,7 @@ function digest(s, P, ym, series) {
     : 'The ledger and the sheet disagree by ' + b(ui.money(variance)) + ' — worth opening before month-end.');
 
   fillK(s, 'digest-date', 'PAYROLL DIGEST · ' + ui.date(today(), 'long'));
-  fillK(s, 'digest-title', coFull(CID) + ' — ' + PR().mLabel(ym));
+  fillK(s, 'digest-title', scopeFull() + ' — ' + PR().mLabel(ym));
   fillH(s, 'digest-text', lines.join(' '));
 }
 
@@ -1122,31 +1330,57 @@ function digest(s, P, ym, series) {
  * next, each as a proposal with the button that does it. It never acts on its
  * own (owner 2026-07-28), so an automatic payroll can never surprise the bank. */
 function autopilot(ym, P) {
-  var out = [], run = PR().getRun(CID, ym), st = run ? run.status : 'draft';
-  var slips = PR().slipsFor(CID, ym);
+  var out = [], R = runInfo(ym), run = R.run, st = R.status;
+  var slips = slipsIn(ym);
   var net = sum(slips, function (s) { return PR().slipPayable(s); });
   var paid = sum(slips, function (s) { return s.paid || 0; });
   var due = net - paid, td = today();
 
-  // both draft proposals quote the correction window, which only a RUN carries —
-  // and a hydrated install can hold payslips with no run row (live 2026-07-28)
-  if (st === 'draft' && slips.length && run) {
-    if (PR().inCorrectionWindow(CID, ym)) {
-      out.push({ sev: 'low', icon: 'pencil-square', title: 'Correction window is open until ' + ui.date(run.correctionUntil),
-        why: 'Record absents, lates, overtime and bonuses now — after that the month should be accrued.',
-        action: 'Open sheet', actionIcon: 'table', on: function () { goTab('manage'); } });
-    } else {
-      out.push({ sev: 'high', icon: 'lock', title: 'Finalize & accrue ' + PR().mLabel(ym) + ' — ' + ui.money(net),
-        why: 'The correction window closed on ' + ui.date(run.correctionUntil) + '. Until this is accrued the books do not carry the month\'s salary cost.',
-        action: 'Finalize & Accrue', actionIcon: 'lock', on: function () { finalizeRun(ym, net); } });
+  if (isAll()) {
+    /* ALL COMPANIES — the month proposals become a BOARD READ-OUT, one row per
+     * concern that is behind, because the button behind them (finalize, Pay All)
+     * writes a run and a run belongs to ONE company. Naming the company and what
+     * it owes is the useful half of the proposal; the click has to happen on that
+     * company's own desk, which is one switcher button away. Everything below
+     * this block is keyed by employee and works from here unchanged. */
+    scopeCids().forEach(function (c) {
+      var r = PR().getRun(c, ym);
+      var cs = slips.filter(function (x) { return x.companyId === c; });
+      if (!cs.length || !r) return;
+      var cnet = sum(cs, function (x) { return PR().slipPayable(x); }), cdue = sum(cs, dueOf);
+      if (r.status === 'draft' && !PR().inCorrectionWindow(c, ym)) {
+        out.push({ sev: 'high', icon: 'lock',
+          title: coShort(c) + ' — ' + PR().mLabel(ym) + ' is not accrued · ' + ui.money(cnet),
+          why: 'Its correction window closed on ' + ui.date(r.correctionUntil) + ', so its books do not carry the month\'s salary cost yet. Switch the company switcher to ' + coShort(c) + ' to finalize it.' });
+      } else if (r.status !== 'draft' && cdue > 0) {
+        var lateC = td > r.dueAfter;
+        out.push({ sev: lateC ? 'high' : 'med', icon: 'cash-coin',
+          title: coShort(c) + ' — ' + ui.money(cdue) + ' still owed for ' + PR().mLabel(ym),
+          why: (lateC ? 'The pay-by date (' + ui.date(r.dueAfter) + ') has passed. ' : 'Due by ' + ui.date(r.dueAfter) + '. ') +
+            'Pay the whole run from ' + coShort(c) + '\'s own desk, or pay one person from Staff without leaving this view.' });
+      }
+    });
+  } else {
+    // both draft proposals quote the correction window, which only a RUN carries —
+    // and a hydrated install can hold payslips with no run row (live 2026-07-28)
+    if (st === 'draft' && slips.length && run) {
+      if (R.inWindow) {
+        out.push({ sev: 'low', icon: 'pencil-square', title: 'Correction window is open until ' + ui.date(run.correctionUntil),
+          why: 'Record absents, lates, overtime and bonuses now — after that the month should be accrued.',
+          action: 'Open sheet', actionIcon: 'table', on: function () { goTab('manage'); } });
+      } else {
+        out.push({ sev: 'high', icon: 'lock', title: 'Finalize & accrue ' + PR().mLabel(ym) + ' — ' + ui.money(net),
+          why: 'The correction window closed on ' + ui.date(run.correctionUntil) + '. Until this is accrued the books do not carry the month\'s salary cost.',
+          action: 'Finalize & Accrue', actionIcon: 'lock', on: function () { finalizeRun(ym, net); } });
+      }
     }
-  }
-  if (st !== 'draft' && due > 0 && canCreate()) {
-    var late = run && td > run.dueAfter;
-    out.push({ sev: late ? 'high' : 'med', icon: 'cash-coin',
-      title: 'Pay ' + ui.money(due) + ' to ' + slips.filter(function (s) { return dueOf(s) > 0; }).length + ' staff',
-      why: late ? 'The pay-by date (' + ui.date(run.dueAfter) + ') has passed — unpaid salaries are flagged Due.' : 'Due by ' + ui.date(run.dueAfter) + '.',
-      action: 'Pay All', actionIcon: 'cash-coin', on: function () { payAll(ym); } });
+    if (st !== 'draft' && due > 0 && canCreate()) {
+      var late = run && td > run.dueAfter;
+      out.push({ sev: late ? 'high' : 'med', icon: 'cash-coin',
+        title: 'Pay ' + ui.money(due) + ' to ' + slips.filter(function (s) { return dueOf(s) > 0; }).length + ' staff',
+        why: late ? 'The pay-by date (' + ui.date(run.dueAfter) + ') has passed — unpaid salaries are flagged Due.' : 'Due by ' + ui.date(run.dueAfter) + '.',
+        action: 'Pay All', actionIcon: 'cash-coin', on: function () { payAll(ym); } });
+    }
   }
   var arrearsBy = P.team.map(function (e) { return { e: e, amt: PR().previousDue(e.id, ym) }; }).filter(function (r) { return r.amt > 0; });
   if (arrearsBy.length && canCreate()) {
@@ -1190,7 +1424,7 @@ function autopilot(ym, P) {
  * told. Every finding names the employee and opens their file. */
 function radar(P) {
   var out = [];
-  function openEmp(e) { return function () { if (EPAL.people) EPAL.people.open(e.id); }; }
+  function openEmp(e) { return function () { showEmp(e.id); }; }
   P.live.forEach(function (s) {
     var payable = PR().slipPayable(s);
     if ((s.paid || 0) > payable + 1) out.push({ sev: 'high', icon: 'exclamation-octagon',
@@ -1268,6 +1502,9 @@ function registerTable(series) {
   return EPAL.table({
     columns: [
       { key: 'ym', label: 'Month', render: function (m) { return '<span class="strong">' + esc(PR().mLabel(m.ym)) + '</span>'; }, sortVal: function (m) { return m.ym; } },
+      // 'mixed' is an all-mode value only — the concerns on this month are not at
+      // the same stage. It is deliberately left OUT of the tone map: no colour
+      // here would be true, so it renders as the plain badge.
       { key: 'status', label: 'Run', badge: { draft: 'warn', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } },
       { key: 'heads', label: 'Employees', num: true, sortVal: function (m) { return m.heads; } },
       { key: 'gross', label: 'Gross', num: true, money: true },
@@ -1279,7 +1516,7 @@ function registerTable(series) {
       { key: 'due', label: 'Due', num: true, sortVal: function (m) { return m.due; }, render: function (m) { return m.due ? '<span class="num strong text-bad">' + ui.money(m.due) + '</span>' : '—'; } }
     ],
     rows: rows, pageSize: 12, totalKey: 'net', exportName: 'payroll-monthly-register.csv',
-    pdfTitle: coFull(CID) + ' — Payroll Monthly Register',
+    pdfTitle: scopeFull() + ' — Payroll Monthly Register',
     onRow: function (m) { ovMonth = m.ym; repaint(); },
     actions: [{ icon: 'box-arrow-up-right', title: 'Open this month in full', onClick: function (m) { ovMonth = m.ym; repaint(); } }],
     empty: { icon: 'calendar3', title: 'No payroll months yet', hint: 'Salary Manage generates the current month.' }
@@ -1308,7 +1545,7 @@ function deptRing(s, dc) {
 }
 
 function deptTable(P, dc) {
-  dc = dc || PR().departmentCost(CID);
+  dc = dc || deptCost();
   var total = sum(dc, function (r) { return r.cost; });
   return EPAL.table({
     columns: [
@@ -1329,9 +1566,9 @@ function deptTable(P, dc) {
  * ONE MONTH, IN FULL — the drill behind a Monthly Register row
  * ==========================================================================*/
 function monthView(page) {
-  var ym = ovMonth, s = screen('month'), meta = coMeta(CID);
-  var run = PR().getRun(CID, ym), st = run ? run.status : 'draft';
-  var slips = PR().slipsFor(CID, ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
+  var ym = ovMonth, s = screen('month'), meta = scopeMeta();
+  var R = runInfo(ym), st = R.status;
+  var slips = slipsIn(ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
   var gross = sum(slips, function (x) { return x.earnedGross; });
   var net = sum(slips, function (x) { return PR().slipPayable(x); });
   var paid = sum(slips, function (x) { return x.paid || 0; });
@@ -1342,7 +1579,8 @@ function monthView(page) {
   /* ---- the control bar -------------------------------------------------- */
   act(s, 'back', function () { ovMonth = null; repaint(); }).innerHTML = ui.icon('arrow-left') + ' Monthly Register';
   act(s, 'print', function () { printSheetForm(slips, ym); }).innerHTML = ui.icon('printer') + ' Print register';
-  act(s, 'open-run', function () { payYm = ym; goTab('manage'); }).innerHTML = ui.icon('sliders') + ' Manage this run';
+  act(s, 'open-run', function () { payYm = ym; goTab('manage'); })
+    .innerHTML = ui.icon('sliders') + (isAll() ? ' Open this month' : ' Manage this run');
   var pick = part(s, 'mpick');
   monthSeries().slice().reverse().forEach(function (m) {
     var o = el('option', { value: m.ym, text: PR().mLabel(m.ym) + '  ·  ' + cap(m.status || 'draft') });
@@ -1351,12 +1589,13 @@ function monthView(page) {
   pick.addEventListener('change', function () { ovMonth = this.value; repaint(); });
   fillK(s, 'status', cap(st)).classList.add('badge-' + (st === 'paid' ? 'good' : st === 'due' ? 'bad' : st === 'draft' ? 'warn' : 'info'));
   fillK(s, 'note', slips.length + ' employees · ' + payEntries(ym).length + ' ledger postings · ' +
-    S.list('pay_txns').filter(function (x) { return x.companyId === CID && String(x.date || '').slice(0, 7) === ym; }).length +
-    ' employee money movements in ' + PR().mLabel(ym) + '.');
+    scoped('pay_txns').filter(function (x) { return String(x.date || '').slice(0, 7) === ym; }).length +
+    ' employee money movements in ' + PR().mLabel(ym) +
+    (isAll() ? ', across ' + R.n + ' of ' + scopeCids().length + ' companies.' : '.'));
 
   /* ---- the dashboard row, scoped to this month -------------------------- */
   box(s, 'dash').appendChild(dashRow({
-    hue: meta.accent, icon: 'calendar3', co: PR().mLabel(ym), coSub: coShort(CID) + ' · ' + cap(st),
+    hue: meta.accent, icon: 'calendar3', co: PR().mLabel(ym), coSub: scopeShort() + ' · ' + cap(st),
     hero: ui.money(net), heroLabel: 'Net payable', heroTitle: 'Manage this run', heroOn: function () { payYm = ym; goTab('manage'); },
     facts: [
       { k: 'Employees', v: String(slips.length), on: null },
@@ -1392,9 +1631,9 @@ function monthView(page) {
    * absence), which is what the net is built from — so the row adds up on paper
    * exactly as the engine computes it, with no hidden step. */
   fillH(s, 'reg-title', ui.icon('table') + ' Salary Register — ' + esc(PR().mLabel(ym)));
-  fillK(s, 'reg-sub', 'every employee · click a row for the payslip · export or print the lot');
+  fillK(s, 'reg-sub', (isAll() ? 'every employee of every company · ' : 'every employee · ') + 'click a row for the payslip · export or print the lot');
   box(s, 'reg').appendChild(EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'empName', label: 'Employee', render: function (x) { return EPAL.people ? EPAL.people.linkify(x.empName, x.empId) : '<span class="strong">' + esc(x.empName) + '</span>'; } },
       { key: 'empId', label: 'ID', render: function (x) { return '<span class="mono xs text-mute">' + esc(x.empId) + '</span>'; } },
       { key: 'dept', label: 'Dept', badge: {} },
@@ -1426,58 +1665,69 @@ function monthView(page) {
       { key: 'paid', label: 'Paid', num: true, sortVal: function (x) { return x.paid || 0; }, render: function (x) { return x.paid ? '<span class="text-good">' + ui.money(x.paid) + '</span>' : '—'; } },
       { key: 'due', label: 'Due', num: true, sortVal: dueOf, render: function (x) { var v = dueOf(x); return v ? '<span class="num strong text-bad">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'status', label: 'Status', badge: { draft: '', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
-    ],
+    ], null, 2),
     rows: slips, searchKeys: ['empName', 'empId', 'dept'], quickFilter: 'status', filterPanel: true,
-    filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }],
+    filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }].concat(coFilter()),
     totalKey: 'net', pageSize: 25,
-    exportName: 'salary-register-' + ym + '.csv', pdfTitle: coFull(CID) + ' — Salary Register ' + PR().mLabel(ym),
+    exportName: 'salary-register-' + ym + '.csv', pdfTitle: scopeFull() + ' — Salary Register ' + PR().mLabel(ym),
     onRow: function (x) { var e = empById(x.empId); if (e) statement(e, ym); },
-    actions: [{ icon: 'person-lines-fill', title: 'Open the employee\'s full file', onClick: function (x) { if (EPAL.people) EPAL.people.open(x.empId); } }]
+    actions: [{ icon: 'person-lines-fill', title: 'Open the employee\'s full file', onClick: function (x) { showEmp(x.empId); } }]
       .concat(ui.actions({ print: function (x) { var e = empById(x.empId); if (e) statementPrint(e, ym); } })),
     empty: { icon: 'table', title: 'No payslips in ' + PR().mLabel(ym) }
   }).el);
 
   /* ---- every movement that touched an employee's money this month ------- */
-  var txns = S.list('pay_txns').filter(function (x) { return x.companyId === CID && String(x.date || '').slice(0, 7) === ym; })
+  var txns = scoped('pay_txns').filter(function (x) { return String(x.date || '').slice(0, 7) === ym; })
     .sort(function (a, b) { return a.date < b.date ? 1 : -1; });
   fillH(s, 'txn-title', ui.icon('journal-text') + ' Employee money movements');
   fillK(s, 'txn-sub', txns.length + ' in ' + PR().mLabel(ym) + ' · advance · loan · repayment · bonus · encashment');
   box(s, 'txns').appendChild(EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'date', label: 'Date', date: true },
       { key: 'empName', label: 'Employee', render: function (x) { return EPAL.people ? EPAL.people.linkify(x.empName, x.empId) : esc(x.empName); } },
       { key: 'type', label: 'Type', badge: { advance: 'warn', loan: 'warn', 'loan-repay': 'good', bonus: 'good', 'encash-paid': 'info', settlement: 'bad' } },
       { key: 'memo', label: 'Detail' },
       { key: 'method', label: 'Through', badge: {} },
       { key: 'amount', label: 'Amount', num: true, money: true }
-    ],
+    ], null, 2),
     rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, totalKey: 'amount',
     exportName: 'payroll-movements-' + ym + '.csv',
-    onRow: function (x) { if (EPAL.people) EPAL.people.open(x.empId); },
+    onRow: function (x) { showEmp(x.empId); },
     empty: { icon: 'journal', title: 'No movements in ' + PR().mLabel(ym) }
   }).el);
 
   /* ---- and every journal payroll wrote into the books that month -------- */
   var posts = payEntries(ym).slice().reverse().map(function (e) {
     var amt = 0; (e.lines || []).forEach(function (l) { amt += +l.dr || 0; });
-    return { id: e.id, date: e.date, ref: e.ref || e.id, memo: e.memo || '', amount: amt, entry: e };
+    return { id: e.id, date: e.date, companyId: e.companyId, ref: e.ref || e.id, memo: e.memo || '', amount: amt, entry: e };
   });
   fillH(s, 'post-title', ui.icon('shield-check') + ' Ledger postings');
-  fillK(s, 'post-sub', posts.length + ' journal(s) written by payroll');
+  fillK(s, 'post-sub', posts.length + ' journal(s) written by payroll' + (isAll() ? ' into ' + scopeCids().length + ' sets of books' : ''));
   box(s, 'posts').appendChild(EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'date', label: 'Date', date: true },
       { key: 'ref', label: 'Ref', render: function (r) { return '<span class="txn-id-chip">' + esc(r.ref) + '</span>'; } },
       { key: 'memo', label: 'Posting' },
       { key: 'amount', label: 'Amount', num: true, money: true }
-    ],
+    ]),
     rows: posts, searchKeys: ['ref', 'memo'], pageSize: 10, totalKey: 'amount',
     exportName: 'payroll-postings-' + ym + '.csv',
     onRow: function () { EPAL.router.navigate('group/master-accounts/journals'); },
     empty: { icon: 'shield-check', title: 'Nothing posted in ' + PR().mLabel(ym), hint: 'A draft month is not on the books until it is finalized.' }
   }).el);
 
+  /* THE EMPLOYEE FILE ON THIS DESK TOO (owner 2026-07-29: the register's profile
+   * button "still opens the old layout"). The same file Staff Accounts opens,
+   * mounted directly under the register — reached from the row's profile button,
+   * from a name in the register, and from a name in the money movements. The
+   * register ROW still opens the payslip: that is what a register row is for,
+   * and it is unchanged. The two cards are grabbed BEFORE the mount (which
+   * empties the screen) and mounted after it (which is when they are on the
+   * page and the file can be slid in under the register). */
+  var regCard = box(s, 'reg').closest('.card');
+  var txnCard = box(s, 'txns').closest('.card');
   mountScreen(page, s);
+  empFileUnder(page, el('div.emp-file-host'), [regCard, txnCard]);
 }
 
 
@@ -1522,7 +1772,7 @@ function staffView(page) {
     var ls = PR().leaveState(e);
     var lb = PR().loanBook ? PR().loanBook(e.id) : [];
     return {
-      id: e.id, emp: e, name: e.name, dept: e.dept || '—', designation: e.designation || '—',
+      id: e.id, emp: e, name: e.name, companyId: e.companyId, dept: e.dept || '—', designation: e.designation || '—',
       status: e.status || 'active', salary: +e.salary || 0,
       netDue: led.length ? led[led.length - 1].balance : 0,
       salaryDue: PR().salaryDue(e.id), advance: PR().advanceOutstanding(e.id),
@@ -1537,7 +1787,7 @@ function staffView(page) {
     };
   });
   var tbl = EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id) : '<span class="strong">' + esc(r.name) + '</span>'; } },
       { key: 'id', label: 'ID', render: function (r) { return '<span class="mono xs nowrap" title="' + esc(r.id) + '">' + esc(shortId(r.id)) + '</span>'; } },
       // ONE COLUMN, TWO ROWS (owner 2026-07-29). Dept and Designation used to sit
@@ -1579,12 +1829,12 @@ function staffView(page) {
       { key: 'lastPaid', label: 'Last paid', render: function (r) { return r.lastPaid ? '<span class="nowrap">' + esc(PR().mLabel(r.lastPaid)) + '</span>' : '<span class="text-mute">never</span>'; } },
       { key: 'movements', label: 'Rec.', num: true, sortVal: function (r) { return r.movements; } },
       { key: 'status', label: 'Status', badge: { active: 'good', resigned: 'bad', probation: 'warn' } }
-    ],
+    ], null, 2),
     rows: rows, searchKeys: ['name', 'id', 'dept', 'designation'], quickFilter: 'status', filterPanel: true,
-    filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }],
-    pageSize: 15, exportName: 'staff-accounts.csv', pdfTitle: coFull(CID) + ' — Staff Payroll Accounts',
+    filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }].concat(coFilter()),
+    pageSize: 15, exportName: 'staff-accounts.csv', pdfTitle: scopeFull() + ' — Staff Payroll Accounts',
     // the row and the name both open the file UNDER the table, not a modal
-    onRow: function (r) { openEmp = r.id; drawFile(true); },
+    onRow: function (r) { openFile(r.id, true); },
     actions: (canCreate() ? [
       { icon: 'cash', title: 'Give advance', onClick: function (r) { moneyForm(r.emp, 'advance'); } },
       { icon: 'bank', title: 'Disburse loan', onClick: function (r) { moneyForm(r.emp, 'loan'); } }
@@ -1593,30 +1843,18 @@ function staffView(page) {
   });
   var card2 = frag('reg-card');
   slot(card2, 'title').innerHTML = ui.icon('people') + ' Staff Accounts';
-  slot(card2, 'sub').textContent = 'search by name OR employee ID · click anyone for their complete file — ledger, payslips, loans, advances, attendance';
+  slot(card2, 'sub').textContent = (isAll() ? 'everyone on every payroll in the group · ' : '') +
+    'search by name OR employee ID · click anyone for their complete file — ledger, payslips, loans, advances, attendance';
   // .tbl-snug: 13 money/identity columns + the action buttons on screen at once,
   // one 10% step of type smaller and higher-contrast (owner 2026-07-29).
   slot(card2, 'body').classList.add('tbl-snug');
   slot(card2, 'body').appendChild(tbl.el);
   page.appendChild(card2);
 
-  /* THE FILE OPENS HERE — under the table, with the list still above it (owner
-   * 2026-07-29). Two ways in, one destination:
-   *   · the ROW click        → onRow above
-   *   · the NAME (.emp-link) → claimed by [data-emp-host] + __empOpen, because
-   *     the kit's own listener is on document in the capture phase and would
-   *     otherwise always win and open the modal.
-   * `openEmp` is module state, so the file survives a desk redraw (a company
-   * switch, a data change) and re-renders itself for the same person. */
-  card2.setAttribute('data-emp-host', '');
-  card2.__empOpen = function (id) { openEmp = id; drawFile(true); };
-  page.appendChild(fileHost);
-  drawFile(false);
-
-  function drawFile(scroll) {
-    if (!openEmp) { killFileCharts(); fileHost.innerHTML = ''; return; }
-    empFile(fileHost, openEmp, { scroll: scroll, onClose: function () { openEmp = null; drawFile(false); } });
-  }
+  /* THE FILE OPENS HERE — under the table, with the list still above it. Two
+   * ways in, one destination: the ROW click (onRow above) and the NAME
+   * (.emp-link, claimed by the host below). See empFileUnder(). */
+  var openFile = empFileUnder(page, fileHost, [card2]);
 }
 
 /* ============================================================ THE EMPLOYEE FILE
@@ -1637,6 +1875,7 @@ function staffView(page) {
  * desk redraw or route change drops the whole page (so the desk must be able to
  * kill them too). Destroying twice is harmless — both killers swallow it.  */
 var openEmp = null;                       // whose file is open under the table
+var deskFileOpen = null;                  // the opener THIS desk mounted, if any
 var fileCharts = [];
 function killFileCharts() { fileCharts.forEach(function (c) { try { c.destroy(); } catch (e) {} }); fileCharts = []; }
 function fileChart(c) { if (c) { fileCharts.push(c); trackChart(c); } return c; }
@@ -1645,6 +1884,73 @@ function dstr(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padSt
 function accentOf(node) {
   var v = node ? getComputedStyle(node).getPropertyValue('--accent').trim() : '';
   return v || '#1A43BF';
+}
+
+/* MOUNTING THE FILE ON A DESK (owner 2026-07-29: on the Salary Register "if i
+ * click in profile here, it still opens the old layout … I want the updated
+ * profile version"). Staff Accounts already opened the file under its table;
+ * every other payroll desk still had the pop-up card. This is that same mount,
+ * written once and handed to whichever desk wants it:
+ *   · `host` goes directly UNDER `cards[0]` — the table the person was clicked
+ *     in — so the file reads as that table's drill-down, not as something at
+ *     the bottom of the page.
+ *   · every card in `cards` is marked [data-emp-host] with an `__empOpen`, which
+ *     is how the kit's own document-capture listener hands the NAME click to the
+ *     desk instead of opening its modal.
+ *   · `deskFileOpen` lets any other control on the desk (a row action, a radar
+ *     finding) reach the same file through showEmp() without threading the
+ *     opener through five call layers.
+ * `openEmp` is module state, so the file survives a desk redraw (a company
+ * switch, a data change) and re-renders itself for the same person. */
+function empFileUnder(page, host, cards) {
+  (cards || []).forEach(function (c) {
+    if (!c) return;
+    c.setAttribute('data-emp-host', '');
+    c.__empOpen = function (id) { openFile(id, true); };
+  });
+  var anchor = cards && cards[0] && cards[0].parentNode === page ? cards[0] : null;
+  if (anchor) page.insertBefore(host, anchor.nextSibling); else page.appendChild(host);
+  deskFileOpen = openFile;
+  draw(false);
+  function draw(scroll) {
+    if (!openEmp) { killFileCharts(); host.innerHTML = ''; return; }
+    empFile(host, openEmp, { scroll: scroll, onClose: function () { openEmp = null; draw(false); } });
+  }
+  function openFile(id, scroll) { openEmp = id; draw(scroll !== false); }
+  return openFile;
+}
+
+/* One way in from anywhere on the desk: the file if this desk holds one, the
+ * shared modal (every other module's behaviour) if it does not. */
+function showEmp(id) {
+  if (deskFileOpen) { deskFileOpen(id, true); return; }
+  if (EPAL.people) EPAL.people.open(id);
+}
+
+/* THE SAME FILE ON EVERY OTHER PAYROLL DESK. Salary Register and Staff Accounts
+ * mount the file under the exact table the person was clicked in. The remaining
+ * desks — Salary Manage, Loans, Advance, Payslip, Reports, Overview — carry
+ * employee names too, and every one of them was still opening the pop-up card.
+ * They get the file at the foot of the desk instead: no card to slide under, so
+ * `page` itself is the host claim and the file scrolls into view. The desk's own
+ * mount, if it made one, has already claimed `deskFileOpen` and this does
+ * nothing. Called once per desk render, from both dispatchers. */
+function ensureEmpFile(page) {
+  if (deskFileOpen) return;
+  empFileUnder(page, el('div.emp-file-host'), [page]);
+}
+
+/* THE FILE BELONGS TO THE DESK IT WAS OPENED ON. `openEmp` survives a REDRAW on
+ * purpose (a company switch, a data change, a form saved) so the person you are
+ * reading is still there afterwards — but a different tab is a different piece
+ * of work, and finding someone's file sitting at the foot of it is a surprise,
+ * not a convenience. So the file closes when the desk changes, and only then. */
+var fileDesk = null;
+function deskChanged(tab) {
+  // the month register is a drill INSIDE the overview tab and a desk in its own
+  // right — and a different month is a different desk
+  var key = (tab === 'overview' && ovMonth) ? 'month:' + ovMonth : tab;
+  if (fileDesk !== key) { fileDesk = key; openEmp = null; }
 }
 
 function empFile(host, empId, opts) {
@@ -1922,24 +2228,40 @@ var VIEWS = { overview: overviewView, template: tplView, manage: manageView, loa
  * Engine side: EPAL.payroll.salaryPackages/savePackage/deletePackage/fineSlip. */
 function tplListView(page) {
   var s = screen('salary-templates');
-  var pkgs = PR().salaryPackages(CID);
+  /* A template lives in ONE company, so the combined list is the union of the
+   * per-company lists. It is asked for PER COMPANY on purpose: salaryPackages()
+   * seeds a company's templates on first read, derived from the staff already on
+   * its payroll and figure-for-figure identical to what the percentages compute —
+   * exactly what opening that company's own tab does. Reading the store directly
+   * instead would silently omit every company nobody had visited yet, and a
+   * combined list that is missing a concern is worse than no list. What must
+   * NEVER happen is salaryPackages(ALL): it would create a real template row for
+   * a company called "all". */
+  var pkgs = [];
+  scopeCids().forEach(function (c) { pkgs = pkgs.concat(PR().salaryPackages(c)); });
   var staff = team();
   var nameOf = {}; staff.forEach(function (e) { nameOf[e.id] = e.name; });
 
   fillH(s, 'title', ui.icon('list-ul') + ' Salary Templates List');
-  fillK(s, 'sub', pkgs.length + ' template' + (pkgs.length === 1 ? '' : 's') + ' · ' + pkgs.filter(function (p) { return (p.empIds || []).length; }).length + ' assigned');
+  fillK(s, 'sub', pkgs.length + ' template' + (pkgs.length === 1 ? '' : 's') + ' · ' +
+    pkgs.filter(function (p) { return (p.empIds || []).length; }).length + ' assigned' +
+    (isAll() ? ' · across ' + scopeCids().length + ' companies' : ''));
   var addBtn = act(s, 'new', function () { pkgForm(null); });
   if (addBtn) {
     if (canCreate()) addBtn.innerHTML = ui.icon('plus-lg') + ' Add New Salary Template';
     else addBtn.parentNode.removeChild(addBtn);      // removed, never hidden
   }
-  fillH(s, 'note', ui.icon('info-circle') + ' A template states the actual taka. An employee on one is paid its <strong>total</strong>, split exactly as it says; anyone <em>not</em> on a template is still computed from the percentages in Structure below. Income tax, provident fund, absence, late and leave-encashment always come from Structure, so the statutory rules stay in one place.');
+  // the note points at the Structure card below it — which all-mode does not
+  // show, because a structure belongs to one company (see tplView)
+  fillH(s, 'note', ui.icon('info-circle') + ' A template states the actual taka. An employee on one is paid its <strong>total</strong>, split exactly as it says; anyone <em>not</em> on a template is still computed from the percentages in ' +
+    (isAll() ? 'their own company’s Structure. Income tax, provident fund, absence, late and leave-encashment come from there too, so the statutory rules stay in one place per concern — pick a company from the switcher to read or edit its Structure.'
+             : 'Structure below. Income tax, provident fund, absence, late and leave-encashment always come from Structure, so the statutory rules stay in one place.'));
 
   var rows = pkgs.map(function (p, i) {
     var ids = (p.empIds || []).filter(function (id) { return nameOf[id]; });
     var emp = ids.length ? empById(ids[0]) : null;
     return {
-      id: p.id, no: i + 1, name: p.name, pkg: p,
+      id: p.id, no: i + 1, name: p.name, pkg: p, companyId: p.companyId,
       basic: +p.basic || 0, house: +p.house || 0, medical: +p.medical || 0,
       conveyance: +p.conveyance || 0, other: +p.other || 0, bonus: +p.bonus || 0,
       total: PR().packageTotal(p),
@@ -1960,7 +2282,8 @@ function tplListView(page) {
     rows: rows, pageSize: 12, sortDefault: 'none', exportName: 'salary-templates-' + CID,
     searchKeys: ['name', 'empName', 'empId'],
     empty: { icon: 'list-ul', title: 'No salary templates yet', hint: canCreate() ? 'Add one and assign it to an employee — it becomes their pay.' : 'Nobody is on a fixed salary package yet.' },
-    columns: [
+    // the company goes after the NAME (index 2), not after the row number
+    columns: withCo([
       { key: 'no', label: '#', width: '44px', render: function (r) { return '<span class="text-mute">' + r.no + '</span>'; } },
       { key: 'name', label: 'Template name', render: function (r) {
         // when the template IS the person, the second line does not repeat their
@@ -1981,7 +2304,7 @@ function tplListView(page) {
         if (!r.fine) return '<span class="text-mute">—</span>';
         return '<span class="num text-bad">−' + ui.money(r.fine) + '</span><div class="text-mute xs">' + esc(r.fineNote || 'standing, every month') + '</div>';
       } }
-    ],
+    ], null, 2),
     actions: canCreate() ? [
       { icon: 'pencil-square', title: 'Edit this template', onClick: function (r) { pkgForm(r.pkg); } },
       { icon: 'toggles', title: 'Turn overtime on / off', onClick: function (r) {
@@ -1991,8 +2314,8 @@ function tplListView(page) {
       } },
       { icon: 'exclamation-diamond', title: 'Deduct a punishment from a month', onClick: function (r) { fineForm(r); } },
       { icon: 'trash', title: 'Delete this template', onClick: function (r) { deletePkg(r); } }
-    ] : [{ icon: 'eye', title: 'Open this employee\'s file', onClick: function (r) { if (r.empId && EPAL.people) EPAL.people.open(r.empId); } }],
-    onRow: function (r) { if (r.empId && EPAL.people) EPAL.people.open(r.empId); }
+    ] : [{ icon: 'eye', title: 'Open this employee\'s file', onClick: function (r) { if (r.empId) showEmp(r.empId); } }],
+    onRow: function (r) { if (r.empId) showEmp(r.empId); }
   });
   box(s, 'list').appendChild(tbl.el);
   mountScreen(page, s);
@@ -2002,15 +2325,22 @@ function tplListView(page) {
  * up, so the list can never show a total the payslip disagrees with. */
 function pkgForm(p) {
   var isNew = !p;
-  p = p || { companyId: CID, otEligible: true };
+  // in all-mode a NEW template has no company until an employee is picked — the
+  // person's own company is the answer, and it is required (see onSave)
+  p = p || { companyId: isAll() ? '' : CID, otEligible: true };
   var taken = {};
-  PR().salaryPackages(CID).forEach(function (o) {
-    if (o.id === p.id) return;
-    (o.empIds || []).forEach(function (id) { taken[id] = o.name; });
+  // "one person, one template" is a GROUP rule as much as a company one — the
+  // clash to warn about is any template already claiming this employee, wherever
+  // it lives, so the check reads the whole scope
+  scopeCids().forEach(function (c) {
+    PR().salaryPackages(c).forEach(function (o) {
+      if (o.id === p.id) return;
+      (o.empIds || []).forEach(function (id) { taken[id] = o.name; });
+    });
   });
   var mine = (p.empIds || [])[0] || '';
   var opts = [['', '— not assigned (a pay grade, nobody on it yet) —']].concat(team().map(function (e) {
-    return [e.id, e.name + ' · ' + e.id + (taken[e.id] ? '  (moves off "' + taken[e.id] + '")' : '')];
+    return [e.id, e.name + ' · ' + e.id + (isAll() ? ' · ' + coShort(e.companyId) : '') + (taken[e.id] ? '  (moves off "' + taken[e.id] + '")' : '')];
   }));
   EPAL.formModal({
     title: (isNew ? 'Add New Salary Template' : 'Edit Salary Template — ' + p.name), icon: 'list-ul', size: 'md',
@@ -2021,7 +2351,8 @@ function pkgForm(p) {
     fields: [
       { key: 'name', label: 'Template name', required: true, hint: 'The employee\'s name, or a grade like "Manager".' },
       { key: 'empId', label: 'Assign to employee', type: 'select', options: opts,
-        hint: 'The assigned employee is paid THIS template from the current draft month on. One person, one template.' },
+        hint: 'The assigned employee is paid THIS template from the current draft month on. One person, one template.' +
+          (isAll() && !p.companyId ? ' On All Companies the employee also decides which company the template belongs to, so it is required here.' : '') },
       { type: 'section', label: 'Salary components (৳) — the total is these five added up' },
       { key: 'basic', label: 'Basic salary', type: 'money', min: 0, required: true },
       { key: 'house', label: 'House rent', type: 'money', min: 0, default: 0 },
@@ -2041,15 +2372,21 @@ function pkgForm(p) {
       var total = (+v.basic || 0) + (+v.house || 0) + (+v.medical || 0) + (+v.conveyance || 0) + (+v.other || 0);
       if (total <= 0) { ui.toast('A template must add up to more than zero', 'error'); return false; }
       if (+v.fine > 0 && !String(v.fineNote || '').trim()) { ui.toast('A standing fine needs a reason — it is printed on the payslip', 'error'); return false; }
+      // A template lives in ONE company: its own if it already has one, otherwise
+      // the assigned employee's. It must never be saved against the 'all'
+      // sentinel — the row would belong to a company that does not exist and no
+      // payroll run would ever find it.
+      var pkgCid = p.companyId || (v.empId ? empCo(v.empId) : (isAll() ? '' : CID));
+      if (!pkgCid || pkgCid === ALL) { ui.toast('Pick the employee this template is for — that is which company it belongs to', 'error'); return false; }
       PR().savePackage({
-        id: p.id, companyId: CID, name: String(v.name).trim(),
+        id: p.id, companyId: pkgCid, name: String(v.name).trim(),
         basic: +v.basic || 0, house: +v.house || 0, medical: +v.medical || 0,
         conveyance: +v.conveyance || 0, other: +v.other || 0, bonus: +v.bonus || 0,
         otEligible: !!v.otEligible, otRate: +v.otRate || 0,
         fine: +v.fine || 0, fineNote: String(v.fineNote || '').trim(),
         empIds: v.empId ? [v.empId] : [], seeded: false
       });
-      regenDraft();
+      regenDraft(pkgCid);
       ui.toast('Template saved · ' + ui.money(total) + (v.empId ? ' · applies from the open draft month' : ''), 'success');
       EPAL.router.render(); return true;
     }
@@ -2089,7 +2426,7 @@ function deletePkg(r) {
       : 'Nobody is on this template, so no pay changes.' })
     .then(function (ok) {
       if (!ok) return;
-      PR().deletePackage(r.id); regenDraft();
+      PR().deletePackage(r.id); regenDraft(r.companyId);
       ui.toast('Template deleted', 'success'); EPAL.router.render();
     });
 }
@@ -2098,13 +2435,26 @@ function deletePkg(r) {
  * Deliberately only the draft: generate() rewrites every slip it touches, and a
  * finalized month's figures are what was posted to the ledger — they change only
  * when someone reopens the month on purpose. */
-function regenDraft() {
-  var ym = PR().curYm(), run = PR().getRun(CID, ym);
-  if (!run || run.status === 'draft') { try { PR().generate(CID, ym); } catch (e) {} }
+// `cid` = the company whose template just changed. On All Companies that is the
+// template's own company, never the 'all' sentinel — generate() writes a run row
+// and a run belongs to a real company.
+function regenDraft(cid) {
+  var c = (cid && cid !== ALL) ? cid : (isAll() ? null : CID);
+  if (!c) return;
+  var ym = PR().curYm(), run = PR().getRun(c, ym);
+  if (!run || run.status === 'draft') { try { PR().generate(c, ym); } catch (e) {} }
 }
 
 function tplView(page) {
   tplListView(page);
+  /* THE STRUCTURE CARD IS PER COMPANY, so All Companies does not show it — the
+   * percentages, the tax threshold, the working days and the pay-by day are that
+   * concern's own rules and there is no single set of them to edit. Reading
+   * template('all') would not merely be meaningless: template() UPSERTS, so it
+   * would create a statutory template for a company that does not exist. Instead
+   * the tab shows every company's structure side by side, read-only, which is the
+   * question All Companies can actually answer: where do the six differ? */
+  if (isAll()) { structureCompare(page); return; }
   var t = PR().template(CID);
   var preview = el('div');
   function drawPreview(salary) {
@@ -2147,6 +2497,53 @@ function tplView(page) {
   page.appendChild(tc);
   drawPreview(50000);
 }
+/* EVERY COMPANY'S STRUCTURE, SIDE BY SIDE — what All Companies can honestly say
+ * about a per-company rule set. Read-only, and read straight from the store
+ * rather than through template(), which upserts: by the time this runs the
+ * templates list above has already asked each company for its own (documented
+ * there), so nothing here creates anything. Editing happens on the company. */
+function structureCompare(page) {
+  var have = scoped('pay_templates');
+  var byCo = {}; have.forEach(function (t) { byCo[t.companyId] = t; });
+  var rows = scopeCids().map(function (c) {
+    var t = byCo[c] || null;
+    return { companyId: c, t: t,
+      basic: t ? Math.round(t.basicPct * 100) : null, house: t ? Math.round(t.housePct * 100) : null,
+      medical: t ? Math.round(t.medicalPct * 100) : null, taxPct: t ? Math.round(t.taxPct * 100) : null,
+      taxThreshold: t ? t.taxThreshold : null, pf: t ? Math.round(t.pfPct * 100) : null,
+      leave: t ? t.leaveDaysPerYear : null, workingDays: t ? t.workingDays : null,
+      payByDay: t ? t.payByDay : null, correctionDay: t ? t.correctionDay : null };
+  });
+  function pct(k) {
+    return { key: k, label: { basic: 'Basic %', house: 'House %', medical: 'Medical %', taxPct: 'Tax %', pf: 'PF % (of basic)' }[k],
+      num: true, render: function (r) { return r[k] == null ? '<span class="text-mute">—</span>' : r[k] + '%'; } };
+  }
+  function day(k, label) {
+    return { key: k, label: label, num: true,
+      render: function (r) { return r[k] == null ? '<span class="text-mute">—</span>' : String(r[k]); } };
+  }
+  var card = frag('reg-card');
+  slot(card, 'title').innerHTML = ui.icon('sliders') + ' Salary Structure — every company';
+  slot(card, 'sub').textContent = 'the statutory rules each concern computes an off-template salary with · pick a company from the switcher to edit its own';
+  slot(card, 'body').appendChild(EPAL.table({
+    columns: [
+      { key: 'companyId', label: 'Company', render: function (r) { return coCell(r.companyId); },
+        exportVal: function (r) { return coShort(r.companyId); } },
+      pct('basic'), pct('house'), pct('medical'),
+      { key: 'taxThreshold', label: 'Tax-free up to', num: true,
+        render: function (r) { return r.taxThreshold == null ? '<span class="text-mute">—</span>' : ui.money(r.taxThreshold); } },
+      pct('taxPct'), pct('pf'),
+      day('leave', 'Annual leave'), day('workingDays', 'Working days'),
+      day('payByDay', 'Pay by'), day('correctionDay', 'Corrections until')
+    ],
+    rows: rows, pageSize: 10, exportName: 'salary-structures.csv',
+    pdfTitle: scopeFull() + ' — Salary Structures',
+    empty: { icon: 'sliders', title: 'No company has a salary structure yet' }
+  }).el);
+  slot(card, 'body').appendChild(el('p.text-mute.xs.mt-2', { text:
+    'Transport is the remainder of gross in every case. A dash means that company has never run a payroll, so it has no structure yet — it opens on the standard the first time one is generated.' }));
+  page.appendChild(card);
+}
 function formField(label, key, val) {
   return el('div.form-row', { style: { marginBottom: '9px' } }, [
     el('label.text-mute.sm', { text: label, style: { display: 'block', marginBottom: '3px' } }),
@@ -2166,21 +2563,31 @@ function saveTpl(t) {
 /* =================================================== SALARY MANAGE */
 function manageView(page) {
   var ym = payYm || PR().curYm();
-  PR().generate(CID, ym); PR().refreshRunStatus(CID, ym);
-  var run = PR().getRun(CID, ym);
-  var slips = PR().slipsFor(CID, ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
+  /* GENERATE ONLY ON A REAL COMPANY. This is the one screen that writes as a side
+   * effect of being opened — it opens the month so there is a sheet to work on —
+   * and on All Companies there is no single company to open it for. It would be
+   * wrong twice: `generate('all', ym)` would create a pay_runs row for a company
+   * that does not exist, and generating SIX months because someone glanced at a
+   * combined view is not a glance, it is a payroll action. So all-mode reads the
+   * months that already exist and offers no run controls. */
+  if (!isAll()) { PR().generate(CID, ym); PR().refreshRunStatus(CID, ym); }
+  var R = runInfo(ym), run = R.run;
+  var slips = slipsIn(ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
   var gross = sum(slips, function (s) { return s.earnedGross; }), net = sum(slips, function (s) { return PR().slipPayable(s); });
   var paid = sum(slips, function (s) { return s.paid || 0; }), due = net - paid;
-  var st = run ? run.status : 'draft', inWin = PR().inCorrectionWindow(CID, ym);
+  var st = R.status, inWin = R.inWindow;
 
   // THE DASHBOARD ROW (owner 2026-07-28) — the five flat KPI tiles became the
   // same four-card row Manage Banks uses, scoped to the selected month. Every
   // figure the tiles carried is still here: Headcount and Gross are drill facts,
   // Net Payable is the hero, Paid and Outstanding are the payment-progress card.
-  var meta = coMeta(CID);
+  var meta = scopeMeta();
   var advRec = sum(slips, advOf), emiRec = sum(slips, emiOf);
+  if (isAll()) page.appendChild(scopeNote('Combined salary sheet — ' + scopeNames(),
+    'Every employee on ' + PR().mLabel(ym) + ' across ' + R.n + ' of ' + scopeCids().length + ' payrolls, with the company on each row. Generating, finalizing, reopening and Pay All write a run, and a run belongs to one company — pick one from the switcher for those. Paying, adjusting and managing an individual salary work from right here, because they follow the employee.'));
   page.appendChild(dashRow({
-    hue: meta.accent, icon: meta.icon, co: coShort(CID), coSub: PR().mLabel(ym) + ' payroll run · ' + cap(st),
+    hue: meta.accent, icon: meta.icon, co: scopeShort(),
+    coSub: PR().mLabel(ym) + (isAll() ? ' · ' + R.n + ' payroll runs · ' : ' payroll run · ') + cap(st),
     hero: ui.money(net), heroLabel: 'Net payable · ' + PR().mLabel(ym),
     heroTitle: 'Open this month in full', heroOn: function () { ovMonth = ym; goTab('overview'); },
     facts: [
@@ -2212,16 +2619,20 @@ function manageView(page) {
     ]
   }));
 
-  var runs = S.list('pay_runs').filter(function (r) { return r.companyId === CID; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
+  // the month list: one entry per run on a company, and the UNION of months on
+  // All Companies (six runs of January are ONE January to pick)
+  var months = isAll()
+    ? monthSeries().slice().reverse().map(function (m) { return { ym: m.ym, status: m.status || 'draft' }; })
+    : scoped('pay_runs').sort(function (a, b) { return a.ym < b.ym ? 1 : -1; }).map(function (r) { return { ym: r.ym, status: r.status }; });
   var sel = el('select.input', { onchange: function () { payYm = this.value; EPAL.router.render(); } }); sel.classList.add('tw-max-w-[230px]');
-  runs.forEach(function (r) { var o = el('option', { value: r.ym, text: PR().mLabel(r.ym) + '  ·  ' + cap(r.status) }); if (r.ym === ym) o.selected = true; sel.appendChild(o); });
+  months.forEach(function (r) { var o = el('option', { value: r.ym, text: PR().mLabel(r.ym) + '  ·  ' + cap(r.status) }); if (r.ym === ym) o.selected = true; sel.appendChild(o); });
   var rcard = frag('run-card');
   var left = slot(rcard, 'left');
   left.appendChild(sel);
   left.appendChild(el('span.badge.badge-' + (st === 'paid' ? 'good' : st === 'due' ? 'bad' : st === 'draft' ? 'warn' : 'info'), { text: cap(st) }));
   var actions = slot(rcard, 'actions');
   actions.appendChild(el('button.btn.btn-ghost', { html: ui.icon('printer') + ' Print Sheet', onclick: function () { printSheetForm(slips, ym); } }));
-  if (canCreate()) {
+  if (canCreate() && !isAll()) {
     if (st === 'draft') actions.appendChild(el('button.btn.btn-primary', { html: ui.icon('lock') + ' Finalize & Accrue', onclick: function () { finalizeRun(ym, net); } }));
     if (st !== 'draft') actions.appendChild(el('button.btn.btn-outline', { html: ui.icon('arrow-counterclockwise') + ' Reopen Draft',
       title: 'Rewind to the BEFORE-ACCRUED state — repeatable (demo-safe)',
@@ -2235,7 +2646,13 @@ function manageView(page) {
   }
   // generate() above normally creates the run, but a hydrated install can answer
   // with slips and no run row — say so rather than crash (live 2026-07-28)
-  slot(rcard, 'status').innerHTML = !run
+  slot(rcard, 'status').innerHTML = isAll()
+    ? (R.has
+        ? (R.n + ' compan' + (R.n === 1 ? 'y has' : 'ies have') + ' opened ' + PR().mLabel(ym) +
+           (st === 'mixed' ? ' and they are <b>not at the same stage</b>' : ' and all of them are <b>' + esc(cap(st)) + '</b>') +
+           (R.dueAfter ? ' — the last pay-by date is ' + ui.date(R.dueAfter) + '.' : '.'))
+        : ('No company has opened ' + PR().mLabel(ym) + ' yet — pick one from the switcher to generate it.'))
+    : !run
     ? ('No payroll run exists for ' + PR().mLabel(ym) + ' yet — generating this month will open one.')
     : st === 'draft'
       ? (inWin ? ('<b>Correction window open</b> until ' + ui.date(run.correctionUntil) + ' — adjust per head, then finalize.') : ('Correction window closed (' + ui.date(run.correctionUntil) + ') — finalize to accrue.'))
@@ -2264,7 +2681,7 @@ function manageView(page) {
   // (advOf / emiOf / otherOf / dueOf are shared helpers — see the top of the
   // file — so the sheet, the month register and the radar read a slip alike.)
   var tbl = EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'empName', label: 'Employee', render: function (s) { return EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : '<span class="strong">' + esc(s.empName) + '</span>'; } },
       { key: 'gross', label: 'Gross', num: true, money: true },
       { key: 'overtime', label: 'OT', num: true, render: function (s) { return s.overtime ? ui.money(s.overtime) : '—'; }, sortVal: function (s) { return s.overtime || 0; } },
@@ -2278,8 +2695,9 @@ function manageView(page) {
       { key: 'paid', label: 'Paid', num: true, sortVal: function (s) { return s.paid || 0; }, render: function (s) { return s.paid ? '<span class="text-good">' + ui.money(s.paid) + '</span>' : '—'; } },
       { key: 'due', label: 'Due', num: true, sortVal: dueOf, render: function (s) { var v = dueOf(s); return v ? '<span class="num strong text-bad">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'status', label: 'Status', badge: { draft: '', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
-    ],
-    rows: slips, searchKeys: ['empName', 'empId', 'dept'], quickFilter: 'status', filterPanel: true, filters: [{ key: 'dept', label: 'Dept' }],
+    ]),
+    rows: slips, searchKeys: ['empName', 'empId', 'dept'], quickFilter: 'status', filterPanel: true,
+    filters: [{ key: 'dept', label: 'Dept' }].concat(coFilter()),
     totalKey: 'net',
     exportName: 'salary-sheet-' + ym + '.csv', pdfTitle: 'Salary Sheet — ' + PR().mLabel(ym),
     onRow: function (s) { var e = empById(s.empId); if (e) statement(e, ym); },
@@ -2291,7 +2709,7 @@ function manageView(page) {
   });
   // .tbl-dense: the 13-column salary sheet fits without a horizontal scrollbar.
   var scard = frag('salary-card');
-  slot(scard, 'title').innerHTML = ui.icon('cash-stack') + ' Salary Sheet — ' + PR().mLabel(ym);
+  slot(scard, 'title').innerHTML = ui.icon('cash-stack') + ' Salary Sheet — ' + PR().mLabel(ym) + (isAll() ? ' · every company' : '');
   slot(scard, 'sub').textContent = 'click a row = payslip · 💰 manage pay/due/status · ✎ adjust';
   slot(scard, 'body').appendChild(tbl.el);
   page.appendChild(scard);
@@ -2421,11 +2839,21 @@ function monthMakeupCard(slips, ym, net, paid, advRec, emiRec) {
   return c;
 }
 
+/* Both of these accrue or pay a whole RUN, which belongs to one company. All-mode
+ * never offers their buttons; the guard is here as well because a run action must
+ * be impossible to reach with the 'all' sentinel, not merely hard to reach. */
+function needsOneCompany(what) {
+  if (!isAll()) return false;
+  ui.toast(what + ' belongs to one company — pick one from the switcher', 'error');
+  return true;
+}
 function finalizeRun(ym, net) {
+  if (needsOneCompany('Finalizing a payroll month')) return;
   ui.confirm({ title: 'Finalize ' + PR().mLabel(ym) + '?', text: 'Locks corrections and accrues salaries + leave encashment to the ledger. Net ' + ui.money(net) + '.', confirmLabel: 'Finalize' })
     .then(function (ok) { if (!ok) return; try { PR().finalize(CID, ym); ui.toast('Payroll finalized', 'success'); EPAL.router.render(); } catch (e) { ui.toast(e.message || 'Failed', 'error'); } });
 }
 function payAll(ym) {
+  if (needsOneCompany('Paying a whole payroll run')) return;
   ui.confirm({ title: 'Pay all outstanding?', text: 'Posts each payment (recovers any advance).', confirmLabel: 'Pay All' })
     .then(function (ok) { if (!ok) return; PR().slipsFor(CID, ym).forEach(function (s) { try { PR().pay(s.empId, ym); } catch (e) {} }); ui.toast('Salaries paid', 'success'); EPAL.router.render(); });
 }
@@ -2480,8 +2908,10 @@ function payAllocator(emp, ym) {
    * must still be recordable — and 'm:<Method>' is unwrapped back to the plain
    * word before it reaches pay(), so the Method badge everywhere else reads as
    * it always has. */
+  // the accounts of the EMPLOYEE'S company — it is that company's money paying
+  // its own staff, and on All Companies the desk's scope is not a payer
   var srcSel = el('select.input', { style: { minWidth: '210px' } });
-  ((EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(CID) : [['m:Bank', 'Bank'], ['m:Cash', 'Cash']])
+  payOptions(emp.companyId)
     .forEach(function (o) { srcSel.appendChild(el('option', { value: o[0], text: o[1] })); });
   var dateIn = el('input.input', { type: 'date', value: today() });
 
@@ -2576,7 +3006,9 @@ function payAllocator(emp, ym) {
 /* The Pay… button's form — the allocator on its own, for when the month list is
  * all that is wanted. Manage Salary renders the same widget inline. */
 function payForm(s, ym) {
-  var emp = empById(s.empId) || { id: s.empId, name: s.empName };
+  // the slip carries the company even when the employee record has gone, and the
+  // allocator needs it to offer the right accounts
+  var emp = empById(s.empId) || { id: s.empId, name: s.empName, companyId: s.companyId };
   var a = payAllocator(emp, ym);
   // onClick returning false keeps the modal open, so a rejected posting does not
   // throw the operator's figures away
@@ -2589,7 +3021,9 @@ function payForm(s, ym) {
 /* ---- MANAGE SALARY modal (legacy el()) ---------------------------------- */
 function manageSalary(s, ym) {
   var e = empById(s.empId); if (!e) { ui.toast('Employee not found', 'error'); return; }
-  var run = PR().getRun(CID, ym), st = run ? run.status : 'draft';
+  // THE SLIP'S OWN COMPANY, not the desk's scope: this modal is about one
+  // person's month, and on All Companies the desk has no single run to read
+  var run = PR().getRun(s.companyId || CID, ym), st = run ? run.status : 'draft';
   var payable = PR().slipPayable(s), out = Math.max(0, payable - (s.paid || 0));
   var advOut = PR().advanceOutstanding(e.id), arrears = PR().previousDue(e.id, ym);
   var body = el('div');
@@ -2724,7 +3158,9 @@ function salaryRecordCard(e, s, ym, run, st) {
     ]);
 }
 function attendanceCard(e, s, ym) {
-  var att = PR().attendanceFor(s.empId, ym), t = PR().template(CID);
+  // the working-day divisor and the lates-per-absent rule are the SLIP'S
+  // company's, which is also the only one that computed this month
+  var att = PR().attendanceFor(s.empId, ym), t = PR().template(s.companyId || CID);
   var calDays = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
   var lpa = t.latesPerAbsent > 0 ? t.latesPerAbsent : 3;
   function d(n) { return (n || 0) + ' day' + ((n || 0) === 1 ? '' : 's'); }
@@ -2811,17 +3247,20 @@ function printSheetForm(slips, ym) {
     onSave: function (v) {
       var chosen = COLS.filter(function (c) { return v['col_' + c[0]] !== false; });
       if (!chosen.length) { ui.toast('Tick at least one column', 'error'); return false; }
-      var head2 = '<tr><th>Employee</th>' + chosen.map(function (c) { return '<th style="text-align:right">' + esc(c[1]) + '</th>'; }).join('') + '</tr>';
+      // on All Companies the sheet mixes six payrolls, so the printed row has to
+      // say whose employee it is
+      var co = isAll();
+      var head2 = '<tr><th>Employee</th>' + (co ? '<th>Company</th>' : '') + chosen.map(function (c) { return '<th style="text-align:right">' + esc(c[1]) + '</th>'; }).join('') + '</tr>';
       var totals = {};
       var rows = slips.map(function (s) {
-        return '<tr><td>' + esc(s.empName) + '</td>' + chosen.map(function (c) {
+        return '<tr><td>' + esc(s.empName) + '</td>' + (co ? '<td>' + esc(coShort(s.companyId)) + '</td>' : '') + chosen.map(function (c) {
           var val = c[2](s);
           if (typeof val === 'number') { totals[c[0]] = (totals[c[0]] || 0) + val; return '<td style="text-align:right">' + ui.money(val) + '</td>'; }
           return '<td style="text-align:right">' + esc(String(val)) + '</td>';
         }).join('') + '</tr>';
       }).join('');
-      var totRow = '<tr><th>Total</th>' + chosen.map(function (c) { return '<th style="text-align:right">' + (totals[c[0]] != null ? ui.money(totals[c[0]]) : '') + '</th>'; }).join('') + '</tr>';
-      ui.printDoc({ title: 'Salary Sheet — ' + PR().mLabel(ym), subtitle: coShort(CID) + ' · Payroll', meta: slips.length + ' employees · generated ' + ui.date(today()), footer: 'System-generated salary sheet — Confidential',
+      var totRow = '<tr><th>Total</th>' + (co ? '<th></th>' : '') + chosen.map(function (c) { return '<th style="text-align:right">' + (totals[c[0]] != null ? ui.money(totals[c[0]]) : '') + '</th>'; }).join('') + '</tr>';
+      ui.printDoc({ title: 'Salary Sheet — ' + PR().mLabel(ym), subtitle: scopeShort() + ' · Payroll', meta: slips.length + ' employees · generated ' + ui.date(today()), footer: 'System-generated salary sheet — Confidential',
         bodyHtml: '<table>' + head2 + rows + totRow + '</table>' });
       return true;
     }
@@ -2851,7 +3290,7 @@ function correctionForm(s, ym) {
     fields: [
       { type: 'section', label: 'Attendance counts (drive the automatic amounts)' },
       { key: 'leaveDeductDays', label: 'Absent days', type: 'number', min: 0, max: 30, default: 0 },
-      { key: 'lateDays', label: 'Late count', type: 'number', min: 0, default: 0, hint: 'Every ' + (PR().template(CID).latesPerAbsent || 3) + ' lates = one day.' },
+      { key: 'lateDays', label: 'Late count', type: 'number', min: 0, default: 0, hint: 'Every ' + (PR().template(s.companyId || CID).latesPerAbsent || 3) + ' lates = one day.' },
       { key: 'earlyDays', label: 'Early-leave count', type: 'number', min: 0, default: 0 },
       { key: 'overtimeHours', label: 'Overtime hours', type: 'number', min: 0, default: 0 },
       { type: 'section', label: 'Amounts (৳) — automatic; change any figure to override it' },
@@ -3063,7 +3502,7 @@ function printLoan(L) {
     '</table>';
   ui.printDoc({
     title: 'Staff Loan Statement — ' + L.empName,
-    subtitle: coFull(CID) + ' · Payroll · loan taken ' + ui.date(L.date),
+    subtitle: coFull(L.companyId || (L.emp && L.emp.companyId) || CID) + ' · Payroll · loan taken ' + ui.date(L.date),
     meta: L.payments.length + ' payment(s) · generated ' + ui.date(today()),
     footer: 'System-generated staff loan statement — Confidential',
     bodyHtml: facts + '<table>' + head + rows + '</table>'
@@ -3076,7 +3515,7 @@ function loansView(page) {
   var byEmp = t.map(function (e) {
     var mine = book.filter(function (L) { return L.empId === e.id; });
     var back = sum(mine, function (L) { return L.paid; });
-    return { e: e, out: PR().loanOutstanding(e.id), loans: mine,
+    return { e: e, companyId: e.companyId, out: PR().loanOutstanding(e.id), loans: mine,
       taken: sum(mine, function (L) { return L.principal; }),
       // `paid` as well as `back`, so the shared repaidVia* helpers read a person
       // and a loan with the same two fields
@@ -3085,7 +3524,7 @@ function loansView(page) {
       viaCash: sum(mine, function (L) { return L.viaCash; }),
       last: mine.length ? mine[0].date : '' };
   });
-  var txns = S.list('pay_txns').filter(function (x) { return x.companyId === CID && (x.type === 'loan' || x.type === 'loan-repay'); }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+  var txns = scoped('pay_txns').filter(function (x) { return x.type === 'loan' || x.type === 'loan-repay'; }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
   var totalOut = sum(byEmp, function (x) { return x.out; });
   var active = byEmp.filter(function (x) { return x.out > 0; });
 
@@ -3100,6 +3539,8 @@ function loansView(page) {
   var disbursed = sum(outflowOnly(LE), function (e) { return e.delta; });
   var emiTotal = sum(t, function (e) { return PR().emiInstallment(e.id); });
 
+  if (isAll()) page.appendChild(scopeNote('Every staff loan in the group — ' + scopeNames(),
+    'One book across ' + scopeCids().length + ' payrolls: who holds a loan, what was taken, what has been paid back, what is still due, and every loan transaction of every company. Disbursing and recording a repayment work from here — the loan is booked against the employee\'s own company, which is also whose account the money moves through.'));
   var grid = frag('kpi-grid');
   grid.appendChild(kpi2({ label: 'Loan Outstanding', value: ui.money(totalOut, { compact: true }), icon: 'bank', tone: 'text-warn',
     foot: active.length ? active.length + ' of ' + t.length + ' staff carrying a loan' : 'nobody is carrying a loan',
@@ -3118,7 +3559,7 @@ function loansView(page) {
 
   if (active.length) {
     var lt = EPAL.table({
-      columns: [
+      columns: withCo([
         { key: 'name', label: 'Employee', sortVal: function (r) { return r.e.name; }, exportVal: function (r) { return r.e.name; },
           render: function (r) { return '<span class="strong">' + esc(r.e.name) + '</span>' +
             '<div class="text-mute xs">' + r.loans.length + ' loan' + (r.loans.length === 1 ? '' : 's') +
@@ -3135,19 +3576,24 @@ function loansView(page) {
           exportVal: function (r) { return PR().emiInstallment(r.e.id); },
           render: function (r) { var m = PR().emiInstallment(r.e.id);
             return m ? '<span class="num">' + ui.money(m) + '</span>' : '<span class="text-mute">no EMI plan</span>'; } }
-      ],
+      ]),
       rows: active, pageSize: 8, onRow: function (r) { moneyForm(r.e, 'loan-repay'); },
-      exportName: 'staff-loans.csv', pdfTitle: 'Staff loans outstanding',
+      // the filter panel appears only when there is something to filter BY —
+      // a company. Search is untouched (the table always has it).
+      filters: coFilter(), filterPanel: isAll(),
+      exportName: 'staff-loans.csv', pdfTitle: 'Staff loans outstanding' + (isAll() ? ' — ' + scopeFull() : ''),
       actions: ui.actions({ edit: canCreate() ? function (r) { moneyForm(r.e, 'loan-repay'); } : null }), empty: { icon: 'bank', title: 'No active loans' }
     });
-    var lc = frag('reg-card'); slot(lc, 'title').innerHTML = ui.icon('people') + ' Employees with loans'; slot(lc, 'sub').textContent = 'taken · paid · still due, per person · click to record a repayment'; slot(lc, 'body').appendChild(lt.el); page.appendChild(lc);
+    var lc = frag('reg-card'); slot(lc, 'title').innerHTML = ui.icon('people') + ' Employees with loans';
+    slot(lc, 'sub').textContent = 'taken · paid · still due, per person' + (isAll() ? ', across every company' : '') + ' · click to record a repayment';
+    slot(lc, 'body').appendChild(lt.el); page.appendChild(lc);
   }
 
   /* THE REGISTER — one row per loan, running and cleared, because "how much of
    * the ৳20,000 taken in May is left" is a question about a LOAN, not a person. */
   if (book.length) {
     var rt = EPAL.table({
-      columns: [
+      columns: withCo([
         { key: 'empName', label: 'Employee', sortVal: function (L) { return L.empName; },
           render: function (L) { return '<span class="strong">' + esc(L.empName) + '</span>' +
             (L.memo && L.memo !== 'Staff loan' ? '<div class="text-mute xs">' + esc(L.memo) + '</div>' : ''); } },
@@ -3163,23 +3609,24 @@ function loansView(page) {
         { key: 'via', label: 'Repaid via', sort: false, exportVal: repaidViaText, render: repaidViaHtml },
         { key: 'status', label: 'Status', sort: false, exportVal: function (L) { return L.closed ? 'Cleared' : 'Running'; },
           render: loanStatusHtml }
-      ],
+      ]),
       rows: book, pageSize: 8, searchKeys: ['empName', 'empId', 'memo'], sortKey: 'date', sortDir: -1,
-      exportName: 'loan-register.csv', pdfTitle: 'Staff Loan Register — ' + coFull(CID),
+      filters: coFilter(), filterPanel: isAll(),
+      exportName: 'loan-register.csv', pdfTitle: 'Staff Loan Register — ' + scopeFull(),
       onRow: function (L) { loanDetailModal(L); },
       actions: [{ icon: 'eye', title: 'Open this loan', onClick: function (L) { loanDetailModal(L); } }],
       empty: { icon: 'bank', title: 'No loan has been disbursed yet' }
     });
     var rc = frag('reg-card');
     slot(rc, 'title').innerHTML = ui.icon('journal-bookmark') + ' Loan register';
-    slot(rc, 'sub').textContent = 'every loan ever taken — taken on · taken · paid till now · still due · click one for its whole history';
+    slot(rc, 'sub').textContent = 'every loan ever taken' + (isAll() ? ', in every company' : '') + ' — taken on · taken · paid till now · still due · click one for its whole history';
     slot(rc, 'body').appendChild(rt.el); page.appendChild(rc);
   }
 
   var emis = txns.filter(function (x) { return x.type === 'loan-repay' && /EMI auto-deducted/.test(x.memo || ''); });
   if (emis.length) {
     var et = EPAL.table({
-      columns: [
+      columns: withCo([
         { key: 'date', label: 'Deducted on', date: true },
         { key: 'empName', label: 'Employee', render: function (x) { return EPAL.people ? EPAL.people.linkify(x.empName, x.empId) : esc(x.empName); } },
         { key: 'memo', label: 'From which salary', render: function (x) { return esc(String(x.memo || '').replace('EMI auto-deducted from ', '')); } },
@@ -3193,12 +3640,16 @@ function loansView(page) {
         { key: 'after', label: 'Loan due after', sort: false,
           exportVal: function (x) { return (payIx[x.id] || []).map(function (h) { return h.p.balance; }).join(' + '); },
           render: function (x) { return loanDueHtml(payIx[x.id]); } }
-      ],
-      rows: emis, pageSize: 8, totalKey: 'amount', exportName: 'emi-history.csv', pdfTitle: 'Loan EMI Deduction History',
+      ], null, 2),
+      rows: emis, pageSize: 8, totalKey: 'amount', exportName: 'emi-history.csv',
+      filters: coFilter(), filterPanel: isAll(),
+      pdfTitle: 'Loan EMI Deduction History' + (isAll() ? ' — ' + scopeFull() : ''),
       onRow: function (x) { var h = (payIx[x.id] || [])[0]; if (h) loanDetailModal(h.L); },
       empty: { icon: 'bank', title: 'No EMI deductions yet' }
     });
-    var ec = frag('reg-card'); slot(ec, 'title').innerHTML = ui.icon('calendar2-check') + ' EMI Deduction History'; slot(ec, 'sub').textContent = 'auto-deducted from salary · dated individually · click a row for that loan'; slot(ec, 'body').appendChild(et.el); page.appendChild(ec);
+    var ec = frag('reg-card'); slot(ec, 'title').innerHTML = ui.icon('calendar2-check') + ' EMI Deduction History';
+    slot(ec, 'sub').textContent = 'auto-deducted from salary · dated individually' + (isAll() ? ' · every company' : '') + ' · click a row for that loan';
+    slot(ec, 'body').appendChild(et.el); page.appendChild(ec);
   }
   page.appendChild(loanTxnTable(txns, book, payIx));
 }
@@ -3206,8 +3657,8 @@ function loansView(page) {
 /* =================================================== ADVANCE SALARY */
 function advanceView(page) {
   var t = team();
-  var byEmp = t.map(function (e) { return { e: e, out: PR().advanceOutstanding(e.id) }; });
-  var txns = S.list('pay_txns').filter(function (x) { return x.companyId === CID && x.type === 'advance'; }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+  var byEmp = t.map(function (e) { return { e: e, companyId: e.companyId, out: PR().advanceOutstanding(e.id) }; });
+  var txns = scoped('pay_txns').filter(function (x) { return x.type === 'advance'; }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
   var totalOut = sum(byEmp, function (x) { return x.out; });
   var active = byEmp.filter(function (x) { return x.out > 0; });
 
@@ -3215,6 +3666,8 @@ function advanceView(page) {
   var AE = advanceEvents(), N = 12;
   var given = sum(outflowOnly(AE), function (e) { return e.delta; });
 
+  if (isAll()) page.appendChild(scopeNote('Every advance in the group — ' + scopeNames(),
+    'Who is holding an advance across all ' + scopeCids().length + ' payrolls, what has been recovered, and every advance transaction and request. Giving and approving work from here — the money leaves the employee\'s own company\'s account.'));
   var grid = frag('kpi-grid');
   grid.appendChild(kpi2({ label: 'Advance Outstanding', value: ui.money(totalOut, { compact: true }), icon: 'cash', tone: 'text-warn',
     foot: totalOut ? 'recovered automatically from the next payslip' : 'nothing left to recover',
@@ -3251,11 +3704,13 @@ function advanceView(page) {
 
   if (active.length) {
     var at = EPAL.table({
-      columns: [ { key: 'name', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.e.name) + '</span>'; } },
-        { key: 'out', label: 'Outstanding', num: true, render: function (r) { return '<span class="num strong text-warn">' + ui.money(r.out) + '</span>'; }, sortVal: function (r) { return r.out; } } ],
-      rows: active, pageSize: 8, empty: { icon: 'cash', title: 'No outstanding advances' }
+      columns: withCo([ { key: 'name', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.e.name) + '</span>'; } },
+        { key: 'out', label: 'Outstanding', num: true, render: function (r) { return '<span class="num strong text-warn">' + ui.money(r.out) + '</span>'; }, sortVal: function (r) { return r.out; } } ]),
+      rows: active, pageSize: 8, filters: coFilter(), filterPanel: isAll(), empty: { icon: 'cash', title: 'No outstanding advances' }
     });
-    var ac = frag('reg-card'); slot(ac, 'title').innerHTML = ui.icon('people') + ' Outstanding advances'; slot(ac, 'sub').textContent = 'recovered automatically from the next salary'; slot(ac, 'body').appendChild(at.el); page.appendChild(ac);
+    var ac = frag('reg-card'); slot(ac, 'title').innerHTML = ui.icon('people') + ' Outstanding advances';
+    slot(ac, 'sub').textContent = 'recovered automatically from the next salary' + (isAll() ? ' · every company' : '');
+    slot(ac, 'body').appendChild(at.el); page.appendChild(ac);
   }
   page.appendChild(txnTable('Advance transactions', txns));
 }
@@ -3275,11 +3730,12 @@ function advanceView(page) {
  *                                       history, and the memo on the posting
  * ==========================================================================*/
 function advRequestQueue(page) {
-  var pend = PR().advRequests({ companyId: CID, status: 'pending' });
+  var pend = (PR().advRequests({ status: 'pending' }) || []).filter(function (r) { return inScope(r.companyId); });
   if (!pend.length) return;                 // nothing waiting → no card at all
   var card = shell('advreq');
   fillH(card, 'title', ui.icon('hourglass-split') + ' Advance requests waiting on you');
-  fillK(card, 'sub', pend.length + ' pending · ' + ui.money(sum(pend, function (r) { return r.amount; })) + ' asked for');
+  fillK(card, 'sub', pend.length + ' pending · ' + ui.money(sum(pend, function (r) { return r.amount; })) + ' asked for' +
+    (isAll() ? ' · across every company' : ''));
   var host = box(card, 'rows');
   var tpl = host.querySelector('[data-proto="row"]');
   tpl.parentNode.removeChild(tpl);          // the prototype itself never renders
@@ -3287,7 +3743,8 @@ function advRequestQueue(page) {
     var row = tpl.cloneNode(true);
     row.removeAttribute('hidden'); row.removeAttribute('data-proto');
     fillH(row, 'name', EPAL.people ? EPAL.people.linkify(r.empName, r.empId) : esc(r.empName));
-    fillK(row, 'when', 'asked ' + ui.date(r.requestedOn));
+    // on All Companies the row also has to say whose employee is asking
+    fillK(row, 'when', 'asked ' + ui.date(r.requestedOn) + (isAll() ? ' · ' + coShort(r.companyId) : ''));
     fillK(row, 'amount', ui.money(r.amount));
     fillK(row, 'forym', 'against ' + PR().mLabel(r.forYm));
     fillK(row, 'reason', r.reason || 'No reason given');
@@ -3309,10 +3766,10 @@ function advRequestQueue(page) {
  * say" is exactly the question this screen gets asked six months later. Both
  * figures are shown: what was requested, and what was actually approved. */
 function advRequestHistory(page) {
-  var rows = PR().advRequests({ companyId: CID }).filter(function (r) { return r.status !== 'pending'; });
+  var rows = (PR().advRequests({}) || []).filter(function (r) { return r.status !== 'pending' && inScope(r.companyId); });
   if (!rows.length) return;
   var tbl = EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'requestedOn', label: 'Asked', date: true },
       { key: 'empName', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.empName, r.empId) : '<span class="strong">' + esc(r.empName) + '</span>'; } },
       { key: 'forYm', label: 'Against', render: function (r) { return '<span class="badge">' + esc(PR().mLabel(r.forYm)) + '</span>'; } },
@@ -3328,9 +3785,10 @@ function advRequestHistory(page) {
       { key: 'reason', label: 'Reason' },
       { key: 'note', label: 'Decision note' },
       { key: 'status', label: 'Status', badge: { approved: 'good', rejected: 'bad' } }
-    ],
+    ], null, 2),
     rows: rows, searchKeys: ['empName', 'reason', 'note'], quickFilter: 'status', pageSize: 10,
-    exportName: 'advance-requests.csv', pdfTitle: coFull(CID) + ' — Advance Salary Requests',
+    filters: coFilter(), filterPanel: isAll(),
+    exportName: 'advance-requests.csv', pdfTitle: scopeFull() + ' — Advance Salary Requests',
     empty: { icon: 'inbox', title: 'Nothing decided yet' }
   });
   var card = frag('reg-card');
@@ -3351,7 +3809,7 @@ function advRequestForm(emp) {
     record: { empId: emp ? emp.id : '', forYm: PR().nextYm(PR().curYm()), date: today() },
     fields: [
       { key: 'empId', label: 'Employee', type: 'select', required: true, searchable: true,
-        options: team().map(function (e) { return [e.id, e.name + ' · ' + (e.dept || '—')]; }) },
+        options: team().map(function (e) { return [e.id, e.name + ' · ' + (e.dept || '—') + (isAll() ? ' · ' + coShort(e.companyId) : '')]; }) },
       { key: 'amount', label: 'Amount asked for (৳)', type: 'money', required: true, min: 0 },
       { key: 'forYm', label: 'Advance against which month', type: 'select', required: true, options: mopts,
         hint: 'The month of salary this will be recovered from.' },
@@ -3383,8 +3841,10 @@ function advDecideForm(r, decision) {
           (r.reason ? ' — "' + r.reason + '"' : '') },
       approve ? { key: 'amount', label: 'Amount to release (৳)', type: 'money', required: true, min: 0, default: r.amount,
         hint: 'Asked for ' + ui.money(r.amount) + '. Release less (or more) by changing this — the request keeps what was asked.' } : null,
+      // the accounts of the company the REQUEST belongs to — that is whose staff
+      // is being paid, and on All Companies the desk's scope is not a payer
       approve ? { key: 'method', label: 'Paid from', type: 'select', required: true, searchable: true,
-        options: (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(CID) : ['Bank', 'Cash'] } : null,
+        options: payOptions(r.companyId) } : null,
       approve ? { key: 'date', label: 'Paid on', type: 'date', default: today() } : null,
       { key: 'note', label: approve ? 'Note (optional)' : 'Reason for declining', type: 'text',
         required: !approve, placeholder: approve ? '' : 'They need to be told why' }
@@ -3409,7 +3869,7 @@ function loanTxnTable(txns, book, payIx) {
   var byId = {}; book.forEach(function (L) { byId[L.id] = L; });
   function hitsOf(x) { return x.type === 'loan' ? (byId[x.id] ? [{ L: byId[x.id] }] : []) : (payIx[x.id] || []); }
   var tbl = EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'date', label: 'Date', date: true },
       { key: 'empName', label: 'Employee' },
       { key: 'type', label: 'Type', badge: { loan: 'warn', 'loan-repay': 'good' } },
@@ -3431,35 +3891,50 @@ function loanTxnTable(txns, book, payIx) {
         exportVal: function (x) { return hitsOf(x).map(function (h) { return h.p ? h.p.balance : h.L.due; }).join(' + '); },
         render: function (x) { return loanDueHtml(hitsOf(x)); } },
       { key: 'amount', label: 'Amount', num: true, money: true }
-    ],
+    ], null, 2),
     rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, exportName: 'loan-transactions.csv',
-    pdfTitle: 'Loan transactions — ' + coFull(CID),
+    filters: coFilter(), filterPanel: isAll(),
+    pdfTitle: 'Loan transactions — ' + scopeFull(),
     onRow: function (x) { var h = hitsOf(x)[0]; if (h) loanDetailModal(h.L); },
     empty: { icon: 'journal', title: 'No transactions' }
   });
   var card = frag('head-card');
-  slot(card, 'title').innerHTML = ui.icon('journal-text') + ' Loan transactions';
+  slot(card, 'title').innerHTML = ui.icon('journal-text') + ' Loan transactions' + (isAll() ? ' — every company' : '');
   slot(card, 'body').appendChild(tbl.el);
   return card;
 }
 
 function txnTable(title, txns) {
   var tbl = EPAL.table({
-    columns: [ { key: 'date', label: 'Date', date: true }, { key: 'empName', label: 'Employee' },
+    columns: withCo([ { key: 'date', label: 'Date', date: true }, { key: 'empName', label: 'Employee' },
       { key: 'type', label: 'Type', badge: { advance: 'warn', loan: 'warn', 'loan-repay': 'good' } },
       { key: 'memo', label: 'Note' }, { key: 'method', label: 'Method', badge: {} },
-      { key: 'amount', label: 'Amount', num: true, money: true } ],
-    rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, exportName: 'payroll-txns.csv', empty: { icon: 'journal', title: 'No transactions' }
+      { key: 'amount', label: 'Amount', num: true, money: true } ], null, 2),
+    rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, exportName: 'payroll-txns.csv',
+    filters: coFilter(), filterPanel: isAll(), empty: { icon: 'journal', title: 'No transactions' }
   });
-  var card2 = frag('head-card'); slot(card2, 'title').innerHTML = ui.icon('journal-text') + ' ' + title; slot(card2, 'body').appendChild(tbl.el); return card2;
+  var card2 = frag('head-card'); slot(card2, 'title').innerHTML = ui.icon('journal-text') + ' ' + title + (isAll() ? ' — every company' : ''); slot(card2, 'body').appendChild(tbl.el); return card2;
 }
 function moneyForm(emp, type) {
   var meta = { advance: ['Give Advance Salary', 'cash', 'Advance salary'], loan: ['Disburse Staff Loan', 'bank', 'Staff loan'], 'loan-repay': ['Record Loan Repayment', 'arrow-return-left', 'Loan repayment'] }[type];
+  var staff = team();
   var rec = { date: today(), method: 'Bank' }; if (emp) rec.empId = emp.id;
+  // WHOSE ACCOUNTS to offer. The engine books this against the EMPLOYEE's company
+  // (loan/advance/repayLoan all derive it from compOf(empId)), so the account list
+  // has to follow the employee, not the desk — otherwise All Companies would offer
+  // Travels' bank for a Woodart loan. The list starts on whoever the form opens
+  // with and re-fills when the employee changes.
+  var firstCo = (emp && emp.companyId) || (staff.length ? staff[0].companyId : CID);
   EPAL.formModal({
     title: meta[0], icon: meta[1], size: 'sm', record: rec,
+    onReady: isAll() ? function (f) {
+      var ctrl = f.ctrls && f.ctrls.empId;
+      if (!ctrl || !ctrl.input) return;
+      ctrl.input.addEventListener('change', function () { f.setOptions('method', payOptions(empCo(this.value))); });
+    } : null,
     fields: [
-      { key: 'empId', label: 'Employee', type: 'select', required: true, options: team().map(function (e) { return [e.id, e.name + ' · ' + e.dept]; }) },
+      { key: 'empId', label: 'Employee', type: 'select', required: true,
+        options: staff.map(function (e) { return [e.id, e.name + ' · ' + e.dept + (isAll() ? ' · ' + coShort(e.companyId) : '')]; }) },
       { key: 'amount', label: 'Amount (৳)', type: 'money', required: true, min: 0 },
       type === 'loan' ? { key: 'emiMonths', label: 'Repay over (months)', type: 'number', min: 0, default: 0 } : null,
       { key: 'date', label: 'Date', type: 'date', default: today() },
@@ -3467,7 +3942,8 @@ function moneyForm(emp, type) {
       // handing an employee an advance actually leaves an account and lands in its
       // history, instead of moving an abstract 1010 and nothing else
       { key: 'method', label: type === 'loan-repay' ? 'Received into' : 'Paid from', type: 'select', required: true, searchable: true,
-        options: (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(CID) : ['Bank', 'Cash'] },
+        hint: isAll() ? 'The employee\'s own company\'s accounts — pick the employee first.' : '',
+        options: payOptions(firstCo) },
       { key: 'memo', label: 'Note', type: 'text', placeholder: meta[2] }
     ].filter(Boolean),
     saveLabel: meta[0],
@@ -3481,30 +3957,36 @@ function moneyForm(emp, type) {
 /* =================================================== PAYSLIP */
 function payslipView(page) {
   var t = team();
-  var slips = S.list('pay_slips').filter(function (s) { return s.companyId === CID && s.status !== 'draft'; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
-  var months = S.list('pay_runs').filter(function (r) { return r.companyId === CID; }).map(function (r) { return r.ym; }).sort().reverse();
+  var slips = scoped('pay_slips').filter(function (s) { return s.status !== 'draft'; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
+  // the month list is a UNION on All Companies — six runs of January are one
+  // January to pick, and a month with slips but no run still has payslips to read
+  var months = isAll()
+    ? monthSeries().map(function (m) { return m.ym; }).sort().reverse()
+    : scoped('pay_runs').map(function (r) { return r.ym; }).sort().reverse();
   var pick = frag('pick-card');
   var row = slot(pick, 'row');
-  row.appendChild(field('Employee', (function () { var s = el('select.input', { id: 'ps-emp' }); t.forEach(function (e) { s.appendChild(el('option', { value: e.id, text: e.name })); }); return s; })()));
+  row.appendChild(field('Employee', (function () { var s = el('select.input', { id: 'ps-emp' }); t.forEach(function (e) { s.appendChild(el('option', { value: e.id, text: e.name + (isAll() ? ' · ' + coShort(e.companyId) : '') })); }); return s; })()));
   row.appendChild(field('Month', (function () { var s = el('select.input', { id: 'ps-ym' }); (months.length ? months : [PR().curYm()]).forEach(function (m) { s.appendChild(el('option', { value: m, text: PR().mLabel(m) })); }); return s; })()));
   row.appendChild(field(' ', el('button.btn.btn-primary', { html: ui.icon('receipt') + ' View Statement', onclick: function () { var e = empById(document.getElementById('ps-emp').value); var ym = document.getElementById('ps-ym').value; if (e) statement(e, ym); } })));
   page.appendChild(pick);
 
   var tbl = EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'empName', label: 'Employee', render: function (s) { return EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : '<span class="strong">' + esc(s.empName) + '</span>'; } },
       { key: 'ym', label: 'Month', render: function (s) { return PR().mLabel(s.ym); } },
       { key: 'earnedGross', label: 'Gross', num: true, money: true },
       { key: 'net', label: 'Net', num: true, sortVal: function (s) { return PR().slipPayable(s); }, render: function (s) { return '<span class="num strong">' + ui.money(PR().slipPayable(s)) + '</span>'; } },
       { key: 'encashAmt', label: 'Leave Encash', num: true, money: true },
       { key: 'status', label: 'Status', badge: { accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
-    ],
-    rows: slips, searchKeys: ['empName', 'empId'], quickFilter: 'status', pageSize: 12, exportName: 'payslips.csv', pdfTitle: 'Travels Payslips',
+    ]),
+    rows: slips, searchKeys: ['empName', 'empId'], quickFilter: 'status', pageSize: 12, exportName: 'payslips.csv',
+    filters: coFilter(), filterPanel: isAll(),
+    pdfTitle: isAll() ? scopeFull() + ' — Payslips' : 'Travels Payslips',
     onRow: function (s) { var e = empById(s.empId); if (e) statement(e, s.ym); },
     actions: ui.actions({ print: function (s) { var e = empById(s.empId); if (e) statementPrint(e, s.ym); } }),
     empty: { icon: 'receipt', title: 'No payslips yet', hint: 'Finalize a payroll month in Salary Manage.' }
   });
-  var card2 = frag('head-card'); slot(card2, 'title').innerHTML = ui.icon('card-list') + ' All Payslips'; slot(card2, 'body').appendChild(tbl.el); page.appendChild(card2);
+  var card2 = frag('head-card'); slot(card2, 'title').innerHTML = ui.icon('card-list') + ' All Payslips' + (isAll() ? ' — every company' : ''); slot(card2, 'body').appendChild(tbl.el); page.appendChild(card2);
 }
 function field(label, input) { return el('div', null, [ el('label.text-mute.sm', { text: label, style: { display: 'block', marginBottom: '3px' } }), input ]); }
 
@@ -3589,7 +4071,7 @@ function sourceCard() {
         render: function (r) { return r.back ? '<span class="text-good">' + ui.money(r.back) + '</span>' : '—'; } }
     ],
     rows: res.rows, pageSize: 10, totalKey: 'out', searchKeys: ['from'],
-    exportName: 'payroll-by-account.csv', pdfTitle: coFull(CID) + ' — Payroll by account',
+    exportName: 'payroll-by-account.csv', pdfTitle: scopeFull() + ' — Payroll by account',
     onRow: function (r) { sourceDrill(r); },
     empty: { icon: 'bank', title: 'Nothing was paid in this period', hint: 'Salary that is accrued but unpaid never leaves an account.' }
   }).el);
@@ -3628,7 +4110,7 @@ function sourceDrill(row) {
 
 function reportsView(page) {
   var t = team();
-  var liability = PR().encashmentLiability(CID);
+  var liability = scopeCids().reduce(function (a, c) { return a + PR().encashmentLiability(c); }, 0);
   var salaryDue = sum(t, function (e) { return PR().salaryDue(e.id); });
   var advOut = sum(t, function (e) { return PR().advanceOutstanding(e.id); });
   var loanOut = sum(t, function (e) { return PR().loanOutstanding(e.id); });
@@ -3652,6 +4134,8 @@ function reportsView(page) {
   var eligible = t.filter(function (e) { var ls = PR().leaveState(e); return ls.eligibleFullYear && ls.value > 0; }).length;
   var emiTotal = sum(t, function (e) { return PR().emiInstallment(e.id); });
 
+  if (isAll()) page.appendChild(scopeNote('Group payroll reports — ' + scopeNames(),
+    'Encashment liability, salary due, advance and loan registers and the department cost of all ' + scopeCids().length + ' payrolls added together, with the company on every row. "Where the money went" groups by the account it left, so an account is still one company\'s.'));
   var grid = frag('kpi-grid');
   grid.appendChild(kpi2({ label: 'Leave Encash Liability', value: ui.money(liability, { compact: true }), icon: 'piggy-bank', tone: 'text-warn',
     foot: accruing ? accruing + ' accruing · ' + eligible + ' encashable now' : 'nothing accrued yet' }));
@@ -3669,24 +4153,25 @@ function reportsView(page) {
   // the owner's most-asked question — from WHICH account, over WHICH period
   page.appendChild(sourceCard());
 
-  var encRows = t.map(function (e) { var ls = PR().leaveState(e); return { e: e, name: e.name, dept: e.dept, days: ls.encashableDays, value: ls.value, eligible: ls.eligibleFullYear }; }).filter(function (r) { return r.value > 0; });
+  var encRows = t.map(function (e) { var ls = PR().leaveState(e); return { e: e, name: e.name, companyId: e.companyId, dept: e.dept, days: ls.encashableDays, value: ls.value, eligible: ls.eligibleFullYear }; }).filter(function (r) { return r.value > 0; });
   var encTbl = EPAL.table({
-    columns: [
+    columns: withCo([
       { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.e.id) : '<span class="strong">' + esc(r.name) + '</span>'; } },
       { key: 'dept', label: 'Dept', badge: {} },
       { key: 'days', label: 'Accrued days', num: true, sortVal: function (r) { return r.days; }, render: function (r) { return r.days.toFixed(2); } },
       { key: 'value', label: 'Value', num: true, money: true },
       { key: 'eligible', label: 'Eligibility', render: function (r) { return r.eligible ? '<span class="badge badge-good">Eligible</span>' : '<span class="badge badge-warn">Accruing</span>'; } }
-    ],
-    rows: encRows, pageSize: 10, exportName: 'leave-encashment-liability.csv', pdfTitle: 'Leave Encashment Liability',
+    ]),
+    rows: encRows, pageSize: 10, exportName: 'leave-encashment-liability.csv',
+    filters: coFilter(), filterPanel: isAll(), pdfTitle: 'Leave Encashment Liability' + (isAll() ? ' — ' + scopeFull() : ''),
     actions: ui.actions({ edit: canCreate() ? function (r) { payEncashFlow(r.e); } : null }),
     onRow: function (r) { statement(r.e, PR().curYm()); }, empty: { icon: 'piggy-bank', title: 'No accrued encashment' }
   });
   page.appendChild(reportCard('Leave Encashment Liability', 'piggy-bank', ui.money(liability) + ' total provision · ✎ to pay out & reset', encTbl.el));
 
-  var dueRows = t.map(function (e) { return { id: e.id, name: e.name, dept: e.dept, amt: PR().salaryDue(e.id) }; }).filter(function (r) { return r.amt > 0; });
+  var dueRows = t.map(function (e) { return { id: e.id, name: e.name, companyId: e.companyId, dept: e.dept, amt: PR().salaryDue(e.id) }; }).filter(function (r) { return r.amt > 0; });
   if (dueRows.length) page.appendChild(reportCard('Salary Due', 'hourglass-split', dueRows.length + ' employees owed', simpleTbl(dueRows, 'Outstanding')));
-  var advRows = t.map(function (e) { return { id: e.id, name: e.name, dept: e.dept, amt: PR().advanceOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
+  var advRows = t.map(function (e) { return { id: e.id, name: e.name, companyId: e.companyId, dept: e.dept, amt: PR().advanceOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
   if (advRows.length) page.appendChild(reportCard('Advance Register', 'cash', 'who holds advance now', simpleTbl(advRows, 'Advance held')));
   /* The loan register is the one report that cannot be a name-and-a-number:
    * a loan balance means nothing without what was taken, when, and how much has
@@ -3695,7 +4180,7 @@ function reportsView(page) {
   if (openLoans.length) page.appendChild(reportCard('Loan Outstanding', 'bank',
     openLoans.length + ' loan(s) in progress · taken · paid till now · still due',
     EPAL.table({
-      columns: [
+      columns: withCo([
         { key: 'empName', label: 'Employee', sortVal: function (L) { return L.empName; },
           render: function (L) { return EPAL.people ? EPAL.people.linkify(L.empName, L.empId) : '<span class="strong">' + esc(L.empName) + '</span>'; } },
         { key: 'dept', label: 'Dept', badge: {}, exportVal: function (L) { return (L.emp && L.emp.dept) || ''; },
@@ -3708,13 +4193,16 @@ function reportsView(page) {
           render: function (L) { return '<span class="num strong text-warn">' + ui.money(L.due) + '</span>'; } },
         { key: 'emi', label: 'EMI', num: true, sortVal: function (L) { return L.emi; },
           render: function (L) { return L.emi ? '<span class="num">' + ui.money(L.emi) + '/mo</span>' : '<span class="text-mute">no plan</span>'; } }
-      ],
-      rows: openLoans, pageSize: 8, exportName: 'loan-outstanding.csv', pdfTitle: 'Loan Outstanding — ' + coFull(CID),
+      ]),
+      rows: openLoans, pageSize: 8, exportName: 'loan-outstanding.csv', pdfTitle: 'Loan Outstanding — ' + scopeFull(),
+      filters: coFilter(), filterPanel: isAll(),
       onRow: function (L) { loanDetailModal(L); },
       empty: { icon: 'bank', title: 'Nothing outstanding' }
     }).el));
 
-  var dc = PR().departmentCost(CID);
+  // merged across the scope: "Sales" exists in more than one concern, and the
+  // group's Sales line is their sum, not six rows with the same name
+  var dc = deptCost();
   var dcTbl = EPAL.table({
     columns: [ { key: 'dept', label: 'Department', render: function (r) { return '<span class="strong">' + esc(r.dept) + '</span>'; } },
       { key: 'heads', label: 'Headcount', num: true, render: function (r) { return String(t.filter(function (e) { return (e.dept || '—') === r.dept; }).length); } },
@@ -3723,14 +4211,15 @@ function reportsView(page) {
   });
   page.appendChild(reportCard('Department Cost (monthly gross)', 'diagram-3', 'salary cost by department', dcTbl.el));
 
-  var incRows = []; t.forEach(function (e) { (e.salaryHistory || []).forEach(function (h) { incRows.push({ name: e.name, date: h.date, from: h.from, to: h.to, by: h.by || '' }); }); });
+  var incRows = []; t.forEach(function (e) { (e.salaryHistory || []).forEach(function (h) { incRows.push({ name: e.name, companyId: e.companyId, date: h.date, from: h.from, to: h.to, by: h.by || '' }); }); });
   incRows.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
   if (incRows.length) {
     var incTbl = EPAL.table({
-      columns: [ { key: 'date', label: 'Date', date: true }, { key: 'name', label: 'Employee' },
+      columns: withCo([ { key: 'date', label: 'Date', date: true }, { key: 'name', label: 'Employee' },
         { key: 'from', label: 'From', num: true, money: true }, { key: 'to', label: 'To', num: true, money: true },
-        { key: 'change', label: 'Change', num: true, sortVal: function (r) { return (r.to || 0) - (r.from || 0); }, render: function (r) { var d = (r.to || 0) - (r.from || 0); return '<span class="num ' + (d >= 0 ? 'text-good' : 'text-bad') + '">' + (d >= 0 ? '+' : '') + ui.money(d) + '</span>'; } } ],
-      rows: incRows, pageSize: 10, exportName: 'increment-history.csv', empty: { icon: 'graph-up-arrow', title: 'No increments' }
+        { key: 'change', label: 'Change', num: true, sortVal: function (r) { return (r.to || 0) - (r.from || 0); }, render: function (r) { var d = (r.to || 0) - (r.from || 0); return '<span class="num ' + (d >= 0 ? 'text-good' : 'text-bad') + '">' + (d >= 0 ? '+' : '') + ui.money(d) + '</span>'; } } ], null, 2),
+      rows: incRows, pageSize: 10, exportName: 'increment-history.csv',
+      filters: coFilter(), filterPanel: isAll(), empty: { icon: 'graph-up-arrow', title: 'No increments' }
     });
     page.appendChild(reportCard('Increment History', 'graph-up-arrow', incRows.length + ' salary revisions', incTbl.el));
   }
@@ -3739,14 +4228,17 @@ function reportCard(title, icon, sub, node) {
   var card2 = frag('reg-card'); slot(card2, 'title').innerHTML = ui.icon(icon) + ' ' + title; slot(card2, 'sub').textContent = sub; slot(card2, 'body').appendChild(node); return card2;
 }
 function simpleTbl(rows, label) {
-  return EPAL.table({ columns: [ { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id || r.name) : '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'dept', label: 'Dept', badge: {} }, { key: 'amt', label: label, num: true, money: true } ], rows: rows, pageSize: 8, empty: { icon: 'inbox', title: 'Nothing outstanding' } }).el;
+  return EPAL.table({ columns: withCo([ { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id || r.name) : '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'dept', label: 'Dept', badge: {} }, { key: 'amt', label: label, num: true, money: true } ]),
+    rows: rows, pageSize: 8, filters: coFilter(), filterPanel: isAll(), empty: { icon: 'inbox', title: 'Nothing outstanding' } }).el;
 }
 function payEncashFlow(e) {
   var ls = PR().leaveState(e);
   // it names the account it is paid from (audit 2026-07-28), so the payout leaves a
   // real balance and shows in that account's history like every other payment
   if (EPAL.pay && EPAL.pay.ask) {
-    EPAL.pay.ask({ title: 'Pay leave encashment · ' + e.name, icon: 'cash-coin', owner: CID,
+    // the EMPLOYEE'S company pays its own staff — never the desk's scope, which
+    // on All Companies is not a company and owns no accounts
+    EPAL.pay.ask({ title: 'Pay leave encashment · ' + e.name, icon: 'cash-coin', owner: e.companyId || CID,
       amount: ls.value, saveLabel: 'Pay Encashment', onPick: function (src) {
         try { PR().payEncashment(e.id, { method: src && src.bank ? 'bank:' + src.bank.id : 'Bank' });
           ui.toast('Encashment paid' + (src && src.bank ? ' from ' + src.bank.name : ''), 'success'); EPAL.router.render(); }

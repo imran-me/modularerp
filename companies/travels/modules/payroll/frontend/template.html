@@ -122,6 +122,27 @@
   <div class="meter"><span data-el="bar"></span></div>
 </div>
 
+<!-- ---------------------------------------------------------------------------
+  ALL-COMPANIES NOTE (owner 2026-07-29) — shown only when the switcher is on
+  "All Companies". It says which concerns the figures above it add up, and, where
+  a control is missing, WHY: a payroll run and a salary structure belong to one
+  company, so they are asked for from a company rather than guessed at from six.
+
+  It reuses .brief-exc (the autopilot/radar row) deliberately — same voice, same
+  spacing, and not one new CSS rule.
+--------------------------------------------------------------------------- -->
+<div data-shell="scopenote" class="card mb-3">
+  <div class="card-body">
+    <div class="brief-exc">
+      <div class="brief-exc-ico" data-k="ico"></div>
+      <div class="brief-exc-body">
+        <strong data-k="title"></strong>
+        <span data-k="why"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div data-shell="kpitile" class="kpi-card">
   <div class="kpi-top">
     <span class="kpi-label" data-k="label"></span>
