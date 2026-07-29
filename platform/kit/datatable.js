@@ -75,12 +75,19 @@
          opts.quickFilter : column key → renders value CHIPS after a HALF search
          opts.filterPanel : true → a "Filter" button opens a card (filters + date
                             presets + highest/lowest sort); filters move off the bar
-         opts.dateKey     : column key the date-range presets filter on            */
+         opts.dateKey     : column key the date-range presets filter on
+         opts.toolbarEl   : a node to ride IN the toolbar, right of the search box.
+                            For a control that belongs to the table but is not a
+                            column filter — a period selector, say. It sits before
+                            the spacer, so the count and the export buttons stay
+                            where they are on every other table.                   */
     var compact = !!(opts.quickFilter || opts.filterPanel);
     var toolbar = el('div.dt-toolbar');
     var searchIn = el('input.input.dt-search', { placeholder: opts.searchPlaceholder || 'Search…',
       oninput: ui.debounce(function () { state.q = searchIn.value.toLowerCase(); state.page = 0; draw(); }, 120) });
     toolbar.appendChild(el('div.dt-search-wrap' + (compact ? '.half' : ''), null, [ ui.frag(ui.icon('search', 'dt-search-ico')), searchIn ]));
+
+    if (opts.toolbarEl) toolbar.appendChild(opts.toolbarEl);
 
     var chipWrap = null;
     if (opts.quickFilter) { chipWrap = el('div.dt-chips'); toolbar.appendChild(chipWrap); }

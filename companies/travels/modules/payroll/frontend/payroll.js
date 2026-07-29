@@ -1494,6 +1494,7 @@ function shortId(raw) {
 
 function staffView(page) {
   var t = team();
+  var fileHost = el('div.emp-file-host');       // the open person's file lives here
   var rows = t.map(function (e) {
     var led = PR().empLedger(e.id);
     var slips = S.list('pay_slips').filter(function (s) { return s.empId === e.id && s.status !== 'draft'; }).sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
@@ -1549,7 +1550,8 @@ function staffView(page) {
     rows: rows, searchKeys: ['name', 'id', 'dept', 'designation'], quickFilter: 'status', filterPanel: true,
     filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }],
     pageSize: 15, exportName: 'staff-accounts.csv', pdfTitle: coFull(CID) + ' — Staff Payroll Accounts',
-    onRow: function (r) { if (EPAL.people) EPAL.people.open(r.id); },
+    // the row and the name both open the file UNDER the table, not a modal
+    onRow: function (r) { openEmp = r.id; drawFile(true); },
     actions: (canCreate() ? [
       { icon: 'cash', title: 'Give advance', onClick: function (r) { moneyForm(r.emp, 'advance'); } },
       { icon: 'bank', title: 'Disburse loan', onClick: function (r) { moneyForm(r.emp, 'loan'); } }
@@ -1564,6 +1566,254 @@ function staffView(page) {
   slot(card2, 'body').classList.add('tbl-snug');
   slot(card2, 'body').appendChild(tbl.el);
   page.appendChild(card2);
+
+  /* THE FILE OPENS HERE — under the table, with the list still above it (owner
+   * 2026-07-29). Two ways in, one destination:
+   *   · the ROW click        → onRow above
+   *   · the NAME (.emp-link) → claimed by [data-emp-host] + __empOpen, because
+   *     the kit's own listener is on document in the capture phase and would
+   *     otherwise always win and open the modal.
+   * `openEmp` is module state, so the file survives a desk redraw (a company
+   * switch, a data change) and re-renders itself for the same person. */
+  card2.setAttribute('data-emp-host', '');
+  card2.__empOpen = function (id) { openEmp = id; drawFile(true); };
+  page.appendChild(fileHost);
+  drawFile(false);
+
+  function drawFile(scroll) {
+    if (!openEmp) { killFileCharts(); fileHost.innerHTML = ''; return; }
+    empFile(fileHost, openEmp, { scroll: scroll, onClose: function () { openEmp = null; drawFile(false); } });
+  }
+}
+
+/* ============================================================ THE EMPLOYEE FILE
+ * (owner 2026-07-29: "clicking a staff's name opens a modal card … but I want it
+ * to open another structure, in the below of the page, not on a pop up card")
+ *
+ * The file opens UNDER the Staff Accounts table with the table still on screen
+ * above it — pick a person, read them, pick the next one. Nothing is duplicated:
+ * the tab bar and the five tab bodies (Overview · Accounts · Payslips ·
+ * Attendance · All Details) are the SHARED kit `platform/kit/emp-profile.js`,
+ * rendered with `{host, head:false}` — the very same code the modal runs from
+ * every other module, in a different box. THIS screen adds the page chrome (the
+ * identity band + the six money tiles) and, inside the Overview tab, the
+ * analytics stack from the owner's reference screenshots.
+ *
+ * Charts live in `fileCharts` AND in the desk's own `myCharts`: a tab click
+ * inside the file redraws Overview (so the file's own charts must go), and a
+ * desk redraw or route change drops the whole page (so the desk must be able to
+ * kill them too). Destroying twice is harmless — both killers swallow it.  */
+var openEmp = null;                       // whose file is open under the table
+var fileCharts = [];
+function killFileCharts() { fileCharts.forEach(function (c) { try { c.destroy(); } catch (e) {} }); fileCharts = []; }
+function fileChart(c) { if (c) { fileCharts.push(c); trackChart(c); } return c; }
+// a local date string — NEVER toISOString(), which shifts a day back in +06
+function dstr(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function accentOf(node) {
+  var v = node ? getComputedStyle(node).getPropertyValue('--accent').trim() : '';
+  return v || '#1A43BF';
+}
+
+function empFile(host, empId, opts) {
+  opts = opts || {};
+  killFileCharts();
+  host.innerHTML = '';
+  var e = empById(empId) || (db.employee ? db.employee(empId) : null);
+  if (!e || !EPAL.people || !PR()) return;
+  var P = PR();
+  var s = screen('emp-file');
+
+  fillH(s, 'avatar', e.photo
+    ? '<span class="avatar emp-av" style="background-image:url(' + esc(e.photo) + ')"></span>'
+    : '<span class="avatar emp-av" style="background:' + ui.colorFor(e.name) + '">' + esc(ui.initials(e.name)) + '</span>');
+  fillK(s, 'name', e.name);
+  fillK(s, 'meta', [e.designation, e.dept, coFull(e.companyId || CID)].filter(Boolean).join(' · '));
+  fillH(s, 'chips', '<span class="badge">' + esc(e.empType || 'Permanent') + '</span>' +
+    '<span class="badge badge-' + (e.status === 'active' ? 'good' : e.status === 'resigned' ? 'bad' : 'warn') + '">' + esc(cap(e.status || 'active')) + '</span>');
+
+  var led = P.empLedger(e.id);
+  var netDue = led.length ? led[led.length - 1].balance : 0;
+  var ls = P.leaveState(e);
+  fillK(s, 't-salary', ui.money(e.salary || 0));
+  fillK(s, 't-owes-l', netDue >= 0 ? 'Company owes' : 'Employee owes');
+  fillK(s, 't-owes', ui.money(Math.abs(netDue)));
+  fillK(s, 't-due', ui.money(P.salaryDue(e.id)));
+  fillK(s, 't-adv', ui.money(P.advanceOutstanding(e.id)));
+  fillK(s, 't-loan', ui.money(P.loanOutstanding(e.id)));
+  fillK(s, 't-encash', ls.encashableDays.toFixed(1) + 'd · ' + ui.money(ls.value));
+
+  var payBtn = act(s, 'payslip', function () { EPAL.people.statement(e, P.curYm()); });
+  if (payBtn) payBtn.innerHTML = ui.icon('receipt') + ' Payslip';
+  var closeBtn = act(s, 'close', function () { if (opts.onClose) opts.onClose(); });
+  if (closeBtn) closeBtn.innerHTML = ui.icon('x-lg') + ' Close file';
+
+  var fileBox = box(s, 'file');            // grabbed BEFORE the mount moves it
+  mountScreen(host, s);
+  EPAL.people.open(e.id, { host: fileBox, head: false,
+    overviewExtra: function (h) { h.appendChild(empAnalytics(e)); } });
+
+  if (opts.scroll) requestAnimationFrame(function () {
+    if (!host.isConnected) return;
+    try { host.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (x) { host.scrollIntoView(); }
+  });
+}
+
+/* THE ANALYTICS STACK — the owner's two reference screenshots, built ONLY from
+ * data this app already holds:
+ *   tasks      db.tasksFor(empId)        (board records: created · status · phases)
+ *   attendance att_monthly               (present · absent · late · earlyLeave · leave)
+ *   leave      tv_leaves                 (type · status · days · from)
+ *   money      EPAL.payroll              (slips · advances · loans · ledger)
+ * The reference app also printed "Working Hour 174.03 hr" and "Late Time 862.52
+ * min". Nothing in this system records a clock-in or a clock-out — attendance is
+ * kept in DAYS — so those two are NOT rendered from a guess; the card shows the
+ * days and hours we do hold and says plainly what is missing. */
+function empAnalytics(e) {
+  killFileCharts();
+  var s = screen('emp-analytics');
+  var P = PR(), t0 = today(), year = t0.slice(0, 4);
+  var now = new Date(t0 + 'T00:00:00');
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /* ---- profile details ---------------------------------------------------*/
+  fillH(s, 'pd-title', ui.icon('person-vcard') + ' Profile Details');
+  fillK(s, 'pd-sub', 'current');
+  fillK(s, 'p-email', e.email || '—');
+  fillK(s, 'p-phone', e.phone || '—');
+  fillK(s, 'p-company', coFull(e.companyId || CID));
+  fillK(s, 'p-dept', e.dept || '—');
+  fillK(s, 'p-desig', e.designation || '—');
+  fillK(s, 'p-type', e.empType || 'Permanent');
+  fillK(s, 'p-id', e.id);
+  fillK(s, 'p-join', e.joinDate ? ui.date(e.joinDate) : '—');
+
+  /* ---- tasks -------------------------------------------------------------
+   * A task carries `created` (the board writes it) and per-phase `completedAt`
+   * (epoch ms, written when a phase is ticked). There is no single "completed
+   * on" field, so a done task is dated by its LAST completed phase — which is
+   * the moment the work actually ended. Anything older than the board (seeded
+   * records with neither) falls back to its due date, so it still lands on the
+   * axis instead of silently disappearing from the count. */
+  var tasks = (db.tasksFor ? db.tasksFor(e.id) : []) || [];
+  var done = tasks.filter(function (t) { return t.status === 'done'; });
+  var live = tasks.filter(function (t) { return t.status !== 'done' && t.status !== 'cancelled'; });
+  fillK(s, 'k-tasks', tasks.length);
+  fillK(s, 'k-tasks-f', 'assigned on this board');
+  fillK(s, 'k-done', done.length);
+  fillK(s, 'k-done-f', tasks.length ? Math.round(done.length / tasks.length * 100) + '% of the board' : 'nothing assigned yet');
+  fillK(s, 'k-pending', live.length);
+  fillK(s, 'k-pending-f', 'to-do · in progress · review');
+
+  function taskStart(t) { return String(t.created || t.due || '').slice(0, 10); }
+  function taskEnd(t) {
+    var ph = (t.phases || []).filter(function (p) { return p.completedAt; });
+    if (!ph.length) return taskStart(t);
+    return dstr(new Date(Math.max.apply(null, ph.map(function (p) { return p.completedAt; }))));
+  }
+
+  var dowMon = (now.getDay() + 6) % 7;                    // 0 = Monday
+  var monday = new Date(now); monday.setDate(now.getDate() - dowMon);
+  var wDays = [], wLbl = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  for (var i = 0; i < 7; i++) { var d = new Date(monday); d.setDate(monday.getDate() + i); wDays.push(dstr(d)); }
+  var wAssigned = wDays.map(function (day) { return tasks.filter(function (t) { return taskStart(t) === day; }).length; });
+  var wDone = wDays.map(function (day) { return done.filter(function (t) { return taskEnd(t) === day; }).length; });
+
+  var yms = [], mLbl = [];
+  for (var k = 11; k >= 0; k--) {
+    var dm = new Date(now.getFullYear(), now.getMonth() - k, 1);
+    yms.push(dstr(dm).slice(0, 7)); mLbl.push(MON[dm.getMonth()]);
+  }
+  var mAssigned = yms.map(function (ym2) { return tasks.filter(function (t) { return taskStart(t).slice(0, 7) === ym2; }).length; });
+  var mDone = yms.map(function (ym2) { return done.filter(function (t) { return taskEnd(t).slice(0, 7) === ym2; }).length; });
+
+  fillH(s, 'wk-title', ui.icon('bar-chart') + ' Weekly Task Performance');
+  fillK(s, 'wk-sub', 'this week · ' + ui.date(wDays[0]) + ' → ' + ui.date(wDays[6]));
+  fillH(s, 'mn-title', ui.icon('graph-up') + ' Monthly Task Performance');
+  fillK(s, 'mn-sub', 'last 12 months');
+
+  /* ---- attendance --------------------------------------------------------*/
+  var ym = P.curYm();
+  var att = P.attendanceFor(e.id, ym) || {};
+  var slipNow = P.slip(e.id, ym);
+  fillH(s, 'att-title', ui.icon('calendar-check') + ' Attendance Summary');
+  fillK(s, 'att-sub', P.mLabel(ym));
+  fillK(s, 'a-present', att.present || 0);
+  fillK(s, 'a-absent', att.absent || 0);
+  fillK(s, 'a-late', att.late || 0);
+  fillK(s, 'a-early', att.earlyLeave || 0);
+  fillK(s, 'a-leave', att.leave || 0);
+  fillK(s, 'a-ot', ((slipNow && +slipNow.overtimeHours) || 0) + ' hr');
+  fillH(s, 'att-note', ui.icon('info-circle') + ' Attendance is recorded per month in <strong>days</strong> — present, absent, late, early leave, on leave — and those counts feed the month\'s draft payslip directly. Clock-in / clock-out times are not recorded anywhere in the system, so worked <em>hours</em> and late <em>minutes</em> cannot be shown; overtime hours come from the payslip.');
+  var attRows = yms.map(function (ym2) { return P.attendanceFor(e.id, ym2) || {}; });
+
+  /* ---- leave -------------------------------------------------------------*/
+  var lv = S.list('tv_leaves').filter(function (l) { return l.empId === e.id; });
+  var lvY = lv.filter(function (l) { return String(l.from || '').slice(0, 4) === year; });
+  function lvCount(st) { return lvY.filter(function (l) { return String(l.status || '').toLowerCase() === st; }).length; }
+  var ls2 = P.leaveState(e);
+  fillH(s, 'lv-title', ui.icon('calendar2-week') + ' Leave Summary');
+  fillK(s, 'lv-sub', year + ' · ' + ls2.accruedDays.toFixed(1) + 'd accrued of ' + ls2.fullYearDays + 'd a year');
+  fillK(s, 'l-approved', lvCount('approved'));
+  fillK(s, 'l-pending', lvCount('pending'));
+  fillK(s, 'l-rejected', lvCount('rejected'));
+  fillK(s, 'l-used', ls2.takenDays.toFixed(1) + 'd');
+  fillK(s, 'l-left', ls2.encashableDays.toFixed(1) + 'd');
+
+  /* ---- salary & loan -----------------------------------------------------
+   * Staff loans are transactions, not documents — the engine keeps a running
+   * outstanding, not one record per loan — so "completed" is worked out the way
+   * the money actually moved: repayments are allocated to disbursements oldest
+   * first, and a disbursement is completed once it is fully covered. */
+  var slips = S.list('pay_slips').filter(function (x) { return x.empId === e.id && x.status !== 'draft'; })
+    .sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
+  var paidRec = slips.filter(function (x) { return (x.paid || 0) >= P.slipPayable(x); }).length;
+  var pendRec = slips.length - paidRec;
+  var totalNet = slips.filter(function (x) { return String(x.ym).slice(0, 4) === year; })
+    .reduce(function (a, x) { return a + P.slipPayable(x); }, 0);
+  var latest = slips[0];
+  fillH(s, 'sl-title', ui.icon('cash-stack') + ' Salary & Loan Summary');
+  fillK(s, 'sl-sub', slips.length + ' payslip' + (slips.length === 1 ? '' : 's') + ' on file');
+  fillK(s, 's-paid', paidRec);
+  fillK(s, 's-pending', pendRec);
+  fillK(s, 's-total-l', 'Total net salary (' + year + ')');
+  fillK(s, 's-total', ui.money(totalNet));
+  fillK(s, 's-latest-l', 'Latest net salary' + (latest ? ' (' + P.mLabel(latest.ym) + ')' : ''));
+  fillK(s, 's-latest', latest ? ui.money(P.slipPayable(latest)) : '—');
+
+  var txns = P.txnsFor(e.id) || [];
+  var lent = txns.filter(function (x) { return x.type === 'loan'; })
+    .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  var back = txns.filter(function (x) { return x.type === 'loan-repay'; })
+    .reduce(function (a, x) { return a + Math.abs(+x.amount || 0); }, 0);
+  var doneLoans = 0;
+  lent.forEach(function (x) { var amt = Math.abs(+x.amount || 0); if (back >= amt) { back -= amt; doneLoans++; } else back = 0; });
+  fillK(s, 'ln-running', Math.max(0, lent.length - doneLoans));
+  fillK(s, 'ln-done', doneLoans);
+  fillK(s, 'ln-remaining', ui.money(P.loanOutstanding(e.id)));
+  var pendReq = P.advRequests ? P.advRequests({ empId: e.id, status: 'pending' }) : [];
+  fillK(s, 'ln-advpending', pendReq.length ? ui.money(sum(pendReq, function (r) { return +r.amount || 0; })) + ' · ' + pendReq.length + ' waiting' : ui.money(0));
+  fillK(s, 'ln-advout', ui.money(P.advanceOutstanding(e.id)));
+
+  /* ---- the three charts, drawn once the canvases are on the page ---------*/
+  var wk = part(s, 'wk'), mn = part(s, 'mn'), atc = part(s, 'att');
+  requestAnimationFrame(function () {
+    if (!wk || !wk.isConnected || !EPAL.charts) return;
+    var acc = accentOf(wk), good = getComputedStyle(document.documentElement).getPropertyValue('--good').trim() || '#12b3a6';
+    fileChart(EPAL.charts.bar(wk, { labels: wLbl, money: false, legend: true,
+      datasets: [{ label: 'Assigned', data: wAssigned, color: acc }, { label: 'Completed', data: wDone, color: good }] }));
+    fileChart(EPAL.charts.area(mn, { labels: mLbl, money: false, legend: true,
+      datasets: [{ label: 'Assigned', data: mAssigned, color: acc }, { label: 'Completed', data: mDone, color: good }] }));
+    fileChart(EPAL.charts.bar(atc, { labels: mLbl, money: false, legend: true, stacked: true,
+      datasets: [
+        { label: 'Present', data: attRows.map(function (a) { return +a.present || 0; }), color: good },
+        { label: 'Absent', data: attRows.map(function (a) { return +a.absent || 0; }), color: getComputedStyle(document.documentElement).getPropertyValue('--bad').trim() || '#e0356e' },
+        { label: 'Late', data: attRows.map(function (a) { return +a.late || 0; }), color: getComputedStyle(document.documentElement).getPropertyValue('--warn').trim() || '#e2721b' }
+      ] }));
+  });
+
+  var wrap = el('div');
+  mountScreen(wrap, s);
+  return wrap;
 }
 
 /* the tab → view map, in one place so the route and the embedded desk can never
@@ -2593,8 +2843,10 @@ function sourceCard() {
   });
   slot(c, 'title').innerHTML = ui.icon('bank') + ' Where the money went';
   slot(c, 'sub').textContent = 'every payroll taka by the account it left, on the day it moved — click an account for its transactions';
-  slot(c, 'body').appendChild(el('div.mb-2', null, [sel]));
+  // the period rides IN the table's own toolbar, beside Search (owner 2026-07-29:
+  // "all in one row") — on its own line above it cost a whole row to one control
   slot(c, 'body').appendChild(EPAL.table({
+    toolbarEl: sel,
     columns: [
       { key: 'from', label: 'Paid from', render: function (r) { return '<span class="strong">' + esc(r.from) + '</span>'; } },
       moneyCol('salary', 'Salary'), moneyCol('advance', 'Advance'), moneyCol('loan', 'Staff loan'),
