@@ -1,0 +1,36 @@
+/* ============================================================================
+ * TRAVELS · PAYROLL · MODULE STYLESHEET
+ * ----------------------------------------------------------------------------
+ * The few rules the shared design system does not already express. Picked up
+ * automatically by tools/build/build-module.mjs (it compiles frontend/<id>.css
+ * into view.js as MODULE_CSS and injects it once into <head> as
+ * <style data-module-style="travels/payroll">), so nothing in
+ * platform/design-system/ has to fork for one screen.
+ *
+ * Everything else on this desk uses the house vocabulary — .kpi-card, .meter,
+ * .card, .bank-* for the dashboard row — on purpose: reusing them means Payroll
+ * stays pixel-consistent with Manage Banks and the group dashboard for free.
+ * Only add here what genuinely has no house equivalent.
+ * ========================================================================== */
+
+/* WHERE THE MONEY GOES — the department doughnut beside its table.
+   The ring carries the PROPORTION, the table the precise figures; the chart runs
+   with its legend switched off because the table beside it already names every
+   department and its share, and a legend would print each label a second time.
+   min-width:0 on the table column matters: a flex child defaults to
+   min-width:auto, and a wide table would otherwise refuse to shrink and push the
+   ring off the card. */
+.pay-dept-split { display: flex; gap: 18px; align-items: center; }
+.pay-dept-ring { flex: none; width: 190px; height: 190px; position: relative; }
+.pay-dept-tbl { flex: 1; min-width: 0; }
+@media (max-width: 720px) {
+  .pay-dept-split { flex-direction: column; align-items: stretch; }
+  .pay-dept-ring { width: 100%; height: 170px; }
+}
+
+/* PAYMENT PROGRESS — appended under the Salary Manage run card's status line.
+   The card already prints the net and the outstanding as two separate figures;
+   this makes the relationship between them readable without doing the division
+   in your head. Uses the house .meter; only the label row above it is new. */
+.pay-progress { margin-top: 10px; }
+.pay-progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 5px; }

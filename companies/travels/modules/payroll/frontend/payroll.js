@@ -5,12 +5,22 @@
  * file (by tools/build/build-module.mjs) as the string TEMPLATE_HTML. This file
  * is NOT an IIFE and has no 'use strict' of its own: the build wraps it.
  *
- * A payroll desk driven by EPAL.payroll, rendered standalone (cid/payroll) AND
- * embedded in Master Accounts (EPAL.payrollDesk) and in each company's Accounts
- * module. ONE implementation — so Master Accounts > Master Payroll, Travels >
- * Accounts > Payroll and travels/payroll are the same screen, same design, same
- * logic, always. Seven tabs: overview / template / manage / loans / payslip /
- * advance / reports. All accounting posts to the ledger. Every modal/form and the
+ * A payroll desk driven by EPAL.payroll and mounted EMBEDDED — in Master Accounts
+ * (EPAL.payrollDesk) and in each company's Accounts module. ONE implementation, so
+ * Master Accounts > Master Payroll and Travels/Woodart > Accounts > Payroll are the
+ * same screen, same design, same logic, always. The sections are TABS (see the TABS
+ * array below — do not restate the list here, it goes stale).
+ *
+ * ⚠ THE STANDALONE ROUTES DO NOT WORK, and this header used to claim they did.
+ * EPAL.view() below registers 'cid/payroll' for five companies, but `payroll` is
+ * NOT a module in platform/core/config.js and no company manifest lists it, so the
+ * router 404s every #/<cid>/payroll/<tab> address. The registrations are kept (they
+ * are the standalone render path, ready if the desk is ever given its own menu
+ * entry) but nothing reaches them today. Owner decision 2026-07-29: leave it
+ * embedded-only — a standalone entry would sit in the sidebar next to the Accounts
+ * tab that already opens this exact desk. See modules/payroll/module.json.
+ *
+ * All accounting posts to the ledger. Every modal/form and the
  * compound-styled leaf helpers (formField, field, drow) keep their legacy
  * el()-built DOM. Never write a literal star-slash in this comment.
  *
@@ -984,7 +994,9 @@ function overviewView(page) {
 
   fillH(s, 'dept-title', ui.icon('diagram-3') + ' Where the money goes');
   fillK(s, 'dept-sub', 'monthly salary cost by department');
-  box(s, 'dept').appendChild(deptTable(P));
+  var dc = PR().departmentCost(CID);          // read ONCE — ring and table must agree
+  box(s, 'dept').appendChild(deptTable(P, dc));
+  deptRing(s, dc);
 
   mountScreen(page, s);
 }
@@ -1234,8 +1246,30 @@ function registerTable(series) {
   }).el;
 }
 
-function deptTable(P) {
-  var dc = PR().departmentCost(CID), total = sum(dc, function (r) { return r.cost; });
+/* The doughnut beside the department table. Fed the SAME rows in the SAME order,
+ * so slice N and row N are the same department and the two can never tell
+ * different stories. No legend: the table IS the legend, and printing every
+ * department name twice in one card is noise, not clarity.
+ * The ring is REMOVED (not hidden) when there is nothing to draw — an empty
+ * doughnut is a grey disc that looks like a broken chart. */
+function deptRing(s, dc) {
+  var ring = part(s, 'ring'), cv = part(s, 'deptcanvas');
+  if (!ring) return;
+  if (!dc.length || !sum(dc, function (r) { return r.cost; })) { ring.parentNode.removeChild(ring); return; }
+  requestAnimationFrame(function () {
+    if (!cv.isConnected) return;               // tab switched before the frame ran
+    trackChart(EPAL.charts.doughnut(cv, {
+      labels: dc.map(function (r) { return r.dept; }),
+      data: dc.map(function (r) { return r.cost; }),
+      // maintainAspectRatio:false lets it fill the fixed .pay-dept-ring box
+      options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    }));
+  });
+}
+
+function deptTable(P, dc) {
+  dc = dc || PR().departmentCost(CID);
+  var total = sum(dc, function (r) { return r.cost; });
   return EPAL.table({
     columns: [
       { key: 'dept', label: 'Department', render: function (r) { return '<span class="strong">' + esc(r.dept) + '</span>'; } },
@@ -1798,6 +1832,23 @@ function manageView(page) {
     : st === 'draft'
       ? (inWin ? ('<b>Correction window open</b> until ' + ui.date(run.correctionUntil) + ' — adjust per head, then finalize.') : ('Correction window closed (' + ui.date(run.correctionUntil) + ') — finalize to accrue.'))
       : ('Finalized — pay by ' + ui.date(run.dueAfter) + ' or unpaid salaries flag Due.');
+
+  /* PAYMENT PROGRESS — the card states the net and the outstanding as two separate
+   * figures; this shows the relationship without making anyone do the division.
+   * Appended here rather than added to the [data-tpl="run-card"] fragment, which is
+   * one of the ORIGINALS whose pixels must not move.
+   * The .meter lvl-* scale is risk-coloured, and that reads correctly once you see
+   * WHAT is being metered: unpaid salary. All paid = lvl-low = green. */
+  if (net > 0) {
+    var pm = shell('paymeter');
+    var pct = Math.max(0, Math.min(100, Math.round(paid / net * 100)));
+    fillK(pm, 'label', 'Paid ' + ui.money(paid) + ' of ' + ui.money(net) + (due > 0 ? ' · ' + ui.money(due) + ' still owed' : ''));
+    fillK(pm, 'pct', pct + '%');
+    var bar = part(pm, 'bar');
+    bar.style.width = pct + '%';
+    bar.classList.add(pct >= 100 ? 'lvl-low' : (pct > 0 ? 'lvl-mid' : 'lvl-high'));
+    rcard.querySelector('.card-body').appendChild(pm);
+  }
   page.appendChild(rcard);
 
   // The FULL salary sheet: Gross | OT | Bonus | Encash | Advance | Loan EMI |

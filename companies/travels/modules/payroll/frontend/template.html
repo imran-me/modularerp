@@ -4,9 +4,14 @@
   The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +
   filled at runtime via [data-tpl] / [data-slot] hooks.
 
-  Seven tabs (overview / template / manage / loans / payslip / advance /
-  reports), rendered BOTH standalone (cid/payroll/…) and embedded in Master
-  Accounts via EPAL.payrollDesk. Every modal/form (manage-salary, correction/
+  The desk is mounted EMBEDDED — in Master Accounts and in each company's Accounts
+  module, via EPAL.payrollDesk. Its sections are the tabs listed in the TABS array
+  in payroll.js (not restated here — a count in a comment goes stale).
+  ⚠ The #/<cid>/payroll/… standalone routes 404: `payroll` is not a module in
+  platform/core/config.js. Embedded-only is the owner's decision (2026-07-29) —
+  see payroll.js's header and modules/payroll/module.json.
+
+  Every modal/form (manage-salary, correction/
   edit, print-sheet, pay, money, encashment) keeps its legacy el()-built DOM, as
   do the compound-styled leaf helpers formField() and field() (label+control rows
   with inline padding/width — impractical as utilities). STYLING = the house
@@ -96,6 +101,27 @@
   in payroll.js, and because a tile must never imply a trend it cannot prove.
   (Payroll Reports is exactly that case: see reportsView.)
 --------------------------------------------------------------------------- -->
+<!-- ---------------------------------------------------------------------------
+  PAYMENT PROGRESS — appended into the Salary Manage run card (owner 2026-07-29).
+  The card already states the net and the outstanding as two separate figures;
+  this makes the RELATIONSHIP between them readable at a glance — how much of the
+  month's payroll has actually reached staff.
+
+  It is appended by JS rather than added to the [data-tpl="run-card"] fragment
+  above, because that fragment is one of the ORIGINALS whose pixels must not move.
+
+  The .meter lvl-* vocabulary is risk-coloured (low = green), and that is exactly
+  right here read the right way round: the risk being metered is UNPAID SALARY.
+  Fully paid = lvl-low = green; nothing paid = lvl-high = red.
+--------------------------------------------------------------------------- -->
+<div data-shell="paymeter" class="pay-progress">
+  <div class="pay-progress-top">
+    <span class="text-mute sm" data-k="label"></span>
+    <span class="sm fw-600" data-k="pct"></span>
+  </div>
+  <div class="meter"><span data-el="bar"></span></div>
+</div>
+
 <div data-shell="kpitile" class="kpi-card">
   <div class="kpi-top">
     <span class="kpi-label" data-k="label"></span>
@@ -278,12 +304,20 @@
     <div class="card-body tbl-dense" data-fill="trend"></div>
   </div>
 
+  <!-- Where the money goes: the doughnut carries the PROPORTION, the table the
+       precise figures. No chart legend — the table beside it already names every
+       department and its share, so a legend would print each label twice. -->
   <div class="card">
     <div class="card-head">
       <h3 data-k="dept-title"></h3>
       <span class="card-sub" data-k="dept-sub"></span>
     </div>
-    <div class="card-body" data-fill="dept"></div>
+    <div class="card-body">
+      <div class="pay-dept-split">
+        <div class="pay-dept-ring" data-el="ring"><canvas data-el="deptcanvas"></canvas></div>
+        <div class="pay-dept-tbl" data-fill="dept"></div>
+      </div>
+    </div>
   </div>
 
 </section>
