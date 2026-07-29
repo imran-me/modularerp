@@ -2187,7 +2187,25 @@ function advanceView(page) {
     foot: 'of ' + t.length + ' on this payroll',
     series: headSeries(AE, N), goodDown: true }));
   page.appendChild(grid);
-  if (canCreate()) { var br = frag('btn-row'); var bb = slot(br, 'btn'); bb.innerHTML = ui.icon('cash') + ' Give Advance'; bb.addEventListener('click', function () { moneyForm(null, 'advance'); }); page.appendChild(br); }
+
+  /* THE DECISION QUEUE comes before everything else on this tab: it is the only
+   * thing here that is waiting on a person. */
+  advRequestQueue(page);
+
+  if (canCreate()) {
+    var br = frag('btn-row'); var bb = slot(br, 'btn');
+    bb.innerHTML = ui.icon('cash') + ' Give Advance';
+    bb.addEventListener('click', function () { moneyForm(null, 'advance'); });
+    // raising a REQUEST is the normal route; giving one outright stays for the
+    // case where the boss simply decides to, which is how this desk worked before
+    var rq = el('button.btn.btn-outline.ml-1', { html: ui.icon('hand-index') + ' Request Advance',
+      title: 'Raise a request for approval instead of paying it out now',
+      onclick: function () { advRequestForm(); } });
+    slot(br, 'btn').parentNode.appendChild(rq);
+    page.appendChild(br);
+  }
+
+  advRequestHistory(page);
 
   if (active.length) {
     var at = EPAL.table({
@@ -2199,6 +2217,147 @@ function advanceView(page) {
   }
   page.appendChild(txnTable('Advance transactions', txns));
 }
+/* ============================================================================
+ * ADVANCE SALARY REQUESTS — the ask, and the decision on it
+ * ----------------------------------------------------------------------------
+ * Owner 2026-07-29. Before this, opening the Give Advance form WAS the decision:
+ * whoever filled it in moved the money, and there was nothing to allow or
+ * disallow. Now a request is a record, and approving it is what disburses.
+ *
+ * Three things the owner asked for, and where each one lives:
+ *   "boss will allow or disallow"     → Approve / Decline on every waiting row
+ *   "can customize the amount"        → Approve opens a form with the asked
+ *                                       figure pre-filled and editable; the ask
+ *                                       is kept, so the sheet shows both
+ *   "for which month advanced"        → a badge on the row, a column in the
+ *                                       history, and the memo on the posting
+ * ==========================================================================*/
+function advRequestQueue(page) {
+  var pend = PR().advRequests({ companyId: CID, status: 'pending' });
+  if (!pend.length) return;                 // nothing waiting → no card at all
+  var card = shell('advreq');
+  fillH(card, 'title', ui.icon('hourglass-split') + ' Advance requests waiting on you');
+  fillK(card, 'sub', pend.length + ' pending · ' + ui.money(sum(pend, function (r) { return r.amount; })) + ' asked for');
+  var host = box(card, 'rows');
+  var tpl = host.querySelector('[data-proto="row"]');
+  tpl.parentNode.removeChild(tpl);          // the prototype itself never renders
+  pend.forEach(function (r) {
+    var row = tpl.cloneNode(true);
+    row.removeAttribute('hidden'); row.removeAttribute('data-proto');
+    fillH(row, 'name', EPAL.people ? EPAL.people.linkify(r.empName, r.empId) : esc(r.empName));
+    fillK(row, 'when', 'asked ' + ui.date(r.requestedOn));
+    fillK(row, 'amount', ui.money(r.amount));
+    fillK(row, 'forym', 'against ' + PR().mLabel(r.forYm));
+    fillK(row, 'reason', r.reason || 'No reason given');
+    var ap = act(row, 'approve', function () { advDecideForm(r, 'approved'); });
+    var rj = act(row, 'reject', function () { advDecideForm(r, 'rejected'); });
+    if (canCreate()) {
+      ap.innerHTML = ui.icon('check2-circle') + ' Approve';
+      rj.innerHTML = ui.icon('x-circle') + ' Decline';
+    } else {
+      // no permission to decide → the row still informs, but offers no buttons
+      ap.parentNode.removeChild(ap); rj.parentNode.removeChild(rj);
+    }
+    host.appendChild(row);
+  });
+  page.appendChild(card);
+}
+
+/* Everything already decided — kept because "who asked for what and what did we
+ * say" is exactly the question this screen gets asked six months later. Both
+ * figures are shown: what was requested, and what was actually approved. */
+function advRequestHistory(page) {
+  var rows = PR().advRequests({ companyId: CID }).filter(function (r) { return r.status !== 'pending'; });
+  if (!rows.length) return;
+  var tbl = EPAL.table({
+    columns: [
+      { key: 'requestedOn', label: 'Asked', date: true },
+      { key: 'empName', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.empName, r.empId) : '<span class="strong">' + esc(r.empName) + '</span>'; } },
+      { key: 'forYm', label: 'Against', render: function (r) { return '<span class="badge">' + esc(PR().mLabel(r.forYm)) + '</span>'; } },
+      { key: 'amount', label: 'Asked for', num: true, money: true },
+      { key: 'approvedAmount', label: 'Approved', num: true, sortVal: function (r) { return r.approvedAmount || 0; },
+        render: function (r) {
+          if (r.status !== 'approved') return '—';
+          // a figure that differs from the ask is the interesting case — say so
+          var cut = r.approvedAmount < r.amount;
+          return '<span class="num strong ' + (cut ? 'text-warn' : 'text-good') + '">' + ui.money(r.approvedAmount) + '</span>' +
+            (cut ? ' <span class="xs text-mute">of ' + esc(ui.money(r.amount)) + '</span>' : '');
+        } },
+      { key: 'reason', label: 'Reason' },
+      { key: 'note', label: 'Decision note' },
+      { key: 'status', label: 'Status', badge: { approved: 'good', rejected: 'bad' } }
+    ],
+    rows: rows, searchKeys: ['empName', 'reason', 'note'], quickFilter: 'status', pageSize: 10,
+    exportName: 'advance-requests.csv', pdfTitle: coFull(CID) + ' — Advance Salary Requests',
+    empty: { icon: 'inbox', title: 'Nothing decided yet' }
+  });
+  var card = frag('reg-card');
+  slot(card, 'title').innerHTML = ui.icon('journal-check') + ' Decided requests';
+  slot(card, 'sub').textContent = 'what was asked for, what was approved, and why';
+  slot(card, 'body').appendChild(tbl.el);
+  page.appendChild(card);
+}
+
+/* Raising the ask. The month defaults to NEXT month because that is what an
+ * advance is — money against pay not yet earned. */
+function advRequestForm(emp) {
+  var mopts = [];
+  var ym = PR().curYm();
+  for (var i = 0; i < 4; i++) { mopts.push([ym, PR().mLabel(ym)]); ym = PR().nextYm(ym); }
+  EPAL.formModal({
+    title: 'Request advance salary', icon: 'hand-index', size: 'sm',
+    record: { empId: emp ? emp.id : '', forYm: PR().nextYm(PR().curYm()), date: today() },
+    fields: [
+      { key: 'empId', label: 'Employee', type: 'select', required: true, searchable: true,
+        options: team().map(function (e) { return [e.id, e.name + ' · ' + (e.dept || '—')]; }) },
+      { key: 'amount', label: 'Amount asked for (৳)', type: 'money', required: true, min: 0 },
+      { key: 'forYm', label: 'Advance against which month', type: 'select', required: true, options: mopts,
+        hint: 'The month of salary this will be recovered from.' },
+      { key: 'reason', label: 'Reason', type: 'text', placeholder: 'Why is it needed?' },
+      { key: 'date', label: 'Requested on', type: 'date', default: today() }
+    ],
+    saveLabel: 'Submit request',
+    onSave: function (v) {
+      try {
+        PR().requestAdvance(v.empId, +v.amount, { forYm: v.forYm, reason: v.reason, date: v.date });
+        ui.toast('Request submitted — it now needs approval', 'success'); repaint(); return true;
+      } catch (e) { ui.toast(e.message || 'Could not submit', 'error'); return false; }
+    }
+  });
+}
+
+/* The decision. Approving pre-fills the asked amount and lets it be changed —
+ * "asked 20,000, approved 12,000" is the normal case, not an edge one — and it
+ * names the account the money leaves, so an approval moves a real balance rather
+ * than an abstract one. Declining insists on a reason. */
+function advDecideForm(r, decision) {
+  var approve = decision === 'approved';
+  EPAL.formModal({
+    title: (approve ? 'Approve advance · ' : 'Decline advance · ') + r.empName,
+    icon: approve ? 'check2-circle' : 'x-circle', size: 'sm',
+    record: { amount: r.amount, date: today(), method: 'Bank' },
+    fields: [
+      { type: 'section', label: r.empName + ' asked for ' + ui.money(r.amount) + ' against ' + PR().mLabel(r.forYm) +
+          (r.reason ? ' — "' + r.reason + '"' : '') },
+      approve ? { key: 'amount', label: 'Amount to release (৳)', type: 'money', required: true, min: 0, default: r.amount,
+        hint: 'Asked for ' + ui.money(r.amount) + '. Release less (or more) by changing this — the request keeps what was asked.' } : null,
+      approve ? { key: 'method', label: 'Paid from', type: 'select', required: true, searchable: true,
+        options: (EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(CID) : ['Bank', 'Cash'] } : null,
+      approve ? { key: 'date', label: 'Paid on', type: 'date', default: today() } : null,
+      { key: 'note', label: approve ? 'Note (optional)' : 'Reason for declining', type: 'text',
+        required: !approve, placeholder: approve ? '' : 'They need to be told why' }
+    ].filter(Boolean),
+    saveLabel: approve ? 'Approve & release' : 'Decline request',
+    onSave: function (v) {
+      try {
+        PR().decideAdvance(r.id, decision, { amount: v.amount, method: v.method, date: v.date, note: v.note });
+        ui.toast(approve ? 'Approved — ' + ui.money(+v.amount || r.amount) + ' released' : 'Request declined', 'success');
+        repaint(); return true;
+      } catch (e) { ui.toast(e.message || 'Could not record the decision', 'error'); return false; }
+    }
+  });
+}
+
 function txnTable(title, txns) {
   var tbl = EPAL.table({
     columns: [ { key: 'date', label: 'Date', date: true }, { key: 'empName', label: 'Employee' },

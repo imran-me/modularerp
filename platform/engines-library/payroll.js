@@ -659,6 +659,113 @@
       [{ account: '1250', dr: amount, cr: 0 }, { account: src.account, dr: 0, cr: amount }]);
     return txn({ type: 'advance', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Advance salary' });
   }
+  /* ====================================================================== *
+   * ADVANCE SALARY REQUESTS — the ask, and the decision on it
+   * ---------------------------------------------------------------------
+   * Owner 2026-07-29: "in the advance salary option, employees' advance salary
+   * request option will appear, boss will allow or disallow, also can customize
+   * the amount. For which month advanced — that should indicate."
+   *
+   * Until now advance() fired immediately: whoever opened the form moved the
+   * money. That is the whole gap — there was no ask, so there was nothing to
+   * allow or disallow. A REQUEST is now a record in its own right and approval is
+   * what disburses; nothing leaves an account until someone decides.
+   *
+   * WHICH MONTH. An advance is taken against a FUTURE month's salary, and which
+   * month was never recorded anywhere — the advance transaction has no such
+   * field. `forYm` is that missing fact, defaulted to next month because that is
+   * what "advance salary" almost always means, and shown wherever the request is.
+   *
+   * THE AMOUNT ON THE REQUEST IS THE ASK, NOT THE ANSWER. The approver may
+   * disburse a different figure (asked 20,000, approved 12,000 — extremely common),
+   * so the record keeps BOTH: `amount` is what was requested, forever, and
+   * `approvedAmount` is what was actually paid. Overwriting the ask would erase
+   * the fact that a decision was made at all.
+   *
+   * store pay_adv_requests
+   *   { id, empId, empName, companyId, amount, forYm, reason, status:
+   *     pending|approved|rejected, requestedOn, requestedBy,
+   *     decidedOn, decidedBy, approvedAmount, note, txnId }
+   * ====================================================================== */
+  function advRequests(f) {
+    f = f || {};
+    return S.list('pay_adv_requests').filter(function (r) {
+      if (f.companyId && r.companyId !== f.companyId) return false;
+      if (f.status && r.status !== f.status) return false;
+      if (f.empId && r.empId !== f.empId) return false;
+      return true;
+    }).sort(function (a, b) { return (a.requestedOn || '') < (b.requestedOn || '') ? 1 : -1; });
+  }
+  function advRequest(id) { return S.list('pay_adv_requests').filter(function (r) { return r.id === id; })[0] || null; }
+  // the month AFTER ym — an advance is against pay not yet earned
+  function nextYm(ym) {
+    var y = +String(ym).slice(0, 4), m = +String(ym).slice(5, 7) + 1;
+    if (m > 12) { m = 1; y++; }
+    return y + '-' + String(m).padStart(2, '0');
+  }
+  function requestAdvance(empId, amount, opts) {
+    opts = opts || {};
+    amount = round(amount);
+    if (!empId) throw new Error('Choose an employee.');
+    if (amount <= 0) throw new Error('Enter how much is being asked for.');
+    var cid = compOf(empId);
+    var req = {
+      id: 'AR-' + empId + '-' + String(S.list('pay_adv_requests').length + 1).padStart(3, '0'),
+      empId: empId, empName: empName(empId), companyId: cid,
+      amount: amount,
+      forYm: opts.forYm || nextYm(curYm()),
+      reason: opts.reason || '',
+      status: 'pending',
+      requestedOn: opts.date || today(),
+      requestedBy: opts.by || empId,
+      approvedAmount: 0, decidedOn: '', decidedBy: '', note: '', txnId: ''
+    };
+    S.upsert('pay_adv_requests', req);
+    bus.emit('data:changed', { store: 'pay_adv_requests' });
+    if (EPAL.audit && EPAL.audit.record) {
+      try { EPAL.audit.record({ action: 'create', entity: 'pay_adv_requests', entityId: req.id,
+        entityLabel: 'Advance request · ' + req.empName + ' · ' + round(amount), companyId: cid }); } catch (e) {}
+    }
+    return req;
+  }
+  /* APPROVE (optionally for a different amount) or REJECT.
+   * Approval is the only thing that moves money: it calls advance(), so the
+   * request inherits the whole existing chain — DR 1250 / CR the named account,
+   * the account's own register row, and automatic recovery from a later payslip.
+   * A rejection needs a reason: "no" without a why is not a decision anyone can
+   * act on later. */
+  function decideAdvance(id, decision, opts) {
+    opts = opts || {};
+    var req = advRequest(id);
+    if (!req) throw new Error('Request not found.');
+    if (req.status !== 'pending') throw new Error('This request was already ' + req.status + '.');
+    if (decision === 'rejected') {
+      if (!String(opts.note || '').trim()) throw new Error('Give a reason for turning it down.');
+      req.status = 'rejected';
+      req.note = String(opts.note).trim();
+    } else {
+      var amt = (opts.amount == null || opts.amount === '') ? req.amount : round(opts.amount);
+      if (amt <= 0) throw new Error('An approved advance has to be more than zero.');
+      var txn = advance(req.empId, amt, {
+        date: opts.date || today(), method: opts.method,
+        memo: 'Advance salary · against ' + mLabel(req.forYm)
+      });
+      req.status = 'approved';
+      req.approvedAmount = amt;                 // what was PAID — req.amount stays the ask
+      req.note = String(opts.note || '').trim();
+      req.txnId = txn ? txn.id : '';
+    }
+    req.decidedOn = opts.date || today();
+    req.decidedBy = opts.by || (EPAL.auth && EPAL.auth.current ? (EPAL.auth.current() || {}).id : '') || '';
+    S.upsert('pay_adv_requests', req);
+    bus.emit('data:changed', { store: 'pay_adv_requests' });
+    if (EPAL.audit && EPAL.audit.record) {
+      try { EPAL.audit.record({ action: 'update', entity: 'pay_adv_requests', entityId: req.id,
+        entityLabel: 'Advance ' + req.status + ' · ' + req.empName, companyId: req.companyId }); } catch (e) {}
+    }
+    return req;
+  }
+
   function loan(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
@@ -997,6 +1104,37 @@
     S.set('pay_seeded_v3', true);
   }
 
+  /* A decision queue with nothing in it teaches nobody what the screen is for, so
+   * the demo opens with two real asks waiting and one that was turned down.
+   * ITS OWN GATE, deliberately not seedDemo's: every browser already carries
+   * pay_seeded_v3, so anything added there would never appear for anyone who has
+   * run this app before.
+   * NOTHING HERE IS PRE-APPROVED. Approving moves money out of a real account,
+   * and money should move because somebody decided it should — the approved rows
+   * on this screen are the ones the owner creates by approving. */
+  function seedAdvReqs() {
+    if (S.get('pay_advreq_seeded_v1', false)) return;
+    var t = activeTeam('travels');
+    if (t.length >= 4) {
+      var nx = nextYm(curYm());
+      var on = function (day) {                     // never date a request in the future
+        var d = curYm() + '-' + day;
+        return d > today() ? today() : d;
+      };
+      try {
+        requestAdvance(t[2].id, 20000, { forYm: nx, date: on('18'),
+          reason: 'School admission fee for my daughter' });
+        requestAdvance((t[4] || t[3]).id, 12000, { forYm: nx, date: on('21'),
+          reason: 'Medical — my father is admitted' });
+        var r = requestAdvance(t[3].id, 45000, { forYm: nx, date: on('09'),
+          reason: 'Home renovation' });
+        decideAdvance(r.id, 'rejected', { date: on('10'),
+          note: 'More than a month of salary. Reapply for a smaller amount, or take it as a staff loan on EMI so it clears over time.' });
+      } catch (e) { /* a thin demo team — leave the queue empty */ }
+    }
+    S.set('pay_advreq_seeded_v1', true);
+  }
+
   /* --------------------------------------------------------------- API */
   EPAL.payroll = {
     template: template, saveTemplate: saveTemplate, computeSlip: computeSlip, slipPayable: slipPayable,
@@ -1007,6 +1145,8 @@
     inCorrectionWindow: inCorrectionWindow, adjustSlip: adjustSlip,
     finalize: finalize, unfinalize: unfinalize, pay: pay, unpay: unpay, autoDue: autoDue, refreshRunStatus: refreshRunStatus,
     advance: advance, loan: loan, repayLoan: repayLoan, bonus: bonus,
+    advRequests: advRequests, advRequest: advRequest, requestAdvance: requestAdvance,
+    decideAdvance: decideAdvance, nextYm: nextYm,
     advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, emiInstallment: emiInstallment, salaryDue: salaryDue,
     leaveState: leaveState, settlementPreview: settlementPreview, settle: settle,
     encashmentLiability: encashmentLiability, payEncashment: payEncashment, departmentCost: departmentCost,
@@ -1017,7 +1157,7 @@
 
   EPAL.registerEngine({
     name: 'payroll',
-    seed: function () { ensureAccounts(); S.list('employees'); seedDemo(); },
+    seed: function () { ensureAccounts(); S.list('employees'); seedDemo(); seedAdvReqs(); },
     boot: function () { ensureAccounts(); autoDue(); }
   });
 

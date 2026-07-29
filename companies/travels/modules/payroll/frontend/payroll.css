@@ -28,6 +28,26 @@
   .pay-dept-ring { width: 100%; height: 170px; }
 }
 
+/* ADVANCE REQUESTS — one waiting row. Four columns on a desk (who · how much and
+   for which month · why · the two buttons), stacking to a readable block on a
+   phone. The left rail is the house "needs a decision" cue, the same idea as the
+   severity stripe on an Autopilot row. */
+.adv-req {
+  display: grid; grid-template-columns: minmax(150px, 1.1fr) auto minmax(0, 1.6fr) auto;
+  gap: 14px; align-items: center;
+  padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--r-md);
+  border-left: 3px solid var(--warn); background: var(--surface-2); margin-bottom: 9px;
+}
+.adv-req:last-child { margin-bottom: 0; }
+.adv-req-ask { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.adv-req-why { min-width: 0; overflow-wrap: anywhere; }
+.adv-req-do { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 860px) {
+  .adv-req { grid-template-columns: 1fr auto; }
+  .adv-req-why { grid-column: 1 / -1; }
+  .adv-req-do { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
 /* PAYMENT PROGRESS — appended under the Salary Manage run card's status line.
    The card already prints the net and the outstanding as two separate figures;
    this makes the relationship between them readable without doing the division

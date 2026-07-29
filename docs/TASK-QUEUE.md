@@ -550,7 +550,7 @@ proposals-with-buttons that never posts by itself.
 
 Two tasks, given together. Doing them in order, one at a time.
 
-### T-PAY-DATA — Jan 2026 → today, every scenario, all of it logical ◻
+### T-PAY-DATA — Jan 2026 → today, every scenario, all of it logical ✅ DONE 2026-07-29 (4ee897e)
 Owner: *"give some demo realistic data, from january 2026 to present real time,
 with all scenario, employee based deduction, bonus, attendances, etc. All should be
 functional, and logical data. like someone taken a loan, his next month payroll
@@ -580,7 +580,7 @@ variety comes from a hash of `empId + ym`.
 ⚠ **Idempotency:** never adjust a run that is already finalized; that would move
 slips out from under postings the ledger has already made.
 
-### T-PAY-ADVREQ — advance salary becomes a request the boss approves ◻
+### T-PAY-ADVREQ — advance salary becomes a request the boss approves ✅ DONE 2026-07-29
 Owner: *"in the advance salary option, employees' advance salary request option
 will appear, boss will allow or disallow, also can customize the amount. For which
 month advanced — that should indicate."*
@@ -591,8 +591,38 @@ amount**; approval is what actually disburses (today `EPAL.payroll.advance()` fi
 straight away with no ask). The month it is advanced AGAINST must be shown, and it
 is a genuinely new field — the current advance txn has no target month.
 
-Needs a new store, engine calls, and a queue on the Advance Salary tab. Wave-3
-"control" work arriving early because the owner asked for it directly.
+**DONE.** New store `pay_adv_requests`; engine gains `advRequests` / `advRequest` /
+`requestAdvance` / `decideAdvance` / `nextYm`; the Advance Salary tab gains a
+decision queue, an approve/decline flow and a decided-requests history.
+
+**The three asks, and where each landed:**
+· *"boss will allow or disallow"* → Approve / Decline on every waiting row.
+· *"can customize the amount"* → Approve opens a form with the asked figure
+  pre-filled and editable. **Both figures are kept** — `amount` is the ask, for
+  ever, and `approvedAmount` is what was actually released. Overwriting the ask
+  would erase the fact that a decision was made at all; the history column shows
+  "৳6,000 of ৳12,000" when they differ.
+· *"for which month advanced"* → `forYm`, a genuinely new field (the advance
+  transaction never had one). Defaults to NEXT month, because that is what an
+  advance is. Shown as a badge on the row, a column in the history, and written
+  into the ledger memo: *"Advance salary · against August 2026"*.
+
+**Approval is the only thing that moves money** — it calls the existing
+`advance()`, so a request inherits the whole chain: DR 1250 / CR the named
+account, the account's own register row, and automatic recovery from a later
+payslip. Declining insists on a reason; a decided request cannot be decided twice.
+
+Seeded with 2 pending + 1 declined under its OWN gate (`pay_advreq_seeded_v1`, not
+seedDemo's — every existing browser already carries `pay_seeded_v3`, so anything
+added there would never appear for anyone who has run the app before). **Nothing
+is pre-approved**: approving moves real money, and the approved rows should be the
+ones the owner creates.
+
+**Verified 20/20** — approving 6,000 against a 12,000 ask moved advance outstanding
+and ledger 1250 by exactly 6,000 while the ask stayed 12,000, the memo named the
+month, the books balanced, and the three guards (no-reason decline, double
+decision, zero amount) all refused. Sweep 253/253 × both themes · trial balance
+balances · tw gate green.
 
 ---
 

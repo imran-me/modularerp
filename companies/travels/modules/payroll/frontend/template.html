@@ -412,6 +412,45 @@
   The [data-fill="list"] table is EPAL.table (a data grid — the law's live-data
   carve-out); everything around it is markup.
 --------------------------------------------------------------------------- -->
+<!-- ---------------------------------------------------------------------------
+  ADVANCE REQUESTS — the decision queue on the Advance Salary tab (owner
+  2026-07-29: "employees' advance salary request option will appear, boss will
+  allow or disallow, also can customize the amount. For which month advanced,
+  that should indicate.").
+
+  One card, two parts: the asks still waiting on a decision, then everything
+  already decided. The pending card is REMOVED when the queue is empty — an empty
+  decision queue is not a screen anyone needs to look at, and leaving it there
+  makes the tab look like it is asking for something when it is not.
+
+  Each waiting row states who, how much, WHICH MONTH the advance is against, and
+  why — then Approve (which opens a form where the amount can be changed) and
+  Decline (which insists on a reason).
+--------------------------------------------------------------------------- -->
+<div data-shell="advreq" class="card mb-3">
+  <div class="card-head">
+    <h3 data-k="title"></h3>
+    <span class="card-sub" data-k="sub"></span>
+  </div>
+  <div class="card-body" data-fill="rows">
+    <div class="adv-req" hidden data-proto="row">
+      <div class="adv-req-who">
+        <div class="fw-700" data-k="name"></div>
+        <div class="text-mute xs" data-k="when"></div>
+      </div>
+      <div class="adv-req-ask">
+        <div class="strong num" data-k="amount"></div>
+        <span class="badge badge-info" data-k="forym"></span>
+      </div>
+      <div class="adv-req-why text-mute sm" data-k="reason"></div>
+      <div class="adv-req-do">
+        <button class="btn btn-sm btn-primary" type="button" data-act="approve"></button>
+        <button class="btn btn-sm btn-outline" type="button" data-act="reject"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <section data-screen="salary-templates">
 
   <div class="card mb-3">
