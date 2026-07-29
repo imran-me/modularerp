@@ -220,7 +220,16 @@ function sectionNav(sub, cid) {
  * group desk and a company desk. */
 var deskTab = 'overview';
 EPAL.payrollDesk = function (page, cid, opts) {
-  if (CID !== cid) { payYm = null; ovMonth = null; deskTab = 'overview'; }
+  /* SWITCHING COMPANY KEEPS THE SECTION (owner 2026-07-29: "suppose i am in
+   * salary manage, if i switch company on the right, the menu also gets changed
+   * from salary manage to overview!!! The page should stay where it was, just
+   * the switcher applied"). The switcher answers "whose payroll", not "which
+   * screen" — comparing Travels' salary run with Woodart's means staying on the
+   * salary run. Only the MONTH selections reset: `payYm`/`ovMonth` name a month
+   * that was picked from the previous company's own list of runs and need not
+   * exist in the new one, so they fall back to that company's current month. The
+   * eight sections exist for every company, so the tab always survives. */
+  if (CID !== cid) { payYm = null; ovMonth = null; }
   CID = cid;
   var host = el('div');
   function draw() {
