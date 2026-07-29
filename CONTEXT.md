@@ -490,6 +490,81 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-29 · SALARY IS PAID MONTH BY MONTH, AND A LOAN ROW SAYS WHAT IS DUE
+
+Two owner asks, landed together (both edit `payroll.js` and the hunks interleave).
+Commit `6991280`. Detail in `docs/TASK-QUEUE.md` › T-SALARY-SPLIT and T-LOAN-ROWS.
+
+**1 · The allocator — paying more than one month at once.** Owner: *"he might have 20K
+due for his March salary and 40K for July, so I can pay Against Due 15K (due becomes
+5K) and against July 30K (10K goes to the due), total due 15K."* Until now salary
+payment could aim at ONE month only: the Pay… form paid the month whose row you
+clicked, and earlier months were all-or-nothing through `payArrears()`, which clears
+every open month in full, oldest first. There was no way to put a part-payment against
+March and a different one against July in the same breath.
+
+**Nothing in the accounting had to move.** `pay(empId, ym, amount, method)` has always
+booked a PARTIAL against a NAMED month, leaving the rest on 2100 Salary Payable — the
+company's debt to the employee — with the slip reading `partial`. What was missing was
+a way to SAY it. So the allocator is one posting per month with a figure in it, and
+every guard the engine carries (never more than outstanding, advance/EMI recovery, the
+`onBooks()` ledger ceiling) still applies to each leg untouched.
+
+`payAllocator(emp, ym)` returns `{ el, post() }`, so ONE widget serves both surfaces —
+it renders inline in Manage Salary and it is the body of the Pay… modal. It lists every
+unpaid month via `previousDueList(empId, '9999-12')` — an upper bound, not a date, so
+the question asked is "every unpaid month there is" rather than "every month before
+this one". Opening March must still show that July is unpaid.
+**Paid from now names a REAL account** (`EPAL.pay.options(CID)`, `'m:<Method>'`
+unwrapped back to the plain word before it reaches `pay()`), so a salary payment moves
+the account's own register. The old form offered a bare `['Bank','Cash','bKash',…]`
+list and moved nothing — the same class of bug the 2026-07-28 audit found on advance,
+loan, repayment, bonus and encashment.
+
+**2 · Manage Salary now reads the month out in full.** Owner sent the reference app's
+*Add New salary form* with: *"our current + this screenshot, by combining both. I must
+need what I have now, then will be added the new screenshot like shape."* So the modal
+keeps its identity row, its four stats and every button EXACTLY, and gains four cards
+beneath: **Salary record** (month · generated · scheduled · method · status · gross ·
+total deductions · total additions · bonus · adjustment · net + amount in words) ·
+**Attendance summary** · **Deduction breakdown** · **Overtime & additions**. Size went
+`md` → `lg`; the fact tiles reuse `.emp-facts`/`.emp-fact` from the employee profile so
+the modal reads as one system.
+
+They are READ-OUTS, not inputs. The month is still edited where it always was — Adjust
+(`correctionForm`) while the run is a draft. Two places to type the same figure is how
+the two drift apart. Net checks by construction: gross + additions − deductions IS
+`slipPayable(s)`, the tiles are that sum split.
+
+**Where the reference shows something this system does not hold, the tile says what we
+DO hold.** Attendance is recorded in DAYS (present · absent · late count · early-leave
+count · overtime hours) — there is no clock-in/out anywhere, so late MINUTES and worked
+HOURS cannot be shown, and the card says so rather than inventing them (same gap the
+task queue already flags as an owner decision). The overtime RATE is read back out of
+the slip (`overtime ÷ hours`) rather than recomputed — a slip does not carry `otRate`,
+and recomputing would quote today's package against a month finalized under the old one.
+**⏭ Still needs an owner call:** the reference's free-text **Note** and editable
+**Bonus Label** are new persisted fields (column + migration + a place on Adjust), so
+they were not invented into the store.
+
+**3 · Every loan row says taken · taken on · paid till now · still due.** New engine
+read `EPAL.payroll.loanBook(empId)` rebuilds the per-loan book from the movements the
+engine already records — every disbursement is a loan, every repayment (manual, the
+auto payslip EMI, or a settlement) applied FIFO to the oldest open loan. Nothing is
+stored, and Σ due IS `loanOutstanding()` by construction, so no tile can drift from
+another. Surfaced on Payroll › Loans (plus a Loan register and a per-loan drill-down
+with the balance after each payment), Staff Accounts, the employee file, Payroll ›
+Reports and Master Accounts › Manage Loan.
+
+**Verified:** routes-imports 46/46 · tailwind reproducible + 0 orphans · every committed
+`view.js` is the real build of its sources · boot sweep **253/253 routes × both themes,
+0 console errors, 0 render failures** · trial balance balances · and the allocator
+driven end-to-end in headless Chrome — 26,474 typed against January and 16,805 against
+July of 35,298/33,609 left **8,824 + 16,804 = 25,628**, exactly what the footer
+previewed before the button was pressed.
+
+---
+
 ## 🆕 SESSION — 2026-07-29 · SALARY TEMPLATES: A SAVED PACKAGE PER EMPLOYEE, AND IT IS THE PAY
 
 **The ask** (owner screenshot of the group's existing *Salary Templates List*): the saved
