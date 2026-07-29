@@ -1445,19 +1445,25 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
         });
         actions.appendChild(sb);
       }
-      /* SIX MONTHS OF TRAVELS PAYROLL (owner 2026-07-28: "in travels, push some
-       * realistic data of past 6 month … in payroll"). Runs the real engine month
-       * by month — generate, accrue, pay — with a staff loan on EMI, an Eid bonus,
-       * an advance recovered from the next salary, and every payment leaving a
-       * named account. Idempotent: a month already finalized is left alone. */
+      /* TRAVELS PAYROLL HISTORY (owner 2026-07-28, extended 2026-07-29: "from
+       * january 2026 to present real time, with all scenario"). Runs the real
+       * engine month by month — attendance, generate, per-head adjustments, accrue,
+       * pay — with absences and lates deducted automatically, overtime, an Eid
+       * bonus, a loan amortised by EMI, a second loan settled in one payment, an
+       * advance recovered from the next salary, and every payment leaving a named
+       * account. Idempotent: a month already finalized is left alone.
+       * The label counts the months rather than stating a number, so extending the
+       * range never leaves a button lying about what it does. */
       if (EPAL.samplePayroll) {
-        var pb = btn('btn btn-sm btn-outline', ui.icon('people') + ' Load 6 months of Travels payroll', function () {
+        var pms = EPAL.samplePayroll.months();
+        var pb = btn('btn btn-sm btn-outline', ui.icon('people') + ' Load ' + pms.length + ' months of Travels payroll', function () {
           var ms = EPAL.samplePayroll.months();
-          ui.confirm({ title: 'Write six months of Travels payroll?', icon: 'people',
-            text: 'Runs ' + ms[0] + ' to ' + ms[ms.length - 1] + ' through the payroll engine: each month generated, ' +
-              'accrued to the ledger and paid from a real account, plus a staff loan on EMI, an Eid bonus for the team ' +
-              'and an advance recovered from the following salary. Travels only, payroll only. Running it again changes ' +
-              'nothing — months already finalized are left as they are.',
+          ui.confirm({ title: 'Write ' + ms.length + ' months of Travels payroll?', icon: 'people',
+            text: 'Runs ' + ms[0] + ' to ' + ms[ms.length - 1] + ' through the payroll engine: attendance recorded per head, ' +
+              'each month generated, accrued to the ledger and paid from a real account — plus absences and lates deducted ' +
+              'automatically, overtime, an Eid bonus for the team, a staff loan amortised by EMI, a second loan settled in ' +
+              'one payment, and an advance recovered from the following salary. The current month is left with real work in ' +
+              'it. Travels only, payroll only. Running it again changes nothing — months already finalized are left as they are.',
             confirmLabel: 'Write it' }).then(function (ok) {
               if (!ok) return;
               var r;

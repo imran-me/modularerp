@@ -546,6 +546,56 @@ proposals-with-buttons that never posts by itself.
   **Salary Templates** slice landed (`a7a5d4b` + `5c90096`). 1b and 1c were built
   straight on top of it. **Only 1d's column groups remain open in Wave 1.**
 
+## 🆕 2026-07-29 — OWNER: DEMO DATA + ADVANCE-SALARY REQUESTS
+
+Two tasks, given together. Doing them in order, one at a time.
+
+### T-PAY-DATA — Jan 2026 → today, every scenario, all of it logical ◻
+Owner: *"give some demo realistic data, from january 2026 to present real time,
+with all scenario, employee based deduction, bonus, attendances, etc. All should be
+functional, and logical data. like someone taken a loan, his next month payroll
+should deduct the EMI automatically, an employee can also repay the loan at once."*
+
+Extends `platform/kit/sample-payroll.js`, which already drives the REAL engine
+month by month (generate → finalize → pay) rather than writing fixtures — so the
+books fill exactly as if the months had been run at the time. What it covers today:
+a staff loan on 6 EMIs, an Eid bonus, one advance, one part-paid month, Jan–Jun.
+
+**To add:** the current month (so it runs to *today*, not to last month) ·
+per-employee **attendance** (absent / late / early-leave) feeding the automatic
+deductions · **overtime** hours · **individual** performance bonuses on top of the
+festival one · an occasional **other deduction** · and a **lump-sum loan
+repayment** (`repayLoan`) beside the EMI-amortised one, because the owner asked for
+both ways of clearing a loan.
+
+**Two engine facts that decide the shape:**
+1. `generate()` reads `attendanceFor(empId, ym)` when it creates a NEW slip — so
+   attendance must be written BEFORE the first generate, and then the absences are
+   baked in with no correction-window fight.
+2. `adjustSlip()` recomputes the slip from the `adj` it is handed, so a partial adj
+   (just `{overtimeHours}`) would silently WIPE the attendance. Always pass the
+   full set.
+⚠ **Determinism:** the boot sweep must stay reproducible, so no `Math.random()` —
+variety comes from a hash of `empId + ym`.
+⚠ **Idempotency:** never adjust a run that is already finalized; that would move
+slips out from under postings the ledger has already made.
+
+### T-PAY-ADVREQ — advance salary becomes a request the boss approves ◻
+Owner: *"in the advance salary option, employees' advance salary request option
+will appear, boss will allow or disallow, also can customize the amount. For which
+month advanced — that should indicate."*
+
+So: an employee raises a REQUEST (amount + which month it is against + reason);
+the approver sees it pending and can **approve / reject / approve-for-a-different-
+amount**; approval is what actually disburses (today `EPAL.payroll.advance()` fires
+straight away with no ask). The month it is advanced AGAINST must be shown, and it
+is a genuinely new field — the current advance txn has no target month.
+
+Needs a new store, engine calls, and a queue on the Advance Salary tab. Wave-3
+"control" work arriving early because the owner asked for it directly.
+
+---
+
 **WAVE 1 IS COMPLETE EXCEPT 1d's column groups.** Next up is either that or Wave 2
 (the real gaps — variance report, gross→net waterfall, cost bridge, run checklist,
 pre-finalize gates). Wave 2 is where the distance to SAP/Workday/Oracle actually
