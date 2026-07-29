@@ -3,15 +3,16 @@
   "company": "travels",
   "title": "Payroll",
   "icon": "cash-coin",
-  "desc": "Dedicated payroll desk — salary template, monthly run, loans, payslips and advances.",
-  "route": "#/travels/payroll",
+  "desc": "Dedicated payroll desk — overview, salary template, monthly run, staff accounts, loans, payslips, advances and reports.",
+  "route": "#/travels/accounts → the Payroll tab",
+  "routeNote": "EMBEDDED-ONLY BY DESIGN (owner decision 2026-07-29). This field used to read '#/travels/payroll'. That address 404s and always has: payroll is not registered as a module in platform/core/config.js, and the Travels company manifest does not list it either, so the router has no door to open. The desk is reached through Accounts → Payroll on a company, and Master Accounts → Master Payroll at group level — the only ways anyone actually uses it. Registering the standalone route would add a second Payroll entry to the sidebar beside the Accounts tab that already exists; the owner chose not to. Nothing in the app reads this field (discovery only HEADs the file to see whether the folder still exists), so it is documentation — and it is now written to be TRUE rather than aspirational.",
   "enabled": true,
   "built": true,
   "menu": [],
-  "menuNote": "No sidebar sub-menu by design — the 5 sections (Template/Manage/Loans/Payslip/Advance/Reports) are pill-buttons at the top of the payroll view.",
+  "menuNote": "No sidebar sub-menu by design — the 8 sections (Overview / Salary Manage / Staff Accounts / Salary Template / Loan Management / Payslip / Advance Salary / Reports) are pill-buttons at the top of the payroll desk.",
   "files": {
     "view": "view.js",
     "backend": "backend/LARAVEL-BLUEPRINT.md"
   },
-  "note": "Driven by the shared EPAL.payroll engine; posts accruals/payments/advances/loans/encashment to the GL tagged companyId:travels."
+  "note": "Driven by the shared EPAL.payroll engine; posts accruals/payments/advances/loans/encashment to the GL tagged companyId:travels. ONE implementation serves every concern — EPAL.payrollDesk(page, cid) is mounted by Master Accounts and by each company's Accounts module, so the group desk and a company desk cannot diverge."
 }
