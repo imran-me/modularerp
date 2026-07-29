@@ -670,6 +670,65 @@
       ])
     ]);
 
+    /* ---- DEMO DATA SWITCH (owner 2026-07-29) -------------------------------
+     * "why does after reload all data vanishes????? Just make a option in the
+     * settings, load demo data, if click that, demo data will be permanent, after
+     * turning off the demo data in the same place in settings, the data will be
+     * vanished, and the real database will work perfectly."
+     *
+     * ON re-generates the sample payroll after every hydration, which is what
+     * makes it survive a reload without one row ever reaching the database.
+     * OFF empties the browser-side stores and reloads, so hydration refills them
+     * from the real database. Nothing is deleted server-side because nothing was
+     * ever written there. */
+    var demoCard = null;
+    if (EPAL.demoData) {
+      var d = EPAL.demoData.summary();
+      var sw = el('input', { type: 'checkbox' });
+      sw.checked = d.on;
+      sw.addEventListener('change', function () {
+        var turningOn = sw.checked;
+        if (turningOn) {
+          var r = EPAL.demoData.enable();
+          ui.toast(r ? ('Demo data loaded — ' + r.made.months + ' months · ' + r.made.slips + ' payslips') : 'Demo data on', 'success');
+          setTimeout(function () { location.reload(); }, 600);
+        } else {
+          ui.confirm({ title: 'Turn demo data off?', icon: 'trash',
+            text: 'Every generated payroll month, payslip, transaction and attendance record is cleared from this browser, and the page reloads onto your real database. Nothing is deleted on the server — none of it was ever written there.',
+            confirmLabel: 'Turn it off' }).then(function (ok) {
+              if (!ok) { sw.checked = true; return; }
+              EPAL.demoData.disable();
+              ui.toast('Demo data cleared — reloading onto the real database…', 'success');
+              setTimeout(function () { location.reload(); }, 600);
+            });
+        }
+      });
+      demoCard = el('div.card', null, [
+        el('div.card-head', null, [ el('h3', { html: ui.icon('database-fill-gear') + ' Demo Data' }),
+          el('span.card-sub', { text: d.live ? 'live database — demo data stays in this browser' : 'demo database' }) ]),
+        el('div.card-body', null, [
+          el('div.flex.items-center.gap-3', { style: { flexWrap: 'wrap' } }, [
+            el('label.switch', null, [ sw, el('span.track') ]),
+            el('div.flex-1', { style: { minWidth: '220px' } }, [
+              el('div.fw-600', { text: d.on ? 'Demo data is ON' : 'Demo data is OFF' }),
+              el('div.text-mute.sm', { text: d.on
+                ? ('Sample payroll for ' + d.months + ' months (' + d.from + ' → ' + d.to + ') across every concern, rebuilt on each load so it survives a reload.')
+                : 'Only your real data is shown. Switch on to add a sample payroll history for demos.' })
+            ])
+          ]),
+          d.on ? el('div.stat-row.mt-3', null, [
+            el('div.stat', null, [ el('div.stat-label', { text: 'Payroll months' }), el('div.stat-value', { text: String(d.runs) }) ]),
+            el('div.stat', null, [ el('div.stat-label', { text: 'Payslips' }), el('div.stat-value', { text: String(d.slips) }) ]),
+            el('div.stat', null, [ el('div.stat-label', { text: 'Transactions' }), el('div.stat-value', { text: String(d.txns) }) ]),
+            el('div.stat', null, [ el('div.stat-label', { text: 'Attendance' }), el('div.stat-value', { text: String(d.attendance) }) ])
+          ]) : null,
+          el('p.text-mute.xs.mt-3', { html: d.live
+            ? ui.icon('shield-check') + ' Your database is never written to. The history is rebuilt in this browser after each load, so switching off leaves your real books exactly as they are.'
+            : ui.icon('info-circle') + ' On a demo database this is the payroll history the desks read.' })
+        ].filter(Boolean))
+      ]);
+    }
+
     /* ---- storage footprint chart ------------------------------------------*/
     var footId = ui.uid('gset');
     var chart = el('div.card', null, [
@@ -683,7 +742,7 @@
     var row = el('div.two-col');
     row.appendChild(formCard);
     row.appendChild(el('div.flex.flex-col.gap-3', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } }, [
-      dataCard, chart ]));
+      dataCard, demoCard, chart ].filter(Boolean)));
     page.appendChild(row);
 
     /* ---- SETTINGS ENGINE sections -----------------------------------------*/

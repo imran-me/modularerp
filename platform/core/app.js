@@ -81,6 +81,12 @@
     start: function (apiMode) {
       if (!apiMode) EPAL.db.seed();      // 1. demo data — DEMO MODE ONLY
       if (apiMode) EPAL.api.wireWrites();// 1b. saves/deletes on writable stores now reach the DB
+      // 1c. the DEMO DATA SWITCH (Settings › Demo Data). Deliberately here: after
+      // hydrate() has resolved, so the server's real rows are already in place and
+      // the sample history is added ON TOP rather than fighting them, and after
+      // wireWrites() has set EPAL.api.live, which is what makes the generator
+      // suspend its database writes. Off by default on a live database.
+      if (EPAL.demoData) EPAL.demoData.applyIfOn();
       EPAL.modules.applyOverrides();     // 2. fold saved on/off flags onto config
       this.applyTheme();                 // 3. paint theme before first render
       this.renderShell();                // 4. build rail + sidebar + topbar
