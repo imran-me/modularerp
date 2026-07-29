@@ -1,8 +1,26 @@
 # Payroll UI/UX — market research, gap analysis and a build backlog
 
-**Date:** 2026-07-28 · **Scope:** research + comparison only. Nothing in this document
-has been implemented. Every item is tagged with whether the data already exists, so
-nothing here violates R8 (no invented data) without saying so out loud.
+**Date:** 2026-07-28 · **Scope:** research + comparison. Every item is tagged with
+whether the data already exists, so nothing here violates R8 (no invented data)
+without saying so out loud.
+
+> **Build status — updated 2026-07-29.** Wave 1 is under way; see `docs/TASK-QUEUE.md`
+> for the live tracker.
+> · ✅ **A6 + B1 + B2 — rich KPI tiles** (trend pill · context foot line · sparkline)
+>   on Loan Management and Advance Salary; Payroll Reports gets pills and foot lines
+>   but deliberately **no sparkline band** (`918bb22`). The governing rule that came
+>   out of building it: *a sparkline's last point must equal the figure printed above
+>   it* — which is why the encashment tile has no line, exactly as §5 predicted.
+> · ✅ **E2 (half) — frozen identity column** on the `.tbl-dense` sheets (`a6887df`).
+> · ⛔ A4 doughnut, A7 meter and E1 column groups are blocked behind a concurrent
+>   session holding `payroll.js`.
+>
+> One correction to §3 from testing: the module header claims the desk renders
+> "standalone (`#/<cid>/payroll/<tab>`) AND embedded". **Standalone does not work** —
+> `payroll` is registered as a view for five companies and declares
+> `"route": "#/travels/payroll"` in its `module.json`, but it is not a module in
+> `platform/core/config.js`, so every standalone payroll route 404s. The desk is
+> reachable only embedded. Flagged for an owner decision, not fixed.
 
 ---
 

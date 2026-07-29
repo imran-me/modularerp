@@ -490,10 +490,33 @@ proposals-with-buttons that never posts by itself.
     (Master Accounts › Master Payroll, `<co>` › Accounts › Payroll). The module header
     still claims it renders standalone. Registering it is a navigation change and per
     CLAUDE.md needs both config.js and module.json — **owner decision.**
-  - ◻ 1b · department doughnut beside the existing "Where the money goes" table
-  - ◻ 1c · payment-progress `.meter` on the Salary Manage run card
-  - ◻ 1d · column groups (Earnings │ Deductions │ Recovery │ Settlement) + sticky
-    employee column on the 24-column register
+  - ⛔ 1b · department doughnut beside the existing "Where the money goes" table
+  - ⛔ 1c · payment-progress `.meter` on the Salary Manage run card
+  - ✅ **1d (half) · FROZEN IDENTITY COLUMN — DONE 2026-07-29** (`a6887df`).
+    Pure CSS in `platform/design-system/css/base.css`, scoped to `.tbl-dense`,
+    which ONLY Payroll applies — no other table in the app is touched. The dense
+    rule is "fit, don't scroll", but the 24-column Salary Register gives up at a
+    narrow window or 110%+ zoom, and scrolling right stranded the figures with no
+    way to tell whose they were. Every `.tbl-dense` table leads with WHO or WHICH
+    MONTH, so that column now stays put. Purely progressive — at a wide window
+    there is 0px of overflow and the rule does nothing. Edge is a box-shadow, not
+    a border, so border-collapse layout and measured widths are untouched.
+    **Verified:** sweep 253/253 × both themes · tw gate green · 10/10 driver
+    (forced 395px of overflow, scrolled 220px, identity cell stayed flush at the
+    wrap edge while column 2 moved 182px → −38px; z-ladder corner 3 > cells 2 >
+    thead 1; inert at a wide window).
+  - ⛔ 1d (other half) · column groups (Earnings │ Deductions │ Recovery │
+    Settlement) — needs an optional second header row in `platform/kit/datatable.js`
+    (uncontested) *plus* a `columns[].group` wiring in `payroll.js` (contested).
+    Not started: shipping the datatable half with no caller would be dead code.
+
+  ⛔ **1b, 1c and 1d's column groups are BLOCKED the same way 1a was** — all three
+  need `companies/travels/modules/payroll/frontend/payroll.js`, which a concurrent
+  session is actively writing (2026-07-29 ~11:20–11:33 it was building a **Salary
+  Templates list** — per-employee salary packages — touching `payroll.js`,
+  `template.html`, `platform/engines-library/payroll.js`, `platform/kit/emp-profile.js`
+  and `CONTEXT.md`, rebuilding `view.js` as it went). Two writers doing whole-file
+  saves on one file is how ~200 lines go missing. Resume when that lands.
 - **Wave 2 · the real gaps** — employee-level variance report · gross→net waterfall ·
   month-over-month cost bridge · run checklist · pre-finalize validation gates
 - **Wave 3 · control** — approvals (`EPAL.approvals` already ships a
