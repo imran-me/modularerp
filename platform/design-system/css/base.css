@@ -173,6 +173,44 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 .tbl-dense .dt-actions .row-actions { gap: 0; }
 .tbl-dense .dt-actions .icon-btn { width: 26px; height: 26px; }
 .tbl-dense .dt-actions .icon-btn i { font-size: 15px; }
+/* SNUG variant (2026-07-29, owner: Staff Accounts). Same goal as .tbl-dense —
+   every column on screen, no horizontal scrollbar — but for a table that must
+   stay COMFORTABLY readable: exactly ONE 10% step down from the normal table
+   font (13px → 11.7px) instead of dense's 10.56px, which is under the 11px
+   --fs-micro floor the tokens call "never go under".
+   Density comes from the cells, not from shrinking the type: tighter padding,
+   tighter badges, smaller action buttons. And because small text is only small,
+   not faint, the body text goes UP in contrast — full --text (near-black in
+   light) instead of the default --text-dim, with secondary captions ("we owe",
+   "/mo") at --text-dim rather than the pale --text-mute. */
+.tbl-snug table.tbl { font-size: calc(var(--fs-small) * 0.9); }
+.tbl-snug .tbl thead th { padding: 5px 4px; letter-spacing: 0; font-size: var(--fs-micro); }
+.tbl-snug .tbl tbody td { padding: 5px 4px; color: var(--text); }
+.tbl-snug .tbl td.num, .tbl-snug .tbl th.num { padding-left: 3px; padding-right: 4px; }
+/* the id is a reference, not prose — one step down from the row keeps its column
+   to the width of the code itself */
+.tbl-snug .tbl td .mono { font-size: var(--fs-micro); }
+/* department/status chips wrap like any other text here — "Visa & Immigration"
+   on one unbreakable line was setting the Dept column's minimum width */
+.tbl-snug .tbl td .badge { white-space: normal; }
+.tbl-snug .tbl td .text-mute { color: var(--text-dim); }
+/* The width was never in the type — it was in the CAPTIONS. Half these money
+   cells carry a figure plus a qualifier ("৳126,523 we owe", "৳8,947 ৳1,491/mo",
+   "4.0d Eligible") and td.num is nowrap, so every one of those pairs demanded a
+   single unbroken line. Let the CELL wrap; the .num/.mono spans inside it stay
+   atomic (base rule above), so a figure still never fractures — the qualifier
+   simply sits under it. That alone is worth ~370px across the row. */
+.tbl-snug .tbl td.num { white-space: normal; }
+.tbl-snug .tbl td.num .num, .tbl-snug .tbl td.num .mono { white-space: nowrap; }
+.tbl-snug .tbl td .badge { padding: 2px 6px; gap: 4px; }
+/* the three row-action buttons were the single widest column in the row (88px
+   for icons); at 26px with no gap they give the money columns their width back
+   and still clear the 24px comfortable-tap floor */
+.tbl-snug .tbl td.dt-actions { padding-left: 2px; padding-right: 2px; }
+.tbl-snug .dt-actions .row-actions { gap: 0; }
+.tbl-snug .dt-actions .icon-btn { width: 24px; height: 24px; }
+.tbl-snug .dt-actions .icon-btn i { font-size: 14px; }
+
 /* FROZEN IDENTITY COLUMN (2026-07-29). The rule above is "fit, don't scroll" — but
    it cannot always win: the Salary Register carries 24 columns, and at a narrow
    window or 110%+ zoom it does scroll. When it does, the first column is the one
@@ -180,19 +218,23 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    with WHO (salary sheet, salary register) or WHICH MONTH (monthly register), and
    scrolling right used to strand the figures with no idea whose they were.
    Purely progressive: while the sheet still fits, nothing scrolls and this does
-   nothing at all. Scoped to .tbl-dense, which only Payroll applies.
+   nothing at all. Scoped to .tbl-dense and .tbl-snug, which only Payroll applies
+   — Staff Accounts fits at the owner's window but not on a 1280 laptop, and the
+   name is exactly the cell that must survive scrolling there too.
    z-index ladder: header corner (3) over frozen body cells (2) over the already
    sticky thead (1). The edge is a box-shadow, not a border, so border-collapse
    layout and the measured column widths are untouched. */
-.tbl-dense .tbl thead th:first-child,
-.tbl-dense .tbl tbody td:first-child { position: sticky; left: 0; }
-.tbl-dense .tbl tbody td:first-child {
+.tbl-dense .tbl thead th:first-child, .tbl-snug .tbl thead th:first-child,
+.tbl-dense .tbl tbody td:first-child, .tbl-snug .tbl tbody td:first-child { position: sticky; left: 0; }
+.tbl-dense .tbl tbody td:first-child, .tbl-snug .tbl tbody td:first-child {
   z-index: 2; background: var(--surface); box-shadow: 1px 0 0 var(--border);
 }
-.tbl-dense .tbl thead th:first-child { z-index: 3; box-shadow: 1px 0 0 var(--border); }
+.tbl-dense .tbl thead th:first-child,
+.tbl-snug .tbl thead th:first-child { z-index: 3; box-shadow: 1px 0 0 var(--border); }
 /* the frozen cell paints its own background, so it would otherwise sit out the
    row-hover the rest of the row gets */
-.tbl-dense .tbl tbody tr:hover td:first-child { background: var(--surface-2); }
+.tbl-dense .tbl tbody tr:hover td:first-child,
+.tbl-snug .tbl tbody tr:hover td:first-child { background: var(--surface-2); }
 /* Any inline number/money span is atomic too — never break a figure. */
 .num, .mono { white-space: nowrap; }
 
@@ -271,16 +313,29 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    Rule 3 above (the switcher demotes to its own row) was firing on every desk
    whose tab band is long — Master Payroll needs ~1248px for 8 tabs + 6 companies
    and has 944 at a 1350px window, so it ALWAYS dropped, at every zoom.
-   On a desktop-width row the switcher now keeps its full width on the line and
-   the TAB GROUP gives way instead — it wraps INSIDE its own pill, which is the
-   one form of yielding that hides nothing (the doctrine above: a nav that hides
-   its own destinations is worse than a nav on two rows). Below 1200px — phones,
-   tablets, heavy zoom — rule 3 still applies and the switcher takes its own row. */
+   On a desktop-width row the two groups now share the line and the SWITCHER is
+   what gives way. Below 1200px — phones, tablets, heavy zoom — rule 3 still
+   applies and the switcher takes its own row.
+
+   ⚠ REVISED the same day, on the owner's next screenshot: yielding by wrapping
+   put the TAB BAND on two lines, which reads worse than the problem it solved
+   ("this created the new problem … you just decrease the company switcher size,
+   20%"). So the switcher is what gives way now — it rides ~20% narrower on a
+   shared row (tighter padding + the 11px type floor, never below it) and the tab
+   band keeps ONE line. When even that is not enough the band scrolls sideways
+   with its visible thin scrollbar rather than growing a second row. */
 @media (min-width: 1200px) {
-  .nav-row { flex-wrap: nowrap; }
-  .nav-row > .pill-tab { flex: 0 1 auto; min-width: 0; overflow: visible; }
+  .nav-row { flex-wrap: nowrap; gap: 6px; }
+  .nav-row > .pill-tab { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; overflow-x: auto; }
   .nav-row .vsep, .nav-row .co-sw { flex: 0 0 auto; }
-  .nav-row .co-sw { margin-left: auto; }
+  .nav-row .co-sw { margin-left: auto; gap: 2px; }
+  /* the switcher, 20% narrower: the saving comes from padding + gap, with the
+     label at the 11px floor — 20% off 12px type would be 9.6px, which is the
+     unreadable caption size the dashboard row was just rescued from. */
+  .nav-row .co-sw .btn { font-size: var(--fs-micro); padding: clamp(3px, 0.34vw, 5px) clamp(4px, 0.42vw, 6px); gap: 4px; }
+  /* the tab band matches it: same 11px floor, tighter padding — between the two
+     the whole band fits without scrolling at 1440 and at 90% zoom on a 1366 */
+  .nav-row .pill-tab button { font-size: var(--fs-micro); padding: 6px clamp(4px, 0.42vw, 9px); }
 }
 /* UNDERLINE TABS — the calm PRIMARY navigation (owner mock 2026-07-15).
    Hierarchy: section nav = quiet underline tabs; switchers/filters below it

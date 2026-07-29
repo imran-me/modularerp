@@ -1444,6 +1444,33 @@ function monthView(page) {
 /* ============================================================================
  * STAFF ACCOUNTS — find anyone by NAME or EMPLOYEE ID, open their whole file
  * ==========================================================================*/
+
+/* SHORT ID (owner 2026-07-29: "like ABC-123"). The live directory keeps ids in
+ * whatever shape HR typed them — 'U-76', 'ET 25 317', 'ET24 601' and the
+ * generated 'EPL-parvez-hossain-8a8731' — and that last shape alone was wider
+ * than three money columns, which is what pushed this table into a horizontal
+ * scrollbar. This is DISPLAY ONLY. Nothing is stored, renamed or invented: the
+ * series letters and every digit group of the real id survive; what drops out
+ * is the punctuation and the person's name repeated inside their own id — and
+ * the name is in the very next column anyway. The full id stays in the cell's
+ * tooltip and search still matches it.
+ *   U-76 -> U-76 · ET 25 317 -> ET-25317 · ET24 601 -> ET-24601
+ *   EPL-parvez-hossain-8a8731 -> EPL-8A8731
+ * Ids carrying no digit at all are left exactly as they are — better a wide
+ * cell than a code that cannot be traced back to the person. */
+function shortId(raw) {
+  var s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  var lead = s.match(/^[A-Za-z]+/);                 // the series prefix, if any
+  var prefix = lead ? lead[0].toUpperCase().slice(0, 4) : '';
+  var rest = lead ? s.slice(lead[0].length) : s;
+  // every remaining chunk that carries a digit, in order — pure-letter chunks
+  // (the name words) fall away
+  var code = (rest.match(/[0-9A-Za-z]*[0-9][0-9A-Za-z]*/g) || []).join('').toUpperCase();
+  if (!code) return s;
+  return prefix ? prefix + '-' + code : code;
+}
+
 function staffView(page) {
   var t = team();
   var rows = t.map(function (e) {
@@ -1465,7 +1492,7 @@ function staffView(page) {
   var tbl = EPAL.table({
     columns: [
       { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id) : '<span class="strong">' + esc(r.name) + '</span>'; } },
-      { key: 'id', label: 'Employee ID', render: function (r) { return '<span class="mono xs">' + esc(r.id) + '</span>'; } },
+      { key: 'id', label: 'ID', render: function (r) { return '<span class="mono xs nowrap" title="' + esc(r.id) + '">' + esc(shortId(r.id)) + '</span>'; } },
       { key: 'dept', label: 'Dept', badge: {} },
       { key: 'designation', label: 'Designation' },
       { key: 'salary', label: 'Salary', num: true, money: true },
@@ -1494,6 +1521,9 @@ function staffView(page) {
   var card2 = frag('reg-card');
   slot(card2, 'title').innerHTML = ui.icon('people') + ' Staff Accounts';
   slot(card2, 'sub').textContent = 'search by name OR employee ID · click anyone for their complete file — ledger, payslips, loans, advances, attendance';
+  // .tbl-snug: 13 money/identity columns + the action buttons on screen at once,
+  // one 10% step of type smaller and higher-contrast (owner 2026-07-29).
+  slot(card2, 'body').classList.add('tbl-snug');
   slot(card2, 'body').appendChild(tbl.el);
   page.appendChild(card2);
 }
