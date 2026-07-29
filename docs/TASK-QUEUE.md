@@ -26,6 +26,36 @@
 
 ## ⏭️ STILL OPEN
 
+### T-PAY-QUESTIONS — the owner's accounting questions, answered on the desk (2026-07-29)
+He asks payroll in depth: how much due / payable this month · how much comes off
+for loans, absence, punishments, advance EMI · how much goes out extra as overtime
+and bonus · for ONE person: how much now and for what, where the rest goes on a
+partial, his last months' history, how much of it was advance repayment vs
+deduction, hours worked, where he stands against the others · and **from WHICH
+account did I pay — cash, which bank, last month, last six months.**
+
+Audit of what the desk could answer: the accounting spine was there (accrual,
+partial pay, arrears with dates, advance/loan recovery, ledger reconciliation) —
+roughly 70%. The gaps were presentation of data already on file, except hours.
+
+- ✅ **Where the money went** (Reports) — by account, over 1/3/6/12 months, split
+  Salary · Advance · Loan · Bonus · Other, plus what came back in; click an account
+  for its transactions and vouchers. Answers the whole "from where / which bank /
+  how much last 6 months" block. `299751e`
+- ✅ **How <month> is made up** (Salary Manage) — gross → OT/bonus/adjustment →
+  absent/late/early/fine/tax/PF/other → net payable → advance + EMI recovered →
+  cash to hand out. Answers the deduction/addition split by kind. `299751e`
+- ⏭️ **Per-employee, folded into T-PROFILE-FULL below** (do NOT build twice):
+  a "Paid from" column + a 6/12-month money summary on the profile's Accounts tab
+  (salary paid · advance taken/recovered · loan taken · EMI paid · bonus ·
+  deductions), and a plain rank ("#3 of 14 by salary") on Staff + the profile head.
+- ⛔ **Hours worked — NOT answerable, needs a decision.** Attendance stores DAYS
+  (present/absent/late/early-leave); there is no clock-in/out anywhere, so the
+  reference screenshot's "Working Hour 174.03 hr · Late Time 862.52 min" cannot be
+  derived from anything we hold. Either per-day time entry starts being recorded,
+  or the profile keeps showing what is true — worked days, absent days, late count,
+  overtime hours. **Owner decision.**
+
 ### T-PROFILE-FULL — the individual employee profile (owner, 2026-07-29) — NEXT
 Owner sent two screenshots while the Staff Accounts fit was being finished:
 
