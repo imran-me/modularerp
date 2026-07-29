@@ -1482,23 +1482,31 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
        * books. samplePayroll.write() refuses outright in that case; the button is
        * not offered at all, because a button you must not press should not be
        * on the screen. api.js sets EPAL.api.live when it wires writes to a host. */
-      if (EPAL.samplePayroll && !(EPAL.api && EPAL.api.live)) {
+      if (EPAL.samplePayroll) {
+        var liveHost = !!(EPAL.api && EPAL.api.live);
         var pms = EPAL.samplePayroll.months();
-        var pb = btn('btn btn-sm btn-outline', ui.icon('people') + ' Load ' + pms.length + ' months of Travels payroll', function () {
+        var pb = btn('btn btn-sm btn-outline', ui.icon('people') + ' Load ' + pms.length + ' months of payroll' +
+          (liveHost ? ' (this browser)' : ''), function () {
           var ms = EPAL.samplePayroll.months();
-          ui.confirm({ title: 'Write ' + ms.length + ' months of Travels payroll?', icon: 'people',
-            text: 'Runs ' + ms[0] + ' to ' + ms[ms.length - 1] + ' through the payroll engine: attendance recorded per head, ' +
-              'each month generated, accrued to the ledger and paid from a real account — plus absences and lates deducted ' +
-              'automatically, overtime, an Eid bonus for the team, a staff loan amortised by EMI, a second loan settled in ' +
-              'one payment, and an advance recovered from the following salary. The current month is left with real work in ' +
-              'it. Travels only, payroll only. Running it again changes nothing — months already finalized are left as they are.',
-            confirmLabel: 'Write it' }).then(function (ok) {
+          ui.confirm({ title: 'Load ' + ms.length + ' months of payroll history?', icon: 'people',
+            text: 'Runs ' + ms[0] + ' to ' + ms[ms.length - 1] + ' through the payroll engine for every concern: attendance ' +
+              'per head, each month generated, accrued and paid from a real account — absences and lates deducted ' +
+              'automatically, overtime, an Eid bonus, a staff loan amortised by EMI, a second loan settled in one payment, ' +
+              'and an advance recovered from the following salary. The current month is left with real work in it. ' +
+              'Running it again changes nothing — months already finalized are left as they are.' +
+              (liveHost
+                ? '\n\n⚠ THIS IS A LIVE DATABASE. The history loads into THIS BROWSER ONLY — nothing is written to the ' +
+                  'server and your real books are not touched. It is exactly what you see until the server carries the ' +
+                  'payroll chart of accounts (5150 and the rest) and its migrations.'
+                : ''),
+            confirmLabel: liveHost ? 'Load into this browser' : 'Write it' }).then(function (ok) {
               if (!ok) return;
               var r;
               try { r = EPAL.samplePayroll.write(); }
               catch (e) { ui.toast(e.message || 'Could not write the payroll history', 'error'); return; }
               ui.toast(r.made.months + ' months · ' + r.made.slips + ' payslips · ' + r.made.payments +
-                ' payments posted — salary cost ' + ui.money(r.salaryCost), 'success');
+                ' payments' + (liveHost ? ' — in this browser only' : ' posted') +
+                ' — salary cost ' + ui.money(r.salaryCost), 'success');
               EPAL.router.render();
             });
         });

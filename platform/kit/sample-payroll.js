@@ -224,11 +224,28 @@
    * a demo database. On a live one this refuses, once, with a reason. */
   function liveDb() { return !!(EPAL.api && EPAL.api.live); }
 
+  /* ON A LIVE HOST THIS RUNS IN THIS BROWSER ONLY (owner 2026-07-29: "whatever, i
+   * need data from jan 2026, you have to do that").
+   *
+   * Refusing outright was the safe answer and the wrong one — the owner needs the
+   * history on screen to work with. So it still runs, but inside
+   * EPAL.api.withoutDbWrites(): every payslip, posting and payment lands in this
+   * browser and NOTHING is pushed at the host. That is not a compromise, it is the
+   * only thing that could have worked — pushing produced a wall of rejected writes
+   * ("Operation not permitted" at the connection cap, "Unknown account code: 5150"
+   * from a chart the host has never had) and changed nothing on the server anyway.
+   *
+   * What it means in practice: the data is real, complete and computed by the real
+   * engine, it survives reloads for stores the server does not own (attendance,
+   * runs are re-hydrated), and the real books are untouched. To persist it the
+   * server needs the payroll chart (5150 et al) and the migrations — see
+   * docs/PAYROLL-DEMO-DATA.md. */
   function write() {
-    if (liveDb()) {
-      throw new Error('This is a live database — sample payroll is demo data and will not be written over real books. ' +
-        'Open the app without EPAL_API_BASE (a local/demo profile) to load it.');
-    }
+    if (liveDb() && EPAL.api.withoutDbWrites) return EPAL.api.withoutDbWrites(writeNow);
+    return writeNow();
+  }
+
+  function writeNow() {
     var made = { months: 0, slips: 0, payments: 0, advances: 0, loans: 0, bonuses: 0, salaried: 0,
       attendance: 0, overtime: 0, slipBonuses: 0, deductions: 0, lumpRepayments: 0, rewound: 0,
       hired: 0, companies: 0, headcount: {} };

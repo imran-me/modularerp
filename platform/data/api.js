@@ -396,6 +396,14 @@
         if (e.local) return;               // DERIVED entry (bank-opening / historical
                                            // mirror), recomputed each load from a store
                                            // that already persists — never a DB write.
+        /* PAUSED — a deliberate, temporary "this browser only" window (owner
+         * 2026-07-29). Sample payroll needs to fill seven months of history on a
+         * host whose chart of accounts lacks 5150 and whose connection cap answers
+         * "Operation not permitted": pushing any of it produces a wall of rejected
+         * writes and changes nothing on the server anyway. Paused, the app writes
+         * locally and stays fully usable, and the real books are not touched.
+         * Always restored in a finally — see EPAL.api.withoutDbWrites(). */
+        if (Api.paused) return;
         if (e.action === 'upsert') {
           var before = e.record.id;
           call(path, { method: 'POST', body: e.record }).then(function (j) {
@@ -431,6 +439,17 @@
         }
       });
     }
+  };
+
+  /* Run `fn` with DB writes suspended: everything lands in this browser and
+   * nothing is pushed at the host. The flag is ALWAYS restored, including when fn
+   * throws — a permanently paused client would silently stop saving real work,
+   * which is far worse than the flood this exists to prevent. */
+  Api.paused = false;
+  Api.withoutDbWrites = function (fn) {
+    var was = Api.paused;
+    Api.paused = true;
+    try { return fn(); } finally { Api.paused = was; }
   };
 
   EPAL.api = Api;
