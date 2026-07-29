@@ -1454,7 +1454,16 @@ function titledCard(titleHtml, subText, bodyEl, extraClass) {
        * account. Idempotent: a month already finalized is left alone.
        * The label counts the months rather than stating a number, so extending the
        * range never leaves a button lying about what it does. */
-      if (EPAL.samplePayroll) {
+      /* ⚠ NOT ON A LIVE DATABASE (owner, 2026-07-29). Clicking this on
+       * dev.epal.com.bd filled the screen with "Not saved" toasts that would not
+       * stop: every posting was pushed at the host and refused, and the payroll
+       * engine's locally-invented 5150 Leave Encashment is a code the host's chart
+       * has never heard of. Beneath the noise is the real point — seven months of
+       * invented payslips have no business being written over a real company's
+       * books. samplePayroll.write() refuses outright in that case; the button is
+       * not offered at all, because a button you must not press should not be
+       * on the screen. api.js sets EPAL.api.live when it wires writes to a host. */
+      if (EPAL.samplePayroll && !(EPAL.api && EPAL.api.live)) {
         var pms = EPAL.samplePayroll.months();
         var pb = btn('btn btn-sm btn-outline', ui.icon('people') + ' Load ' + pms.length + ' months of Travels payroll', function () {
           var ms = EPAL.samplePayroll.months();

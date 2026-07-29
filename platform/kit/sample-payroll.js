@@ -206,7 +206,29 @@
     });
   }
 
+  /* ⚠ IS THIS BROWSER TALKING TO A REAL DATABASE?
+   * api.js sets EPAL.api.live the moment it wires writes to a host, precisely so
+   * that code which may only use data the SERVER already knows about can ask.
+   *
+   * THIS GENERATOR MUST NEVER RUN AGAINST A LIVE COMPANY (owner, 2026-07-29).
+   * It did, on dev.epal.com.bd, and the screen filled with "Not saved" toasts that
+   * would not stop. Two things went wrong at once, and both are the same mistake:
+   *   · every posting was pushed to the host, which refused them — the shared host
+   *     answers "Operation not permitted" at its connection cap;
+   *   · the payroll engine's ensureAccounts() invents 5150 Leave Encashment in the
+   *     LOCAL chart, but the host's chart has never heard of it, so every accrual
+   *     came back "Unknown account code: 5150" (api.js has a note about exactly
+   *     this class of bug).
+   * Beneath the noise sits the real point: seven months of invented payslips have
+   * no business being written over a real company's books. Demo history belongs to
+   * a demo database. On a live one this refuses, once, with a reason. */
+  function liveDb() { return !!(EPAL.api && EPAL.api.live); }
+
   function write() {
+    if (liveDb()) {
+      throw new Error('This is a live database — sample payroll is demo data and will not be written over real books. ' +
+        'Open the app without EPAL_API_BASE (a local/demo profile) to load it.');
+    }
     var made = { months: 0, slips: 0, payments: 0, advances: 0, loans: 0, bonuses: 0, salaried: 0,
       attendance: 0, overtime: 0, slipBonuses: 0, deductions: 0, lumpRepayments: 0, rewound: 0,
       hired: 0, companies: 0, headcount: {} };
@@ -446,6 +468,7 @@
    * still forces a full re-run. */
   EPAL.onSeed('sample-payroll', function () {
     try {
+      if (liveDb()) return;                              // real books — never (see liveDb)
       if (EPAL.store.get('pay_history_v2', false)) return;
       write();
       EPAL.store.set('pay_history_v2', true);
