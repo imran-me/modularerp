@@ -100,7 +100,19 @@ function killCharts() { myCharts.forEach(function (c) { try { c.destroy(); } cat
 // COMPANY-AGNOSTIC payroll desk: CID is stamped at render time.
 var CID = 'travels';
 function PR() { return EPAL.payroll; }
-var TABS = [['overview', 'Overview'], ['manage', 'Salary Manage'], ['staff', 'Staff Accounts'], ['template', 'Salary Template'], ['loans', 'Loan Management'], ['payslip', 'Payslip'], ['advance', 'Advance Salary'], ['reports', 'Reports']];
+/* TAB LABELS (owner 2026-07-29: "why scroll bar in the nav???? I said to make
+ * fit in 100% and 90% windows"). Measured on the real screen: eight tabs plus
+ * the six-company switcher wanted 1078px of a 960px row at 100% zoom on a 1366
+ * window — it already fitted at 90%, so only 100% was broken, by ~118px. Type is
+ * pinned at the 11px --fs-micro floor and the padding clamps are at their
+ * minimum, so the only honest lever left was the words.
+ * Three lost a qualifier that the tab's own content repeats anyway — the card
+ * inside `staff` is still titled "Staff Accounts", `advance` still lists
+ * "Advance Salary Requests", and on the standalone route the page H1 still reads
+ * the full "Loan Management" / "Staff Accounts" / "Advance Salary" (see the
+ * `titles` map below, deliberately left long). "Salary Manage" keeps its full
+ * name because the digest and four hints link to it BY that name. */
+var TABS = [['overview', 'Overview'], ['manage', 'Salary Manage'], ['staff', 'Staff'], ['template', 'Salary Template'], ['loans', 'Loans'], ['payslip', 'Payslip'], ['advance', 'Advance'], ['reports', 'Reports']];
 var payYm = null;
 
 /* The payroll chart-of-accounts (mirrors the engine's posting rules — see
@@ -1512,11 +1524,14 @@ function staffView(page) {
     columns: [
       { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id) : '<span class="strong">' + esc(r.name) + '</span>'; } },
       { key: 'id', label: 'ID', render: function (r) { return '<span class="mono xs nowrap" title="' + esc(r.id) + '">' + esc(shortId(r.id)) + '</span>'; } },
-      { key: 'dept', label: 'Dept', badge: {} },
+      // c-dept / c-desig: the two descriptive columns render 25% smaller than the
+      // rest of the row (owner 2026-07-29) — they are the widest non-money text
+      // on the sheet, and the width they give back goes to the figures
+      { key: 'dept', label: 'Dept', badge: {}, cls: 'c-dept' },
       // soft hyphen: the word stays "Designation" everywhere it is read, copied
       // or exported, but the header may break as "DESIG-/NATION" when the column
       // is squeezed instead of setting a 76px floor for a column of short titles
-      { key: 'designation', label: 'Desig­nation' },
+      { key: 'designation', label: 'Desig­nation', cls: 'c-desig' },
       { key: 'salary', label: 'Salary', num: true, money: true },
       { key: 'netDue', label: 'Net pos.', num: true, sortVal: function (r) { return r.netDue; },
         render: function (r) { return '<span class="num strong ' + (r.netDue >= 0 ? 'text-good' : 'text-bad') + '">' + ui.money(Math.abs(r.netDue)) + '</span> <span class="xs text-mute">' + (r.netDue >= 0 ? 'we owe' : 'they owe') + '</span>'; } },

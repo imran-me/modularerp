@@ -274,7 +274,10 @@
       var table = el('table.tbl');
       var thead = el('thead'); var htr = el('tr');
       cols.forEach(function (c) {
-        var th = el('th' + (c.num ? '.num' : ''), { style: c.width ? { width: c.width } : null });
+        // c.cls stamps the SAME class on the header and every cell of a column,
+        // so a stylesheet can address one column by name instead of counting
+        // nth-child positions that shift the moment a column is added
+        var th = el('th' + (c.num ? '.num' : '') + (c.cls ? '.' + c.cls : ''), { style: c.width ? { width: c.width } : null });
         var lbl = el('span.dt-th' + (c.sort === false ? '' : '.sortable'), { text: c.label || c.key });
         if (c.sort !== false) {
           if (state.sortKey === c.key) lbl.appendChild(ui.frag(' <i class="bi bi-caret-' + (state.sortDir > 0 ? 'up' : 'down') + '-fill dt-sort-ico"></i>'));
@@ -297,7 +300,7 @@
       rows.slice(start, start + pageSize).forEach(function (r) {
         var tr = el('tr' + (opts.onRow ? '.row-click' : ''));
         cols.forEach(function (c) {
-          var td = el('td' + (c.num ? '.num' : ''));
+          var td = el('td' + (c.num ? '.num' : '') + (c.cls ? '.' + c.cls : ''));
           if (c.render) { var out = c.render(r); if (out && out.nodeType) td.appendChild(out); else td.innerHTML = out == null ? '—' : out; }
           else if (c.money) td.innerHTML = '<span class="num">' + ui.money(r[c.key]) + '</span>';
           else if (c.date) td.textContent = r[c.key] ? ui.date(r[c.key]) : '—';

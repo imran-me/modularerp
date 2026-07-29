@@ -232,9 +232,33 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
    for icons); at 26px with no gap they give the money columns their width back
    and still clear the 24px comfortable-tap floor */
 .tbl-snug .tbl td.dt-actions { padding-left: 2px; padding-right: 2px; }
-.tbl-snug .dt-actions .row-actions { gap: 0; }
-.tbl-snug .dt-actions .icon-btn { width: 24px; height: 24px; }
-.tbl-snug .dt-actions .icon-btn i { font-size: 14px; }
+.tbl-snug .dt-actions .row-actions { gap: 1px; }
+/* THE ROW ACTIONS MUST BE SEEN (owner 2026-07-29: "the action buttons are not
+   visible, pure white"). The house style is deliberately calm — .row-act sits at
+   --text-mute and opacity .7 so it recedes until hover — which works on a roomy
+   row and disappears on this one: three 24px glyphs at 70% of the palest text
+   colour, in the last column, against white. Here they get full opacity, the
+   readable --text-dim, and a surface + border so each one reads as a button at
+   rest instead of only under the pointer. Scoped to .tbl-snug: every other
+   table keeps the calm treatment. */
+.tbl-snug .row-act {
+  opacity: 1; color: var(--text-dim); background: var(--surface-2); border-color: var(--border);
+}
+.tbl-snug .row-act:hover { color: var(--accent); background: var(--surface-3, var(--surface-2)); }
+.tbl-snug .row-act i { font-size: 13px; }
+
+/* DEPT + DESIGNATION, 25% SMALLER (owner 2026-07-29) — the two descriptive
+   columns, deliberately below the 11px floor the rest of the sheet respects,
+   because they are labels you scan rather than figures you read. */
+.tbl-snug .tbl .c-dept, .tbl-snug .tbl .c-desig { font-size: calc(var(--fs-small) * 0.9 * 0.75); }
+.tbl-snug .tbl td.c-dept .badge { font-size: inherit; padding: 2px 5px; }
+
+/* COLUMN RULES (owner 2026-07-29, drawn on the screenshot): a line between every
+   column, 1.5px, black at 75%. Taken from --text rather than hard-coded black so
+   the dark theme gets the same 75%-of-foreground line instead of an invisible
+   one. The header row carries it too, so the rule runs the full height. */
+.tbl-snug .tbl thead th + th,
+.tbl-snug .tbl tbody td + td { border-left: 1.5px solid color-mix(in srgb, var(--text) 75%, transparent); }
 
 /* FROZEN IDENTITY COLUMN (2026-07-29). The rule above is "fit, don't scroll" — but
    it cannot always win: the Salary Register carries 24 columns, and at a narrow
