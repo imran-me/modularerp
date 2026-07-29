@@ -523,6 +523,64 @@
 .bank-cards-row .bank-flow-foot,
 .bank-cards-row .bank-recon .stat-label,
 .bank-cards-row .bank-mini .text-mute { color: var(--text-dim); }
+
+/* ── THE LAST-EVENT PANEL, TIDIED (owner 2026-07-29: "these text looks kind of
+   messy, can you tidy them, without deleting any single one? reducing size,
+   space whatever needed, but need to be visible") ─────────────────────────────
+   On Master Payroll the panel showed "-৳ 12,861" wrapped under the OUT pill,
+   "PAY-2026-07 Salary…" cut off, and "Owed staff ৳ 149,1…" losing its last two
+   digits. Three separate causes, one symptom:
+
+   1 · the money figure could BREAK MID-NUMBER, because only the date beside it
+       was nowrap. base.css already states the rule — a money value must never
+       fracture across lines — this panel simply never got it.
+   2 · the ref and the opening/closing lines were `white-space: nowrap` +
+       ellipsis, so in a half-width column they silently ATE their own content.
+       An ellipsised balance is worse than a small one: "৳ 149,1…" is not a
+       number, it is a rumour.
+   3 · the READABLE CAPTIONS pass above lifted both lines to 11.5px, which is
+       what pushed them past the edge in the narrowest column on the screen.
+
+   So: figures never break, nothing ellipses (long text WRAPS and the panel grows
+   by a line instead of hiding a digit), and the two lines come back to 11px —
+   the floor tokens.css calls "never go under", so still the readable size the
+   owner asked for, a half-step down to buy the room that makes it fit. Nothing
+   is removed; everything is on screen. */
+.bank-cards-row .bank-summary-last-amt { white-space: nowrap; }
+/* if the amount and its date cannot share a line, the DATE drops whole to the
+   next one — the figure never yields */
+.bank-cards-row .bank-summary-last-row { flex-wrap: wrap; row-gap: 1px; gap: 8px; }
+.bank-cards-row .bank-summary-last-ref,
+.bank-cards-row .bank-summary-last-oc .oc-open,
+.bank-cards-row .bank-summary-last-oc .oc-close {
+  white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere;
+}
+.bank-cards-row .bank-summary-last-ref,
+.bank-cards-row .bank-summary-last-oc { font-size: 11px; line-height: 1.35; }
+.bank-cards-row .bank-summary-last-ref { margin-top: 3px; }
+.bank-cards-row .bank-summary-last-oc { margin-top: 4px; }
+/* the reference chip and every bold figure stay atomic while their line wraps */
+.bank-cards-row .bank-summary-last-ref .txn-id-chip,
+.bank-cards-row .bank-summary-last-oc b { white-space: nowrap; }
+/* GIVE THE COLUMN THE WIDTH ITS CONTENT NEEDS. The two halves were flex:1 each —
+   a straight 50/50 — but they never held equal amounts: the left is an icon, a
+   name and one big figure, while the right is five lines including a reference
+   and a memo. Wrapping was the symptom; a column too narrow for its job was the
+   cause, and no amount of font-shaving fixes that. 42/58 lets the label, the
+   amount and both balances sit on one line each, and brings the reference down
+   to about two. 46/54 is the balance point: pushed further (42/58) the RIGHT
+   column tidies but the left starts breaking "Payroll position · July 2026" over
+   three lines, which just moves the mess across the divider. */
+.bank-cards-row .bank-summary-left { flex: 0 1 46%; padding-right: 13px; }
+.bank-cards-row .bank-summary-last { flex: 1 1 54%; padding-left: 11px; }
+/* "LAST PAYROLL EVENT" is a heading, not prose — it holds one line */
+.bank-cards-row .bank-summary-last-lbl { white-space: nowrap; letter-spacing: .3px; }
+
+/* …and the fact keys under the divider stop truncating: "PAYROLL MON…" was
+   eating its own word. They wrap instead — two short words on two lines beats
+   one word with its ending cut off. */
+.bank-cards-row .bank-summary-fact .k { white-space: normal; line-height: 1.2; }
+
 .bank-summary-hero.clik { cursor: pointer; border-radius: 9px; transition: color .15s; }
 .bank-summary-hero.clik:hover .bank-summary-bal { color: color-mix(in srgb, var(--bank-ink) 74%, var(--text)); }
 .bank-recon-clik { cursor: pointer; transition: transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s; }
