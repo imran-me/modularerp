@@ -25,6 +25,37 @@
   migration would hit. Replaces guesswork on the shared-database problem.
 
 ## ⏭️ STILL OPEN
+
+### T-PROFILE-FULL — the individual employee profile (owner, 2026-07-29) — NEXT
+Owner sent two screenshots while the Staff Accounts fit was being finished:
+
+1. **The reference app's analytics stack** — Weekly Task Performance (bar: assigned
+   vs completed, this week) · Monthly Task Performance (area, 12 months) ·
+   **Attendance Summary (July 2026)** with three tiles (Present Days 22 · Late Time
+   862.52 min · Working Hour 174.03 hr) over a dual-axis Late-Time/Working-Hour chart
+   · **Leave Summary (2026)** (Approved 5 · Pending 0 · Rejected 0 · Used Leave Days 5)
+   · **Salary & Loan Summary** (Paid/Pending records, total & latest net salary |
+   running loans, completed loans, remaining amount, pending & approved advance).
+2. **Our own profile with that stack pasted under it** — the dark-blue header
+   (avatar, name, "Interior Design · WOOD ART INTERIORS", Full-time/Active chips,
+   PaySlip + Back buttons), the six money tiles, our real tab row
+   **Overview · Accounts · Payslips · Attendance · All Details**, Profile Details,
+   then TASK TOTAL / COMPLETED / PENDING tiles and the charts above.
+
+**Ask:** "I want the employee profile individually like this. Current one should stay
+as it is now, but clicking an employee name should open an employee's full profile
+like I have given in the screenshot."
+
+Reading: the Staff Accounts table stays exactly as it now is; the profile that opens
+on a name click (`EPAL.people.open` → `platform/kit/emp-profile.js`, today a MODAL
+with those five tabs) grows the analytics stack. Every number already exists in the
+app — tasks + phases (Task Oversight store), attendance (`P.saveAttendance`), leave
+(`P.leaveState`), payroll/loans/advances (`EPAL.payroll`) — so nothing has to be
+invented; it has to be charted.
+
+**Open questions to settle before building:** modal vs full page (the shot shows a
+"Back to User List" button, which implies a page); which chart lib is already in the
+bundle; and whether the tiles belong on Overview or a new tab.
 - **Woodart accent colour** — green `#6f9c1c` is the DELIBERATE per-company identity
   (group blue · travels blue · woodart green · IT purple · shop pink · construction
   orange). Making it blue erases one member of that system. ONE LINE in
