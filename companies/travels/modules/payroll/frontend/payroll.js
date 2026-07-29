@@ -1494,18 +1494,26 @@ function staffView(page) {
       { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id) : '<span class="strong">' + esc(r.name) + '</span>'; } },
       { key: 'id', label: 'ID', render: function (r) { return '<span class="mono xs nowrap" title="' + esc(r.id) + '">' + esc(shortId(r.id)) + '</span>'; } },
       { key: 'dept', label: 'Dept', badge: {} },
-      { key: 'designation', label: 'Designation' },
+      // soft hyphen: the word stays "Designation" everywhere it is read, copied
+      // or exported, but the header may break as "DESIG-/NATION" when the column
+      // is squeezed instead of setting a 76px floor for a column of short titles
+      { key: 'designation', label: 'Desig­nation' },
       { key: 'salary', label: 'Salary', num: true, money: true },
-      { key: 'netDue', label: 'Net position', num: true, sortVal: function (r) { return r.netDue; },
+      { key: 'netDue', label: 'Net pos.', num: true, sortVal: function (r) { return r.netDue; },
         render: function (r) { return '<span class="num strong ' + (r.netDue >= 0 ? 'text-good' : 'text-bad') + '">' + ui.money(Math.abs(r.netDue)) + '</span> <span class="xs text-mute">' + (r.netDue >= 0 ? 'we owe' : 'they owe') + '</span>'; } },
       { key: 'salaryDue', label: 'Salary due', num: true, sortVal: function (r) { return r.salaryDue; }, render: function (r) { return r.salaryDue ? '<span class="num text-bad">' + ui.money(r.salaryDue) + '</span>' : '—'; } },
-      { key: 'advance', label: 'Advance out', num: true, sortVal: function (r) { return r.advance; }, render: function (r) { return r.advance ? '<span class="text-warn">' + ui.money(r.advance) + '</span>' : '—'; } },
+      // 'Adv. out' / 'Rec.': with the chips and every figure kept unbreakable,
+      // the last columns that would not fit were floored by their own header
+      // word — ADVANCE and RECORDS are wider than anything under them.
+      { key: 'advance', label: 'Adv. out', num: true, sortVal: function (r) { return r.advance; }, render: function (r) { return r.advance ? '<span class="text-warn">' + ui.money(r.advance) + '</span>' : '—'; } },
       { key: 'loan', label: 'Loan out', num: true, sortVal: function (r) { return r.loan; },
         render: function (r) { return r.loan ? '<span class="text-warn">' + ui.money(r.loan) + '</span>' + (r.emi ? ' <span class="xs text-mute">' + ui.money(r.emi) + '/mo</span>' : ' <span class="xs text-mute">no EMI</span>') : '—'; } },
       { key: 'encash', label: 'Leave encash', num: true, sortVal: function (r) { return r.encash; },
         render: function (r) { return r.encash ? ui.money(r.encash) + ' <span class="xs text-mute">' + r.encashDays.toFixed(1) + 'd</span>' + (r.eligible ? ' <span class="badge badge-good">Eligible</span>' : '') : '—'; } },
-      { key: 'lastPaid', label: 'Last paid', render: function (r) { return r.lastPaid ? PR().mLabel(r.lastPaid) : '<span class="text-mute">never</span>'; } },
-      { key: 'movements', label: 'Records', num: true, sortVal: function (r) { return r.movements; } },
+      // a month is one token: without .nowrap the narrow column split "May 2026"
+      // into "May 202 / 6"
+      { key: 'lastPaid', label: 'Last paid', render: function (r) { return r.lastPaid ? '<span class="nowrap">' + esc(PR().mLabel(r.lastPaid)) + '</span>' : '<span class="text-mute">never</span>'; } },
+      { key: 'movements', label: 'Rec.', num: true, sortVal: function (r) { return r.movements; } },
       { key: 'status', label: 'Status', badge: { active: 'good', resigned: 'bad', probation: 'warn' } }
     ],
     rows: rows, searchKeys: ['name', 'id', 'dept', 'designation'], quickFilter: 'status', filterPanel: true,
