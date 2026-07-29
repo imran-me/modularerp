@@ -266,6 +266,22 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 /* inside a shared row both groups compress harder — via padding, not type */
 .nav-row .pill-tab button { font-size: var(--fs-tiny); padding: 6px clamp(5px, 0.6vw, 14px); }
 .nav-row .btn.btn-sm { font-size: var(--fs-tiny); padding: clamp(3px, 0.4vw, 6px) clamp(5px, 0.65vw, 12px); white-space:nowrap; }
+/* THE SWITCHER STAYS ON THE NAV LINE (owner 2026-07-29: "these company switcher
+   should be beside sub menu nav, FIXED, in 100% and 90% chrome view").
+   Rule 3 above (the switcher demotes to its own row) was firing on every desk
+   whose tab band is long — Master Payroll needs ~1248px for 8 tabs + 6 companies
+   and has 944 at a 1350px window, so it ALWAYS dropped, at every zoom.
+   On a desktop-width row the switcher now keeps its full width on the line and
+   the TAB GROUP gives way instead — it wraps INSIDE its own pill, which is the
+   one form of yielding that hides nothing (the doctrine above: a nav that hides
+   its own destinations is worse than a nav on two rows). Below 1200px — phones,
+   tablets, heavy zoom — rule 3 still applies and the switcher takes its own row. */
+@media (min-width: 1200px) {
+  .nav-row { flex-wrap: nowrap; }
+  .nav-row > .pill-tab { flex: 0 1 auto; min-width: 0; overflow: visible; }
+  .nav-row .vsep, .nav-row .co-sw { flex: 0 0 auto; }
+  .nav-row .co-sw { margin-left: auto; }
+}
 /* UNDERLINE TABS — the calm PRIMARY navigation (owner mock 2026-07-15).
    Hierarchy: section nav = quiet underline tabs; switchers/filters below it
    stay as pills; real actions stay as buttons. Less chrome, more premium. */

@@ -489,6 +489,40 @@
 .bank-cards-row .bank-recon .stat-value { font-size: 13.5px; }
 .bank-cards-row .bank-recon .stat-label { font-size: 8.5px; }
 .bank-cards-row .bank-mini { padding: 10px 13px; }
+
+/* READABLE CAPTIONS IN THE ROW (owner 2026-07-29, arrows on "Payroll position ·
+   July 2026", "last 0 months · paid vs still owed", "Sheet says owed"): "these
+   are very less visible. make more black, and increase 20% size".
+   The PIXEL-FIT block above had squeezed every caption to 8–9.5px — under the
+   11px floor tokens.css itself calls "never go under" — and left them on
+   --text-mute, the faintest text token. Each one below is ~20% larger and moves
+   one step darker to --text-dim (which in the dark theme is one step LIGHTER —
+   the token pair is contrast, not colour, so both themes gain the same
+   visibility). Only the LABELS change; every figure keeps its size, so the four
+   cards still ride one line at 90–100% zoom. */
+.bank-cards-row .bank-summary-sub { font-size: 11px; }
+.bank-cards-row .bank-summary-ballabel { font-size: 9.5px; }
+.bank-cards-row .bank-summary-fact .k { font-size: 9.5px; }
+.bank-cards-row .bank-summary-last-ref,
+.bank-cards-row .bank-summary-last-oc { font-size: 11.5px; }
+.bank-cards-row .bank-flow-sub { font-size: 11px; }
+.bank-cards-row .bank-flow-foot { font-size: 12px; }
+.bank-cards-row .bank-recon .card-head h3 { font-size: 13px; }
+/* the bigger label WRAPS instead of ellipsing: "Salary payable (2100)" losing
+   its account code to a "…" would have traded one legibility problem for another */
+.bank-cards-row .bank-recon .stat-label,
+.bank-cards-row .bank-recon-2x2 .stat-label { font-size: 10px; white-space: normal; line-height: 1.25; }
+.bank-cards-row .bank-mini .xs { font-size: 12.5px; }
+.bank-cards-row .bank-summary-sub,
+.bank-cards-row .bank-summary-ballabel,
+.bank-cards-row .bank-summary-fact .k,
+.bank-cards-row .bank-summary-last-lbl,
+.bank-cards-row .bank-summary-last-ref,
+.bank-cards-row .bank-summary-last-oc,
+.bank-cards-row .bank-flow-sub,
+.bank-cards-row .bank-flow-foot,
+.bank-cards-row .bank-recon .stat-label,
+.bank-cards-row .bank-mini .text-mute { color: var(--text-dim); }
 .bank-summary-hero.clik { cursor: pointer; border-radius: 9px; transition: color .15s; }
 .bank-summary-hero.clik:hover .bank-summary-bal { color: color-mix(in srgb, var(--bank-ink) 74%, var(--text)); }
 .bank-recon-clik { cursor: pointer; transition: transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s; }
