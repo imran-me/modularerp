@@ -44,8 +44,18 @@
         var self = this;
         var isAdmin = defaultAdmin && EPAL.auth.isAdmin();
         // which employee's board? admin can pick; employee sees their own.
-        var empId = ctx.params.emp || (isAdmin ? 'EPL-DEV1' : (EPAL.auth.current().id === 'EPL-0001' ? 'EPL-DEV1' : EPAL.auth.current().id));
-        var emp = db.employee(empId) || db.employee('EPL-DEV1');
+        var me = EPAL.auth.current() || {};        // null on an empty directory
+        var empId = ctx.params.emp || (isAdmin ? 'EPL-DEV1' : (me.id === 'EPL-0001' ? 'EPL-DEV1' : me.id));
+        /* WHOSE BOARD, ON A REAL DIRECTORY (live blank screen 2026-07-29).
+         * 'EPL-DEV1' is a DEMO id. The live database has a real staff list and
+         * nobody carries that id, so both lookups missed and Task Oversight fell
+         * through to "no employees on file" on a company that has plenty. Fall
+         * back to the first real person on file before concluding there is
+         * nobody: on the demo seed EPL-DEV1 still resolves first, so that path
+         * is untouched. EPL-0001 is the owner/super-admin account, which the
+         * picker deliberately excludes — skip it here for the same reason, but
+         * take it rather than show an empty board if it is all there is. */
+        var emp = db.employee(empId) || db.employee('EPL-DEV1') || firstBoardable();
         var page = el('div.page');
         /* NOBODY ON FILE YET (live crash 2026-07-28: "Cannot read properties of
          * null (reading 'id')" took My Task down). The board is built around one
@@ -64,7 +74,12 @@
                   hint: 'Add someone in Workforce ▸ Directory and their task board opens here.' })
               : el('div.text-mute', { text: 'No employees on file yet — add someone in Workforce ▸ Directory and their task board opens here.' })
           ])]));
-          return page;
+          /* MOUNT IT. The router ignores whatever render() returns (router.js:111)
+           * — a view is only on screen once it appends to ctx.mount. Returning
+           * the page here painted nothing at all: the shell drew the breadcrumb
+           * and the content area stayed blank, with no error to explain it. */
+          ctx.mount.appendChild(page);
+          return;
         }
 
         // ---- header ----
@@ -110,10 +125,22 @@
     };
   }
 
+  /* Anyone on file who can own a board — same exclusion as the picker below, so
+   * the board that opens by default is always one the picker can show as
+   * selected. EPL-0001 (owner) only if the directory holds nobody else. */
+  function firstBoardable() {
+    var all = db.employees() || [];
+    return all.filter(function (e) { return e.id !== 'EPL-0001'; })[0] || all[0] || null;
+  }
+
   /* ---- employee picker (admin) ------------------------------------------*/
   function employeePicker(current, onPick) {
     var sel = el('select.select', { style:{ minWidth:'220px' }, onchange: function () { onPick(sel.value); } });
-    db.employees().filter(function (e) { return e.id !== 'EPL-0001'; }).forEach(function (e) {
+    var list = (db.employees() || []).filter(function (e) { return e.id !== 'EPL-0001'; });
+    // the board being shown must always be selectable — on a directory of one
+    // (the owner) the exclusion above would otherwise leave the picker blank
+    if (!list.some(function (e) { return e.id === current.id; })) list.unshift(current);
+    list.forEach(function (e) {
       var o = el('option', { value: e.id, text: e.name + ' · ' + (EPAL.config.company(e.companyId) || {short:'Group'}).short });
       if (e.id === current.id) o.selected = true;
       sel.appendChild(o);

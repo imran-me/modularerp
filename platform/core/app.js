@@ -217,7 +217,14 @@
     },
 
     buildUserCard: function () {
-      var u = EPAL.auth.current();
+      /* auth.current() can be null — it resolves the signed-in identity against
+       * the employee directory, and on a freshly migrated database that list is
+       * empty. Every other caller in auth.js already guards it (role(),
+       * homeCompany(), accessLevel()); this one did not, so a boot on an empty
+       * directory died in the SHELL — no sidebar, no view, just "Boot failed:
+       * Cannot read properties of null (reading 'name')". The card is chrome;
+       * it must never be what stops the app from starting. */
+      var u = EPAL.auth.current() || { name: 'Signed in', companyId: 'group' };
       var card = el('div.user-card', { id:'user-card', onclick: function (e) { App.openUserMenu(e); } }, [
         el('div.avatar', { style:{ background: ui.colorFor(u.name) }, text: ui.initials(u.name) }),
         el('div.user-meta', null, [
