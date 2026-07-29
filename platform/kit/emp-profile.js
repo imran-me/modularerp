@@ -360,6 +360,35 @@
           empty: { icon: 'journal', title: 'No movements yet' }
         }).el);
       } else accBody.appendChild(el('div.text-mute.sm', { text: 'No salary movements yet.' }));
+
+      /* THE LOANS THEMSELVES (owner 2026-07-29). The ledger shows a loan going
+       * out and each repayment coming back, but never "the ৳20,000 taken in May
+       * is ৳14,000 short". `loanBook()` rebuilds that per loan — same book
+       * Payroll ▸ Loan Management reads, so the two can never disagree. */
+      var lb = P.loanBook ? P.loanBook(e.id) : [];
+      if (lb.length) {
+        accBody.appendChild(el('div.section-label.mt-3', { text: 'Staff loans — taken · paid · still due' }));
+        accBody.appendChild(EPAL.table({
+          columns: [
+            { key: 'date', label: 'Taken on', date: true },
+            { key: 'principal', label: 'Loan taken', num: true, money: true },
+            { key: 'paid', label: 'Paid till now', num: true, sortVal: function (L) { return L.paid; }, exportVal: function (L) { return L.paid; },
+              render: function (L) { return '<span class="num text-good">' + money(L.paid) + '</span>' +
+                '<div class="text-mute xs">' + (L.principal ? Math.round(L.paid / L.principal * 100) : 0) + '%' +
+                (L.viaSalary > 0 && L.viaCash > 0 ? ' · salary + cash' : L.viaSalary > 0 ? ' · from salary' : L.viaCash > 0 ? ' · in cash' : '') + '</div>'; } },
+            { key: 'due', label: 'Still due', num: true, sortVal: function (L) { return L.due; }, exportVal: function (L) { return L.due; },
+              render: function (L) { return '<span class="num strong ' + (L.due > 0 ? 'text-warn' : 'text-good') + '">' + money(L.due) + '</span>'; } },
+            { key: 'emi', label: 'EMI', num: true, sortVal: function (L) { return L.emi; },
+              render: function (L) { return L.emi ? '<span class="num">' + money(L.emi) + '/mo</span>' : '<span class="text-mute">no plan</span>'; } },
+            { key: 'status', label: 'Status', sort: false, exportVal: function (L) { return L.closed ? 'Cleared' : 'Running'; },
+              render: function (L) { return L.closed
+                ? '<span class="badge badge-good">Cleared</span><div class="text-mute xs">' + ui().escapeHtml(ui().date(L.closedOn)) + '</div>'
+                : '<span class="badge badge-warn">Running</span>'; } }
+          ],
+          rows: lb.slice().reverse(), pageSize: 5, exportName: 'employee-loans-' + e.id + '.csv',
+          pdfTitle: 'Staff loans — ' + e.name, empty: { icon: 'bank', title: 'No loan taken' }
+        }).el);
+      }
       h.appendChild(accCard);
     }
 

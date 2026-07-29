@@ -822,6 +822,72 @@
     var settled = t.filter(function (x) { return x.type === 'settlement'; }).reduce(function (a, x) { return a + (x.loanCleared || 0); }, 0);
     return Math.max(0, given - repaid - settled);
   }
+  /* ------------------------------------------------------------- LOAN BOOK
+   * loanOutstanding() above answers "how much does this person still owe" —
+   * one number for the whole person. But a loan is a THING that happened:
+   * "৳20,000 taken on 20 May, ৳6,000 back so far, ৳14,000 still due, and it
+   * came back out of salary." Every loan row in the app has to be able to say
+   * that (owner 2026-07-29), and nothing in the store does today.
+   *
+   * The engine records MOVEMENTS, not loan documents — a `loan` txn out,
+   * `loan-repay` txns back (manual or the auto payslip EMI), and a final
+   * settlement clearing whatever is left. So the book is REBUILT here the way
+   * the money actually moved: every disbursement is a loan, and every
+   * repayment is applied to the OLDEST loan still open — FIFO, the way a
+   * cashier clears the oldest bill first. It is a read; nothing is stored, so
+   * no existing number moves.
+   *
+   * It agrees with loanOutstanding() by construction rather than by care:
+   * FIFO allocates min(given, repaid + settled), so Σ due across the book is
+   * max(0, given − repaid − settled) — that function, line for line. Money
+   * repaid beyond everything ever lent (bad data) allocates to nothing and is
+   * dropped, exactly as the Math.max(0, …) there drops it.
+   *
+   * Returns, oldest first: { id, seq, date, principal, paid, due, emiMonths,
+   * emi, method, memo, closed, closedOn, lastPaidOn, viaSalary, viaCash,
+   * payments:[{ date, amount, kind:'salary'|'cash'|'settlement', method, memo,
+   * balance }] }.
+   */
+  function isEmiMemo(memo) { return String(memo || '').indexOf('EMI auto-deducted from ') === 0; }
+  function loanBook(empId) {
+    var t = txnsFor(empId).slice().sort(function (a, b) {
+      if (a.date === b.date) return String(a.id) < String(b.id) ? -1 : 1;
+      return a.date < b.date ? -1 : 1;
+    });
+    var loans = [], pays = [];
+    t.forEach(function (x) {
+      if (x.type === 'loan') {
+        var amt = round(x.amount);
+        loans.push({ id: x.id, empId: empId, empName: x.empName || empName(empId), companyId: x.companyId,
+          date: x.date, principal: amt, due: amt, paid: 0,
+          emiMonths: +x.emiMonths || 0, emi: (+x.emiMonths || 0) ? Math.round(amt / (+x.emiMonths)) : 0,
+          method: x.method || '', memo: x.memo || '', seq: loans.length + 1,
+          closed: false, closedOn: '', lastPaidOn: '', viaSalary: 0, viaCash: 0, payments: [] });
+      } else if (x.type === 'loan-repay') {
+        pays.push({ txnId: x.id, date: x.date, amount: round(x.amount), method: x.method || '',
+          memo: x.memo || '', kind: isEmiMemo(x.memo) ? 'salary' : 'cash' });
+      } else if (x.type === 'settlement' && (+x.loanCleared || 0) > 0) {
+        pays.push({ txnId: x.id, date: x.date, amount: round(x.loanCleared), method: x.method || '',
+          memo: x.memo || 'Final settlement', kind: 'settlement' });
+      }
+    });
+    pays.forEach(function (p) {
+      var left = p.amount;
+      for (var i = 0; i < loans.length && left > 0; i++) {
+        var L = loans[i];
+        if (L.due <= 0) continue;
+        var take = Math.min(L.due, left);
+        L.due -= take; L.paid += take; left -= take;
+        if (p.kind === 'salary') L.viaSalary += take; else L.viaCash += take;
+        L.lastPaidOn = p.date;
+        L.payments.push({ txnId: p.txnId, date: p.date, amount: take, kind: p.kind,
+          method: p.method, memo: p.memo, balance: L.due });
+        if (L.due <= 0 && !L.closed) { L.closed = true; L.closedOn = p.date; }
+      }
+    });
+    return loans;
+  }
+
   // the monthly EMI to auto-deduct from salary = Σ(loan amount ÷ emiMonths) for loans
   // set up with an installment plan, capped at what's still owed.
   function emiInstallment(empId) {
@@ -1157,7 +1223,8 @@
     advance: advance, loan: loan, repayLoan: repayLoan, bonus: bonus,
     advRequests: advRequests, advRequest: advRequest, requestAdvance: requestAdvance,
     decideAdvance: decideAdvance, nextYm: nextYm,
-    advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, emiInstallment: emiInstallment, salaryDue: salaryDue,
+    advanceOutstanding: advanceOutstanding, loanOutstanding: loanOutstanding, loanBook: loanBook,
+    emiInstallment: emiInstallment, salaryDue: salaryDue,
     leaveState: leaveState, settlementPreview: settlementPreview, settle: settle,
     encashmentLiability: encashmentLiability, payEncashment: payEncashment, departmentCost: departmentCost,
     previousDue: previousDue, previousDueList: previousDueList, payArrears: payArrears,

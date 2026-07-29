@@ -161,6 +161,46 @@
   }
   function staffEmi(empId) { return PR() && PR().emiInstallment ? PR().emiInstallment(empId) : 0; }
   function staffOut(empId) { return PR() && PR().loanOutstanding ? PR().loanOutstanding(empId) : 0; }
+  /* The per-loan book payroll rebuilds from its movements: each disbursement
+   * with what has been paid against it, what is still due, and whether the
+   * money came back out of salary or in cash. Every loan row on this desk shows
+   * those figures (owner 2026-07-29) — a staff loan reads like the borrowings
+   * book next door: total · paid · due. */
+  function staffBook(empId) { return (PR() && PR().loanBook) ? PR().loanBook(empId) : []; }
+  function staffPayIndex(loansList) {
+    var ix = {};
+    loansList.forEach(function (L) {
+      (L.payments || []).forEach(function (p) { (ix[p.txnId] || (ix[p.txnId] = [])).push({ L: L, p: p }); });
+    });
+    return ix;
+  }
+  function staffLoanRef(hits) {
+    if (!hits || !hits.length) return '<span class="text-mute">—</span>';
+    return hits.map(function (h) {
+      return '<div><span class="num">' + ui.money(h.L.principal) + '</span> <span class="text-mute xs">taken ' + esc(ui.date(h.L.date)) + '</span></div>';
+    }).join('');
+  }
+  function staffLoanDue(hits) {
+    if (!hits || !hits.length) return '<span class="text-mute">—</span>';
+    return hits.map(function (h) {
+      var due = h.p ? h.p.balance : h.L.due;
+      return '<div class="num ' + (due > 0 ? 'text-warn' : 'text-good') + '">' + ui.money(due) + '</div>';
+    }).join('');
+  }
+  /* a stored 'bank:BNK-04' is an account id, not a sentence — name the account */
+  function payLabel(v) {
+    v = String(v || '');
+    if (v.indexOf('bank:') === 0 && EPAL.pay && EPAL.pay.byId) {
+      var b = EPAL.pay.byId(v.slice(5));
+      if (b) return b.name + (b.branch && b.branch !== '—' ? ' · ' + b.branch : '');
+    }
+    return (v.indexOf('m:') === 0 ? v.slice(2) : v) || '—';
+  }
+  function staffVia(L) {
+    if (!(L.paid > 0)) return 'nothing repaid yet';
+    if (L.viaSalary > 0 && L.viaCash > 0) return 'salary + cash';
+    return L.viaSalary > 0 ? 'salary deduction' : 'cash / bank';
+  }
   // A name that LOOKS clickable but is deliberately not EPAL.people.linkify:
   // that helper carries the .emp-link class, and a global listener on it opens
   // the entire employee (accounts, payslips, attendance). On a loan desk the
@@ -349,7 +389,12 @@
     cos.forEach(function (c) {
       (db().employees ? db().employees({ companyId: c }) : []).forEach(function (e) {
         var o = staffOut(e.id);
-        if (o > 0) out.push({ emp: e, companyId: c, out: o });
+        if (o <= 0) return;
+        var bk = staffBook(e.id);
+        out.push({ emp: e, companyId: c, out: o, book: bk,
+          taken: bk.reduce(function (a, L) { return a + L.principal; }, 0),
+          paid: bk.reduce(function (a, L) { return a + L.paid; }, 0),
+          open: bk.filter(function (L) { return !L.closed; }) });
       });
     });
     return out;
@@ -845,14 +890,22 @@
           // employee — every account, payslip, attendance. On a loan desk the
           // name must open the LOAN only, so it renders as a plain affordance
           // and the row click below opens the staff-loan drill-down.
-          { key: 'name', label: 'Employee', render: function (r) { return nameLink(r.emp.name); },
-            exportVal: function (r) { return r.emp.name; }, sortVal: function (r) { return r.emp.name; } },
+          { key: 'name', label: 'Employee', exportVal: function (r) { return r.emp.name; }, sortVal: function (r) { return r.emp.name; },
+            render: function (r) { return nameLink(r.emp.name) +
+              '<div class="text-mute xs">' + r.open.length + ' running · ' +
+              (r.open.length === 1 ? 'taken ' : 'latest ') + esc(ui.date(r.open[r.open.length - 1].date)) + '</div>'; } },
           { key: 'dept', label: 'Department', render: function (r) { return esc(r.emp.dept || '—'); } },
           { key: 'companyId', label: 'Company', render: function (r) { return '<span class="badge">' + esc(coName(r.companyId)) + '</span>'; }, exportVal: function (r) { return r.companyId; } },
+          // total · paid · due — the same three figures the borrowings book
+          // next door shows, so a loan reads the same wherever it appears
+          { key: 'taken', label: 'Total Loan', num: true, money: true, sortVal: function (r) { return r.taken; } },
+          { key: 'paid', label: 'Paid', num: true, sortVal: function (r) { return r.paid; }, exportVal: function (r) { return r.paid; },
+            render: function (r) { return '<span class="num text-good">' + ui.money(r.paid) + '</span>' +
+              '<div class="text-mute xs">' + (r.taken ? Math.round(r.paid / r.taken * 100) : 0) + '% recovered</div>'; } },
           { key: 'emi', label: 'Monthly EMI', num: true, sortVal: function (r) { return staffEmi(r.emp.id); },
             render: function (r) { var e = staffEmi(r.emp.id); return e ? '<span class="num">' + ui.money(e) + '</span>' : '<span class="text-mute">—</span>'; },
             exportVal: function (r) { return staffEmi(r.emp.id); } },
-          { key: 'out', label: 'Outstanding', num: true, sortVal: function (r) { return r.out; }, render: function (r) { return '<span class="num strong text-warn">' + ui.money(r.out) + '</span>'; }, exportVal: function (r) { return r.out; } }
+          { key: 'out', label: 'Due', num: true, sortVal: function (r) { return r.out; }, render: function (r) { return '<span class="num strong text-warn">' + ui.money(r.out) + '</span>'; }, exportVal: function (r) { return r.out; } }
         ],
         rows: emp, pageSize: 10, searchKeys: ['emp.name'], exportName: 'employee-loans.csv', pdfTitle: 'Employee Loan Book — ' + coName(cid),
         onRow: function (r) { staffLoanDetail(r.emp); },
@@ -866,12 +919,23 @@
       ]));
     }
     var emis = txns.filter(function (x) { return x.type === 'loan-repay' && /EMI auto-deducted/.test(x.memo || ''); });
+    // which loan each instalment paid down, and where that loan stood after it —
+    // built across everyone in the trail, cleared loans included
+    var seen = {}, allLoans = [];
+    txns.forEach(function (x) { if (!seen[x.empId]) { seen[x.empId] = 1; allLoans = allLoans.concat(staffBook(x.empId)); } });
+    var payIx = staffPayIndex(allLoans);
     var et = EPAL.table({
       columns: [
         { key: 'date', label: 'Deducted on', date: true },
         { key: 'empName', label: 'Employee', render: function (x) { return EPAL.people && EPAL.people.linkify ? EPAL.people.linkify(x.empName, x.empId) : esc(x.empName); } },
         { key: 'memo', label: 'From which salary', render: function (x) { return esc(String(x.memo || '').replace('EMI auto-deducted from ', '')); } },
-        { key: 'amount', label: 'EMI deducted', num: true, money: true }
+        { key: 'loan', label: 'Against loan', sort: false,
+          exportVal: function (x) { return (payIx[x.id] || []).map(function (h) { return ui.money(h.L.principal) + ' taken ' + ui.date(h.L.date); }).join(' + '); },
+          render: function (x) { return staffLoanRef(payIx[x.id]); } },
+        { key: 'amount', label: 'EMI deducted', num: true, money: true },
+        { key: 'after', label: 'Loan due after', sort: false,
+          exportVal: function (x) { return (payIx[x.id] || []).map(function (h) { return h.p.balance; }).join(' + '); },
+          render: function (x) { return staffLoanDue(payIx[x.id]); } }
       ],
       rows: emis, pageSize: 8, totalKey: 'amount', exportName: 'emi-history.csv', pdfTitle: 'Loan EMI Deduction History',
       empty: { icon: 'calendar2-check', title: 'No EMI deductions yet' }
@@ -1127,6 +1191,7 @@
     var disbursed = given.reduce(function (a, x) { return a + (+x.amount || 0); }, 0);
     var repaid = back.reduce(function (a, x) { return a + (+x.amount || 0); }, 0);
     var out = staffOut(emp.id), emi = staffEmi(emp.id);
+    var bk = staffBook(emp.id), bkIx = staffPayIndex(bk);   // per-loan: taken · paid · due
     var pct = disbursed ? Math.min(100, Math.round((disbursed - out) / disbursed * 100)) : 0;
     // How long until it is clear, at the EMI payroll is actually deducting.
     var monthsLeft = emi > 0 ? Math.ceil(out / emi) : 0;
@@ -1161,6 +1226,8 @@
         ['How it is recovered', [
           ['Method', 'Payslip EMI — automatic'],
           ['Deducted', emi ? ui.money(emi) + ' every payroll run' : 'Nothing scheduled'],
+          ['Recovered from salary', ui.money(bk.reduce(function (a, L) { return a + L.viaSalary; }, 0))],
+          ['Repaid in cash / bank', ui.money(bk.reduce(function (a, L) { return a + L.viaCash; }, 0))],
           ['Recoveries so far', String(back.length)],
           ['Last recovery', back.length ? ui.date(back[0].date) + ' · ' + ui.money(back[0].amount) : '—'],
           ['On the books', 'Yes — GL 1260 (payroll owns it)']
@@ -1168,23 +1235,35 @@
       ])
     ])]));
 
+    /* LOAN BY LOAN — not "what was disbursed" but "where each loan stands":
+     * taken, taken on, paid till now, still due, and out of what. */
     var gt = EPAL.table({
       columns: [
         { key: 'date', label: 'Taken on', date: true },
-        { key: 'amount', label: 'Amount', num: true, money: true },
-        { key: 'emiMonths', label: 'EMI plan', render: function (x) { return (+x.emiMonths || 0) ? x.emiMonths + ' months' : '<span class="text-mute">—</span>'; } },
-        { key: 'perMonth', label: 'Per month', num: true, sortVal: function (x) { return (+x.emiMonths || 0) ? x.amount / x.emiMonths : 0; },
-          render: function (x) { return (+x.emiMonths || 0) ? '<span class="num">' + ui.money(Math.round(x.amount / x.emiMonths)) + '</span>' : '<span class="text-mute">—</span>'; },
-          exportVal: function (x) { return (+x.emiMonths || 0) ? Math.round(x.amount / x.emiMonths) : ''; } },
-        { key: 'method', label: 'Paid via', render: function (x) { return esc(x.method || '—'); } },
-        { key: 'memo', label: 'Note', render: function (x) { return esc(x.memo || '—'); } }
+        { key: 'principal', label: 'Loan taken', num: true, money: true },
+        { key: 'paid', label: 'Paid till now', num: true, sortVal: function (L) { return L.paid; }, exportVal: function (L) { return L.paid; },
+          render: function (L) { return '<span class="num text-good">' + ui.money(L.paid) + '</span>' +
+            '<div class="text-mute xs">' + (L.principal ? Math.round(L.paid / L.principal * 100) : 0) + '% · ' + esc(staffVia(L)) + '</div>'; } },
+        { key: 'due', label: 'Still due', num: true, sortVal: function (L) { return L.due; }, exportVal: function (L) { return L.due; },
+          render: function (L) { return '<span class="num strong ' + (L.due > 0 ? 'text-warn' : 'text-good') + '">' + ui.money(L.due) + '</span>'; } },
+        { key: 'emiMonths', label: 'EMI plan', sortVal: function (L) { return L.emiMonths; },
+          render: function (L) { return L.emiMonths
+            ? esc(L.emiMonths + ' months') + '<div class="text-mute xs num">' + ui.money(L.emi) + '/mo</div>'
+            : '<span class="text-mute">—</span>'; } },
+        { key: 'method', label: 'Paid via', exportVal: function (L) { return payLabel(L.method); },
+          render: function (L) { return esc(payLabel(L.method)); } },
+        { key: 'status', label: 'Status', sort: false, exportVal: function (L) { return L.closed ? 'Cleared' : 'Running'; },
+          render: function (L) { return L.closed
+            ? '<span class="badge badge-good">Cleared</span><div class="text-mute xs">' + esc(ui.date(L.closedOn)) + '</div>'
+            : '<span class="badge badge-warn">Running</span>'; } },
+        { key: 'memo', label: 'Note', render: function (L) { return esc(L.memo || '—'); } }
       ],
-      rows: given, pageSize: 6, totalKey: 'amount', exportName: 'staff-loan-' + emp.id + '.csv',
+      rows: bk.slice().reverse(), pageSize: 6, totalKey: 'principal', exportName: 'staff-loan-' + emp.id + '.csv',
       empty: { icon: 'cash-stack', title: 'No loan disbursed' }
     });
     body.appendChild(el('div.card.mb-2', null, [
       el('div.card-head', null, [el('h3', { html: ui.icon('cash-stack') + ' Loans Given' }),
-        el('span.card-sub', { text: 'disbursed from Payroll ▸ Loan Management' })]),
+        el('span.card-sub', { text: 'each loan: taken · paid till now · still due' })]),
       el('div.card-body', null, [gt.el])
     ]));
 
@@ -1192,20 +1271,30 @@
       columns: [
         { key: 'date', label: 'Deducted on', date: true },
         { key: 'memo', label: 'From which salary', render: function (x) { return esc(String(x.memo || '').replace('EMI auto-deducted from ', '')) || '—'; } },
-        { key: 'amount', label: 'Recovered', num: true, money: true }
+        { key: 'loan', label: 'Against loan', sort: false,
+          exportVal: function (x) { return (bkIx[x.id] || []).map(function (h) { return ui.money(h.L.principal) + ' taken ' + ui.date(h.L.date); }).join(' + '); },
+          render: function (x) { return staffLoanRef(bkIx[x.id]); } },
+        { key: 'amount', label: 'Recovered', num: true, money: true },
+        { key: 'after', label: 'Loan due after', sort: false,
+          exportVal: function (x) { return (bkIx[x.id] || []).map(function (h) { return h.p.balance; }).join(' + '); },
+          render: function (x) { return staffLoanDue(bkIx[x.id]); } }
       ],
       rows: back, pageSize: 8, totalKey: 'amount', dateKey: 'date', exportName: 'staff-loan-recovery-' + emp.id + '.csv',
       empty: { icon: 'calendar2-check', title: 'Nothing recovered yet', hint: 'The EMI comes off the next payslip.' }
     });
     body.appendChild(el('div.card', null, [
       el('div.card-head', null, [el('h3', { html: ui.icon('calendar2-check') + ' Recovery History' }),
-        el('span.card-sub', { text: 'every EMI, and the salary it came off' })]),
+        el('span.card-sub', { text: 'every EMI, the salary it came off, and the loan it paid down' })]),
       el('div.card-body', null, [rt.el])
     ]));
   }
   function printStaffStatement(emp) {
     var tx = staffTxns(emp.id);
     var out = staffOut(emp.id), emi = staffEmi(emp.id);
+    var loanRows2 = staffBook(emp.id).slice().reverse().map(function (L) {
+      return '<tr><td>' + ui.date(L.date) + '</td><td class="num">' + ui.money(L.principal) + '</td><td class="num">' + ui.money(L.paid) +
+        '</td><td class="num">' + ui.money(L.due) + '</td><td>' + esc(staffVia(L)) + '</td><td>' + (L.closed ? 'Cleared ' + ui.date(L.closedOn) : 'Running') + '</td></tr>';
+    }).join('');
     var rows = tx.map(function (x) {
       return '<tr><td>' + ui.date(x.date) + '</td><td>' + (x.type === 'loan' ? 'Loan given' : 'EMI recovered') + '</td><td>' + esc(x.memo || '') +
         '</td><td class="num">' + (x.type === 'loan' ? ui.money(x.amount) : '—') + '</td><td class="num">' + (x.type === 'loan-repay' ? ui.money(x.amount) : '—') + '</td></tr>';
@@ -1216,6 +1305,10 @@
       footer: 'Accounts Department · Confidential · generated ' + ui.date(today()),
       bodyHtml: '<table><tr><td><b>Employee</b></td><td>' + esc(emp.name) + (emp.dept ? ' · ' + esc(emp.dept) : '') + '</td></tr>' +
         '<tr><td><b>Outstanding</b></td><td>' + ui.money(out) + '</td></tr></table>' +
+        // loan by loan, so the statement answers "what is left of the one taken
+        // in May" without the reader adding the trail up by hand
+        '<h3>Loans</h3><table><thead><tr><th>Taken on</th><th class="num">Loan taken</th><th class="num">Paid till now</th><th class="num">Still due</th><th>Repaid via</th><th>Status</th></tr></thead><tbody>' +
+        (loanRows2.length ? loanRows2 : '<tr><td colspan="6">No loan on record</td></tr>') + '</tbody></table>' +
         '<h3>Loan History</h3><table><thead><tr><th>Date</th><th>Type</th><th>Detail</th><th class="num">Given</th><th class="num">Recovered</th></tr></thead><tbody>' +
         rows + '</tbody></table>'
     });

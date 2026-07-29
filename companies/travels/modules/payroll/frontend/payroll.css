@@ -171,3 +171,58 @@
 .emp-chart { position: relative; height: 230px; }
 .emp-chart canvas { width: 100% !important; height: 100% !important; }
 @media (max-width: 720px) { .emp-chart { height: 190px; } }
+
+/* ============================================================================
+ * MANAGE SALARY — the extended panels (owner 2026-07-29)
+ * ----------------------------------------------------------------------------
+ * The modal that opens from the money-bag icon on Salary Manage keeps everything
+ * it had (identity, the four stats, the button row) and gains, beneath it, the
+ * salary RECORD read out in full plus the ALLOCATOR that pays several months in
+ * one posting. Nothing here restyles the part that was already there.
+ *
+ * The fact tiles reuse .emp-facts / .emp-fact from the profile above — same grid,
+ * same border, same label-over-value rhythm — so the modal reads as one system.
+ * These rules only add the tone (a deduction is red, an addition green) and the
+ * small hint line under a value ("Auto: Overtime + Bonus + Adjustment").
+ * ==========================================================================*/
+.sal-facts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.sal-fact-h { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 3px; overflow-wrap: anywhere; }
+.emp-fact.is-ded .emp-fact-v { color: var(--bad); }
+.emp-fact.is-add .emp-fact-v { color: var(--good); }
+.emp-fact.is-key { background: var(--surface-3); border-color: var(--accent); }
+.emp-fact.is-key .emp-fact-v { font-size: var(--fs-body); color: var(--accent); }
+/* a tile whose figure is nil is still printed — a missing tile reads as "we do
+   not track this", which is a different statement from "none this month" */
+.emp-fact.is-nil .emp-fact-v { color: var(--text-mute); font-weight: 600; }
+
+/* THE ALLOCATOR — one row per month the employee is still owed for, each with
+   its own box. The grid is month · owed · pay · left, collapsing to two columns
+   on a phone so the input never shrinks below a thumb. */
+.alloc { display: flex; flex-direction: column; }
+.alloc-row {
+  display: grid; grid-template-columns: 1fr auto 120px auto; gap: 10px;
+  align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.alloc-row:last-of-type { border-bottom: none; }
+.alloc-m { min-width: 0; }
+.alloc-mn { font-size: var(--fs-small); font-weight: 700; overflow-wrap: anywhere; }
+.alloc-ms { font-size: var(--fs-micro); color: var(--text-mute); }
+.alloc-owed, .alloc-left {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-small); white-space: nowrap; text-align: right;
+}
+.alloc-left { min-width: 92px; color: var(--text-mute); }
+.alloc-left.is-clear { color: var(--good); }
+.alloc-left.is-owing { color: var(--warn); }
+.alloc-in { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.alloc-foot {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  flex-wrap: wrap; margin-top: 8px; padding-top: 9px; border-top: 2px solid var(--border);
+}
+.alloc-foot-v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; }
+.alloc-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+@media (max-width: 640px) {
+  .alloc-row { grid-template-columns: 1fr 110px; row-gap: 4px; }
+  .alloc-owed { text-align: left; grid-column: 1; }
+  .alloc-left { text-align: right; }
+}

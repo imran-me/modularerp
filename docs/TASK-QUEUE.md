@@ -26,6 +26,76 @@
 
 ## ⏭️ STILL OPEN
 
+### T-LOAN-ROWS — every loan row says taken · taken on · paid till now · still due ✅ (2026-07-29)
+Owner, with a screenshot of Payroll ▸ Loans (EMI Deduction History + Loan
+transactions, both showing only an amount): *"the loan section in payroll needs
+more perfections. Like, MrX taken 20K loan, Loan date May 2026, Total Paid 6K,
+Total Due 14K to the date, Paid as Deduction of Salary / Cash etc. Wherever is a
+row of a loan, whether its status or history, it must show these figures — loan
+taken, date taken, paid till now, due total."*
+
+- ✅ **`EPAL.payroll.loanBook(empId)`** (engine) — the per-loan book, rebuilt from
+  the movements: every disbursement is a loan; every repayment (manual, the auto
+  payslip EMI, or a final settlement) is applied to the OLDEST loan still open
+  (FIFO). Returns taken / taken on / paid / due / EMI plan / viaSalary / viaCash /
+  closed + the payment trail with the balance after each one. A READ — nothing is
+  stored, and Σ due IS `loanOutstanding()` by construction, so no tile can drift.
+- ✅ **Payroll ▸ Loans** — "Employees with loans" gained taken · paid · still due ·
+  repaid via; a new **Loan register** lists every loan ever taken (running and
+  cleared) and opens a per-loan drill-down (stats, how it was repaid, every
+  payment with the balance after it, printable statement); EMI history and the
+  transaction trail now name the loan each row touched and its due after it.
+- ✅ **Everywhere else a loan row appears:** Staff Accounts' "Loan out" column,
+  the employee file's Salary & Loan Summary (every loan, one row each), Payroll ▸
+  Reports' Loan Outstanding (loan-wise), the employee profile's Accounts tab, and
+  Master Accounts ▸ Manage Loan (staff book = Total Loan · Paid · Due, the
+  drill-down's Loans Given table, its recovery history and printed statement).
+- ✅ A stored `bank:BNK-04` now prints as the account's name on these rows.
+- **Verified:** boot sweep 253/253 routes × 2 themes, 0 console errors · trial
+  balance still balances · screenshots of the Loans tab, the loan drill-down
+  (light), Staff, Reports, the employee file and the group loan desk.
+
+### T-SALARY-SPLIT — pay several months in one go, and the month read out in full ✅ (2026-07-29)
+Owner, with a screenshot of the **Manage Salary** modal (the money-bag icon on
+Salary Manage, `#/group/master-accounts/payroll`): *"while salary payment I want
+more option — he might have 20K due for his March salary and 40K for July, so I
+can pay Against Due 15K (due becomes 5K) and against July 30K (10K goes to the
+due), total due 10K + 5K = 15K."* Then a second screenshot — the reference app's
+**Add New salary form** (Users · Salary Month · generation date · scheduled date ·
+Payment Methods · Payment Status · Gross · Total Deductions · Total Additions ·
+Bonus Label/Amount · Salary Adjustment · Net Salary, then ATTENDANCE SUMMARY,
+DEDUCTION BREAKDOWN, OVERTIME ADDITION, Note) — with: *"our current + this
+screenshot, by combining both. I must need what I have now, then will be added
+the new screenshot like shape."* Owner confirmed: **same modal, extended**, and
+**one input per unpaid month** (not two buckets).
+
+- ✅ **The allocator** (`payAllocator` in the payroll module) — one row per month
+  the employee is still owed for, each with its own box and a live "left ৳X",
+  plus a footer that says *Paying now* / *Total due after this* as you type.
+  Quick fills: Fill everything · Past dues only · This month only · Clear.
+  It lists EVERY unpaid month, not only earlier ones, so opening March still
+  shows July. Paid-from uses the REAL account picker (`EPAL.pay.options`), so a
+  salary payment names the bank it left — the old Pay… form offered a bare
+  method list. Renders inline in Manage Salary AND is the body of the Pay… modal.
+- ✅ **No accounting change was needed** — `pay(empId, ym, amount, method)` has
+  always booked a partial against a NAMED month; what was missing was a way to
+  say it. Each month is one posting, so every guard (never more than
+  outstanding, advance/EMI recovery, the ledger ceiling) applies per leg.
+- ✅ **The record read out in full** — four new cards under the part that was
+  already there: Salary record · Attendance summary · Deduction breakdown ·
+  Overtime & additions. Read-outs, not inputs; the month is still edited on
+  Adjust. Every figure comes off the payslip or the attendance record — where
+  the reference shows something this system does not hold (clock minutes, a free
+  bonus label, a note) the tile says what we DO hold instead of guessing.
+- **Verified:** boot sweep 253/253 routes × 2 themes, 0 console errors ·
+  trial balance still balances · modal driven end-to-end in headless Chrome
+  (typed 26,474 against January and 16,805 against July of 35,298/33,609 →
+  8,824 + 16,804 = 25,628 remaining, exactly what the footer previewed).
+- ⏭ **Not built, needs an owner call:** a free-text **Note** on the payslip and
+  an editable **Bonus Label** (both in the reference form). Neither exists in the
+  store today, so both are new persisted fields — say the word and they get a
+  column, a migration and a place on Adjust.
+
 ### T-PAY-QUESTIONS — the owner's accounting questions, answered on the desk (2026-07-29)
 He asks payroll in depth: how much due / payable this month · how much comes off
 for loans, absence, punishments, advance EMI · how much goes out extra as overtime

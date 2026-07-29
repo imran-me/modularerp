@@ -1501,12 +1501,18 @@ function staffView(page) {
     var lastPaid = null;
     for (var i = 0; i < slips.length; i++) if (slips[i].paid > 0) lastPaid = slips[i];
     var ls = PR().leaveState(e);
+    var lb = PR().loanBook ? PR().loanBook(e.id) : [];
     return {
       id: e.id, emp: e, name: e.name, dept: e.dept || '—', designation: e.designation || '—',
       status: e.status || 'active', salary: +e.salary || 0,
       netDue: led.length ? led[led.length - 1].balance : 0,
       salaryDue: PR().salaryDue(e.id), advance: PR().advanceOutstanding(e.id),
       loan: PR().loanOutstanding(e.id), emi: PR().emiInstallment(e.id),
+      // the loan column says "still due" — these are the rest of the loan's
+      // facts (taken, when, paid so far) so the row answers the whole question
+      loanBook: lb, loanTaken: sum(lb, function (L) { return L.principal; }),
+      loanPaid: sum(lb, function (L) { return L.paid; }),
+      loanOpen: lb.filter(function (L) { return !L.closed; }),
       encash: ls.value, encashDays: ls.encashableDays, eligible: ls.eligibleFullYear,
       lastPaid: lastPaid ? lastPaid.ym : '', movements: PR().txnsFor(e.id).length + slips.length
     };
@@ -1538,7 +1544,15 @@ function staffView(page) {
       // word — ADVANCE and RECORDS are wider than anything under them.
       { key: 'advance', label: 'Adv. out', num: true, sortVal: function (r) { return r.advance; }, render: function (r) { return r.advance ? '<span class="text-warn">' + ui.money(r.advance) + '</span>' : '—'; } },
       { key: 'loan', label: 'Loan out', num: true, sortVal: function (r) { return r.loan; },
-        render: function (r) { return r.loan ? '<span class="text-warn">' + ui.money(r.loan) + '</span>' + (r.emi ? ' <span class="xs text-mute">' + ui.money(r.emi) + '/mo</span>' : ' <span class="xs text-mute">no EMI</span>') : '—'; } },
+        exportVal: function (r) { return r.loan; },
+        render: function (r) {
+          if (!r.loan) return r.loanTaken ? '—<div class="xs text-mute nowrap">' + ui.money(r.loanTaken) + ' taken · cleared</div>' : '—';
+          var when = r.loanOpen.length === 1 ? 'taken ' + ui.date(r.loanOpen[0].date) : r.loanOpen.length + ' loans';
+          return '<span class="text-warn">' + ui.money(r.loan) + '</span>' +
+            (r.emi ? ' <span class="xs text-mute">' + ui.money(r.emi) + '/mo</span>' : ' <span class="xs text-mute">no EMI</span>') +
+            '<div class="xs text-mute nowrap">' + ui.money(r.loanTaken) + ' taken · ' + ui.money(r.loanPaid) + ' paid</div>' +
+            '<div class="xs text-mute nowrap">' + esc(when) + '</div>';
+        } },
       { key: 'encash', label: 'Leave encash', num: true, sortVal: function (r) { return r.encash; },
         render: function (r) { return r.encash ? ui.money(r.encash) + ' <span class="xs text-mute">' + r.encashDays.toFixed(1) + 'd</span>' + (r.eligible ? ' <span class="badge badge-good">Eligible</span>' : '') : '—'; } },
       // a month is one token: without .nowrap the narrow column split "May 2026"
@@ -1761,9 +1775,10 @@ function empAnalytics(e) {
 
   /* ---- salary & loan -----------------------------------------------------
    * Staff loans are transactions, not documents — the engine keeps a running
-   * outstanding, not one record per loan — so "completed" is worked out the way
-   * the money actually moved: repayments are allocated to disbursements oldest
-   * first, and a disbursement is completed once it is fully covered. */
+   * outstanding, not one record per loan — so the per-loan facts (taken, taken
+   * on, paid, still due, cleared or running) are rebuilt by the engine's
+   * loanBook(), which allocates repayments to disbursements oldest first. It is
+   * the same book Loan Management reads, so the file and the tab agree. */
   var slips = S.list('pay_slips').filter(function (x) { return x.empId === e.id && x.status !== 'draft'; })
     .sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
   var paidRec = slips.filter(function (x) { return (x.paid || 0) >= P.slipPayable(x); }).length;
@@ -1780,16 +1795,35 @@ function empAnalytics(e) {
   fillK(s, 's-latest-l', 'Latest net salary' + (latest ? ' (' + P.mLabel(latest.ym) + ')' : ''));
   fillK(s, 's-latest', latest ? ui.money(P.slipPayable(latest)) : '—');
 
-  var txns = P.txnsFor(e.id) || [];
-  var lent = txns.filter(function (x) { return x.type === 'loan'; })
-    .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
-  var back = txns.filter(function (x) { return x.type === 'loan-repay'; })
-    .reduce(function (a, x) { return a + Math.abs(+x.amount || 0); }, 0);
-  var doneLoans = 0;
-  lent.forEach(function (x) { var amt = Math.abs(+x.amount || 0); if (back >= amt) { back -= amt; doneLoans++; } else back = 0; });
-  fillK(s, 'ln-running', Math.max(0, lent.length - doneLoans));
+  var lb = P.loanBook ? P.loanBook(e.id) : [];
+  var doneLoans = lb.filter(function (L) { return L.closed; }).length;
+  fillK(s, 'ln-running', lb.length - doneLoans);
   fillK(s, 'ln-done', doneLoans);
   fillK(s, 'ln-remaining', ui.money(P.loanOutstanding(e.id)));
+  /* THE LOANS THEMSELVES, not just the counts (owner 2026-07-29): each one says
+   * what was taken and when, what has come back, what is still due, and out of
+   * what — salary or cash. Newest first, like every other history. */
+  var lnHost = part(s, 'ln-loans');
+  if (lnHost) {
+    lnHost.innerHTML = '';
+    if (!lb.length) lnHost.appendChild(el('div.text-mute.xs', { text: 'No staff loan has ever been taken.' }));
+    else {
+      lnHost.appendChild(el('div.section-label', { text: 'Every loan taken' }));
+      lb.slice().reverse().forEach(function (L) {
+        var via = L.paid > 0
+          ? (L.viaSalary > 0 && L.viaCash > 0 ? 'salary + cash' : L.viaSalary > 0 ? 'from salary' : 'in cash')
+          : 'nothing repaid yet';
+        lnHost.appendChild(el('div.data-row', null, [
+          el('div.flex-1', null, [
+            el('div.sm.strong', { text: ui.money(L.principal) + ' · taken ' + ui.date(L.date) }),
+            el('div.text-mute.xs', { text: 'paid ' + ui.money(L.paid) + ' · due ' + ui.money(L.due) +
+              (L.emi ? ' · EMI ' + ui.money(L.emi) + '/mo' : '') + ' · ' + via })
+          ]),
+          el('span.badge.badge-' + (L.closed ? 'good' : 'warn'), { text: L.closed ? 'Cleared' : 'Running' })
+        ]));
+      });
+    }
+  }
   var pendReq = P.advRequests ? P.advRequests({ empId: e.id, status: 'pending' }) : [];
   fillK(s, 'ln-advpending', pendReq.length ? ui.money(sum(pendReq, function (r) { return +r.amount || 0; })) + ' · ' + pendReq.length + ' waiting' : ui.money(0));
   fillK(s, 'ln-advout', ui.money(P.advanceOutstanding(e.id)));
@@ -2376,12 +2410,161 @@ function payAll(ym) {
   ui.confirm({ title: 'Pay all outstanding?', text: 'Posts each payment (recovers any advance).', confirmLabel: 'Pay All' })
     .then(function (ok) { if (!ok) return; PR().slipsFor(CID, ym).forEach(function (s) { try { PR().pay(s.empId, ym); } catch (e) {} }); ui.toast('Salaries paid', 'success'); EPAL.router.render(); });
 }
+/* ============================================================================
+ * THE ALLOCATOR — pay several months in one go, each month its own figure
+ * ----------------------------------------------------------------------------
+ * Owner 2026-07-29: "he might have 20K due for his March salary and 40K for
+ * July, so I can pay 15K against the due (due becomes 5K) and 30K against July
+ * (10K goes to the due) — total due 15K."
+ *
+ * Before this, salary payment could only aim at ONE month: the Pay… form paid
+ * the month whose row you clicked, and past months were all-or-nothing through
+ * Pay Arrears (payArrears clears every old month in full, oldest first). There
+ * was no way to put a part-payment against March and a different part-payment
+ * against July in the same breath — you either cleared March entirely or paid
+ * nothing towards it.
+ *
+ * The accounting did not need a single change to allow this: the engine's
+ * pay(empId, ym, amount, method) has always taken a partial amount against a
+ * NAMED month, leaving the rest on 2100 Salary Payable as the company's debt.
+ * What was missing was a way to SAY it. So this is one posting per month with a
+ * figure in it — exactly what the engine already books — and every guard it
+ * carries (never more than outstanding, advance/EMI recovery, the ledger
+ * ceiling) still applies to each leg untouched.
+ *
+ * It lists EVERY month the employee is still owed for, not just the one that
+ * was opened and not just the earlier ones — previousDueList against a
+ * far-future month returns the lot, oldest first, and the opened month is
+ * simply marked. Opening March must still show that July is unpaid.
+ *
+ * Returns { el, post() } so the same widget serves both surfaces: it renders
+ * inline inside Manage Salary and it is the body of the Pay… modal.
+ * ==========================================================================*/
+function allocRows(empId, ym) {
+  // '9999-12' is an upper bound, not a date: previousDueList filters `s.ym < ym`,
+  // so this asks for "every unpaid month there is" instead of "before this one".
+  return (PR().previousDueList(empId, '9999-12') || []).map(function (r) {
+    return { ym: r.ym, label: r.label, owed: r.amount, since: r.dueSince, paid: r.paid, current: r.ym === ym };
+  });
+}
+function payAllocator(emp, ym) {
+  var rows = allocRows(emp.id, ym);
+  var wrap = el('div');
+  if (!rows.length) {
+    wrap.appendChild(el('p.text-mute.sm', { text: emp.name + ' has nothing outstanding — every accrued month is paid in full.' }));
+    return { el: wrap, post: function () { ui.toast('Nothing outstanding to pay', 'error'); return false; } };
+  }
+  var owedTotal = sum(rows, function (r) { return r.owed; });
+
+  /* WHICH ACCOUNT the salary leaves. The generic list ('Bank', 'Cash', …) is kept
+   * at the end of EPAL.pay.options — a cheque nobody registered an account for
+   * must still be recordable — and 'm:<Method>' is unwrapped back to the plain
+   * word before it reaches pay(), so the Method badge everywhere else reads as
+   * it always has. */
+  var srcSel = el('select.input', { style: { minWidth: '210px' } });
+  ((EPAL.pay && EPAL.pay.options) ? EPAL.pay.options(CID) : [['m:Bank', 'Bank'], ['m:Cash', 'Cash']])
+    .forEach(function (o) { srcSel.appendChild(el('option', { value: o[0], text: o[1] })); });
+  var dateIn = el('input.input', { type: 'date', value: today() });
+
+  var quick = el('div.alloc-quick');
+  var list = el('div.alloc');
+  var footL = el('div'), footR = el('div');
+  var inputs = [];
+
+  rows.forEach(function (r) {
+    var inp = el('input.input.alloc-in', { type: 'number', min: '0', step: '0.01',
+      max: String(r.owed), placeholder: '0', title: 'Amount to pay against ' + r.label });
+    inp.setAttribute('data-alloc-ym', r.ym);
+    var left = el('div.alloc-left');
+    inputs.push({ r: r, inp: inp, left: left });
+    list.appendChild(el('div.alloc-row', null, [
+      el('div.alloc-m', null, [
+        el('div.alloc-mn', { text: r.label + (r.current ? ' · this month' : '') }),
+        el('div.alloc-ms', { text: (r.paid ? 'part-paid ' + ui.money(r.paid) + ' · ' : '') + 'due since ' + ui.date(r.since) })
+      ]),
+      el('div.alloc-owed', { text: 'owed ' + ui.money(r.owed) }),
+      inp, left
+    ]));
+  });
+
+  function recalc() {
+    var pay = 0;
+    inputs.forEach(function (x) {
+      var v = Math.max(0, Math.min(+x.inp.value || 0, x.r.owed));
+      pay += v;
+      var rest = x.r.owed - v;
+      x.left.textContent = rest <= 0.5 ? 'cleared' : 'left ' + ui.money(rest);
+      x.left.className = 'alloc-left' + (rest <= 0.5 ? ' is-clear' : (v > 0 ? ' is-owing' : ''));
+    });
+    footL.innerHTML = 'Paying now <span class="alloc-foot-v">' + esc(ui.money(pay)) + '</span>';
+    footR.innerHTML = 'Total due after this <span class="alloc-foot-v ' +
+      (owedTotal - pay <= 0.5 ? 'text-good' : 'text-warn') + '">' + esc(ui.money(owedTotal - pay)) + '</span>';
+  }
+  inputs.forEach(function (x) { x.inp.addEventListener('input', recalc); });
+
+  function fill(pick) {
+    inputs.forEach(function (x) { x.inp.value = pick(x.r) ? String(x.r.owed) : ''; });
+    recalc();
+  }
+  quick.appendChild(el('button.btn.btn-xs.btn-outline', { type: 'button',
+    html: ui.icon('check2-all') + ' Fill everything (' + ui.money(owedTotal) + ')',
+    onclick: function () { fill(function () { return true; }); } }));
+  if (rows.some(function (r) { return !r.current; })) {
+    quick.appendChild(el('button.btn.btn-xs.btn-outline', { type: 'button',
+      html: ui.icon('hourglass-split') + ' Past dues only',
+      onclick: function () { fill(function (r) { return !r.current; }); } }));
+  }
+  if (rows.some(function (r) { return r.current; })) {
+    quick.appendChild(el('button.btn.btn-xs.btn-outline', { type: 'button',
+      html: ui.icon('calendar-check') + ' This month only',
+      onclick: function () { fill(function (r) { return r.current; }); } }));
+  }
+  quick.appendChild(el('button.btn.btn-xs.btn-outline', { type: 'button',
+    html: ui.icon('x-circle') + ' Clear', onclick: function () { fill(function () { return false; }); } }));
+
+  wrap.appendChild(el('div.flex.gap-2.flex-wrap.items-end.mb-2', null, [
+    field('Paid from', srcSel), field('Payment date', dateIn)
+  ]));
+  wrap.appendChild(quick);
+  wrap.appendChild(list);
+  wrap.appendChild(el('div.alloc-foot', null, [footL, footR]));
+  wrap.appendChild(el('p.text-mute.xs.mt-2', { text:
+    'Each month is posted on its own, so a part-payment leaves the rest of THAT month on Salary Payable and it keeps ' +
+    'showing as that month\'s due. Advance and loan EMI are recovered out of each posting exactly as they are on a normal payment.' }));
+  recalc();
+
+  function post() {
+    var picks = inputs.map(function (x) {
+      return { ym: x.r.ym, label: x.r.label, amt: Math.max(0, Math.min(+x.inp.value || 0, x.r.owed)) };
+    }).filter(function (p) { return p.amt > 0.005; });
+    if (!picks.length) { ui.toast('Put an amount against at least one month', 'error'); return false; }
+    var raw = srcSel.value, method = raw.indexOf('m:') === 0 ? raw.slice(2) : raw;   // 'm:Bank' -> 'Bank'
+    var when = dateIn.value || today();
+    var done = 0, total = 0, failed = [];
+    picks.forEach(function (p) {
+      try { PR().pay(emp.id, p.ym, p.amt, method, { date: when }); done++; total += p.amt; }
+      catch (x) { failed.push(p.label + ' — ' + (x.message || 'failed')); }
+    });
+    if (!done) { ui.toast(failed[0] || 'Nothing could be posted', 'error'); return false; }
+    ui.toast(ui.money(total) + ' posted across ' + done + ' month' + (done > 1 ? 's' : '') +
+      (failed.length ? ' · ' + failed.length + ' could not post' : ''), failed.length ? 'warning' : 'success');
+    if (failed.length) failed.forEach(function (f) { ui.toast(f, 'error'); });
+    EPAL.router.render();
+    return true;
+  }
+  return { el: wrap, post: post };
+}
+/* The Pay… button's form — the allocator on its own, for when the month list is
+ * all that is wanted. Manage Salary renders the same widget inline. */
 function payForm(s, ym) {
-  var payable = PR().slipPayable(s), out = payable - (s.paid || 0);
-  EPAL.formModal({ title: 'Pay — ' + s.empName, icon: 'cash-coin', size: 'sm', record: { amount: out, method: 'Bank' },
-    fields: [ { key: 'amount', label: 'Amount (৳)', type: 'money', default: out, min: 0, max: out, hint: 'Outstanding ' + ui.money(out) + ' — pay less for a partial (rest becomes Due, shown on next month\'s payslip).' },
-      { key: 'method', label: 'Method', type: 'select', options: ['Bank', 'Cash', 'bKash', 'Nagad', 'Rocket', 'Upay', 'Card', 'Cheque'], default: 'Bank' } ],
-    saveLabel: 'Post Payment', onSave: function (v) { try { PR().pay(s.empId, ym, +v.amount, v.method); ui.toast('Payment posted', 'success'); EPAL.router.render(); return true; } catch (e) { ui.toast(e.message || 'Failed', 'error'); return false; } } });
+  var emp = empById(s.empId) || { id: s.empId, name: s.empName };
+  var a = payAllocator(emp, ym);
+  // onClick returning false keeps the modal open, so a rejected posting does not
+  // throw the operator's figures away
+  return ui.modal({ title: 'Pay — ' + s.empName, icon: 'cash-coin', size: 'lg', body: a.el, actions: [
+    { label: 'Cancel', variant: 'ghost' },
+    { label: 'Post Payment', variant: 'primary', icon: 'cash-coin', onClick: function () { return a.post(); } }
+  ] });
 }
 
 /* ---- MANAGE SALARY modal (legacy el()) ---------------------------------- */
@@ -2391,7 +2574,10 @@ function manageSalary(s, ym) {
   var payable = PR().slipPayable(s), out = Math.max(0, payable - (s.paid || 0));
   var advOut = PR().advanceOutstanding(e.id), arrears = PR().previousDue(e.id, ym);
   var body = el('div');
-  var m = ui.modal({ title: 'Manage Salary — ' + s.empName + ' · ' + PR().mLabel(ym), icon: 'wallet2', size: 'md', body: body, footer: false });
+  // 'md' → 'lg': the modal now carries the full record read-out and the month-by-
+  // month allocator beneath the part it always had, and 420px cannot hold a
+  // four-column fact grid without wrapping every tile onto its own line.
+  var m = ui.modal({ title: 'Manage Salary — ' + s.empName + ' · ' + PR().mLabel(ym), icon: 'wallet2', size: 'lg', body: body, footer: false });
   function act(label, icon2, kind, fn, hint) {
     return el('button.btn' + (kind || '.btn-outline'), { html: ui.icon(icon2) + ' ' + label, title: hint || '', onclick: fn });
   }
@@ -2423,6 +2609,161 @@ function manageSalary(s, ym) {
       act('Payslip', 'receipt', null, function () { m.close(); statement(e, ym); })
     ].filter(Boolean))
   ]) ]));
+
+  /* …and beneath the part that was always here, the month READ OUT IN FULL and
+     the allocator. Everything above this line is untouched. */
+  body.appendChild(salaryRecordCard(e, s, ym, run, st));
+  body.appendChild(attendanceCard(e, s, ym));
+  body.appendChild(deductionCard(e, s));
+  body.appendChild(additionCard(e, s));
+  if (canCreate()) {
+    var alloc = payAllocator(e, ym);
+    var pc = frag('reg-card');
+    slot(pc, 'title').innerHTML = ui.icon('cash-coin') + ' Pay now — month by month';
+    slot(pc, 'sub').textContent = 'put a figure against each month; what you leave stays as that month\'s due';
+    slot(pc, 'body').appendChild(alloc.el);
+    slot(pc, 'body').appendChild(el('div.flex.justify-end.mt-2', null, [
+      el('button.btn.btn-primary', { html: ui.icon('cash-coin') + ' Post Payment',
+        onclick: function () { if (alloc.post()) m.close(); } })
+    ]));
+    body.appendChild(pc);
+  }
+}
+
+/* ============================================================================
+ * MANAGE SALARY — the month read out in full (owner 2026-07-29)
+ * ----------------------------------------------------------------------------
+ * The owner sent the reference app's salary form and asked for its SHAPE on top
+ * of what we already have: the record header (month, dates, method, status,
+ * gross, total deductions, total additions, bonus, adjustment, net), then
+ * ATTENDANCE SUMMARY, DEDUCTION BREAKDOWN and OVERTIME ADDITION as their own
+ * blocks. Every figure below already exists on the payslip or the attendance
+ * record — nothing here computes a new number or invents a field. Where the
+ * reference shows something this system does not record (clock minutes, a free
+ * bonus label, a note), the tile says what we DO hold instead of guessing.
+ *
+ * These are READ-OUTS, not inputs: the month is edited where it always was, on
+ * Adjust (correctionForm) while the run is a draft. Two places to type the same
+ * figure is how the two drift apart.
+ *
+ * Net check: gross + additions − deductions === slipPayable(s), because
+ * slipPayable is earnedGross (= gross − absent) + OT + bonus + tplBonus + adj
+ * − tax − pf − other − late − early − fine. The tiles are that sum, split.
+ * ==========================================================================*/
+function factCard(title, sub, facts, note) {
+  var c = frag('reg-card');
+  slot(c, 'title').innerHTML = title;
+  slot(c, 'sub').textContent = sub || '';
+  var grid = el('div.emp-facts.sal-facts');
+  facts.filter(Boolean).forEach(function (f) {
+    grid.appendChild(el('div.emp-fact' + (f.tone ? '.is-' + f.tone : '') + (f.nil ? '.is-nil' : ''), null, [
+      el('div.emp-fact-l', { text: f.l }),
+      el('div.emp-fact-v', { text: f.v }),
+      f.h ? el('div.sal-fact-h', { text: f.h }) : null
+    ].filter(Boolean)));
+  });
+  slot(c, 'body').appendChild(grid);
+  if (note) slot(c, 'body').appendChild(el('p.text-mute.xs.mt-2', { text: note }));
+  return c;
+}
+// what the company agreed to take back this month — the actual recovery once the
+// month is paid, otherwise the projection the payslip prints (same rule as statement)
+function advLineOf(s) {
+  var auto = Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s)));
+  return (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? auto : Math.min(auto, +s.advCap));
+}
+function emiLineOf(s) {
+  return (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? PR().emiInstallment(s.empId) : +s.emiCap);
+}
+function dedTotalOf(s) {
+  return (s.absentDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0)
+    + (s.tax || 0) + (s.pf || 0) + (s.otherDeduction || 0) + (s.fine || 0);
+}
+function addTotalOf(s) {
+  return (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0) + (s.adjustment || 0);
+}
+function salaryRecordCard(e, s, ym, run, st) {
+  var adj = s.adjustment || 0, bonus = (s.bonus || 0) + (s.tplBonus || 0);
+  var pkg = s.pkgName || '';
+  return factCard(ui.icon('card-list') + ' Salary record — ' + PR().mLabel(ym),
+    'payslip ' + (s.slipNo || '—') + ' · the month as it stands on the books', [
+      { l: 'Employee', v: e.name, h: [e.dept, e.designation].filter(Boolean).join(' · ') || '' },
+      { l: 'Salary month', v: PR().mLabel(ym), h: 'run ' + cap(st) },
+      { l: 'Salary generated', v: run && run.generatedAt ? ui.date(run.generatedAt) : '—', nil: !(run && run.generatedAt) },
+      { l: 'Scheduled (pay by)', v: run && run.dueAfter ? ui.date(run.dueAfter) : '—', nil: !(run && run.dueAfter),
+        h: run && run.correctionUntil ? 'corrections closed ' + ui.date(run.correctionUntil) : '' },
+      { l: 'Payment method', v: s.payMethod || e.salaryMethod || 'Bank', h: s.paid > 0 ? 'last paid ' + ui.date(s.paidDate) : 'not paid yet' },
+      { l: 'Payment status', v: cap(s.status || 'draft') },
+      { l: 'Gross salary', v: ui.money(s.gross || 0), h: pkg ? 'package · ' + pkg : 'template rates' },
+      { l: 'Total deductions', v: ui.money(dedTotalOf(s)), tone: 'ded', h: 'Absent + late + early + tax + PF + other + fine' },
+      { l: 'Total additions', v: ui.money(addTotalOf(s)), tone: 'add', h: 'Auto: overtime + bonus + adjustment' },
+      { l: 'Bonus', v: ui.money(bonus), nil: !bonus,
+        h: s.tplBonus ? 'standing ' + ui.money(s.tplBonus) + (pkg ? ' · ' + pkg : '') + (s.bonus ? ' + this month ' + ui.money(s.bonus) : '') : (s.bonus ? 'this month' : 'none this month') },
+      { l: 'Salary adjustment', v: (adj > 0 ? '+ ' : adj < 0 ? '− ' : '') + ui.money(Math.abs(adj)), nil: !adj,
+        tone: adj > 0 ? 'add' : adj < 0 ? 'ded' : '', h: 'Can be positive or negative' },
+      { l: 'Net salary', v: ui.money(PR().slipPayable(s)), tone: 'key', h: PR().amountInWords(PR().slipPayable(s)) }
+    ]);
+}
+function attendanceCard(e, s, ym) {
+  var att = PR().attendanceFor(s.empId, ym), t = PR().template(CID);
+  var calDays = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
+  var lpa = t.latesPerAbsent > 0 ? t.latesPerAbsent : 3;
+  function d(n) { return (n || 0) + ' day' + ((n || 0) === 1 ? '' : 's'); }
+  return factCard(ui.icon('calendar3') + ' Attendance summary — ' + PR().mLabel(ym),
+    att ? 'from the month\'s attendance record' : 'no attendance record was entered for this month', [
+      { l: 'Total days', v: String(calDays), h: 'calendar days' },
+      { l: 'Payroll working days', v: String(t.workingDays || 30), h: 'the divisor a day is priced at' },
+      { l: 'Present', v: att ? d(att.present) : '—', nil: !att },
+      { l: 'Absent', v: d(s.leaveDeductDays), tone: s.leaveDeductDays ? 'ded' : '', nil: !s.leaveDeductDays },
+      { l: 'Leave', v: att ? d(att.leave) : '—', nil: !att },
+      { l: 'Late', v: String(s.lateDays || 0), tone: s.lateDays ? 'ded' : '', nil: !s.lateDays,
+        h: s.lateDays ? 'counts as ' + (Math.round((s.lateDays / lpa) * 100) / 100) + ' day(s)' : '' },
+      { l: 'Early out', v: String(s.earlyDays || 0), tone: s.earlyDays ? 'ded' : '', nil: !s.earlyDays },
+      { l: 'Overtime', v: (s.overtimeHours || 0) + ' hr', tone: s.overtimeHours ? 'add' : '', nil: !s.overtimeHours },
+      { l: 'Worked days (paid)', v: d(s.workedDays), h: 'working days − absent' }
+    ],
+    'Attendance is recorded in DAYS here — present, absent, late count, early-leave count, overtime hours. ' +
+    'There is no clock-in/out anywhere in this system, so late MINUTES and worked HOURS cannot be shown. ' +
+    'Every ' + lpa + ' lates deduct one day.');
+}
+function deductionCard(e, s) {
+  var advL = advLineOf(s), emiL = emiLineOf(s), adj = s.adjustment || 0;
+  return factCard(ui.icon('dash-circle') + ' Deduction breakdown',
+    'what comes off the month — ' + ui.money(dedTotalOf(s)) + ' off the salary, ' + ui.money(advL + emiL) + ' off the cash', [
+      { l: 'Absent deduction', v: ui.money(s.absentDeduction || 0), tone: 'ded', nil: !s.absentDeduction },
+      { l: 'Late deduction', v: ui.money(s.lateDeduction || 0), tone: 'ded', nil: !s.lateDeduction },
+      { l: 'Early-out deduction', v: ui.money(s.earlyDeduction || 0), tone: 'ded', nil: !s.earlyDeduction },
+      { l: 'Income tax', v: ui.money(s.tax || 0), tone: 'ded', nil: !s.tax },
+      { l: 'Provident fund', v: ui.money(s.pf || 0), tone: 'ded', nil: !s.pf },
+      { l: 'Other deduction', v: ui.money(s.otherDeduction || 0), tone: 'ded', nil: !s.otherDeduction },
+      { l: 'Fine / punishment', v: ui.money(s.fine || 0), tone: 'ded', nil: !s.fine, h: s.fineNote || '' },
+      adj < 0 ? { l: 'Negative adjustment', v: ui.money(Math.abs(adj)), tone: 'ded' } : null,
+      { l: 'Advance recovered', v: ui.money(advL), nil: !advL, h: 'of ' + ui.money(PR().advanceOutstanding(s.empId)) + ' outstanding' },
+      { l: 'Loan EMI', v: ui.money(emiL), nil: !emiL, h: 'of ' + ui.money(PR().loanOutstanding(s.empId)) + ' outstanding' }
+    ],
+    'Advance and loan EMI come back to the company out of the salary, so they reduce the CASH handed over — ' +
+    'not the salary cost, and not the net payable. They are deliberately outside the ' + ui.money(dedTotalOf(s)) + ' above.');
+}
+function additionCard(e, s) {
+  var otOff = e.otEligible === false;
+  var adj = s.adjustment || 0;
+  /* The rate is read back OUT of the slip (pay ÷ hours) rather than recomputed.
+     A slip does not carry otRate — generate() copies the figures, not the rate —
+     and recomputing it would quote today's package against a month that was
+     finalized under the old one. Division is what this slip actually paid. */
+  var otRate = (s.overtimeHours > 0 && s.overtime > 0) ? Math.round((s.overtime / s.overtimeHours) * 100) / 100 : 0;
+  return factCard(ui.icon('plus-circle') + ' Overtime & additions',
+    'what goes on top — ' + ui.money(addTotalOf(s)), [
+      { l: 'Overtime hours', v: (s.overtimeHours || 0) + ' hr', nil: !s.overtimeHours },
+      { l: 'Overtime rate', v: otRate ? ui.money(otRate) + ' / hr' : '—', nil: !otRate, h: otRate ? 'as paid on this slip' : '' },
+      { l: 'Overtime pay', v: otOff ? 'Not eligible' : ui.money(s.overtime || 0), tone: otOff ? '' : 'add', nil: otOff || !s.overtime,
+        h: otOff ? 'overtime is switched off for this employee' : (s.otOverride != null ? 'overridden by hand' : 'hours × rate') },
+      { l: 'Standing bonus', v: ui.money(s.tplBonus || 0), tone: 'add', nil: !s.tplBonus, h: s.pkgName ? 'from ' + s.pkgName : '' },
+      { l: 'Bonus this month', v: ui.money(s.bonus || 0), tone: 'add', nil: !s.bonus },
+      adj > 0 ? { l: 'Positive adjustment', v: ui.money(adj), tone: 'add' } : null,
+      { l: 'Leave encashment accrued', v: ui.money(s.encashAmt || 0), nil: !s.encashAmt,
+        h: (s.encashDays ? (Math.round(s.encashDays * 100) / 100) + ' days · paid on settlement, not with the salary' : '') }
+    ]);
 }
 
 /* ---- PRINT SHEET with column marks (legacy el()) ------------------------ */
@@ -2531,10 +2872,200 @@ function correctionForm(s, ym) {
     } });
 }
 
-/* =================================================== LOAN MANAGEMENT */
+/* ============================================================ LOAN MANAGEMENT
+ * WHAT A LOAN ROW HAS TO SAY (owner 2026-07-29): "Mr X took ৳20,000, taken May
+ * 2026, ৳6,000 paid, ৳14,000 still due, recovered from salary / in cash." Every
+ * loan row on this screen — the status list, the register, the EMI history and
+ * the transaction trail — now carries those four figures, because a row that
+ * only says "outstanding ৳14,000" makes you go and reconstruct the rest by hand.
+ *
+ * The figures come from `EPAL.payroll.loanBook(empId)`, which rebuilds the
+ * per-loan book from the movements (repayments applied oldest loan first). It
+ * is a read: Σ due across the book IS loanOutstanding(), so nothing on this tab
+ * can disagree with the tiles above it.
+ * ==========================================================================*/
+
+/* every loan on this payroll, newest first, each carrying its employee */
+function loanRows() {
+  var out = [];
+  team().forEach(function (e) {
+    (PR().loanBook ? PR().loanBook(e.id) : []).forEach(function (L) { L.emp = e; out.push(L); });
+  });
+  return out.sort(function (a, b) { return a.date === b.date ? (a.id < b.id ? 1 : -1) : (a.date < b.date ? 1 : -1); });
+}
+/* txnId → [{ L, p }] : which loan(s) a repayment went against, and the balance
+ * that loan was left on right after it. A single payment can finish one loan
+ * and start eating the next, so it is a list. */
+function loanPayIndex(rows) {
+  var ix = {};
+  rows.forEach(function (L) {
+    L.payments.forEach(function (p) { (ix[p.txnId] || (ix[p.txnId] = [])).push({ L: L, p: p }); });
+  });
+  return ix;
+}
+/* a stored 'bank:41' is an account id, not a sentence — name the account */
+function methodLabel(v) {
+  v = String(v || '');
+  if (v.indexOf('bank:') === 0 && EPAL.pay && EPAL.pay.byId) {
+    var b = EPAL.pay.byId(v.slice(5));
+    if (b) return b.name + (b.branch && b.branch !== '—' ? ' · ' + b.branch : '');
+  }
+  return (v.indexOf('m:') === 0 ? v.slice(2) : v) || '—';
+}
+/* HOW the money came back — the part a total can never show */
+function repaidViaHtml(L) {
+  if (!(L.paid > 0)) return '<span class="text-mute">nothing repaid yet</span>';
+  var bits = [];
+  if (L.viaSalary > 0) bits.push('<span class="badge badge-info">Salary deduction</span> <span class="num">' + ui.money(L.viaSalary) + '</span>');
+  if (L.viaCash > 0) bits.push('<span class="badge">Cash / bank</span> <span class="num">' + ui.money(L.viaCash) + '</span>');
+  return bits.join('<br>');
+}
+function repaidViaText(L) {
+  if (!(L.paid > 0)) return 'nothing repaid yet';
+  var bits = [];
+  if (L.viaSalary > 0) bits.push('salary deduction ' + ui.money(L.viaSalary));
+  if (L.viaCash > 0) bits.push('cash / bank ' + ui.money(L.viaCash));
+  return bits.join(' · ');
+}
+function loanStatusHtml(L) {
+  return L.closed
+    ? '<span class="badge badge-good">Cleared</span><div class="text-mute xs">' + esc(ui.date(L.closedOn)) + '</div>'
+    : '<span class="badge badge-warn">Running</span>' +
+      (L.emi ? '<div class="text-mute xs num">' + ui.money(L.emi) + '/mo · ' + Math.ceil(L.due / L.emi) + ' left</div>'
+             : '<div class="text-mute xs">no EMI plan</div>');
+}
+function loanPct(L) { return L.principal ? Math.min(100, Math.round(L.paid / L.principal * 100)) : 0; }
+/* the loan a transaction row touches — the same four figures, on the trail */
+function loanRefHtml(hits) {
+  if (!hits || !hits.length) return '<span class="text-mute">—</span>';
+  return hits.map(function (h) {
+    return '<div><span class="num">' + ui.money(h.L.principal) + '</span> <span class="text-mute xs">taken ' + esc(ui.date(h.L.date)) + '</span></div>';
+  }).join('');
+}
+function loanPaidHtml(hits) {
+  if (!hits || !hits.length) return '<span class="text-mute">—</span>';
+  return hits.map(function (h) {
+    var paid = h.p ? (h.L.principal - h.p.balance) : h.L.paid;
+    return '<div class="num text-good">' + ui.money(paid) + '</div>';
+  }).join('');
+}
+function loanDueHtml(hits) {
+  if (!hits || !hits.length) return '<span class="text-mute">—</span>';
+  return hits.map(function (h) {
+    var due = h.p ? h.p.balance : h.L.due;
+    return '<div class="num ' + (due > 0 ? 'text-warn' : 'text-good') + '">' + ui.money(due) + '</div>';
+  }).join('');
+}
+function lstat(label, value, tone) {
+  return el('div.stat', null, [ el('div.stat-label', { text: label }),
+    el('div.stat-value' + (tone ? '.' + tone : ''), { text: value }) ]);
+}
+
+/* ONE LOAN — the whole life of it: what was taken, what has come back, out of
+ * what, and what is still owed. Reached from any loan row on the tab. */
+function loanDetailModal(L) {
+  var body = el('div');
+  var left = (L.emi > 0 && L.due > 0) ? Math.ceil(L.due / L.emi) : 0;
+  body.appendChild(el('div.card', null, [el('div.card-body', null, [
+    el('div.flex.items-center.gap-2.flex-wrap.mb-2', null, [
+      el('div.flex-1', null, [
+        el('div.fw-700', { html: EPAL.people ? EPAL.people.linkify(L.empName, L.empId) : esc(L.empName) }),
+        el('div.text-mute.sm', { text: ui.money(L.principal) + ' taken on ' + ui.date(L.date) + (L.memo ? ' · ' + L.memo : '') })
+      ]),
+      ui.frag(loanStatusHtml(L))
+    ]),
+    // five stats, not six: the row lays out five to a line, and "taken on" is
+    // already the first thing the header line says
+    el('div.stat-row.mb-3', null, [
+      lstat('Loan taken', ui.money(L.principal)),
+      lstat('Paid so far', ui.money(L.paid), 'text-good'),
+      lstat('Still due', ui.money(L.due), L.due > 0 ? 'text-warn' : 'text-good'),
+      lstat('Monthly EMI', L.emi ? ui.money(L.emi) : '—'),
+      lstat('Instalments left', left ? String(left) : (L.due > 0 ? 'no plan' : '—'))
+    ]),
+    el('div.data-list', null, [
+      drow('Disbursed from', methodLabel(L.method)),
+      drow('Repayment plan', L.emiMonths
+        ? L.emiMonths + ' months · ' + ui.money(L.emi) + ' deducted from every salary'
+        : 'None — it comes back only when a repayment is recorded by hand'),
+      drow('Recovered from salary', ui.money(L.viaSalary)),
+      drow('Repaid in cash / bank', ui.money(L.viaCash)),
+      drow('Repaid so far', loanPct(L) + '% of the loan'),
+      drow('Last payment', L.lastPaidOn ? ui.date(L.lastPaidOn) : 'none yet'),
+      drow(L.closed ? 'Cleared on' : 'Status', L.closed ? ui.date(L.closedOn) : 'Running · ' + ui.money(L.due) + ' still due')
+    ])
+  ])]));
+
+  body.appendChild(el('div.card.mt-3', null, [
+    el('div.card-head', null, [ el('h3', { html: ui.icon('clock-history') + ' Every payment against this loan' }),
+      el('span.card-sub', { text: L.payments.length + ' payment(s) · newest first' }) ]),
+    el('div.card-body', null, [ EPAL.table({
+      columns: [
+        { key: 'date', label: 'Paid on', date: true },
+        { key: 'kind', label: 'How', render: function (p) {
+          return p.kind === 'salary' ? '<span class="badge badge-info">Salary deduction</span>'
+            : p.kind === 'settlement' ? '<span class="badge badge-bad">Final settlement</span>'
+            : '<span class="badge">Cash / bank</span>' + (p.method ? ' <span class="text-mute xs">' + esc(methodLabel(p.method)) + '</span>' : ''); },
+          exportVal: function (p) { return p.kind; } },
+        { key: 'memo', label: 'Note', render: function (p) { return esc(p.memo || '—'); } },
+        { key: 'amount', label: 'Paid', num: true, money: true },
+        { key: 'balance', label: 'Due after this', num: true, render: function (p) {
+          return '<span class="num ' + (p.balance > 0 ? 'text-warn' : 'text-good') + '">' + ui.money(p.balance) + '</span>'; },
+          sortVal: function (p) { return p.balance; } }
+      ],
+      rows: L.payments, pageSize: 8, totalKey: 'amount', exportName: 'loan-payments-' + L.empId + '.csv',
+      pdfTitle: 'Loan payments — ' + L.empName,
+      empty: { icon: 'hourglass-split', title: 'Nothing repaid yet', hint: L.emi ? 'The next payroll run deducts ' + ui.money(L.emi) + '.' : 'No EMI plan — record a repayment when the money comes in.' }
+    }).el ])
+  ]));
+
+  var acts = [{ label: 'Print', icon: 'printer', onClick: function () { printLoan(L); return false; } }];
+  if (canCreate() && L.due > 0) acts.push({ label: 'Record repayment', icon: 'arrow-return-left', variant: 'primary',
+    onClick: function () { moneyForm(L.emp || empById(L.empId), 'loan-repay'); return true; } });
+  acts.push({ label: 'Close' });
+  ui.modal({ title: 'Staff loan · ' + L.empName, icon: 'bank', size: 'lg', body: body, actions: acts });
+}
+
+function printLoan(L) {
+  var head = '<tr><th>Paid on</th><th>How</th><th>Note</th><th style="text-align:right">Paid</th><th style="text-align:right">Due after</th></tr>';
+  var rows = L.payments.slice().reverse().map(function (p) {
+    return '<tr><td>' + esc(ui.date(p.date)) + '</td><td>' +
+      esc(p.kind === 'salary' ? 'Salary deduction' : p.kind === 'settlement' ? 'Final settlement' : 'Cash / bank · ' + methodLabel(p.method)) +
+      '</td><td>' + esc(p.memo || '') + '</td><td style="text-align:right">' + ui.money(p.amount) +
+      '</td><td style="text-align:right">' + ui.money(p.balance) + '</td></tr>';
+  }).join('');
+  var facts = '<table>' +
+    '<tr><th>Loan taken</th><td style="text-align:right">' + ui.money(L.principal) + '</td></tr>' +
+    '<tr><th>Taken on</th><td style="text-align:right">' + esc(ui.date(L.date)) + '</td></tr>' +
+    '<tr><th>Paid so far</th><td style="text-align:right">' + ui.money(L.paid) + '</td></tr>' +
+    '<tr><th>Still due</th><td style="text-align:right">' + ui.money(L.due) + '</td></tr>' +
+    '<tr><th>Repaid via</th><td style="text-align:right">' + esc(repaidViaText(L)) + '</td></tr>' +
+    '<tr><th>Monthly EMI</th><td style="text-align:right">' + (L.emi ? ui.money(L.emi) + ' · ' + L.emiMonths + ' months' : 'no plan') + '</td></tr>' +
+    '</table>';
+  ui.printDoc({
+    title: 'Staff Loan Statement — ' + L.empName,
+    subtitle: coFull(CID) + ' · Payroll · loan taken ' + ui.date(L.date),
+    meta: L.payments.length + ' payment(s) · generated ' + ui.date(today()),
+    footer: 'System-generated staff loan statement — Confidential',
+    bodyHtml: facts + '<table>' + head + rows + '</table>'
+  });
+}
+
 function loansView(page) {
   var t = team();
-  var byEmp = t.map(function (e) { return { e: e, out: PR().loanOutstanding(e.id) }; });
+  var book = loanRows(), payIx = loanPayIndex(book);
+  var byEmp = t.map(function (e) {
+    var mine = book.filter(function (L) { return L.empId === e.id; });
+    var back = sum(mine, function (L) { return L.paid; });
+    return { e: e, out: PR().loanOutstanding(e.id), loans: mine,
+      taken: sum(mine, function (L) { return L.principal; }),
+      // `paid` as well as `back`, so the shared repaidVia* helpers read a person
+      // and a loan with the same two fields
+      back: back, paid: back,
+      viaSalary: sum(mine, function (L) { return L.viaSalary; }),
+      viaCash: sum(mine, function (L) { return L.viaCash; }),
+      last: mine.length ? mine[0].date : '' };
+  });
   var txns = S.list('pay_txns').filter(function (x) { return x.companyId === CID && (x.type === 'loan' || x.type === 'loan-repay'); }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
   var totalOut = sum(byEmp, function (x) { return x.out; });
   var active = byEmp.filter(function (x) { return x.out > 0; });
@@ -2568,13 +3099,64 @@ function loansView(page) {
 
   if (active.length) {
     var lt = EPAL.table({
-      columns: [ { key: 'name', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.e.name) + '</span>'; } },
-        { key: 'out', label: 'Outstanding', num: true, render: function (r) { return '<span class="num strong text-warn">' + ui.money(r.out) + '</span>'; }, sortVal: function (r) { return r.out; } } ],
+      columns: [
+        { key: 'name', label: 'Employee', sortVal: function (r) { return r.e.name; }, exportVal: function (r) { return r.e.name; },
+          render: function (r) { return '<span class="strong">' + esc(r.e.name) + '</span>' +
+            '<div class="text-mute xs">' + r.loans.length + ' loan' + (r.loans.length === 1 ? '' : 's') +
+            (r.last ? ' · latest ' + esc(ui.date(r.last)) : '') + '</div>'; } },
+        { key: 'taken', label: 'Loan taken', num: true, money: true, sortVal: function (r) { return r.taken; } },
+        { key: 'back', label: 'Paid so far', num: true, sortVal: function (r) { return r.back; }, exportVal: function (r) { return r.back; },
+          render: function (r) { return '<span class="num text-good">' + ui.money(r.back) + '</span>' +
+            '<div class="text-mute xs">' + (r.taken ? Math.round(r.back / r.taken * 100) : 0) + '% of what was lent</div>'; } },
+        { key: 'out', label: 'Still due', num: true, sortVal: function (r) { return r.out; }, exportVal: function (r) { return r.out; },
+          render: function (r) { return '<span class="num strong text-warn">' + ui.money(r.out) + '</span>'; } },
+        { key: 'via', label: 'Repaid via', sort: false, exportVal: function (r) { return repaidViaText(r); },
+          render: function (r) { return repaidViaHtml(r); } },
+        { key: 'emi', label: 'Monthly EMI', num: true, sortVal: function (r) { return PR().emiInstallment(r.e.id); },
+          exportVal: function (r) { return PR().emiInstallment(r.e.id); },
+          render: function (r) { var m = PR().emiInstallment(r.e.id);
+            return m ? '<span class="num">' + ui.money(m) + '</span>' : '<span class="text-mute">no EMI plan</span>'; } }
+      ],
       rows: active, pageSize: 8, onRow: function (r) { moneyForm(r.e, 'loan-repay'); },
+      exportName: 'staff-loans.csv', pdfTitle: 'Staff loans outstanding',
       actions: ui.actions({ edit: canCreate() ? function (r) { moneyForm(r.e, 'loan-repay'); } : null }), empty: { icon: 'bank', title: 'No active loans' }
     });
-    var lc = frag('reg-card'); slot(lc, 'title').innerHTML = ui.icon('people') + ' Employees with loans'; slot(lc, 'sub').textContent = 'click to record a repayment'; slot(lc, 'body').appendChild(lt.el); page.appendChild(lc);
+    var lc = frag('reg-card'); slot(lc, 'title').innerHTML = ui.icon('people') + ' Employees with loans'; slot(lc, 'sub').textContent = 'taken · paid · still due, per person · click to record a repayment'; slot(lc, 'body').appendChild(lt.el); page.appendChild(lc);
   }
+
+  /* THE REGISTER — one row per loan, running and cleared, because "how much of
+   * the ৳20,000 taken in May is left" is a question about a LOAN, not a person. */
+  if (book.length) {
+    var rt = EPAL.table({
+      columns: [
+        { key: 'empName', label: 'Employee', sortVal: function (L) { return L.empName; },
+          render: function (L) { return '<span class="strong">' + esc(L.empName) + '</span>' +
+            (L.memo && L.memo !== 'Staff loan' ? '<div class="text-mute xs">' + esc(L.memo) + '</div>' : ''); } },
+        { key: 'date', label: 'Taken on', date: true, render: function (L) {
+          return esc(ui.date(L.date)) + '<div class="text-mute xs">' +
+            (L.emiMonths ? L.emiMonths + '-month EMI plan' : 'no EMI plan') + '</div>'; } },
+        { key: 'principal', label: 'Loan taken', num: true, money: true },
+        { key: 'paid', label: 'Paid till now', num: true, sortVal: function (L) { return L.paid; }, exportVal: function (L) { return L.paid; },
+          render: function (L) { return '<span class="num text-good">' + ui.money(L.paid) + '</span>' +
+            '<div class="text-mute xs">' + loanPct(L) + '%' + (L.lastPaidOn ? ' · last ' + esc(ui.date(L.lastPaidOn)) : '') + '</div>'; } },
+        { key: 'due', label: 'Still due', num: true, sortVal: function (L) { return L.due; }, exportVal: function (L) { return L.due; },
+          render: function (L) { return '<span class="num strong ' + (L.due > 0 ? 'text-warn' : 'text-good') + '">' + ui.money(L.due) + '</span>'; } },
+        { key: 'via', label: 'Repaid via', sort: false, exportVal: repaidViaText, render: repaidViaHtml },
+        { key: 'status', label: 'Status', sort: false, exportVal: function (L) { return L.closed ? 'Cleared' : 'Running'; },
+          render: loanStatusHtml }
+      ],
+      rows: book, pageSize: 8, searchKeys: ['empName', 'empId', 'memo'], sortKey: 'date', sortDir: -1,
+      exportName: 'loan-register.csv', pdfTitle: 'Staff Loan Register — ' + coFull(CID),
+      onRow: function (L) { loanDetailModal(L); },
+      actions: [{ icon: 'eye', title: 'Open this loan', onClick: function (L) { loanDetailModal(L); } }],
+      empty: { icon: 'bank', title: 'No loan has been disbursed yet' }
+    });
+    var rc = frag('reg-card');
+    slot(rc, 'title').innerHTML = ui.icon('journal-bookmark') + ' Loan register';
+    slot(rc, 'sub').textContent = 'every loan ever taken — taken on · taken · paid till now · still due · click one for its whole history';
+    slot(rc, 'body').appendChild(rt.el); page.appendChild(rc);
+  }
+
   var emis = txns.filter(function (x) { return x.type === 'loan-repay' && /EMI auto-deducted/.test(x.memo || ''); });
   if (emis.length) {
     var et = EPAL.table({
@@ -2582,14 +3164,24 @@ function loansView(page) {
         { key: 'date', label: 'Deducted on', date: true },
         { key: 'empName', label: 'Employee', render: function (x) { return EPAL.people ? EPAL.people.linkify(x.empName, x.empId) : esc(x.empName); } },
         { key: 'memo', label: 'From which salary', render: function (x) { return esc(String(x.memo || '').replace('EMI auto-deducted from ', '')); } },
-        { key: 'amount', label: 'EMI deducted', num: true, money: true }
+        // WHICH loan this instalment paid down, and where that loan stood after
+        // it — an EMI row that only says "৳10,500" tells you nothing about the
+        // debt it belongs to.
+        { key: 'loan', label: 'Against loan', sort: false,
+          exportVal: function (x) { return (payIx[x.id] || []).map(function (h) { return ui.money(h.L.principal) + ' taken ' + ui.date(h.L.date); }).join(' + '); },
+          render: function (x) { return loanRefHtml(payIx[x.id]); } },
+        { key: 'amount', label: 'EMI deducted', num: true, money: true },
+        { key: 'after', label: 'Loan due after', sort: false,
+          exportVal: function (x) { return (payIx[x.id] || []).map(function (h) { return h.p.balance; }).join(' + '); },
+          render: function (x) { return loanDueHtml(payIx[x.id]); } }
       ],
       rows: emis, pageSize: 8, totalKey: 'amount', exportName: 'emi-history.csv', pdfTitle: 'Loan EMI Deduction History',
+      onRow: function (x) { var h = (payIx[x.id] || [])[0]; if (h) loanDetailModal(h.L); },
       empty: { icon: 'bank', title: 'No EMI deductions yet' }
     });
-    var ec = frag('reg-card'); slot(ec, 'title').innerHTML = ui.icon('calendar2-check') + ' EMI Deduction History'; slot(ec, 'sub').textContent = 'auto-deducted from salary · dated individually'; slot(ec, 'body').appendChild(et.el); page.appendChild(ec);
+    var ec = frag('reg-card'); slot(ec, 'title').innerHTML = ui.icon('calendar2-check') + ' EMI Deduction History'; slot(ec, 'sub').textContent = 'auto-deducted from salary · dated individually · click a row for that loan'; slot(ec, 'body').appendChild(et.el); page.appendChild(ec);
   }
-  page.appendChild(txnTable('Loan transactions', txns));
+  page.appendChild(loanTxnTable(txns, book, payIx));
 }
 
 /* =================================================== ADVANCE SALARY */
@@ -2787,6 +3379,49 @@ function advDecideForm(r, decision) {
       } catch (e) { ui.toast(e.message || 'Could not record the decision', 'error'); return false; }
     }
   });
+}
+
+/* The loan trail, told as loans rather than as movements: every row — the
+ * disbursement and each repayment — names its loan and carries that loan's
+ * "taken · paid · due" at that point in time. A disbursement row shows where
+ * the loan stands NOW; a repayment row shows where it stood right after the
+ * money came in. */
+function loanTxnTable(txns, book, payIx) {
+  var byId = {}; book.forEach(function (L) { byId[L.id] = L; });
+  function hitsOf(x) { return x.type === 'loan' ? (byId[x.id] ? [{ L: byId[x.id] }] : []) : (payIx[x.id] || []); }
+  var tbl = EPAL.table({
+    columns: [
+      { key: 'date', label: 'Date', date: true },
+      { key: 'empName', label: 'Employee' },
+      { key: 'type', label: 'Type', badge: { loan: 'warn', 'loan-repay': 'good' } },
+      { key: 'memo', label: 'Note' },
+      // an auto-EMI carries no account because no account moved — it came off
+      // the salary, and saying so beats an em dash
+      { key: 'method', label: 'Method', sortVal: function (x) { return isAutoEmi(x) ? 'Salary deduction' : methodLabel(x.method); },
+        exportVal: function (x) { return isAutoEmi(x) ? 'Salary deduction' : methodLabel(x.method); },
+        render: function (x) { return isAutoEmi(x)
+          ? '<span class="badge badge-info">Salary deduction</span>'
+          : '<span class="badge">' + esc(methodLabel(x.method)) + '</span>'; } },
+      { key: 'loan', label: 'The loan', sort: false,
+        exportVal: function (x) { return hitsOf(x).map(function (h) { return ui.money(h.L.principal) + ' taken ' + ui.date(h.L.date); }).join(' + '); },
+        render: function (x) { return loanRefHtml(hitsOf(x)); } },
+      { key: 'lpaid', label: 'Paid till then', num: true, sort: false,
+        exportVal: function (x) { return hitsOf(x).map(function (h) { return h.p ? h.L.principal - h.p.balance : h.L.paid; }).join(' + '); },
+        render: function (x) { return loanPaidHtml(hitsOf(x)); } },
+      { key: 'ldue', label: 'Due after', num: true, sort: false,
+        exportVal: function (x) { return hitsOf(x).map(function (h) { return h.p ? h.p.balance : h.L.due; }).join(' + '); },
+        render: function (x) { return loanDueHtml(hitsOf(x)); } },
+      { key: 'amount', label: 'Amount', num: true, money: true }
+    ],
+    rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, exportName: 'loan-transactions.csv',
+    pdfTitle: 'Loan transactions — ' + coFull(CID),
+    onRow: function (x) { var h = hitsOf(x)[0]; if (h) loanDetailModal(h.L); },
+    empty: { icon: 'journal', title: 'No transactions' }
+  });
+  var card = frag('head-card');
+  slot(card, 'title').innerHTML = ui.icon('journal-text') + ' Loan transactions';
+  slot(card, 'body').appendChild(tbl.el);
+  return card;
 }
 
 function txnTable(title, txns) {
@@ -3034,8 +3669,31 @@ function reportsView(page) {
   if (dueRows.length) page.appendChild(reportCard('Salary Due', 'hourglass-split', dueRows.length + ' employees owed', simpleTbl(dueRows, 'Outstanding')));
   var advRows = t.map(function (e) { return { id: e.id, name: e.name, dept: e.dept, amt: PR().advanceOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
   if (advRows.length) page.appendChild(reportCard('Advance Register', 'cash', 'who holds advance now', simpleTbl(advRows, 'Advance held')));
-  var loanRows = t.map(function (e) { return { id: e.id, name: e.name, dept: e.dept, amt: PR().loanOutstanding(e.id) }; }).filter(function (r) { return r.amt > 0; });
-  if (loanRows.length) page.appendChild(reportCard('Loan Outstanding', 'bank', 'staff loans in progress', simpleTbl(loanRows, 'Loan balance')));
+  /* The loan register is the one report that cannot be a name-and-a-number:
+   * a loan balance means nothing without what was taken, when, and how much has
+   * already come back (owner 2026-07-29). */
+  var openLoans = loanRows().filter(function (L) { return !L.closed; });
+  if (openLoans.length) page.appendChild(reportCard('Loan Outstanding', 'bank',
+    openLoans.length + ' loan(s) in progress · taken · paid till now · still due',
+    EPAL.table({
+      columns: [
+        { key: 'empName', label: 'Employee', sortVal: function (L) { return L.empName; },
+          render: function (L) { return EPAL.people ? EPAL.people.linkify(L.empName, L.empId) : '<span class="strong">' + esc(L.empName) + '</span>'; } },
+        { key: 'dept', label: 'Dept', badge: {}, exportVal: function (L) { return (L.emp && L.emp.dept) || ''; },
+          render: function (L) { return '<span class="badge">' + esc((L.emp && L.emp.dept) || '—') + '</span>'; } },
+        { key: 'date', label: 'Taken on', date: true },
+        { key: 'principal', label: 'Loan taken', num: true, money: true },
+        { key: 'paid', label: 'Paid till now', num: true, sortVal: function (L) { return L.paid; }, exportVal: function (L) { return L.paid; },
+          render: function (L) { return '<span class="num text-good">' + ui.money(L.paid) + '</span> <span class="xs text-mute">' + loanPct(L) + '%</span>'; } },
+        { key: 'due', label: 'Still due', num: true, sortVal: function (L) { return L.due; }, exportVal: function (L) { return L.due; },
+          render: function (L) { return '<span class="num strong text-warn">' + ui.money(L.due) + '</span>'; } },
+        { key: 'emi', label: 'EMI', num: true, sortVal: function (L) { return L.emi; },
+          render: function (L) { return L.emi ? '<span class="num">' + ui.money(L.emi) + '/mo</span>' : '<span class="text-mute">no plan</span>'; } }
+      ],
+      rows: openLoans, pageSize: 8, exportName: 'loan-outstanding.csv', pdfTitle: 'Loan Outstanding — ' + coFull(CID),
+      onRow: function (L) { loanDetailModal(L); },
+      empty: { icon: 'bank', title: 'Nothing outstanding' }
+    }).el));
 
   var dc = PR().departmentCost(CID);
   var dcTbl = EPAL.table({
