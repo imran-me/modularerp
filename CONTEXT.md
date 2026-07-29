@@ -1972,3 +1972,27 @@ live API actually serves each hydrated store).
 FIRST.** It reports every store's row count plus the failures, and it
 distinguishes "no data on the server", "endpoint down" and "frontend bug" in one
 glance. Guessing before reading it cost four wrong diagnoses.
+
+### Two traps behind a BLANK screen (2026-07-29, Group ▸ Task Oversight)
+
+A blank content area with a drawn breadcrumb and **no console error** is its own
+diagnosis: the view ran to completion and put nothing on the mount. Two causes,
+both hit at once on that screen:
+
+1. **A view must MOUNT, never RETURN.** `router.js:111` calls `view.render(ctx)`
+   and discards the result — a view is only on screen once it appends to
+   `ctx.mount`. `board.js` built its "no employees on file" page and returned it,
+   so the one branch written to explain an empty directory was the one branch
+   that could only ever render nothing. Grep for `return page;` inside a
+   `render:` before believing any empty-state exists.
+2. **Demo ids do not exist in the live database.** `EPL-DEV1` (and any
+   `EPL-…`/seed id) belongs to `seed-bd.js`. Falling back to one — `db.employee(x)
+   || db.employee('EPL-DEV1')` — resolves in demo mode and misses on every real
+   database, sending a screen with a full staff list down its empty path. Fall
+   back to *the first row that actually exists*, and keep the demo id only as the
+   first preference.
+
+Both are invisible to `sweep.mjs`: it runs the demo seed, where the demo id
+resolves and the branch never executes. The check that catches them is to drive
+the screen against **three directory shapes** — demo seed, real-shaped data with
+no demo ids, and empty — and assert the mount is non-empty in all three.
