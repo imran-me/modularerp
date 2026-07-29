@@ -1533,14 +1533,20 @@ function staffView(page) {
     columns: [
       { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id) : '<span class="strong">' + esc(r.name) + '</span>'; } },
       { key: 'id', label: 'ID', render: function (r) { return '<span class="mono xs nowrap" title="' + esc(r.id) + '">' + esc(shortId(r.id)) + '</span>'; } },
-      // c-dept / c-desig: the two descriptive columns render 25% smaller than the
-      // rest of the row (owner 2026-07-29) — they are the widest non-money text
-      // on the sheet, and the width they give back goes to the figures
-      { key: 'dept', label: 'Dept', badge: {}, cls: 'c-dept' },
-      // soft hyphen: the word stays "Designation" everywhere it is read, copied
-      // or exported, but the header may break as "DESIG-/NATION" when the column
-      // is squeezed instead of setting a 76px floor for a column of short titles
-      { key: 'designation', label: 'Desig­nation', cls: 'c-desig' },
+      // ONE COLUMN, TWO ROWS (owner 2026-07-29). Dept and Designation used to sit
+      // side by side — two narrow columns of short words, each wrapping over three
+      // lines to fit. Stacked they cost one column's width instead of two: what the
+      // person does on the first row, where they sit on the second. c-role keeps the
+      // 25% smaller type the pair already had — they are labels you scan rather than
+      // figures you read, and the width they give back goes to the money columns.
+      { key: 'designation', label: 'Desig. / Dept', cls: 'c-role',
+        // the CSV/PDF cell keeps both facts on one line — a spreadsheet has no
+        // second row to put the department on
+        exportVal: function (r) { return r.designation + ' · ' + r.dept; },
+        render: function (r) {
+          return '<div class="c-role-desig">' + esc(r.designation) + '</div>' +
+            '<div class="c-role-dept"><span class="badge">' + esc(r.dept) + '</span></div>';
+        } },
       { key: 'salary', label: 'Salary', num: true, money: true },
       { key: 'netDue', label: 'Net pos.', num: true, sortVal: function (r) { return r.netDue; },
         render: function (r) { return '<span class="num strong ' + (r.netDue >= 0 ? 'text-good' : 'text-bad') + '">' + ui.money(Math.abs(r.netDue)) + '</span> <span class="xs text-mute">' + (r.netDue >= 0 ? 'we owe' : 'they owe') + '</span>'; } },
@@ -1969,6 +1975,8 @@ function manageView(page) {
   slot(scard, 'body').appendChild(tbl.el);
   page.appendChild(scard);
 
+  page.appendChild(monthMakeupCard(slips, ym, net, paid, advRec, emiRec));
+
   // PAYROLL HISTORY sits directly under the sheet (owner 2026-07-28). It goes in
   // BEFORE the pay-individual-salaries grid on purpose: that grid only exists
   // when the run is finalized and something is still owed, so appending after it
@@ -1988,6 +1996,69 @@ function manageView(page) {
     page.appendChild(pcard);
   }
 }
+/* HOW THIS MONTH IS MADE UP (owner 2026-07-29: "how much am I gonna have as
+ * deduction from employees' loans, absent, punishments, advance EMI — how much am
+ * I gonna pay extra as overtime, bonus?").
+ *
+ * The sheet answers it per head and the dashboard answers it as two words —
+ * "Additions" and "Deductions" — which is exactly the granularity the question is
+ * NOT asked at. This is the same arithmetic the payslip runs, summed over the run
+ * and read top to bottom, so the two figures that matter are both on it: the NET
+ * PAYABLE (what the month costs) and the CASH TO HAND OUT (what actually leaves
+ * an account, once the advances and EMIs the company recovers come off).
+ *
+ * A zero line is dropped — a month with no fine should not print a fine of ৳0 —
+ * but the four anchor rows always show, so the column can always be added up.
+ *
+ * IT OPENS ON THE FULL GROSS, not on the sheet's `earnedGross`. The two differ by
+ * exactly the absence deduction (`earnedGross = gross − absentDeduction`), so
+ * anchoring on the earned figure and then printing Absent as a deduction line
+ * takes absence off twice and the column stops adding up — which is what the
+ * headless driver caught: it walked to ৳197,493 against a stated ৳202,093, short
+ * by the ৳4,600 of absence. Every other card on this screen keeps reading
+ * `earnedGross`; only this one, which has to be added up by eye, opens on gross. */
+function monthMakeupCard(slips, ym, net, paid, advRec, emiRec) {
+  var f = function (fn) { return sum(slips, fn); };
+  var gross = f(function (s) { return s.gross; });
+  var adds = [
+    ['Overtime', f(function (s) { return s.overtime; })],
+    ['Bonus', f(bonusOf)],
+    ['Salary adjustment', f(function (s) { return Math.max(0, s.adjustment || 0); })]
+  ];
+  var deds = [
+    ['Absent', f(function (s) { return s.absentDeduction; })],
+    ['Late', f(function (s) { return s.lateDeduction; })],
+    ['Early leave', f(function (s) { return s.earlyDeduction; })],
+    ['Fine / punishment', f(function (s) { return s.fine; })],
+    ['Income tax', f(function (s) { return s.tax; })],
+    ['Provident fund', f(function (s) { return s.pf; })],
+    ['Other deduction', f(function (s) { return s.otherDeduction; })],
+    ['Negative adjustment', f(function (s) { return Math.max(0, -(s.adjustment || 0)); })]
+  ];
+  function line(k, v, sign, strong) {
+    var txt = (sign && v ? sign + ' ' : '') + ui.money(v);
+    return el('div.data-row', null, [
+      el('div' + (strong ? '.strong' : '.text-mute.sm') + '.flex-1', { text: k }),
+      el('div' + (strong ? '.strong' : ''), { text: txt })
+    ]);
+  }
+  var rows = [line('Gross salary', gross, '', true)];
+  adds.forEach(function (a) { if (a[1]) rows.push(line(a[0], a[1], '+')); });
+  deds.forEach(function (d) { if (d[1]) rows.push(line(d[0], d[1], '−')); });
+  rows.push(line('Net payable to staff', net, '', true));
+  if (advRec) rows.push(line('Advance recovered', advRec, '−'));
+  if (emiRec) rows.push(line('Loan EMI recovered', emiRec, '−'));
+  rows.push(line('Cash to hand out', Math.max(0, net - advRec - emiRec), '', true));
+  var c = frag('reg-card');
+  slot(c, 'title').innerHTML = ui.icon('calculator') + ' How ' + PR().mLabel(ym) + ' is made up';
+  slot(c, 'sub').textContent = 'what is added, what is deducted, and what actually leaves an account';
+  slot(c, 'body').appendChild(el('div.data-list', null, rows));
+  slot(c, 'body').appendChild(el('p.text-mute.xs.mt-2', { text:
+    'Advance and loan EMI come back to the company out of the salary, so they are deducted from the cash but not from the cost. Paid so far: '
+    + ui.money(paid) + ' of ' + ui.money(net) + '.' }));
+  return c;
+}
+
 function finalizeRun(ym, net) {
   ui.confirm({ title: 'Finalize ' + PR().mLabel(ym) + '?', text: 'Locks corrections and accrues salaries + leave encashment to the ledger. Net ' + ui.money(net) + '.', confirmLabel: 'Finalize' })
     .then(function (ok) { if (!ok) return; try { PR().finalize(CID, ym); ui.toast('Payroll finalized', 'success'); EPAL.router.render(); } catch (e) { ui.toast(e.message || 'Failed', 'error'); } });
@@ -2478,6 +2549,118 @@ function statement(e, ym) { if (EPAL.people) EPAL.people.statement(e, ym); }
 function statementPrint(e, ym) { if (EPAL.people) EPAL.people.payslipPrint(e, ym); }
 
 /* =================================================== PAYROLL REPORTS */
+/* ============================================================================
+ * WHERE THE MONEY WENT — which account actually paid the payroll
+ * ----------------------------------------------------------------------------
+ * Owner 2026-07-29: "I have paid salary to Mr X — from WHERE have I paid? From
+ * cash, how much in total? From bank, how much last month, and last 6 months?
+ * In WHICH specific banks?"
+ *
+ * Every one of those figures was already on file and nowhere on a screen: the
+ * month sheet names the account per transaction but only ever totals one month,
+ * and it says "৳X left an account" without saying which. This is the same
+ * `monthTxns()` rows — the ONE place a payroll transaction is normalised — walked
+ * over a period and grouped by the account they left, so there is no second
+ * definition of a payroll payment to keep in step.
+ *
+ * IT COUNTS CASH, NOT THE HEADLINE AMOUNT. A salary of 30,000 with a 5,000 EMI
+ * recovered inside it took 25,000 out of the bank; `r.cash` is that figure and
+ * `r.amount` is not. Rows where nothing moved (an advance recovered out of the
+ * same salary) are excluded from every account and reported separately below the
+ * table, because putting them in an account column would claim money left it.
+ *
+ * AND IT COUNTS BY THE DAY THE MONEY MOVED, not by the salary month it belonged
+ * to. "How much did I pay out of the bank last month" is a question about the
+ * BANK, and June's salary paid on 4 July left the bank in July. So every month
+ * that HAS payroll data is scanned and each transaction is then kept or dropped
+ * on its own date — bucketing by salary month instead lost every payment whose
+ * month fell outside the window (caught by the driver against the ledger's own
+ * cash movement: it was short by ৳51,453 over six months). */
+var srcMonths = 6;
+function sourceRollup(n) {
+  var by = {}, tot = { out: 0, back: 0, internal: 0 };
+  var win = monthsUpTo(n), first = win[0], last = win[win.length - 1];
+  var scan = {};
+  win.forEach(function (m) { scan[m] = 1; });
+  monthSeries().forEach(function (m) { scan[m.ym] = 1; });      // salary months that pay later
+  Object.keys(scan).sort().forEach(function (ym) {
+    monthTxns(ym).forEach(function (r) {
+      var d = String(r.date || '').slice(0, 7);
+      if (d < first || d > last) return;                        // it moved outside the period
+      if (r.dir === 'internal') { tot.internal += r.amount; return; }
+      if (!r.cash) return;                            // nothing actually moved
+      var k = r.from || '—';
+      var row = by[k] || (by[k] = { from: k, salary: 0, advance: 0, loan: 0, bonus: 0, other: 0, out: 0, back: 0, txns: [] });
+      row.txns.push(r);
+      if (r.dir === 'in') { row.back += r.cash; tot.back += r.cash; return; }
+      var b = (r.type === 'salary' || r.type === 'advance' || r.type === 'loan' || r.type === 'bonus') ? r.type : 'other';
+      row[b] += r.cash; row.out += r.cash; tot.out += r.cash;
+    });
+  });
+  return { rows: Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.out - a.out; }), tot: tot };
+}
+function moneyCol(key, label) {
+  return { key: key, label: label, num: true, sortVal: function (r) { return r[key]; },
+    render: function (r) { return r[key] ? ui.money(r[key]) : '—'; } };
+}
+function sourceCard() {
+  var res = sourceRollup(srcMonths), c = frag('reg-card');
+  var sel = el('select.input', { onchange: function () { srcMonths = +this.value; EPAL.router.render(); } });
+  sel.classList.add('tw-max-w-[230px]');
+  [[1, 'This month'], [3, 'Last 3 months'], [6, 'Last 6 months'], [12, 'Last 12 months']].forEach(function (o) {
+    var op = el('option', { value: o[0], text: o[1] }); if (o[0] === srcMonths) op.selected = true; sel.appendChild(op);
+  });
+  slot(c, 'title').innerHTML = ui.icon('bank') + ' Where the money went';
+  slot(c, 'sub').textContent = 'every payroll taka by the account it left, on the day it moved — click an account for its transactions';
+  slot(c, 'body').appendChild(el('div.mb-2', null, [sel]));
+  slot(c, 'body').appendChild(EPAL.table({
+    columns: [
+      { key: 'from', label: 'Paid from', render: function (r) { return '<span class="strong">' + esc(r.from) + '</span>'; } },
+      moneyCol('salary', 'Salary'), moneyCol('advance', 'Advance'), moneyCol('loan', 'Staff loan'),
+      moneyCol('bonus', 'Bonus'), moneyCol('other', 'Other'),
+      { key: 'out', label: 'Total paid out', num: true, sortVal: function (r) { return r.out; },
+        render: function (r) { return '<span class="num strong">' + ui.money(r.out) + '</span>'; } },
+      { key: 'back', label: 'Came back in', num: true, sortVal: function (r) { return r.back; },
+        render: function (r) { return r.back ? '<span class="text-good">' + ui.money(r.back) + '</span>' : '—'; } }
+    ],
+    rows: res.rows, pageSize: 10, totalKey: 'out', searchKeys: ['from'],
+    exportName: 'payroll-by-account.csv', pdfTitle: coFull(CID) + ' — Payroll by account',
+    onRow: function (r) { sourceDrill(r); },
+    empty: { icon: 'bank', title: 'Nothing was paid in this period', hint: 'Salary that is accrued but unpaid never leaves an account.' }
+  }).el);
+  var note = res.rows.length
+    ? ui.money(res.tot.out) + ' left these account(s) over ' + srcMonths + ' month(s)'
+      + (res.tot.back ? ' · ' + ui.money(res.tot.back) + ' came back in (loan repayments)' : '')
+      + (res.tot.internal ? ' · ' + ui.money(res.tot.internal) + ' was recovered inside a salary payment and never touched an account' : '') + '.'
+    : 'Nothing left an account in this period.';
+  slot(c, 'body').appendChild(el('p.text-mute.xs.mt-2', { text: note }));
+  return c;
+}
+/* ONE ACCOUNT — everything payroll moved through it in the period, newest first.
+ * Rows are the same shape the month sheet uses, so clicking one opens the very
+ * same detail + voucher. */
+function sourceDrill(row) {
+  var body = el('div');
+  body.appendChild(el('p.text-mute.sm.mb-2', { text: row.txns.length + ' payroll transaction(s) through ' + row.from
+    + ' in the last ' + srcMonths + ' month(s) — click one for its detail and voucher.' }));
+  body.appendChild(EPAL.table({
+    columns: [
+      { key: 'date', label: 'Date', date: true },
+      { key: 'empName', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.empName) + '</span>'; } },
+      { key: 'purpose', label: 'Purpose', badge: { Salary: 'good', Advance: 'warn', 'Staff loan': 'warn', 'Loan repayment': 'info', Bonus: 'good', 'Leave encashment': 'info', 'Final settlement': 'bad' } },
+      { key: 'ym', label: 'Month', render: function (r) { return '<span class="nowrap">' + esc(PR().mLabel(r.ym)) + '</span>'; } },
+      { key: 'cash', label: 'Amount', num: true, sortVal: function (r) { return r.cash; },
+        render: function (r) { return '<span class="num strong ' + (r.dir === 'in' ? 'text-good' : '') + '">' + ui.money(r.cash) + '</span>'; } }
+    ],
+    rows: row.txns.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; }),
+    searchKeys: ['empName', 'purpose', 'memo'], pageSize: 12, totalKey: 'cash',
+    exportName: 'payroll-account.csv',
+    onRow: function (r) { txnDetailModal(r); },
+    empty: { icon: 'journal', title: 'No transactions' }
+  }).el);
+  ui.modal({ title: row.from, icon: 'bank', size: 'lg', body: body, actions: [{ label: 'Close' }] });
+}
+
 function reportsView(page) {
   var t = team();
   var liability = PR().encashmentLiability(CID);
@@ -2517,6 +2700,9 @@ function reportsView(page) {
     foot: loanHolders ? loanHolders + ' active loan(s)' + (emiTotal ? ' · ' + ui.money(emiTotal) + '/mo EMI' : '') : 'no active loans',
     series: balanceSeries(loanEvents(), 12), spark: false, goodDown: true }));
   page.appendChild(grid);
+
+  // the owner's most-asked question — from WHICH account, over WHICH period
+  page.appendChild(sourceCard());
 
   var encRows = t.map(function (e) { var ls = PR().leaveState(e); return { e: e, name: e.name, dept: e.dept, days: ls.encashableDays, value: ls.value, eligible: ls.eligibleFullYear }; }).filter(function (r) { return r.value > 0; });
   var encTbl = EPAL.table({
