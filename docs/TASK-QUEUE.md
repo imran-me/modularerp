@@ -441,6 +441,25 @@ dividers render at all three boundaries. Sweep 222/222, screenshot confirmed.
 - ⏸ **Interiors layout + style to match Travels** (queued 2026-07-28, above) — still
   pending; the owner interrupted with the payroll work.
 
+## 🆕 2026-07-29 — SALARY TEMPLATES (owner screenshot of the group's Salary Templates List)
+
+- ✅ **DONE (a7a5d4b).** Owner: "in payrolls salary template, make it like this, where saved
+  template for individual employee will appear here, can be edited or modified, can turn on
+  OT here, or Deduction as Punishments" + "option to make new template".
+  Shipped on Payroll › Salary Template, above the untouched Structure card: the
+  **Salary Templates List** (name · basic · house rent · medical · conveyance · other ·
+  bonus · total · overtime · punishment, one row per employee, searchable by name OR
+  employee ID, exportable) with **Add New Salary Template** and four row actions —
+  edit · overtime on/off · punish · delete.
+  **The template is the pay:** an employee on one is paid its total, split exactly as it
+  says (new store `pay_salary_tpl`; tax/PF/absence/encashment still from Structure).
+  Overtime = a switch + its own optional ৳/hour. Punishment = a standing monthly fine AND
+  a one-off on a single month, both printed on the payslip with their reason.
+  Seeded DERIVED from real staff, so opening the tab moved **zero** existing figures.
+  Full write-up + the two defects the probes found in CONTEXT.md.
+- ◻ **Backend not written** for `pay_salary_tpl` (local-only until its Laravel slice —
+  `salary_templates` + a `salary_template_employee` pivot).
+
 ## 🆕 2026-07-28 — PAYROLL UI/UX RESEARCH → BUILD BACKLOG
 
 Owner asked for research into how other ERPs do payroll UI/UX, a comparison against

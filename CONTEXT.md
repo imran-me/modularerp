@@ -490,6 +490,70 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-29 · SALARY TEMPLATES: A SAVED PACKAGE PER EMPLOYEE, AND IT IS THE PAY
+
+**The ask** (owner screenshot of the group's existing *Salary Templates List*): the saved
+template for an individual employee should appear on the Payroll › Salary Template tab,
+be editable, allow **overtime to be turned on there**, carry a **deduction as punishment**,
+and offer **an option to make a new template**.
+
+**Why it was a new thing, not an edit.** `pay_templates` is ONE record per company — the
+statutory structure (basic 60% / house 25% / medical 10% of `emp.salary`, tax, PF, leave,
+working days, pay-by + correction days). It answers *how a salary is split*. The screenshot
+answers a different question — *what THIS person is paid* — in fixed taka. So a second
+store, `pay_salary_tpl`, sits beside it and the tab now has two halves (list on top, the
+untouched Structure + Live Preview below).
+
+- **The list** — name · basic · house rent · medical · conveyance · other · bonus · total ·
+  overtime · punishment, one row per employee, searchable by name **or** employee ID,
+  exportable, with **Add New Salary Template** and four row actions (edit · overtime on/off ·
+  punish · delete). Real HTML `<section data-screen="salary-templates">`; only the grid is JS.
+- **It DRIVES THE PAY.** `computeSlip` takes gross and all five components from the template
+  when the employee is on one (`empIds`), and `total` is always the five added up — never
+  typed — so the list can't show a total the payslip disagrees with. Tax, PF, absence,
+  lateness and encashment still come from Structure: the statutory rules stay in one place.
+  New slip fields: `otherAllow`, `tplBonus`, `fine`/`fineExtra`/`fineNote`, `pkgId`/`pkgName`.
+- **Overtime** = a switch on the template + an optional own ৳/hour rate over the company
+  default. (Turning it off zeroes the recorded hours — the same semantics `emp.otEligible`
+  always had.)
+- **Punishment, both shapes:** a **standing** fine that runs every month until taken off the
+  template, and a **one-off** on ONE month (from the list, and on Edit Salary). Both print on
+  the payslip with their reason, and both are *recovered* in the accrual (they reduce salary
+  cost — they are not income), so `expense − tax − pf = payable` still holds by construction.
+- **NOTHING THAT EXISTS MOVED.** The list **seeds itself DERIVED from the staff actually on
+  the payroll** — each seeded template is exactly what the percentages compute for that
+  salary, conveyance being the same remainder — so opening the tab changes not one figure.
+  Proved by recomputing EVERY month before and after: zero differences. Off-template
+  employees compute exactly as before; an old payslip carries no bonus/fine fields → reads 0.
+- **Assignment lives on the TEMPLATE (`empIds`), not on the employee record** — the employees
+  store is hydrated from the group directory and a payroll desk must not write into it. One
+  person, one template: assigning detaches them from any other, so two templates can never
+  both claim to be someone's pay (the payslip would then depend on record order).
+
+**🐞 TWO DEFECTS THE PROBES FOUND (both fixed in the same commit):**
+1. **A partial save was a full save.** The overtime toggle sends `{id, otEligible}`;
+   `savePackage` derived `empIds`/`total` from that alone, so flipping one switch
+   **detached the employee and zeroed the template** — quietly changing someone's pay.
+   Saves now merge onto the stored record.
+2. **An attendance save erased a fine.** Every caller of `adjustSlip` rebuilds the whole
+   adjustment set by hand (it recomputes the slip from scratch), and the attendance path
+   did not carry the new `fineExtra`. They all read the new **`slipAdj(slip)`** now — one
+   place, so the next new field cannot be dropped by one caller and kept by another.
+
+**VERIFIED** — sweep **253/253 × both themes, 0 console errors** · tw gate green · trial
+balance balances · **23 engine checks** (seed neutrality across every month · the template
+driving gross/components/PF/bonus/fine · the OT switch and its rate · a one-off fine adding
+to the standing one, printing with both reasons and surviving an attendance save · the
+accrual balancing · delete putting the employee back on the percentages while a punishment
+already applied to a month STAYS) · **19 screen checks** at the standalone route and embedded
+in Master Accounts › Master Payroll. Commit a7a5d4b.
+
+**◻ Still owed:** no Laravel slice for `pay_salary_tpl` (local-only, like every store whose
+backend has not been written yet) — the table is `salary_templates` + a
+`salary_template_employee` pivot when it is built.
+
+---
+
 ## 🆕 SESSION — 2026-07-28 · PAYROLL BECOMES A COMMAND CENTRE (owner ask: "make it world class")
 
 **The ask.** The owner pointed at *Manage Banks* — "I liked its KPI, its structure and
