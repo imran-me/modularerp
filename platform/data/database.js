@@ -175,28 +175,60 @@
       joinDate: '2011-07-01', salary: 0, status: 'active',
       attendance: { present: 22, absent: 0, late: 0, leave: 0 }, rating: 5 });
 
-    var n = 2;
-    Object.keys(SCALE).forEach(function (cid) {
-      var count = cid === 'construction' ? 7 : cid === 'travels' ? 6 : 5;
-      for (var i = 0; i < count; i++) {
-        var dept = pick(DEPTS[cid]);
-        var desig = pick(DESIG[dept] || ['Executive']);
-        var role = /Manager|Lead|Head|Chief|BDM/.test(desig) ? 'manager'
-                 : dept === 'Accounts' ? 'accountant' : 'employee';
-        var name = pick(FIRST) + ' ' + pick(LAST);
-        var present = ri(18, 22), absent = ri(0, 3), late = ri(0, 4), leave = ri(0, 2);
-        emps.push({
-          id: 'EPL-' + String(n).padStart(4, '0'),
-          name: name, companyId: cid, dept: dept, designation: desig, role: role,
-          email: name.toLowerCase().replace(/[^a-z]+/g, '.') + '@epal' + cid + '.com',
-          phone: '+88017' + ri(10000000, 99999999),
-          joinDate: (2015 + ri(0, 9)) + '-' + String(ri(1, 12)).padStart(2, '0') + '-' + String(ri(1, 28)).padStart(2, '0'),
-          salary: ri(28, 140) * 1000, status: rnd() > 0.06 ? 'active' : 'on-leave',
-          attendance: { present: present, absent: absent, late: late, leave: leave },
-          rating: ri(30, 50) / 10
-        });
-        n++;
-      }
+    /* THE ROSTER (owner, 2026-07-29): "List 5 Employee in Travels, 3 In interiors,
+     * 3 In constructions, 2 in group (CEO & Director), In IT 3, in shop 1."
+     *
+     * This REPLACED a generator that invented 28 people with random names, random
+     * departments and random salaries. Random staff make random payroll: two heads
+     * on ৳0, seven in Construction, nobody where the owner expected them. A named
+     * roster with real designations and believable Bangladeshi salaries is what
+     * makes every payroll screen downstream read like a company instead of a
+     * fixture.
+     *
+     * IDS ARE DELIBERATE. Ten files hard-reference specific EPL-00NN ids — auth
+     * logins, the audit trail, comments, the task board, meetings and approvals —
+     * and the highest any of them names is EPL-0017. The roster fills EPL-0002
+     * through EPL-0017 exactly, so every one of those references still resolves to
+     * a real person. Do not renumber this list without checking that again.
+     *
+     * IT is two here plus EPL-DEV1 (Tanvir Hasan) below, who is referenced by the
+     * task board, approvals, audit and auth and therefore cannot be removed —
+     * three in IT, as asked.
+     *
+     * Columns: name · dept · designation · monthly gross · join date.
+     * Join dates are all well before January 2026, because payroll history starts
+     * there and nobody can be paid for a month they had not joined. */
+    var ROSTER = [
+      ['travels', 'Rezaul Karim',      'Operations',   'Operations Manager',          68000, '2021-03-01'],
+      ['travels', 'Farhana Ahmed',     'Ticketing',    'Senior Ticketing Executive',  45000, '2022-06-15'],
+      ['travels', 'Shahriar Kabir',    'Ticketing',    'Ticketing Executive',         32000, '2023-09-01'],
+      ['travels', 'Nusrat Jahan',      'Visa',         'Visa Consultant',             36000, '2023-02-01'],
+      ['travels', 'Abdul Mannan',      'Accounts',     'Accounts Officer',            38000, '2022-01-10'],
+      ['woodart', 'Imtiaz Chowdhury',  'Design',       'Lead Interior Designer',      72000, '2021-08-01'],
+      ['woodart', 'Sumaiya Akter',     'Production',   'Production Supervisor',       42000, '2022-11-01'],
+      ['woodart', 'Jahangir Alam',     'Installation', 'Installation Foreman',        34000, '2023-04-15'],
+      ['construction', 'Mizanur Rahman', 'Projects',   'Project Engineer',            85000, '2020-05-01'],
+      ['construction', 'Kamrul Hasan',  'Site',        'Site Supervisor',             40000, '2022-02-01'],
+      ['construction', 'Ruhul Amin',    'Procurement', 'Procurement Officer',         38000, '2023-01-15'],
+      ['group',   'Nasir Uddin Ahmed', 'Executive',    'Chief Executive Officer',    150000, '2019-01-01'],
+      ['group',   'Farzana Rahman',    'Executive',    'Director',                   120000, '2019-06-01'],
+      ['it',      'Arif Mahmud',       'Engineering',  'Software Lead',               95000, '2021-02-01'],
+      ['it',      'Sadia Islam',       'QA',           'QA Engineer',                 45000, '2023-03-01'],
+      ['shop',    'Jasim Uddin',       'Retail',       'Shop Manager',                35000, '2022-09-01']
+    ];
+    ROSTER.forEach(function (r, i) {
+      var desig = r[3];
+      var role = /Chief|Director|Manager|Lead|Foreman|Supervisor/.test(desig) ? 'manager'
+               : r[2] === 'Accounts' ? 'accountant' : 'employee';
+      emps.push({
+        id: 'EPL-' + String(i + 2).padStart(4, '0'),
+        name: r[1], companyId: r[0], dept: r[2], designation: desig, role: role,
+        email: r[1].toLowerCase().replace(/[^a-z]+/g, '.') + '@epal' + r[0] + '.com',
+        phone: '+88017' + String(10000000 + (i * 4831 + 27) % 89999999),
+        joinDate: r[5], salary: r[4], status: 'active',
+        attendance: { present: 22, absent: 0, late: 0, leave: 0 },
+        rating: 4 + ((i % 3) / 10)
+      });
     });
 
     // A named developer in IT Solutions (matches the owner's example use-case).

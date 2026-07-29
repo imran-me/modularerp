@@ -327,9 +327,19 @@
   function slipsFor(cid, ym) { return S.list('pay_slips').filter(function (s) { return s.companyId === cid && s.ym === ym; }); }
   function slip(empId, ym) { return S.list('pay_slips').filter(function (s) { return s.id === slipId(empId, ym); })[0] || null; }
 
+  /* Who is ON this payroll. Resigned staff drop off — and so does the OWNER.
+   *
+   * The owner row (role:'owner') is the proprietor, not an employee: it carries no
+   * salary, and every month it was generating a ৳0 payslip that sat in the salary
+   * sheet with dashes across every column, was counted in Headcount, and appeared
+   * in the Autopilot's "employee(s) have no salary set" warning for ever. The
+   * owner spotted it on Master Payroll — two of five rows reading ৳0 (2026-07-29).
+   *
+   * A proprietor's drawings are equity, not a payslip. Anyone who genuinely should
+   * be paid through payroll is an employee/manager/accountant and is unaffected. */
   function activeTeam(cid) {
     var all = (db() && db().employees) ? db().employees({ companyId: cid }) : S.list('employees').filter(function (e) { return e.companyId === cid; });
-    return all.filter(function (e) { return e.status !== 'resigned'; });
+    return all.filter(function (e) { return e.status !== 'resigned' && e.role !== 'owner'; });
   }
 
   /* ------------------------------------------------ per-month attendance */
