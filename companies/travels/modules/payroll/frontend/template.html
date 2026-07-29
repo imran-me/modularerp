@@ -474,3 +474,172 @@
   </div>
 
 </section>
+
+<!-- ===========================================================================
+  EMPLOYEE FILE — the whole person, UNDER the table (owner 2026-07-29:
+  "clicking a staff's name opens a modal card … I want it to open another
+  structure, in the below of the page, not on a pop up card").
+
+  Two sections, mounted in two different places, on purpose:
+
+  · [data-screen="emp-file"]      the page chrome — the identity band and the six
+                                  money tiles — plus [data-fill="file"], where the
+                                  SHARED kit (platform/kit/emp-profile.js) renders
+                                  the tab bar and the five tab bodies it already
+                                  owns (Overview · Accounts · Payslips ·
+                                  Attendance · All Details). The kit is called
+                                  with {host, head:false}: same file, no modal,
+                                  and its own header card suppressed because the
+                                  band below IS the header.
+
+  · [data-screen="emp-analytics"] the reference stack from the owner's screenshots
+                                  — profile details, task tiles, the two task
+                                  charts, attendance, leave, salary & loan. It is
+                                  handed to the kit as `overviewExtra`, so it is
+                                  appended INSIDE the Overview tab: it must come
+                                  and go with that tab, not sit under all five.
+
+  Every figure here is read from data the app already holds — tasks
+  (db.tasksFor), attendance (att_monthly), leave (tv_leaves), payslips / loans /
+  advances (EPAL.payroll). Nothing is invented; where the reference app showed a
+  number we cannot honestly derive (clock-in/out "Working Hour", "Late Time"),
+  the card shows the days we DO record and says so.
+============================================================================ -->
+<section data-screen="emp-file">
+
+  <div class="card emp-file mb-3">
+    <!-- The identity band. Dark by design — the reference header is a solid band,
+         and it is what makes a file read as a FILE rather than as one more card.
+         It takes the COMPANY accent gradient, so Woodart's file is green and
+         Travels' is blue: the same per-company identity rule as everywhere else. -->
+    <div class="emp-band">
+      <span class="emp-band-av" data-k="avatar"></span>
+      <div class="emp-band-who">
+        <div class="emp-band-name" data-k="name"></div>
+        <div class="emp-band-meta" data-k="meta"></div>
+      </div>
+      <div class="emp-band-chips" data-k="chips"></div>
+      <div class="emp-band-do">
+        <button class="btn btn-sm emp-band-btn" type="button" data-act="payslip"></button>
+        <button class="btn btn-sm emp-band-btn" type="button" data-act="close"></button>
+      </div>
+    </div>
+
+    <!-- the six money facts, in the order they get asked about -->
+    <div class="stat-row stat-compact">
+      <div class="stat"><div class="stat-label">Salary</div><div class="stat-value num" data-k="t-salary"></div></div>
+      <div class="stat"><div class="stat-label" data-k="t-owes-l"></div><div class="stat-value num" data-k="t-owes"></div></div>
+      <div class="stat"><div class="stat-label">Salary due</div><div class="stat-value num" data-k="t-due"></div></div>
+      <div class="stat"><div class="stat-label">Advance out</div><div class="stat-value num" data-k="t-adv"></div></div>
+      <div class="stat"><div class="stat-label">Loan out</div><div class="stat-value num" data-k="t-loan"></div></div>
+      <div class="stat"><div class="stat-label">Leave encash</div><div class="stat-value num" data-k="t-encash"></div></div>
+    </div>
+  </div>
+
+  <div data-fill="file"></div>
+
+</section>
+
+
+<section data-screen="emp-analytics">
+
+  <div class="card mb-3">
+    <div class="card-head">
+      <h3 data-k="pd-title"></h3>
+      <span class="card-sub" data-k="pd-sub"></span>
+    </div>
+    <div class="card-body">
+      <div class="emp-facts">
+        <div class="emp-fact"><div class="emp-fact-l">Email</div><div class="emp-fact-v" data-k="p-email"></div></div>
+        <div class="emp-fact"><div class="emp-fact-l">Phone</div><div class="emp-fact-v" data-k="p-phone"></div></div>
+        <div class="emp-fact"><div class="emp-fact-l">Company</div><div class="emp-fact-v" data-k="p-company"></div></div>
+        <div class="emp-fact"><div class="emp-fact-l">Department</div><div class="emp-fact-v" data-k="p-dept"></div></div>
+        <div class="emp-fact"><div class="emp-fact-l">Designation</div><div class="emp-fact-v" data-k="p-desig"></div></div>
+        <div class="emp-fact"><div class="emp-fact-l">Employment type</div><div class="emp-fact-v" data-k="p-type"></div></div>
+        <div class="emp-fact"><div class="emp-fact-l">Employee ID</div><div class="emp-fact-v" data-k="p-id"></div></div>
+        <div class="emp-fact"><div class="emp-fact-l">Join date</div><div class="emp-fact-v" data-k="p-join"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TASKS — the board totals for this person (db.tasksFor). "Pending" counts
+       everything not done and not cancelled: a cancelled task is closed, and
+       counting it as outstanding work would overstate the queue. -->
+  <div class="stat-row stat-compact mb-3">
+    <div class="stat"><div class="stat-label">Task total</div><div class="stat-value" data-k="k-tasks"></div><div class="text-mute xs" data-k="k-tasks-f"></div></div>
+    <div class="stat"><div class="stat-label">Completed</div><div class="stat-value text-good" data-k="k-done"></div><div class="text-mute xs" data-k="k-done-f"></div></div>
+    <div class="stat"><div class="stat-label">Pending</div><div class="stat-value text-warn" data-k="k-pending"></div><div class="text-mute xs" data-k="k-pending-f"></div></div>
+  </div>
+
+  <div class="two-col mb-3">
+    <div class="card">
+      <div class="card-head"><h3 data-k="wk-title"></h3><span class="card-sub" data-k="wk-sub"></span></div>
+      <div class="card-body"><div class="emp-chart"><canvas data-el="wk"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3 data-k="mn-title"></h3><span class="card-sub" data-k="mn-sub"></span></div>
+      <div class="card-body"><div class="emp-chart"><canvas data-el="mn"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ATTENDANCE — what att_monthly actually records: DAYS. The reference app
+       printed "Working Hour 174.03 hr" and "Late Time 862.52 min"; there is no
+       clock-in / clock-out anywhere in this system, so neither can be derived and
+       neither is shown as if it could be. The note under the chart says so. -->
+  <div class="card mb-3">
+    <div class="card-head"><h3 data-k="att-title"></h3><span class="card-sub" data-k="att-sub"></span></div>
+    <div class="card-body">
+      <div class="stat-row stat-compact mb-3">
+        <div class="stat"><div class="stat-label">Present days</div><div class="stat-value text-good" data-k="a-present"></div></div>
+        <div class="stat"><div class="stat-label">Absent days</div><div class="stat-value" data-k="a-absent"></div></div>
+        <div class="stat"><div class="stat-label">Late</div><div class="stat-value" data-k="a-late"></div></div>
+        <div class="stat"><div class="stat-label">Early leave</div><div class="stat-value" data-k="a-early"></div></div>
+        <div class="stat"><div class="stat-label">On leave</div><div class="stat-value" data-k="a-leave"></div></div>
+        <div class="stat"><div class="stat-label">Overtime</div><div class="stat-value" data-k="a-ot"></div></div>
+      </div>
+      <div class="emp-chart"><canvas data-el="att"></canvas></div>
+      <div class="text-mute sm mt-2" data-k="att-note"></div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-head"><h3 data-k="lv-title"></h3><span class="card-sub" data-k="lv-sub"></span></div>
+    <div class="card-body">
+      <div class="stat-row stat-compact">
+        <div class="stat"><div class="stat-label">Approved</div><div class="stat-value text-good" data-k="l-approved"></div></div>
+        <div class="stat"><div class="stat-label">Pending</div><div class="stat-value text-warn" data-k="l-pending"></div></div>
+        <div class="stat"><div class="stat-label">Rejected</div><div class="stat-value text-bad" data-k="l-rejected"></div></div>
+        <div class="stat"><div class="stat-label">Used leave days</div><div class="stat-value" data-k="l-used"></div></div>
+        <div class="stat"><div class="stat-label">Still to take</div><div class="stat-value" data-k="l-left"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-head"><h3 data-k="sl-title"></h3><span class="card-sub" data-k="sl-sub"></span></div>
+    <div class="card-body">
+      <div class="two-col">
+        <div>
+          <div class="section-label">Salary</div>
+          <div class="data-list">
+            <div class="data-row"><div class="text-mute sm flex-1">Paid records</div><div class="strong" data-k="s-paid"></div></div>
+            <div class="data-row"><div class="text-mute sm flex-1">Pending records</div><div class="strong" data-k="s-pending"></div></div>
+            <div class="data-row"><div class="text-mute sm flex-1" data-k="s-total-l"></div><div class="strong num" data-k="s-total"></div></div>
+            <div class="data-row"><div class="text-mute sm flex-1" data-k="s-latest-l"></div><div class="strong num" data-k="s-latest"></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Loan &amp; advance</div>
+          <div class="data-list">
+            <div class="data-row"><div class="text-mute sm flex-1">Running loans</div><div class="strong" data-k="ln-running"></div></div>
+            <div class="data-row"><div class="text-mute sm flex-1">Completed loans</div><div class="strong" data-k="ln-done"></div></div>
+            <div class="data-row"><div class="text-mute sm flex-1">Loan remaining</div><div class="strong num" data-k="ln-remaining"></div></div>
+            <div class="data-row"><div class="text-mute sm flex-1">Advance pending decision</div><div class="strong num" data-k="ln-advpending"></div></div>
+            <div class="data-row"><div class="text-mute sm flex-1">Advance to recover</div><div class="strong num" data-k="ln-advout"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>

@@ -220,10 +220,26 @@
     var e = typeof empIdOrEmp === 'object' ? empIdOrEmp : resolve(empIdOrEmp);
     if (!e) { ui().toast('Employee not found', 'error'); return; }
     var body = el('div');
-    var m = ui().modal({ title: e.name, icon: 'person-badge', size: 'lg', body: body, footer: false });
+    /* TWO CONTAINERS, ONE FILE (2026-07-29, owner: "not on a pop up card").
+     * The profile used to exist only as a modal. It now also renders IN PAGE —
+     * `opts.host` hands it an element to live in, and everything below (tabs,
+     * tables, money actions, forms) is untouched, because the only thing that
+     * ever differed was the box around it. `m` keeps the same shape either way,
+     * so `m.close()` still works from the settlement flow and the Edit button.
+     * `opts.head:false` drops the kit's own header card — a page draws its own
+     * header band — and `opts.overviewExtra` lets the page add cards INSIDE the
+     * Overview tab (they must live in the tab, not under it, or they would show
+     * on all five tabs). */
+    var m = opts.host
+      ? (function (h) {
+          h.innerHTML = ''; h.appendChild(body);
+          return { close: function () { h.innerHTML = ''; if (opts.onClose) opts.onClose(); }, el: h, body: body, inline: true };
+        })(opts.host)
+      : ui().modal({ title: e.name, icon: 'person-badge', size: 'lg', body: body, footer: false });
     var P = PR();
 
     // ---- header --------------------------------------------------------
+    if (opts.head !== false) {
     var av = e.photo
       ? '<span class="avatar" style="width:46px;height:46px;background-image:url(' + e.photo + ');background-size:cover;background-position:center"></span>'
       : '<span class="avatar" style="width:46px;height:46px;font-size:16px;background:' + ui().colorFor(e.name) + '">' + ui().initials(e.name) + '</span>';
@@ -254,6 +270,7 @@
         ]);
       })() : null
     ].filter(Boolean))]));
+    }
 
     /* ---- TABBED SECTIONS — one clean bar instead of a long scroll:
      * Overview · Accounts · Payslips · Attendance · All Details -------------*/
@@ -306,6 +323,9 @@
         ])])
       ]));
       h.appendChild(row);
+      // a page can extend Overview with its own cards (tasks, attendance,
+      // leave, salary & loan) — inside the tab, so they come and go with it
+      if (opts.overviewExtra) opts.overviewExtra(h, e, P);
     }
 
     // ACCOUNTS — the personal money book + money actions
@@ -404,6 +424,8 @@
       h.appendChild(row);
       if (EPAL.comments && EPAL.comments.widget) { h.appendChild(el('div.section-label', { text: 'Notes' })); h.appendChild(EPAL.comments.widget('employee', e.id)); }
     }
+
+    return m;                       // page mode needs the handle to close it
   }
 
   /* ---- money forms (advance / loan / repay / bonus) ----------------------*/
@@ -489,12 +511,20 @@
   function linkify(name, empId) {
     return '<span class="strong emp-link" data-emp="' + esc(empId || name) + '" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px">' + esc(name) + '</span>';
   }
-  // one delegated listener makes every .emp-link live, wherever it renders
+  // one delegated listener makes every .emp-link live, wherever it renders.
+  // A SCREEN MAY CLAIM THE CLICK: mark a container [data-emp-host] and give it an
+  // `__empOpen(id)` function, and the name opens the file THERE — that is how
+  // Staff Accounts shows the profile under its own table instead of in a modal.
+  // The listener is on document in the CAPTURE phase and stops propagation, so
+  // an inner handler could never have intercepted it; the hook has to be here.
   document.addEventListener('click', function (ev) {
     var t = ev.target && ev.target.closest ? ev.target.closest('.emp-link') : null;
     if (!t) return;
     ev.stopPropagation(); ev.preventDefault();
-    open(t.getAttribute('data-emp'));
+    var id = t.getAttribute('data-emp');
+    var host = t.closest('[data-emp-host]');
+    if (host && typeof host.__empOpen === 'function') { host.__empOpen(id); return; }
+    open(id);
   }, true);
 
   EPAL.people = { open: open, statement: statement, payslipPrint: payslipPrint, payslipHtml: payslipHtml, linkify: linkify, resolve: resolve, attendanceForm: attendanceForm };

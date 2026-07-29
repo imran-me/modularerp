@@ -1794,20 +1794,57 @@ function empAnalytics(e) {
   fillK(s, 'ln-advpending', pendReq.length ? ui.money(sum(pendReq, function (r) { return +r.amount || 0; })) + ' · ' + pendReq.length + ' waiting' : ui.money(0));
   fillK(s, 'ln-advout', ui.money(P.advanceOutstanding(e.id)));
 
-  /* ---- the three charts, drawn once the canvases are on the page ---------*/
+  /* ---- the three charts, drawn once the canvases are on the page ---------
+   * COUNT SCALES, PASSED EXPLICITLY. Two reasons, both worth writing down:
+   *   · `EPAL.charts.bar()` sets `x.ticks.callback = undefined` on a vertical
+   *     chart, and Chart.js then prints the INDEX instead of the label — every
+   *     vertical bar chart in the app is currently showing 0,1,2… where its own
+   *     labels should be (Travels Accounts › Overview has it too). Fixing the
+   *     shared helper would move pixels on screens nobody asked me to touch
+   *     (R1), so these charts pass their own `scales` — `cfg.options` replaces
+   *     the block wholesale — and the app-wide defect is reported, not patched
+   *     from here.
+   *   · these axes count TASKS and DAYS, so the ticks must be whole numbers;
+   *     the default was drawing 0.5 of a task. */
+  function countScales(stacked) {
+    var bd = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || 'rgba(255,255,255,.05)';
+    return { scales: {
+      x: { grid: { display: false }, border: { display: false }, stacked: !!stacked },
+      y: { grid: { color: bd }, border: { display: false }, stacked: !!stacked, beginAtZero: true,
+           ticks: { precision: 0, maxTicksLimit: 5 } }
+    } };
+  }
   var wk = part(s, 'wk'), mn = part(s, 'mn'), atc = part(s, 'att');
+  // an empty chart says nothing; a sentence says why it is empty
+  if (!tasks.length) {
+    [[wk, 'No tasks on this person\'s board yet — nothing to chart. Tasks come from My Tasks / Task Oversight.'],
+     [mn, 'No tasks on this person\'s board yet — nothing to chart.']].forEach(function (p) {
+      if (p[0]) { var b = p[0].parentNode; b.classList.remove('emp-chart'); b.innerHTML = ''; b.appendChild(el('div.text-mute.sm', { text: p[1] })); }
+    });
+    wk = mn = null;
+  }
+  var hasAtt = attRows.some(function (a) { return a.present || a.absent || a.late || a.earlyLeave || a.leave; });
+  if (!hasAtt && atc) {
+    var ab = atc.parentNode; ab.classList.remove('emp-chart'); ab.innerHTML = '';
+    ab.appendChild(el('div.text-mute.sm', { text: 'No attendance recorded in the last 12 months — record a month on the Attendance tab and it charts from there.' }));
+    atc = null;
+  }
   requestAnimationFrame(function () {
-    if (!wk || !wk.isConnected || !EPAL.charts) return;
-    var acc = accentOf(wk), good = getComputedStyle(document.documentElement).getPropertyValue('--good').trim() || '#12b3a6';
-    fileChart(EPAL.charts.bar(wk, { labels: wLbl, money: false, legend: true,
+    if (!EPAL.charts) return;
+    var root = document.documentElement, cs = getComputedStyle(root);
+    var acc = accentOf(wk || atc || document.body);
+    var good = cs.getPropertyValue('--good').trim() || '#12b3a6';
+    var bad = cs.getPropertyValue('--bad').trim() || '#e0356e';
+    var warn = cs.getPropertyValue('--warn').trim() || '#e2721b';
+    if (wk && wk.isConnected) fileChart(EPAL.charts.bar(wk, { labels: wLbl, money: false, legend: true, options: countScales(false),
       datasets: [{ label: 'Assigned', data: wAssigned, color: acc }, { label: 'Completed', data: wDone, color: good }] }));
-    fileChart(EPAL.charts.area(mn, { labels: mLbl, money: false, legend: true,
+    if (mn && mn.isConnected) fileChart(EPAL.charts.area(mn, { labels: mLbl, money: false, legend: true, options: countScales(false),
       datasets: [{ label: 'Assigned', data: mAssigned, color: acc }, { label: 'Completed', data: mDone, color: good }] }));
-    fileChart(EPAL.charts.bar(atc, { labels: mLbl, money: false, legend: true, stacked: true,
+    if (atc && atc.isConnected) fileChart(EPAL.charts.bar(atc, { labels: mLbl, money: false, legend: true, stacked: true, options: countScales(true),
       datasets: [
         { label: 'Present', data: attRows.map(function (a) { return +a.present || 0; }), color: good },
-        { label: 'Absent', data: attRows.map(function (a) { return +a.absent || 0; }), color: getComputedStyle(document.documentElement).getPropertyValue('--bad').trim() || '#e0356e' },
-        { label: 'Late', data: attRows.map(function (a) { return +a.late || 0; }), color: getComputedStyle(document.documentElement).getPropertyValue('--warn').trim() || '#e2721b' }
+        { label: 'Absent', data: attRows.map(function (a) { return +a.absent || 0; }), color: bad },
+        { label: 'Late', data: attRows.map(function (a) { return +a.late || 0; }), color: warn }
       ] }));
   });
 
@@ -2233,13 +2270,23 @@ function manageView(page) {
  *
  * The sheet answers it per head and the dashboard answers it as two words —
  * "Additions" and "Deductions" — which is exactly the granularity the question is
- * NOT asked at. This is the same arithmetic the payslip runs, summed over the run
- * and read top to bottom, so the two figures that matter are both on it: the NET
- * PAYABLE (what the month costs) and the CASH TO HAND OUT (what actually leaves
- * an account, once the advances and EMIs the company recovers come off).
+ * NOT asked at. This is the same arithmetic the payslip runs, summed over the run,
+ * so the two figures that matter are both on it: the NET PAYABLE (what the month
+ * costs) and the CASH TO HAND OUT (what actually leaves an account, once the
+ * advances and EMIs the company recovers come off).
+ *
+ * SHAPE (owner 2026-07-29: "make this card more compact, two columns"). It used to
+ * be one full-width column of up to fourteen rows — a metre of near-empty card,
+ * with each label a long way from its own figure. Now the three ANCHORS (gross,
+ * net, cash) stay full-width rules across the card, and the movement between them
+ * sits in two columns side by side: what was added on the left, what was taken off
+ * on the right, each carrying its own subtotal in its heading. Same rows, same
+ * arithmetic, roughly half the height, and the two sides can be compared at a
+ * glance instead of by scrolling one past the other.
  *
  * A zero line is dropped — a month with no fine should not print a fine of ৳0 —
- * but the four anchor rows always show, so the column can always be added up.
+ * but the three anchors and both column subtotals always show, so the card can
+ * always be added up.
  *
  * IT OPENS ON THE FULL GROSS, not on the sheet's `earnedGross`. The two differ by
  * exactly the absence deduction (`earnedGross = gross − absentDeduction`), so
@@ -2266,24 +2313,55 @@ function monthMakeupCard(slips, ym, net, paid, advRec, emiRec) {
     ['Other deduction', f(function (s) { return s.otherDeduction; })],
     ['Negative adjustment', f(function (s) { return Math.max(0, -(s.adjustment || 0)); })]
   ];
-  function line(k, v, sign, strong) {
-    var txt = (sign && v ? sign + ' ' : '') + ui.money(v);
-    return el('div.data-row', null, [
-      el('div' + (strong ? '.strong' : '.text-mute.sm') + '.flex-1', { text: k }),
-      el('div' + (strong ? '.strong' : ''), { text: txt })
+  /* One detail line — a label and its signed figure, sitting inside a column. */
+  function line(k, v, sign) {
+    return el('div.makeup-line', null, [
+      el('div.makeup-k', { text: k }),
+      el('div.makeup-v', { text: (sign ? sign + ' ' : '') + ui.money(v) })
     ]);
   }
-  var rows = [line('Gross salary', gross, '', true)];
-  adds.forEach(function (a) { if (a[1]) rows.push(line(a[0], a[1], '+')); });
-  deds.forEach(function (d) { if (d[1]) rows.push(line(d[0], d[1], '−')); });
-  rows.push(line('Net payable to staff', net, '', true));
-  if (advRec) rows.push(line('Advance recovered', advRec, '−'));
-  if (emiRec) rows.push(line('Loan EMI recovered', emiRec, '−'));
-  rows.push(line('Cash to hand out', Math.max(0, net - advRec - emiRec), '', true));
+  /* One anchor — the three figures the column has to be added up TO, so they read
+     as rules across the card rather than as another detail line. */
+  function anchor(k, v, mod) {
+    return el('div.makeup-anchor' + (mod || ''), null, [
+      el('div.makeup-k', { text: k }),
+      el('div.makeup-v', { text: ui.money(v) })
+    ]);
+  }
+  /* A side. Its own subtotal rides in the heading, so the two columns can be read
+     against each other without adding either of them up first. A side with no
+     movement this month still prints — an empty half would knock the pair out of
+     alignment and read as a missing column rather than as "nothing happened". */
+  function side(label, items, sign, mod) {
+    var live = items.filter(function (i) { return i[1]; });
+    var tot = live.reduce(function (a, i) { return a + i[1]; }, 0);
+    return el('div.makeup-col' + mod, null, [
+      el('div.makeup-colhead', null, [
+        el('span.makeup-coltitle', { text: label }),
+        el('span.makeup-coltotal', { text: sign + ' ' + ui.money(tot) })
+      ]),
+      el('div.makeup-lines', null, live.length
+        ? live.map(function (i) { return line(i[0], i[1], sign); })
+        : [el('div.makeup-none', { text: 'nothing this month' })])
+    ]);
+  }
+  var body = [
+    anchor('Gross salary', gross),
+    el('div.makeup-cols', null, [
+      side('Additions', adds, '+', '.is-add'),
+      side('Deductions', deds, '−', '.is-ded')
+    ]),
+    anchor('Net payable to staff', net)
+  ];
+  var recov = [];
+  if (advRec) recov.push(line('Advance recovered', advRec, '−'));
+  if (emiRec) recov.push(line('Loan EMI recovered', emiRec, '−'));
+  if (recov.length) body.push(el('div.makeup-recov', null, recov));
+  body.push(anchor('Cash to hand out', Math.max(0, net - advRec - emiRec), '.is-cash'));
   var c = frag('reg-card');
   slot(c, 'title').innerHTML = ui.icon('calculator') + ' How ' + PR().mLabel(ym) + ' is made up';
   slot(c, 'sub').textContent = 'what is added, what is deducted, and what actually leaves an account';
-  slot(c, 'body').appendChild(el('div.data-list', null, rows));
+  slot(c, 'body').appendChild(el('div.makeup', null, body));
   slot(c, 'body').appendChild(el('p.text-mute.xs.mt-2', { text:
     'Advance and loan EMI come back to the company out of the salary, so they are deducted from the cash but not from the cost. Paid so far: '
     + ui.money(paid) + ' of ' + ui.money(net) + '.' }));

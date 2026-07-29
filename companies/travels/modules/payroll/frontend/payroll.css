@@ -54,3 +54,120 @@
    in your head. Uses the house .meter; only the label row above it is new. */
 .pay-progress { margin-top: 10px; }
 .pay-progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 5px; }
+
+/* ============== HOW THIS MONTH IS MADE UP (owner 2026-07-29) ================
+   The month's arithmetic, compact. Three ANCHORS — gross, net payable, cash to
+   hand out — run full width as rules across the card; between them the movement
+   sits in two columns, additions beside deductions, each with its subtotal in its
+   own heading. The house .data-list was the previous shape and cost ~41px a row
+   for up to fourteen rows; this halves the card and puts each label next to its
+   figure instead of a card-width away from it.
+
+   No house equivalent exists: .detail-cols is label→value facts with no subtotal
+   heading, tinted body or signed money, and .two-col is a 1.6fr/1fr page split. */
+.makeup { display: flex; flex-direction: column; }
+
+/* an anchor — the figures the columns have to add up TO. Heavier than a line and
+   ruled off, so the eye can stop on it while scanning the detail. */
+.makeup-anchor {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 9px 2px; border-bottom: 1px solid var(--border); font-weight: 700;
+}
+.makeup-anchor .makeup-v { font-size: var(--fs-body); }
+/* the last figure on the card is the one the owner acts on — it keeps the accent
+   and loses the rule, because nothing follows it to be separated from */
+.makeup-anchor.is-cash { border-bottom: none; color: var(--accent); padding-bottom: 2px; }
+
+/* THE PAIR. Equal halves with a hairline between them, so neither side reads as
+   the main column. One column on a phone, where two would set ~9 chars a line. */
+.makeup-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.makeup-col { min-width: 0; padding: 9px 0 10px; }
+.makeup-col.is-add { padding-right: 16px; border-right: 1px solid var(--border); }
+.makeup-col.is-ded { padding-left: 16px; }
+.makeup-colhead {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 5px;
+}
+.makeup-coltitle {
+  font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .06em;
+  font-weight: 700; color: var(--text-mute);
+}
+.makeup-coltotal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--fs-small); }
+.is-add .makeup-coltotal { color: var(--good); }
+.is-ded .makeup-coltotal { color: var(--bad); }
+.makeup-none { font-size: var(--fs-micro); color: var(--text-mute); padding: 3px 0; }
+
+/* a detail line. Dense on purpose — these are read as a list of names against a
+   column of figures, not as rows to be clicked. */
+.makeup-lines { display: flex; flex-direction: column; }
+.makeup-line { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; }
+.makeup-k { flex: 1; min-width: 0; font-size: var(--fs-small); color: var(--text-dim); overflow-wrap: anywhere; }
+.makeup-v { margin-left: auto; white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-small); }
+.makeup-anchor .makeup-k { color: var(--text); font-size: var(--fs-body); font-weight: 700; }
+
+/* the recoveries — money that comes back out of the salary, so they belong under
+   the net rather than in either column. Indented to read as a sub-step of it. */
+.makeup-recov { padding: 7px 0 8px 14px; border-bottom: 1px solid var(--border); }
+
+@media (max-width: 720px) {
+  .makeup-cols { grid-template-columns: 1fr; }
+  .makeup-col.is-add { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border); }
+  .makeup-col.is-ded { padding-left: 0; }
+}
+
+/* ============================== THE EMPLOYEE FILE (owner 2026-07-29) ========
+   The person's whole file, opened UNDER the Staff Accounts table instead of in
+   a pop-up card. Only three things here have no house equivalent: the identity
+   BAND, the facts GRID and a chart BOX of a fixed height. Everything else on the
+   file is house vocabulary (.card, .stat-row, .data-list, .badge, .two-col) on
+   purpose — the file has to look like the rest of the desk, not like a guest. */
+
+/* the file sits away from the table it belongs to, so the two never read as one
+   long sheet; the top rule is the seam between "the list" and "this person" */
+.emp-file-host { margin-top: 18px; }
+.emp-file-host:empty { margin-top: 0; }
+
+/* THE BAND. Dark, full-bleed across the card head, carrying the COMPANY accent
+   gradient — Woodart's file is green, Travels' is blue, the same per-company
+   identity the rest of the app uses. It is the one place on the desk where text
+   sits on the accent, so everything inside is locked to white rather than to the
+   theme's --text (which would vanish on the gradient in light mode). */
+.emp-band {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 16px 20px; color: #fff;
+  /* mixed from the LIVE company accent, not from --epal-deep: that token is the
+     group's dark blue everywhere, so a Woodart file came out blue while its own
+     tabs, buttons and chips were green. Darkening the accent towards the brand
+     ink keeps the band deep enough for white text in either theme. */
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 72%, #00072D), var(--accent));
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+.emp-band-av.avatar { width: 52px; height: 52px; font-size: 18px; flex: none; background-size: cover; background-position: center; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+.emp-band-who { min-width: 180px; flex: 1; }
+.emp-band-name { font-family: var(--font-display); font-size: var(--fs-h3); font-weight: 700; line-height: 1.2; }
+.emp-band-meta { font-size: var(--fs-small); color: rgba(255,255,255,.78); margin-top: 2px; }
+.emp-band-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+/* the chips are on the accent, so they cannot use the tinted --*-soft palettes */
+.emp-band-chips .badge { background: rgba(255,255,255,.16); color: #fff; }
+.emp-band-do { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.emp-band-btn { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.28); }
+.emp-band-btn:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.45); }
+/* the six money tiles butt straight onto the band — one block, no seam */
+.emp-file .stat-row { border-radius: 0 0 var(--r-lg) var(--r-lg); }
+/* the sixth tile carries two facts ("13.4d · ৳32,208") and .num is nowrap, so it
+   ran out over the card edge. The tile wraps; the figures inside stay atomic. */
+.emp-file .stat { min-width: 0; }
+.emp-file .stat-value.num { white-space: normal; overflow-wrap: normal; }
+
+/* PROFILE DETAILS — label over value, three across, wrapping to two and then to
+   one. A .data-list would have been the house default, but these are eight short
+   facts that read far faster side by side than as eight full-width rows. */
+.emp-facts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.emp-fact { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 9px 12px; background: var(--surface-2); min-width: 0; }
+.emp-fact-l { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .05em; color: var(--text-mute); }
+.emp-fact-v { font-size: var(--fs-small); font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }
+
+/* A chart needs a height its canvas can be measured against — Chart.js reads the
+   parent box, and an unsized parent collapses to nothing on first paint. */
+.emp-chart { position: relative; height: 230px; }
+.emp-chart canvas { width: 100% !important; height: 100% !important; }
+@media (max-width: 720px) { .emp-chart { height: 190px; } }
