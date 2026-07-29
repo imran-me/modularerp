@@ -31,7 +31,9 @@
 
 <!-- KPI grid + one KPI card + a two-column row ------------------------------>
 <template data-tpl="kpi-grid"><div class="kpi-grid kpi-compact stagger"></div></template>
-<template data-tpl="kpi"><div class="kpi-card"><div class="kpi-top"><span class="kpi-label" data-slot="label"></span><span class="kpi-ico" data-slot="ico"></span></div><div class="kpi-value" data-slot="value"></div></div></template>
+<!-- the flat [data-tpl="kpi"] tile (label · icon · figure, nothing else) was retired
+     2026-07-29 — every caller now builds [data-shell="kpitile"] below, which adds the
+     trend pill, the context foot line and the sparkline. The grid itself is unchanged. -->
 <template data-tpl="two-col"><div class="two-col"></div></template>
 
 <!-- generic cards: plain (body), register (head+sub+body), head-only -------->
@@ -75,6 +77,37 @@
   free and forks not a single rule. The extra `pay-*` classes carry no styling —
   they are semantic hooks for anything payroll ever needs to override.
   ============================================================================ -->
+
+<!-- ---------------------------------------------------------------------------
+  RICH KPI TILE — the house KPI card at full strength (owner 2026-07-29, from the
+  payroll UI/UX research in docs/PAYROLL-UIUX-RESEARCH.md): the figure, a trend
+  pill against last month, a context foot line, and a sparkline bled into the
+  card's bottom edge.
+
+  It replaces the flat [data-tpl="kpi"] fragment on Loan Management and Advance
+  Salary, which carried a label, an icon and a number and nothing else — you
+  could not tell whether ৳4,20,000 of loans out was climbing or clearing.
+
+  Deliberately the SAME markup as the group dashboard's kpiTile()
+  (companies/group-cockpit/modules/dashboard/view.js) so the two cannot drift.
+
+  ⚠ [data-el="trend"] and [data-el="spark"] are REMOVED, never hidden, when a card
+  has no honest history behind it — both because of the [hidden] trap documented
+  in payroll.js, and because a tile must never imply a trend it cannot prove.
+  (Payroll Reports is exactly that case: see reportsView.)
+--------------------------------------------------------------------------- -->
+<div data-shell="kpitile" class="kpi-card">
+  <div class="kpi-top">
+    <span class="kpi-label" data-k="label"></span>
+    <span class="kpi-ico" data-k="ico"></span>
+  </div>
+  <div class="kpi-value" data-k="value"></div>
+  <div class="kpi-foot">
+    <span class="kpi-trend" data-el="trend"></span>
+    <span class="text-muted" data-k="foot"></span>
+  </div>
+  <div class="kpi-spark" data-el="spark"><canvas data-el="canvas"></canvas></div>
+</div>
 
 <!-- ---------------------------------------------------------------------------
   DASHBOARD ROW — the four same-height cards that head both Payroll Overview

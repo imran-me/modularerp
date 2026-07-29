@@ -456,29 +456,40 @@ proposals-with-buttons that never posts by itself.
 
 - **Wave 1 · free wins** — presentation only, no engine change, using design-system
   pieces that already exist and chart code already loaded.
-  - ⛔ **1a · rich KPI cards** (sparkline + trend pill + foot line) on Loans, Advance
-    and Reports — they share the `kpi()` helper, so one change lifts three tabs.
-    Reference implementation to copy: `kpiTile()` +`trendFrom()` in
-    `companies/group-cockpit/modules/dashboard/view.js:234`.
-    **BLOCKED 2026-07-28 18:42 — a concurrent session owns `payroll.js`.** It had
-    ~328 uncommitted lines of a **Payroll History** feature in flight (plus a
-    `[data-shell="history"]` block in template.html, `view.js` rebuilt 18:39:23).
-    A `[data-shell="kpitile"]` block was added here and then **backed out
-    surgically** — verified 0 `kpitile` matches, their history block intact.
-    NOT reverted with `git checkout`: their 330 lines are uncommitted and that
-    would have destroyed them. **Owner's call: wait until Payroll History lands,
-    then rebase 1a on top of it.**
-    Design decisions already settled while planning (so 1a can start cold):
-    · exact month-end series ARE derivable for the loan book (`pay_txns` loan /
-      loan-repay / settlement.loanCleared are all dated) and for advances
-      (advance txns dated; recovery is `slip.advanceRecovered`, attributed to
-      `slip.paidDate || slip.ym` — it is not its own transaction);
-    · **no encashment sparkline** — `encashmentLiability()` computes from
-      `leaveState` per employee while the only history available is Σ`slip.encashAmt`,
-      and the two do not reconcile. A tile must not imply a trend it cannot prove;
-    · therefore **no spark band on Reports at all** (2 of its 4 figures have no
-      derivable history, and a half-sparked row reads broken) — trend pills and
-      foot lines there instead. Loans and Advance get the full treatment.
+  - ✅ **1a · rich KPI cards — DONE 2026-07-29** (was blocked 07-28 while a concurrent
+    session held `payroll.js` for the Payroll History feature; rebased on top of it
+    once that landed in c6e79f5).
+    The flat `kpi()` tile (label · icon · figure, nothing else) is retired; every
+    caller now builds `[data-shell="kpitile"]` — figure + **trend pill vs last month**
+    + **context foot line** + **sparkline**. Same markup as the group dashboard's
+    `kpiTile()` so the two cannot drift.
+    **The rule that shaped it: a sparkline's LAST point must equal the figure printed
+    above it.** So the series are month-end walks over the events that actually moved
+    each balance (`balanceSeries` / `headSeries` over `loanEvents()` / `advanceEvents()`),
+    mirroring the engine's `loanOutstanding()` / `advanceOutstanding()` line for line,
+    with anything older than the 12-month window folded into the opening balance.
+    · **Reports gets NO spark band, on purpose** — leave-encashment liability comes
+      from `leaveState()` (accrued days × today's rate) and does NOT reconcile to the
+      only stored history (Σ`slip.encashAmt`); Salary Due needs accrual dates the slip
+      does not keep. Two of four unprovable, and a half-sparked row reads broken, so
+      all four get trend pills + foot lines instead.
+    · **Latent bug fixed on the way:** Loan/Advance `disbursed`/`given` summed a
+      **companyId-filtered** txn list while `totalOut` summed a **team-filtered** one —
+      and "Repaid = disbursed − totalOut" subtracted across the two bases. Both now
+      read one event list. The transaction TABLES still use their own list, unchanged.
+    · Charts are tracked **locally** (`myCharts`/`killCharts`) and killed in the
+      embedded desk's `draw()`: `charts.destroyAll()` only runs on a route change
+      (`router.js:82`), and a blanket call here would kill the host page's charts.
+    **Verified:** sweep 253/253 × both themes 0 errors · tailwind gate green · trial
+    balance balances · 19/19 headless driver asserting each spark's last point against
+    the engine's own figure, and 0 orphaned Chart instances after three tab redraws.
+    ⚠ **Found while testing — pre-existing, NOT fixed:** `payroll` is registered as a
+    view for five companies (`travels/payroll`, `woodart/…`, `it/…`, `shop/…`,
+    `construction/…`) but is **not a module in `platform/core/config.js`**, so every
+    standalone `#/<cid>/payroll/<tab>` route 404s. The desk is reachable only embedded
+    (Master Accounts › Master Payroll, `<co>` › Accounts › Payroll). The module header
+    still claims it renders standalone. Registering it is a navigation change and per
+    CLAUDE.md needs both config.js and module.json — **owner decision.**
   - ◻ 1b · department doughnut beside the existing "Where the money goes" table
   - ◻ 1c · payment-progress `.meter` on the Salary Manage run card
   - ◻ 1d · column groups (Earnings │ Deductions │ Recovery │ Settlement) + sticky
