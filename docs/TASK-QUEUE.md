@@ -509,8 +509,21 @@ proposals-with-buttons that never posts by itself.
     (Master Accounts › Master Payroll, `<co>` › Accounts › Payroll). The module header
     still claims it renders standalone. Registering it is a navigation change and per
     CLAUDE.md needs both config.js and module.json — **owner decision.**
-  - ⛔ 1b · department doughnut beside the existing "Where the money goes" table
-  - ⛔ 1c · payment-progress `.meter` on the Salary Manage run card
+  - ✅ **1b · department doughnut — DONE 2026-07-29** (`e07835f`). Beside the
+    existing table, fed the SAME rows in the SAME order so slice N and row N are
+    the same department. **Legend off on purpose** — the table already names every
+    department and its share. Removed (not hidden) when there is nothing to draw.
+  - ✅ **1c · payment-progress meter — DONE 2026-07-29** (`e07835f`). On the Salary
+    Manage run card. Appended by JS rather than added to the `[data-tpl="run-card"]`
+    fragment, which is one of the ORIGINALS whose pixels must not move. The
+    `.meter` `lvl-*` scale is risk-coloured and reads correctly once you see what
+    is metered: **unpaid salary** — all paid = `lvl-low` = green.
+    Both verified 13/13 (ring == `departmentCost()` in order; meter width 33% =
+    paid ৳1,20,844 of ৳3,71,101 with the matching lvl class) · sweep 253/253 ×
+    both themes · tw gate green.
+    Adds **`frontend/payroll.css`**, the module's first stylesheet (the build picks
+    up `frontend/<id>.css` automatically). Only what has no house equivalent lives
+    there — everything else still uses `.kpi-card` / `.meter` / `.card` / `bank-*`.
   - ✅ **1d (half) · FROZEN IDENTITY COLUMN — DONE 2026-07-29** (`a6887df`).
     Pure CSS in `platform/design-system/css/base.css`, scoped to `.tbl-dense`,
     which ONLY Payroll applies — no other table in the app is touched. The dense
@@ -529,13 +542,14 @@ proposals-with-buttons that never posts by itself.
     (uncontested) *plus* a `columns[].group` wiring in `payroll.js` (contested).
     Not started: shipping the datatable half with no caller would be dead code.
 
-  ⛔ **1b, 1c and 1d's column groups are BLOCKED the same way 1a was** — all three
-  need `companies/travels/modules/payroll/frontend/payroll.js`, which a concurrent
-  session is actively writing (2026-07-29 ~11:20–11:33 it was building a **Salary
-  Templates list** — per-employee salary packages — touching `payroll.js`,
-  `template.html`, `platform/engines-library/payroll.js`, `platform/kit/emp-profile.js`
-  and `CONTEXT.md`, rebuilding `view.js` as it went). Two writers doing whole-file
-  saves on one file is how ~200 lines go missing. Resume when that lands.
+  ✔ The concurrent-session block that held 1a/1b/1c cleared at 11:41 when the
+  **Salary Templates** slice landed (`a7a5d4b` + `5c90096`). 1b and 1c were built
+  straight on top of it. **Only 1d's column groups remain open in Wave 1.**
+
+**WAVE 1 IS COMPLETE EXCEPT 1d's column groups.** Next up is either that or Wave 2
+(the real gaps — variance report, gross→net waterfall, cost bridge, run checklist,
+pre-finalize gates). Wave 2 is where the distance to SAP/Workday/Oracle actually
+closes; 1d is polish on a screen that already works.
 - **Wave 2 · the real gaps** — employee-level variance report · gross→net waterfall ·
   month-over-month cost bridge · run checklist · pre-finalize validation gates
 - **Wave 3 · control** — approvals (`EPAL.approvals` already ships a
