@@ -50,6 +50,8 @@
  *
  * STORES (localStorage via EPAL.store, ns epal.v1.):
  *   pay_templates  per-company salary template (component %s, tax, PF, leave rule)
+ *   pay_salary_tpl salary PACKAGES — one per pay grade / person: the components as
+ *                  fixed taka, standing bonus, OT switch + rate, standing fine
  *   pay_runs       one record per company-month  {status, correctionUntil, dueAfter}
  *   pay_slips      one payslip per employee-month {earnings, deductions, paid, status}
  *   pay_txns       advances / loans / repayments / bonuses / settlements
@@ -95,6 +97,113 @@
   }
   function saveTemplate(t) { S.upsert('pay_templates', t); bus.emit('data:changed', { store: 'pay_templates' }); return t; }
 
+  /* --------------------------------------------- SALARY PACKAGES (per person)
+   * `pay_templates` above is the company's STATUTORY structure — the percentages,
+   * the tax rule, the PF rule, the leave rule. It answers "how is a salary split".
+   *
+   * A SALARY PACKAGE (`pay_salary_tpl`) answers the other question — "what is THIS
+   * person actually paid": the five components as FIXED taka figures, a standing
+   * monthly bonus, whether overtime is allowed for them (and at what rate), and any
+   * standing disciplinary fine. Owner 2026-07-29, modelled on the group's existing
+   * Salary Templates List.
+   *
+   *   { id, companyId, name, basic, house, medical, conveyance, other, bonus,
+   *     otEligible, otRate, fine, fineNote, empIds:[…] }
+   *
+   * THE RULE THAT KEEPS TODAY'S FIGURES STILL: an employee with no package is
+   * computed exactly as before — percentages of `emp.salary`. A package REPLACES
+   * only the component split and the gross (its five components added up); tax, PF,
+   * absence, lateness, encashment and the correction window keep coming from the
+   * company template, so the statutory rules stay in ONE place.
+   *
+   * ASSIGNMENT LIVES ON THE PACKAGE (`empIds`), not on the employee record: the
+   * employees store is hydrated from the group directory and a payroll desk has no
+   * business writing into it. A package with no empIds is a library entry — a pay
+   * grade you can hand to someone later; it changes nobody's pay until it is.
+   * ==> LARAVEL: salary_templates + a salary_template_employee pivot. */
+  function stTotal(t) {
+    if (!t) return 0;
+    return round(+t.basic || 0) + round(+t.house || 0) + round(+t.medical || 0)
+         + round(+t.conveyance || 0) + round(+t.other || 0);
+  }
+  function allPackages() { return S.list('pay_salary_tpl'); }
+  function packageOf(empId) {
+    if (!empId) return null;
+    var all = allPackages();
+    for (var i = 0; i < all.length; i++) {
+      var ids = all[i].empIds || [];
+      for (var j = 0; j < ids.length; j++) if (ids[j] === empId) return all[i];
+    }
+    return null;
+  }
+  // The list behind the Salary Templates screen. Seeds ONCE per company, DERIVED
+  // from the staff who are actually on the payroll — an invented list would show
+  // packages nobody is paid on, and an empty list would hide the structure the
+  // company already runs. Because each seeded package is exactly what the company
+  // percentages compute for that salary (conveyance is the same remainder), every
+  // existing payslip figure is unchanged by the seed.
+  function salaryPackages(cid) {
+    ensurePackages(cid);
+    return allPackages().filter(function (p) { return p.companyId === cid; });
+  }
+  function ensurePackages(cid) {
+    var t = template(cid);
+    if (t.pkgSeeded) return;
+    var existing = allPackages().filter(function (p) { return p.companyId === cid; });
+    if (!existing.length) {
+      activeTeam(cid).forEach(function (e, i) {
+        var gross = +e.salary || 0;
+        if (gross <= 0) return;
+        var basic = round(gross * t.basicPct), house = round(gross * t.housePct), medical = round(gross * t.medicalPct);
+        savePackage({
+          id: 'STPL-' + cid + '-' + String(i + 1).padStart(3, '0'), companyId: cid,
+          name: e.name, basic: basic, house: house, medical: medical,
+          conveyance: gross - basic - house - medical, other: 0, bonus: 0,
+          otEligible: e.otEligible !== false, otRate: 0, fine: 0, fineNote: '',
+          empIds: [e.id], seeded: true
+        }, true);
+      });
+    }
+    t.pkgSeeded = today(); saveTemplate(t);
+  }
+  function packageId(cid) {
+    var n = 0;
+    allPackages().forEach(function (p) {
+      var m = /-(\d+)$/.exec(String(p.id || ''));
+      if (p.companyId === cid && m) n = Math.max(n, +m[1]);
+    });
+    return 'STPL-' + cid + '-' + String(n + 1).padStart(3, '0');
+  }
+  /* Save a package. ONE EMPLOYEE, ONE PACKAGE: assigning someone here detaches them
+   * from whatever they were on, so two packages can never both claim to be a
+   * person's pay (the payslip would then depend on record order). */
+  /* A PARTIAL SAVE IS A PARTIAL SAVE. The overtime switch on the list sends
+   * {id, otEligible} and nothing else; deriving empIds/total from that alone would
+   * silently detach the employee and zero the package — flipping one switch would
+   * quietly change someone's pay. So the incoming fields are merged ONTO the stored
+   * record and the derived fields are computed from the result. */
+  function savePackage(p, quiet) {
+    var cur = p.id ? allPackages().filter(function (o) { return o.id === p.id; })[0] : null;
+    var rec = Object.assign({}, cur || {}, p);
+    if (!rec.id) rec.id = packageId(rec.companyId);
+    rec.empIds = (rec.empIds || []).filter(Boolean);
+    rec.total = stTotal(rec);
+    if (rec.empIds.length) {
+      allPackages().forEach(function (o) {
+        if (o.id === rec.id) return;
+        var keep = (o.empIds || []).filter(function (id) { return rec.empIds.indexOf(id) < 0; });
+        if (keep.length !== (o.empIds || []).length) S.upsert('pay_salary_tpl', { id: o.id, empIds: keep });
+      });
+    }
+    S.upsert('pay_salary_tpl', rec);
+    if (!quiet) bus.emit('data:changed', { store: 'pay_salary_tpl' });
+    return rec;
+  }
+  function deletePackage(id) {
+    S.removeFrom('pay_salary_tpl', id);
+    bus.emit('data:changed', { store: 'pay_salary_tpl' });
+  }
+
   /* --------------------------------------------------------- computation */
   // Pure payslip maths for one employee in one month, matching the group's real
   // payslip format: salary COMPONENTS are shown on the FULL gross; Absent / Late /
@@ -110,7 +219,9 @@
   function computeSlip(emp, ym, adj) {
     adj = adj || {};
     var t = template(emp.companyId || 'travels');
-    var gross = +emp.salary || 0;
+    // the employee's own salary package, when they are on one (see savePackage)
+    var pkg = packageOf(emp.id);
+    var gross = pkg ? stTotal(pkg) : (+emp.salary || 0);
     var wd = t.workingDays || 30;
     var perDayF = gross / wd;
     // absent / unpaid-leave — full days deducted at the daily rate (or the override)
@@ -126,22 +237,45 @@
     var earlyDeduction = ovr(adj.earlyOverride, round(perDayF * earlyDays / lpa));
     // components presented on the FULL gross (the payslip shows the structure,
     // absences are separate deduction lines)
-    var basic = round(gross * t.basicPct);
-    var house = round(gross * t.housePct);
-    var medical = round(gross * t.medicalPct);
-    var transport = gross - basic - house - medical;
+    // a package states its components in taka; without one they are percentages
+    // of the gross and CONVEYANCE is the remainder, exactly as it always was
+    var basic = pkg ? round(+pkg.basic || 0) : round(gross * t.basicPct);
+    var house = pkg ? round(+pkg.house || 0) : round(gross * t.housePct);
+    var medical = pkg ? round(+pkg.medical || 0) : round(gross * t.medicalPct);
+    var transport = pkg ? round(+pkg.conveyance || 0) : gross - basic - house - medical;
+    var otherAllow = pkg ? round(+pkg.other || 0) : 0;
     var tax = earnedGross > t.taxThreshold ? round(earnedGross * t.taxPct) : 0;
     var pf = round(basic * t.pfPct);
     var otherDeduction = round(+adj.otherDeduction || 0);
+    // STANDING lines from the package: a bonus paid every month, and a
+    // disciplinary fine that runs until it is taken off the package. Both are
+    // their own slip fields — folding them into `bonus`/`otherDeduction` would
+    // double them the next time Edit Salary round-tripped those figures.
+    var tplBonus = (emp.bonusEligible === false || !pkg) ? 0 : round(+pkg.bonus || 0);
+    var pkgFine = (pkg && +pkg.fine > 0) ? round(+pkg.fine) : 0;
+    var fineExtra = Math.max(0, round(+adj.fineExtra || 0));
+    var fine = pkgFine + fineExtra;
+    // fineExtraNote is the reason for the ONE-OFF part only, kept apart from the
+    // combined display line so a round-trip through Edit Salary cannot re-append
+    // the package's standing reason to itself
+    var fineExtraNote = fineExtra ? ((adj.fineNote != null && String(adj.fineNote)) ? String(adj.fineNote) : 'Disciplinary deduction') : '';
+    var fineNote = [
+      pkgFine ? (pkg.fineNote || 'Standing fine · ' + pkg.name) : '',
+      fineExtraNote
+    ].filter(Boolean).join(' · ');
     // eligibility marks: overtime/bonus only count for employees flagged eligible
     // (emp.otEligible / emp.bonusEligible — default true when unset)
     var bonus = (emp.bonusEligible === false) ? 0 : round(+adj.bonus || 0);
     var adjustment = round(+adj.adjustment || 0);            // signed: + adds, − deducts
-    var otHours = (emp.otEligible === false) ? 0 : Math.max(0, +adj.overtimeHours || 0);
-    var otRate = (t.overtimeRate > 0) ? t.overtimeRate : Math.round((gross / wd / 8) * 1.5);   // default 1.5× the hourly rate
-    var overtime = (emp.otEligible === false) ? 0 : ovr(adj.otOverride, round(otHours * otRate));
-    var net = gross + overtime + bonus + adjustment
-            - absentDeduction - lateDeduction - earlyDeduction - tax - pf - otherDeduction;
+    // overtime is allowed by the employee record AND by the package (the switch on
+    // the Salary Templates screen); the package may carry its own ৳/hour rate
+    var otOff = emp.otEligible === false || (pkg && pkg.otEligible === false);
+    var otHours = otOff ? 0 : Math.max(0, +adj.overtimeHours || 0);
+    var otRate = (pkg && pkg.otRate > 0) ? round(pkg.otRate)
+      : ((t.overtimeRate > 0) ? t.overtimeRate : Math.round((gross / wd / 8) * 1.5));   // default 1.5× the hourly rate
+    var overtime = otOff ? 0 : ovr(adj.otOverride, round(otHours * otRate));
+    var net = gross + overtime + bonus + tplBonus + adjustment
+            - absentDeduction - lateDeduction - earlyDeduction - tax - pf - otherDeduction - fine;
     var encashDays = (t.leaveDaysPerYear || 23) / 12;        // 1.92
     var encashAmt = round(encashDays * perDayF);
     return {
@@ -150,17 +284,22 @@
       earlyDays: earlyDays, earlyDeduction: earlyDeduction, adjustment: adjustment,
       absentOverride: keepOvr(adj.absentOverride), lateOverride: keepOvr(adj.lateOverride),
       earlyOverride: keepOvr(adj.earlyOverride), otOverride: keepOvr(adj.otOverride),
-      basic: basic, house: house, medical: medical, transport: transport,
-      tax: tax, pf: pf, otherDeduction: otherDeduction, bonus: bonus, overtimeHours: otHours, overtime: overtime,
+      basic: basic, house: house, medical: medical, transport: transport, otherAllow: otherAllow,
+      tax: tax, pf: pf, otherDeduction: otherDeduction, bonus: bonus, tplBonus: tplBonus,
+      fine: fine, fineExtra: fineExtra, fineNote: fineNote, fineExtraNote: fineExtraNote,
+      pkgId: pkg ? pkg.id : null, pkgName: pkg ? pkg.name : null, otEligible: !otOff, otRate: otRate,
+      overtimeHours: otHours, overtime: overtime,
       net: net, encashDays: encashDays, perDay: round(perDayF), encashAmt: encashAmt
     };
   }
   // The single source of truth for the net owed to an employee for a month.
   // Old slips (no late/early/adjustment fields) compute identically since the new
   // fields default to 0 and earnedGross === gross − absentDeduction.
+  // (a slip written before salary packages existed carries no tplBonus/fine, so
+  // both default to 0 and it computes to exactly the figure it always did)
   function slipPayable(s) {
-    return round((s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + (s.adjustment || 0)
-      - (s.tax || 0) - (s.pf || 0) - (s.otherDeduction || 0) - (s.lateDeduction || 0) - (s.earlyDeduction || 0));
+    return round((s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0) + (s.adjustment || 0)
+      - (s.tax || 0) - (s.pf || 0) - (s.otherDeduction || 0) - (s.lateDeduction || 0) - (s.earlyDeduction || 0) - (s.fine || 0));
   }
   // Amount in words (Bangladeshi numbering: crore / lakh / thousand) for payslips.
   var W1 = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -205,7 +344,11 @@
     S.upsert('att_monthly', a); bus.emit('data:changed', { store: 'att_monthly' });
     // re-apply onto the month's draft slip immediately (if still correctable)
     var s = slip(empId, ym), run = s && getRun(s.companyId, ym);
-    if (s && run && run.status === 'draft') { try { adjustSlip(empId, ym, { leaveDeductDays: a.absent || 0, lateDays: a.late || 0, earlyDays: a.earlyLeave || 0, otherDeduction: s.otherDeduction, bonus: s.bonus, overtimeHours: s.overtimeHours, adjustment: s.adjustment, absentOverride: s.absentOverride, lateOverride: s.lateOverride, earlyOverride: s.earlyOverride, otOverride: s.otOverride }); } catch (x) {} }
+    if (s && run && run.status === 'draft') {
+      var adj = slipAdj(s);                       // everything the slip already carries…
+      adj.leaveDeductDays = a.absent || 0; adj.lateDays = a.late || 0; adj.earlyDays = a.earlyLeave || 0;   // …with the new counts
+      try { adjustSlip(empId, ym, adj); } catch (x) {}
+    }
     return a;
   }
 
@@ -226,7 +369,8 @@
       var adj = existing
         ? { leaveDeductDays: existing.leaveDeductDays, lateDays: existing.lateDays, earlyDays: existing.earlyDays,
             otherDeduction: existing.otherDeduction, bonus: existing.bonus, overtimeHours: existing.overtimeHours, adjustment: existing.adjustment,
-            absentOverride: existing.absentOverride, lateOverride: existing.lateOverride, earlyOverride: existing.earlyOverride, otOverride: existing.otOverride }
+            absentOverride: existing.absentOverride, lateOverride: existing.lateOverride, earlyOverride: existing.earlyOverride, otOverride: existing.otOverride,
+            fineExtra: existing.fineExtra, fineNote: existing.fineExtraNote }
         : (att ? { leaveDeductDays: att.absent || 0, lateDays: att.late || 0, earlyDays: att.earlyLeave || 0 } : {});
       var c = computeSlip(e, ym, adj);
       var s = existing || { id: slipId(e.id, ym), runId: run.id, empId: e.id, companyId: cid, ym: ym, paid: 0, advanceRecovered: 0, loanRecovered: 0, status: 'draft', slipNo: ym + '-' + String(++seq).padStart(3, '0') };
@@ -235,8 +379,9 @@
       // copy computed figures onto the slip
       ['gross', 'earnedGross', 'workedDays', 'leaveDeductDays', 'absentDeduction', 'lateDays', 'lateDeduction',
         'earlyDays', 'earlyDeduction', 'adjustment', 'absentOverride', 'lateOverride', 'earlyOverride', 'otOverride',
-        'basic', 'house', 'medical', 'transport',
-        'tax', 'pf', 'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'net', 'encashDays', 'perDay', 'encashAmt'].forEach(function (k) { s[k] = c[k]; });
+        'basic', 'house', 'medical', 'transport', 'otherAllow', 'pkgId', 'pkgName',
+        'tax', 'pf', 'otherDeduction', 'bonus', 'tplBonus', 'fine', 'fineExtra', 'fineNote', 'fineExtraNote',
+        'overtimeHours', 'overtime', 'net', 'encashDays', 'perDay', 'encashAmt'].forEach(function (k) { s[k] = c[k]; });
       S.upsert('pay_slips', s);
     });
     bus.emit('data:changed', { store: 'pay_slips' });
@@ -255,7 +400,8 @@
     var c = computeSlip(emp, ym, adj);
     ['leaveDeductDays', 'absentDeduction', 'lateDays', 'lateDeduction', 'earlyDays', 'earlyDeduction', 'adjustment',
       'absentOverride', 'lateOverride', 'earlyOverride', 'otOverride',
-      'otherDeduction', 'bonus', 'overtimeHours', 'overtime', 'earnedGross', 'workedDays', 'basic', 'house', 'medical', 'transport', 'tax', 'pf', 'net'].forEach(function (k) { s[k] = c[k]; });
+      'otherDeduction', 'bonus', 'tplBonus', 'fine', 'fineExtra', 'fineNote', 'fineExtraNote', 'overtimeHours', 'overtime', 'earnedGross', 'workedDays',
+      'basic', 'house', 'medical', 'transport', 'otherAllow', 'pkgId', 'pkgName', 'gross', 'tax', 'pf', 'net'].forEach(function (k) { s[k] = c[k]; });
     // agreed pay-time deductions (auto when null): how much advance / loan EMI
     // the company takes out of THIS month's payment
     if ('advCap' in adj) s.advCap = keepOvr(adj.advCap);
@@ -268,16 +414,46 @@
     return s;
   }
 
+  /* The month's adjustments AS THEY STAND — every caller that edits one figure has
+   * to hand adjustSlip the whole set, because it recomputes the slip from scratch.
+   * Reading them off the slip in ONE place means a new field (fineExtra was the
+   * one that showed this up) cannot be silently dropped by one caller and kept by
+   * another — which would quietly erase a real deduction. */
+  function slipAdj(s) {
+    return { leaveDeductDays: s.leaveDeductDays, lateDays: s.lateDays, earlyDays: s.earlyDays,
+      overtimeHours: s.overtimeHours, otherDeduction: s.otherDeduction, bonus: s.bonus, adjustment: s.adjustment,
+      absentOverride: s.absentOverride, lateOverride: s.lateOverride, earlyOverride: s.earlyOverride, otOverride: s.otOverride,
+      fineExtra: s.fineExtra, fineNote: s.fineExtraNote };
+  }
+  /* A ONE-OFF DISCIPLINARY DEDUCTION on one month (owner 2026-07-29). It ADDS to
+   * whatever fine that month already carries — a second incident is a second fine,
+   * not a correction of the first — and lands on the payslip as its own line with
+   * its reason. `amount` 0 clears the one-off part (the package's standing fine, if
+   * any, stays: that is taken off the package). */
+  function fineSlip(empId, ym, amount, note) {
+    var s = slip(empId, ym);
+    if (!s) throw new Error('No payslip for ' + empId + ' in ' + ym);
+    var amt = round(amount);
+    var adj = slipAdj(s);
+    if (amt <= 0) { adj.fineExtra = 0; adj.fineNote = ''; }
+    else {
+      adj.fineExtra = Math.max(0, round(+s.fineExtra || 0)) + amt;
+      var old = (+s.fineExtra > 0 && s.fineExtraNote) ? String(s.fineExtraNote) : '';
+      adj.fineNote = [old, note || 'Disciplinary deduction'].filter(Boolean).join(' · ');
+    }
+    return adjustSlip(empId, ym, adj);
+  }
+
   // Post (or RE-post — stable ids upsert) one slip's accrual + encashment into
   // the GL and refresh its status against what's already been paid.
   function accrueSlip(s, cid, ym) {
     var adjPos = Math.max(0, s.adjustment || 0), adjNeg = Math.max(0, -(s.adjustment || 0));
-    var recovered = (s.otherDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + adjNeg;
+    var recovered = (s.otherDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.fine || 0) + adjNeg;
     // AUDIT FIX: recovered deductions REDUCE salary cost — they are not income.
     // (Booking them to 4900 Other Income inflated the group's topline.)
     // Net expense = earned + OT + bonus + adj⁺ − recovered = tax + pf + payable,
     // so the entry balances by construction with just three credit lines.
-    var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + adjPos - recovered;
+    var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0) + adjPos - recovered;
     var payable = slipPayable(s);
     var lines;
     if (expense >= 0) {
@@ -712,16 +888,18 @@
       generated: today(),
       earnings: [
         ['Basic Salary', s.basic], ['House Rent Allowance', s.house], ['Medical Allowance', s.medical],
-        ['Conveyance Allowance', s.transport], ['Bonus', s.bonus || 0], ['Overtime', s.overtime || 0]
-      ],
-      grossEarnings: (s.gross || 0) + (s.overtime || 0) + (s.bonus || 0),
+        ['Conveyance Allowance', s.transport]
+      ].concat(s.otherAllow ? [['Other Allowance', s.otherAllow]] : [])
+       .concat([['Bonus', (s.bonus || 0) + (s.tplBonus || 0)], ['Overtime', s.overtime || 0]]),
+      grossEarnings: (s.gross || 0) + (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0),
       grossEarned: s.earnedGross,
       deductions: [
         ['Advance Salary', advLine], ['Loan', loanLine],
         ['Absent', s.absentDeduction || 0], ['Late', s.lateDeduction || 0], ['Early leave', s.earlyDeduction || 0],
         ['Income tax', s.tax || 0], ['Provident fund', s.pf || 0]
-      ].concat(s.otherDeduction ? [['Other deduction', s.otherDeduction]] : []),
-      totalDeductions: advLine + loanLine + (s.absentDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.tax || 0) + (s.pf || 0) + (s.otherDeduction || 0),
+      ].concat(s.otherDeduction ? [['Other deduction', s.otherDeduction]] : [])
+       .concat(s.fine ? [['Fine / penalty' + (s.fineNote ? ' (' + s.fineNote + ')' : ''), s.fine]] : []),
+      totalDeductions: advLine + loanLine + (s.absentDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.tax || 0) + (s.pf || 0) + (s.otherDeduction || 0) + (s.fine || 0),
       adjustment: s.adjustment || 0,
       leaveEncashment: { days: s.encashDays, amount: s.encashAmt, accruedDays: ls.encashableDays, accruedValue: ls.value, eligible: ls.eligibleFullYear, fullYearDays: ls.fullYearDays, fullYearValue: ls.fullYearValue },
       netPayable: payable, netCash: cashAfter, inWords: amountInWords(payable),
@@ -822,6 +1000,8 @@
   /* --------------------------------------------------------------- API */
   EPAL.payroll = {
     template: template, saveTemplate: saveTemplate, computeSlip: computeSlip, slipPayable: slipPayable,
+    salaryPackages: salaryPackages, packageOf: packageOf, savePackage: savePackage,
+    deletePackage: deletePackage, packageTotal: stTotal, fineSlip: fineSlip, slipAdj: slipAdj,
     amountInWords: amountInWords, attendanceFor: attendanceFor, saveAttendance: saveAttendance,
     generate: generate, getRun: getRun, run: getRun, slipsFor: slipsFor, slip: slip,
     inCorrectionWindow: inCorrectionWindow, adjustSlip: adjustSlip,

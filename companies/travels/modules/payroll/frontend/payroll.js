@@ -176,7 +176,7 @@ function sectionNav(sub, cid) {
       var titles = { overview: 'Payroll Overview', staff: 'Staff Accounts', template: 'Salary Template', manage: 'Salary Manage', loans: 'Loan Management', payslip: 'Payslip', advance: 'Advance Salary', reports: 'Payroll Reports' };
       var subs = { overview: 'The payroll command centre — position, ledger reconciliation, what to do next, and what looks wrong.',
         staff: 'Everyone on this payroll — search by name or employee ID, open anyone for their complete file.',
-        template: 'The statutory salary structure — components, tax, provident fund and the leave-encashment rule.',
+        template: 'Every employee\'s saved salary template — components, bonus, overtime and punishments — over the statutory structure that computes everyone else.',
         manage: 'The monthly payroll run — generate, correct, finalize and pay. Posts to the ledger.', loans: 'Staff loans — disburse, track balances and record repayments.',
         payslip: 'Salary statements per employee & month, with the annual Leave-Encashment benefit.', advance: 'Advance salary — disburse and recover against future pay.',
         reports: 'Leave-encashment liability, salary due, advance & loan registers, department cost.' };
@@ -234,9 +234,14 @@ EPAL.payrollDesk = function (page, cid, opts) {
 // earnedGross is already net of absence, so absence is NOT re-deducted here.
 function advOf(s) { var auto = Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); return (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? auto : Math.min(auto, +s.advCap)); }
 function emiOf(s) { return (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? PR().emiInstallment(s.empId) : +s.emiCap); }
-function otherOf(s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.otherDeduction || 0); }
-function addOf(s) { return (s.overtime || 0) + (s.bonus || 0) + Math.max(0, s.adjustment || 0); }
+// (`fine` = the salary template's standing punishment + any one-off deducted on
+// this month; `tplBonus` = the template's standing monthly bonus. A slip written
+// before salary templates existed carries neither, so both read 0 and every old
+// figure is exactly what it was.)
+function otherOf(s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.otherDeduction || 0) + (s.fine || 0); }
+function addOf(s) { return (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0) + Math.max(0, s.adjustment || 0); }
 function dedOf(s) { return otherOf(s) + Math.max(0, -(s.adjustment || 0)); }
+function bonusOf(s) { return (s.bonus || 0) + (s.tplBonus || 0); }
 function dueOf(s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }
 function cashOf(s) { return Math.max(0, (s.paid || 0) - (s.advanceRecovered || 0) - (s.loanRecovered || 0)); }
 
@@ -1325,7 +1330,7 @@ function monthView(page) {
       { key: 'earnedGross', label: 'Earned Gross', num: true, money: true },
       { key: 'overtime', label: 'Overtime', num: true, sortVal: function (x) { return x.overtime || 0; },
         render: function (x) { return x.overtime ? '<span class="text-good">' + ui.money(x.overtime) + ' <span class="xs text-mute">(' + (x.overtimeHours || 0) + 'h)</span></span>' : '—'; } },
-      { key: 'bonus', label: 'Bonus', num: true, sortVal: function (x) { return x.bonus || 0; }, render: function (x) { return x.bonus ? '<span class="text-good">' + ui.money(x.bonus) + '</span>' : '—'; } },
+      { key: 'bonus', label: 'Bonus', num: true, sortVal: bonusOf, render: function (x) { var v = bonusOf(x); return v ? '<span class="text-good">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'adjustment', label: 'Adjustment', num: true, sortVal: function (x) { return x.adjustment || 0; },
         render: function (x) { var v = x.adjustment || 0; return v ? '<span class="' + (v > 0 ? 'text-good' : 'text-bad') + '">' + (v > 0 ? '+' : '−') + ui.money(Math.abs(v)) + '</span>' : '—'; } },
       { key: 'adds', label: 'Additions', num: true, sortVal: addOf, render: function (x) { var v = addOf(x); return v ? '<span class="num strong text-good">+' + ui.money(v) + '</span>' : '—'; } },
@@ -1336,6 +1341,8 @@ function monthView(page) {
       { key: 'tax', label: 'Tax', num: true, sortVal: function (x) { return x.tax || 0; }, render: function (x) { return x.tax ? ui.money(x.tax) : '—'; } },
       { key: 'pf', label: 'PF', num: true, sortVal: function (x) { return x.pf || 0; }, render: function (x) { return x.pf ? ui.money(x.pf) : '—'; } },
       { key: 'otherDeduction', label: 'Other Ded.', num: true, sortVal: function (x) { return x.otherDeduction || 0; }, render: function (x) { return x.otherDeduction ? ui.money(x.otherDeduction) : '—'; } },
+      { key: 'fine', label: 'Fine', num: true, sortVal: function (x) { return x.fine || 0; },
+        render: function (x) { return x.fine ? '<span class="text-bad" title="' + esc(x.fineNote || '') + '">−' + ui.money(x.fine) + '</span>' : '—'; } },
       { key: 'deds', label: 'Deductions', num: true, sortVal: dedOf, render: function (x) { var v = dedOf(x); return v ? '<span class="num strong text-warn">−' + ui.money(v) + '</span>' : '—'; } },
       { key: 'net', label: 'Net Payable', num: true, sortVal: function (x) { return PR().slipPayable(x); }, render: function (x) { return '<span class="num strong">' + ui.money(PR().slipPayable(x)) + '</span>'; } },
       { key: 'encashAmt', label: 'Encash Accrued', num: true, money: true },
@@ -1462,8 +1469,200 @@ function staffView(page) {
 var VIEWS = { overview: overviewView, template: tplView, manage: manageView, loans: loansView,
   payslip: payslipView, advance: advanceView, reports: reportsView, staff: staffView };
 
-/* =================================================== SALARY TEMPLATE */
+/* =================================================== SALARY TEMPLATE
+ * TWO THINGS LIVE ON THIS TAB, and they answer different questions:
+ *   · the SALARY TEMPLATES LIST — what THIS person is paid: five components in
+ *     fixed taka, a standing bonus, an overtime switch (+ its own rate) and any
+ *     standing fine. Assigning one to an employee makes it their pay.
+ *   · the STRUCTURE card below it — HOW a salary is split when there is no
+ *     package, plus the statutory rules (tax, PF, leave, working days, the pay-by
+ *     and correction days) that apply to EVERYONE either way.
+ * Engine side: EPAL.payroll.salaryPackages/savePackage/deletePackage/fineSlip. */
+function tplListView(page) {
+  var s = screen('salary-templates');
+  var pkgs = PR().salaryPackages(CID);
+  var staff = team();
+  var nameOf = {}; staff.forEach(function (e) { nameOf[e.id] = e.name; });
+
+  fillH(s, 'title', ui.icon('list-ul') + ' Salary Templates List');
+  fillK(s, 'sub', pkgs.length + ' template' + (pkgs.length === 1 ? '' : 's') + ' · ' + pkgs.filter(function (p) { return (p.empIds || []).length; }).length + ' assigned');
+  var addBtn = act(s, 'new', function () { pkgForm(null); });
+  if (addBtn) {
+    if (canCreate()) addBtn.innerHTML = ui.icon('plus-lg') + ' Add New Salary Template';
+    else addBtn.parentNode.removeChild(addBtn);      // removed, never hidden
+  }
+  fillH(s, 'note', ui.icon('info-circle') + ' A template states the actual taka. An employee on one is paid its <strong>total</strong>, split exactly as it says; anyone <em>not</em> on a template is still computed from the percentages in Structure below. Income tax, provident fund, absence, late and leave-encashment always come from Structure, so the statutory rules stay in one place.');
+
+  var rows = pkgs.map(function (p, i) {
+    var ids = (p.empIds || []).filter(function (id) { return nameOf[id]; });
+    var emp = ids.length ? empById(ids[0]) : null;
+    return {
+      id: p.id, no: i + 1, name: p.name, pkg: p,
+      basic: +p.basic || 0, house: +p.house || 0, medical: +p.medical || 0,
+      conveyance: +p.conveyance || 0, other: +p.other || 0, bonus: +p.bonus || 0,
+      total: PR().packageTotal(p),
+      emp: emp, empName: emp ? emp.name : '', empId: emp ? emp.id : '',
+      ot: p.otEligible === false ? 'Off' : 'On', otRate: +p.otRate || 0,
+      fine: +p.fine || 0, fineNote: p.fineNote || '',
+      // a template whose total no longer matches the employee's recorded salary:
+      // the pay follows the TEMPLATE, so say so rather than let the two drift silently
+      drift: emp ? (PR().packageTotal(p) - (+emp.salary || 0)) : 0
+    };
+  });
+
+  function money(k) {
+    return { key: k, label: k === 'conveyance' ? 'Conveyance' : cap(k === 'house' ? 'House rent' : k === 'medical' ? 'Medical' : k === 'basic' ? 'Basic salary' : k === 'other' ? 'Other' : k),
+      num: true, render: function (r) { return r[k] ? '<span class="num">' + ui.money(r[k]) + '</span>' : '<span class="text-mute">' + ui.money(0) + '</span>'; } };
+  }
+  var tbl = EPAL.table({
+    rows: rows, pageSize: 12, sortDefault: 'none', exportName: 'salary-templates-' + CID,
+    searchKeys: ['name', 'empName', 'empId'],
+    empty: { icon: 'list-ul', title: 'No salary templates yet', hint: canCreate() ? 'Add one and assign it to an employee — it becomes their pay.' : 'Nobody is on a fixed salary package yet.' },
+    columns: [
+      { key: 'no', label: '#', width: '44px', render: function (r) { return '<span class="text-mute">' + r.no + '</span>'; } },
+      { key: 'name', label: 'Template name', render: function (r) {
+        // when the template IS the person, the second line does not repeat their
+        // name — it carries the employee ID, which is what you search by
+        var who = r.empName ? (r.empName === r.name ? esc(r.empId) : esc(r.empName) + ' · ' + esc(r.empId)) : '';
+        return '<div class="fw-700">' + esc(r.name) + '</div><div class="text-mute xs">' +
+          (who ? ui.icon('person') + ' ' + who : '<em>not assigned to anyone</em>') +
+          (r.drift ? ' · <span class="text-warn">' + (r.drift > 0 ? '+' : '−') + ui.money(Math.abs(r.drift)) + ' vs recorded salary</span>' : '') + '</div>';
+      } },
+      money('basic'), money('house'), money('medical'), money('conveyance'), money('other'),
+      { key: 'bonus', label: 'Bonus', num: true, render: function (r) { return r.bonus ? '<span class="num text-good">+' + ui.money(r.bonus) + '</span>' : '<span class="text-mute">' + ui.money(0) + '</span>'; } },
+      { key: 'total', label: 'Total salary', num: true, render: function (r) { return '<span class="num strong">' + ui.money(r.total) + '</span>'; } },
+      { key: 'ot', label: 'Overtime', render: function (r) {
+        return '<span class="badge badge-' + (r.ot === 'On' ? 'good' : '') + '">' + r.ot + '</span>' +
+          (r.ot === 'On' && r.otRate ? '<div class="text-mute xs">' + ui.money(r.otRate) + ' /hr</div>' : '');
+      } },
+      { key: 'fine', label: 'Punishment', num: true, render: function (r) {
+        if (!r.fine) return '<span class="text-mute">—</span>';
+        return '<span class="num text-bad">−' + ui.money(r.fine) + '</span><div class="text-mute xs">' + esc(r.fineNote || 'standing, every month') + '</div>';
+      } }
+    ],
+    actions: canCreate() ? [
+      { icon: 'pencil-square', title: 'Edit this template', onClick: function (r) { pkgForm(r.pkg); } },
+      { icon: 'toggles', title: 'Turn overtime on / off', onClick: function (r) {
+        var p = r.pkg, on = p.otEligible === false;
+        PR().savePackage({ id: p.id, companyId: p.companyId, otEligible: on });
+        ui.toast('Overtime ' + (on ? 'enabled' : 'disabled') + ' · ' + p.name, 'success'); EPAL.router.render();
+      } },
+      { icon: 'exclamation-diamond', title: 'Deduct a punishment from a month', onClick: function (r) { fineForm(r); } },
+      { icon: 'trash', title: 'Delete this template', onClick: function (r) { deletePkg(r); } }
+    ] : [{ icon: 'eye', title: 'Open this employee\'s file', onClick: function (r) { if (r.empId && EPAL.people) EPAL.people.open(r.empId); } }],
+    onRow: function (r) { if (r.empId && EPAL.people) EPAL.people.open(r.empId); }
+  });
+  box(s, 'list').appendChild(tbl.el);
+  mountScreen(page, s);
+}
+
+/* Add / edit one template. TOTAL IS NOT TYPED — it is the five components added
+ * up, so the list can never show a total the payslip disagrees with. */
+function pkgForm(p) {
+  var isNew = !p;
+  p = p || { companyId: CID, otEligible: true };
+  var taken = {};
+  PR().salaryPackages(CID).forEach(function (o) {
+    if (o.id === p.id) return;
+    (o.empIds || []).forEach(function (id) { taken[id] = o.name; });
+  });
+  var mine = (p.empIds || [])[0] || '';
+  var opts = [['', '— not assigned (a pay grade, nobody on it yet) —']].concat(team().map(function (e) {
+    return [e.id, e.name + ' · ' + e.id + (taken[e.id] ? '  (moves off "' + taken[e.id] + '")' : '')];
+  }));
+  EPAL.formModal({
+    title: (isNew ? 'Add New Salary Template' : 'Edit Salary Template — ' + p.name), icon: 'list-ul', size: 'md',
+    record: { name: p.name || '', empId: mine,
+      basic: +p.basic || 0, house: +p.house || 0, medical: +p.medical || 0, conveyance: +p.conveyance || 0,
+      other: +p.other || 0, bonus: +p.bonus || 0,
+      otEligible: p.otEligible !== false, otRate: +p.otRate || 0, fine: +p.fine || 0, fineNote: p.fineNote || '' },
+    fields: [
+      { key: 'name', label: 'Template name', required: true, hint: 'The employee\'s name, or a grade like "Manager".' },
+      { key: 'empId', label: 'Assign to employee', type: 'select', options: opts,
+        hint: 'The assigned employee is paid THIS template from the current draft month on. One person, one template.' },
+      { type: 'section', label: 'Salary components (৳) — the total is these five added up' },
+      { key: 'basic', label: 'Basic salary', type: 'money', min: 0, required: true },
+      { key: 'house', label: 'House rent', type: 'money', min: 0, default: 0 },
+      { key: 'medical', label: 'Medical allowance', type: 'money', min: 0, default: 0 },
+      { key: 'conveyance', label: 'Conveyance allowance', type: 'money', min: 0, default: 0 },
+      { key: 'other', label: 'Other allowance', type: 'money', min: 0, default: 0 },
+      { key: 'bonus', label: 'Bonus (৳ every month)', type: 'money', min: 0, default: 0, hint: 'Paid on top of the total, every month, until it is changed here. Leave 0 for a one-off bonus — those are entered on the payslip.' },
+      { type: 'section', label: 'Overtime' },
+      { key: 'otEligible', label: 'Overtime allowed', type: 'checkbox' },
+      { key: 'otRate', label: 'Overtime rate (৳ / hour)', type: 'money', min: 0, default: 0, hint: '0 = the company rate in Structure (which is itself 1.5× the hourly rate when unset). Hours are entered per month in Salary Manage.' },
+      { type: 'section', label: 'Punishment — a standing deduction' },
+      { key: 'fine', label: 'Fine every month (৳)', type: 'money', min: 0, default: 0, hint: 'Deducted every month until it is set back to 0. For a single incident use the ⚠ action on the list instead.' },
+      { key: 'fineNote', label: 'Reason', hint: 'Printed on the payslip beside the deduction.' }
+    ],
+    saveLabel: isNew ? 'Create Template' : 'Save Template',
+    onSave: function (v) {
+      var total = (+v.basic || 0) + (+v.house || 0) + (+v.medical || 0) + (+v.conveyance || 0) + (+v.other || 0);
+      if (total <= 0) { ui.toast('A template must add up to more than zero', 'error'); return false; }
+      if (+v.fine > 0 && !String(v.fineNote || '').trim()) { ui.toast('A standing fine needs a reason — it is printed on the payslip', 'error'); return false; }
+      PR().savePackage({
+        id: p.id, companyId: CID, name: String(v.name).trim(),
+        basic: +v.basic || 0, house: +v.house || 0, medical: +v.medical || 0,
+        conveyance: +v.conveyance || 0, other: +v.other || 0, bonus: +v.bonus || 0,
+        otEligible: !!v.otEligible, otRate: +v.otRate || 0,
+        fine: +v.fine || 0, fineNote: String(v.fineNote || '').trim(),
+        empIds: v.empId ? [v.empId] : [], seeded: false
+      });
+      regenDraft();
+      ui.toast('Template saved · ' + ui.money(total) + (v.empId ? ' · applies from the open draft month' : ''), 'success');
+      EPAL.router.render(); return true;
+    }
+  });
+}
+
+/* A one-off punishment on ONE month. It adds to whatever fine that month already
+ * carries and lands on the payslip as its own line with the reason. */
+function fineForm(r) {
+  if (!r.empId) { ui.toast('Assign this template to an employee first', 'error'); return; }
+  var months = monthSeries(12).slice().reverse().map(function (m) { return [m.ym, PR().mLabel(m.ym)]; });   // newest first
+  if (!months.length) { ui.toast('No payroll month to deduct from yet', 'error'); return; }
+  EPAL.formModal({
+    title: 'Deduct a Punishment — ' + r.empName, icon: 'exclamation-diamond', size: 'sm',
+    record: { ym: months[0][0], amount: 0, note: '' },
+    fields: [
+      { key: 'ym', label: 'Month', type: 'select', options: months, required: true },
+      { key: 'amount', label: 'Amount (৳)', type: 'money', min: 0, required: true },
+      { key: 'note', label: 'Reason', required: true, hint: 'Printed on the payslip beside the deduction.' }
+    ],
+    saveLabel: 'Deduct',
+    onSave: function (v) {
+      if (+v.amount <= 0) { ui.toast('Enter the amount to deduct', 'error'); return false; }
+      try {
+        PR().fineSlip(r.empId, v.ym, +v.amount, String(v.note).trim());
+        ui.toast('Deducted ' + ui.money(+v.amount) + ' from ' + PR().mLabel(v.ym), 'success');
+        EPAL.router.render(); return true;
+      } catch (e) { ui.toast(e.message || 'Blocked', 'error'); return false; }
+    }
+  });
+}
+
+function deletePkg(r) {
+  ui.confirm({ title: 'Delete "' + r.name + '"?', confirmLabel: 'Delete', danger: true,
+    text: r.empName
+      ? r.empName + ' goes back to the percentage structure on their recorded salary of ' + ui.money((r.emp && +r.emp.salary) || 0) + ' from the open draft month on. Months already finalized keep the figures they were finalized with unless they are reopened.'
+      : 'Nobody is on this template, so no pay changes.' })
+    .then(function (ok) {
+      if (!ok) return;
+      PR().deletePackage(r.id); regenDraft();
+      ui.toast('Template deleted', 'success'); EPAL.router.render();
+    });
+}
+
+/* Re-generate the CURRENT DRAFT month so a template change shows up immediately.
+ * Deliberately only the draft: generate() rewrites every slip it touches, and a
+ * finalized month's figures are what was posted to the ledger — they change only
+ * when someone reopens the month on purpose. */
+function regenDraft() {
+  var ym = PR().curYm(), run = PR().getRun(CID, ym);
+  if (!run || run.status === 'draft') { try { PR().generate(CID, ym); } catch (e) {} }
+}
+
 function tplView(page) {
+  tplListView(page);
   var t = PR().template(CID);
   var preview = el('div');
   function drawPreview(salary) {
@@ -1610,7 +1809,7 @@ function manageView(page) {
       { key: 'empName', label: 'Employee', render: function (s) { return EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : '<span class="strong">' + esc(s.empName) + '</span>'; } },
       { key: 'gross', label: 'Gross', num: true, money: true },
       { key: 'overtime', label: 'OT', num: true, render: function (s) { return s.overtime ? ui.money(s.overtime) : '—'; }, sortVal: function (s) { return s.overtime || 0; } },
-      { key: 'bonus', label: 'Bonus', num: true, render: function (s) { return s.bonus ? ui.money(s.bonus) : '—'; }, sortVal: function (s) { return s.bonus || 0; } },
+      { key: 'bonus', label: 'Bonus', num: true, render: function (s) { var v = bonusOf(s); return v ? ui.money(v) : '—'; }, sortVal: bonusOf },
       { key: 'encashAmt', label: 'Encash', num: true, money: true },
       { key: 'adv', label: 'Advance', num: true, sortVal: advOf, render: function (s) { var v = advOf(s); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'emi', label: 'Loan EMI', num: true, sortVal: emiOf, render: function (s) { var v = emiOf(s); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
@@ -1719,12 +1918,12 @@ function printSheetForm(slips, ym) {
   var COLS = [
     ['gross', 'Gross', function (s) { return s.gross; }],
     ['overtime', 'Overtime', function (s) { return s.overtime || 0; }],
-    ['bonus', 'Bonus', function (s) { return s.bonus || 0; }],
+    ['bonus', 'Bonus', function (s) { return bonusOf(s); }],
     ['encash', 'Leave Encashment', function (s) { return s.encashAmt || 0; }],
     ['advance', 'Advance', function (s) { return (s.paid > 0) ? (s.advanceRecovered || 0) : Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); }],
     ['emi', 'Loan EMI', function (s) { return (s.paid > 0) ? (s.loanRecovered || 0) : PR().emiInstallment(s.empId); }],
     ['absent', 'Absent', function (s) { return s.absentDeduction || 0; }],
-    ['other', 'Other Ded.', function (s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.otherDeduction || 0); }],
+    ['other', 'Other Ded.', function (s) { return otherOf(s); }],
     ['net', 'Net Payable', function (s) { return PR().slipPayable(s); }],
     ['paid', 'Paid', function (s) { return s.paid || 0; }],
     ['due', 'Due', function (s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }],
@@ -1775,7 +1974,8 @@ function correctionForm(s, ym) {
     record: { leaveDeductDays: s.leaveDeductDays || 0, lateDays: s.lateDays || 0, earlyDays: s.earlyDays || 0, overtimeHours: s.overtimeHours || 0,
       absentAmt: pre.absentAmt, lateAmt: pre.lateAmt, earlyAmt: pre.earlyAmt, otAmt: pre.otAmt,
       advCap: pre.advCap, emiCap: pre.emiCap,
-      otherDeduction: s.otherDeduction || 0, bonus: s.bonus || 0, adjustment: s.adjustment || 0 },
+      otherDeduction: s.otherDeduction || 0, bonus: s.bonus || 0, adjustment: s.adjustment || 0,
+      fineExtra: s.fineExtra || 0, fineNote: (s.fineExtra > 0 ? (s.fineExtraNote || '') : '') },
     fields: [
       { type: 'section', label: 'Attendance counts (drive the automatic amounts)' },
       { key: 'leaveDeductDays', label: 'Absent days', type: 'number', min: 0, max: 30, default: 0 },
@@ -1790,6 +1990,11 @@ function correctionForm(s, ym) {
       { key: 'otherDeduction', label: 'Other deduction (৳)', type: 'money', min: 0, default: 0 },
       { key: 'bonus', label: 'Bonus (৳)', type: 'money', min: 0, default: 0 },
       { key: 'adjustment', label: 'Salary adjustment (± ৳)', type: 'number', default: 0, hint: 'Signed: positive adds, negative deducts.' },
+      { key: 'fineExtra', label: 'Punishment this month (৳)', type: 'money', min: 0, default: 0,
+        hint: (s.fine - (s.fineExtra || 0)) > 0
+          ? 'A standing fine of ' + ui.money(s.fine - (s.fineExtra || 0)) + ' also applies from the salary template — take that off on the Salary Template tab.'
+          : 'A one-off disciplinary deduction, printed on the payslip with its reason.' },
+      { key: 'fineNote', label: 'Punishment reason', hint: 'Shown beside the deduction on the payslip.' },
       { type: 'section', label: 'Agreed pay-time deductions (auto — change what the company takes this month)' },
       { key: 'advCap', label: 'Advance to recover this month (৳)', type: 'money', min: 0, hint: 'Outstanding advance ' + ui.money(PR().advanceOutstanding(s.empId)) + ' — auto takes what fits.' },
       { key: 'emiCap', label: 'Loan EMI this month (৳)', type: 'money', min: 0, hint: 'Scheduled EMI ' + ui.money(PR().emiInstallment(s.empId)) + ' — edit what the company agrees to deduct.' }
@@ -1806,7 +2011,8 @@ function correctionForm(s, ym) {
           otOverride: pick(v.otAmt, pre.otAmt, s.otOverride),
           advCap: pick(v.advCap, pre.advCap, s.advCap),
           emiCap: pick(v.emiCap, pre.emiCap, s.emiCap),
-          otherDeduction: +v.otherDeduction, bonus: +v.bonus, adjustment: +v.adjustment
+          otherDeduction: +v.otherDeduction, bonus: +v.bonus, adjustment: +v.adjustment,
+          fineExtra: Math.max(0, +v.fineExtra || 0), fineNote: String(v.fineNote || '').trim()
         });
         ui.toast('Salary updated', 'success'); EPAL.router.render(); return true;
       } catch (e) { ui.toast(e.message || 'Blocked', 'error'); return false; }

@@ -279,15 +279,22 @@
         el('div.card-head', null, [el('h3', { html: ui().icon('cash-stack') + ' Salary Structure' })]),
         el('div.card-body', null, [el('div.data-list', null, [
           drow('Basic Salary', money(c.basic)), drow('House Rent Allowance', money(c.house)),
-          drow('Medical Allowance', money(c.medical)), drow('Conveyance Allowance', money(c.transport)),
-          el('div.data-row', null, [el('div.strong.flex-1', { text: 'Gross' }), el('div.strong', { text: money(c.gross) })]),
+          drow('Medical Allowance', money(c.medical)), drow('Conveyance Allowance', money(c.transport))
+        ].concat(c.otherAllow ? [drow('Other Allowance', money(c.otherAllow))] : [])
+         .concat(c.tplBonus ? [drow('Bonus (every month)', money(c.tplBonus))] : [])
+         .concat(c.fine ? [drow('Fine' + (c.fineNote ? ' · ' + c.fineNote : ''), '−' + money(c.fine))] : [])
+         .concat([el('div.data-row', null, [el('div.strong.flex-1', { text: 'Gross' }), el('div.strong', { text: money(c.gross) })])])
+         // the salary template this person is on, when they are on one — it is what
+         // their pay is computed from, so the file has to name it
+         .concat(c.pkgName ? [drow('Salary template', c.pkgName)] : [])
+         .concat([
           el('div.data-row', null, [el('div.text-mute.sm.flex-1', { text: 'Eligibility' }), el('div.flex.gap-1', null, [
-            el('span.badge.badge-' + (e.otEligible === false ? '' : 'good'), { text: 'Overtime ' + (e.otEligible === false ? '✗' : '✓') }),
+            el('span.badge.badge-' + (c.otEligible === false ? '' : 'good'), { text: 'Overtime ' + (c.otEligible === false ? '✗' : '✓') }),
             el('span.badge.badge-' + (e.bonusEligible === false ? '' : 'good'), { text: 'Bonus ' + (e.bonusEligible === false ? '✗' : '✓') })
           ])])
         ].concat((e.salaryHistory || []).slice(-3).reverse().map(function (h2) {
           return drow('Increment · ' + ui().date(h2.date), money(h2.from) + ' → ' + money(h2.to));
-        })))])
+        }))))])
       ]));
       row.appendChild(el('div.card', null, [
         el('div.card-head', null, [el('h3', { html: ui().icon('person-lines-fill') + ' Quick Facts' })]),

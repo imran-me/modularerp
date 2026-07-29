@@ -362,3 +362,42 @@
   </div>
 
 </section>
+
+<!-- ---------------------------------------------------------------------------
+  SALARY TEMPLATE — the tab, in two halves (owner 2026-07-29):
+
+  1 · SALARY TEMPLATES LIST — the saved package per employee: the five components
+      as fixed taka, the standing bonus, the total, whether overtime is allowed
+      and any standing fine. Add · edit · punish · delete. It is the top half
+      because it is the half people work in daily.
+  2 · STRUCTURE + LIVE PREVIEW — the company's STATUTORY rules (percentages, tax,
+      PF, leave, working days, the pay-by and correction days). Unchanged: they
+      still compute everyone who is NOT on a package, and they still govern tax,
+      PF, absence and encashment for everyone who is. Built by JS below this block.
+
+  The [data-fill="list"] table is EPAL.table (a data grid — the law's live-data
+  carve-out); everything around it is markup.
+--------------------------------------------------------------------------- -->
+<section data-screen="salary-templates">
+
+  <div class="card mb-3">
+    <div class="card-head">
+      <h3 data-k="title"></h3>
+      <!-- ⚠ the button is REMOVED by the logic when the user cannot create, never
+           hidden: [hidden] and .btn{display:inline-flex} have the same specificity
+           and the class wins (the trap documented in payroll.js). -->
+      <div class="flex items-center gap-2">
+        <span class="card-sub" data-k="sub"></span>
+        <button class="btn btn-primary btn-sm" type="button" data-act="new"></button>
+      </div>
+    </div>
+    <div class="card-body tbl-dense" data-fill="list"></div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <div class="text-mute sm" data-k="note"></div>
+    </div>
+  </div>
+
+</section>
