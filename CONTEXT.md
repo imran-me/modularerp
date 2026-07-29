@@ -1607,11 +1607,18 @@ so the work is preserved; `composer install` regenerates vendor on the server at
 >   numbers/badges/actions stay one line — so every column incl. Actions is visible
 >   with **NO horizontal scrollbar** at 90–100% zoom (reversed the old nowrap+scroll
 >   rule; see `base.css`). Grid overflow fix: `.app` main track `minmax(0,1fr)`.
-> - **3D atmosphere** (`platform/atmosphere/ambient3d.js`, three.js): a full 3D
->   AIRFIELD — runway/taxiway/tower/terminal/hangar/skyline + take-off, landing,
->   taxi, cruise, cargo, helicopter (spinning rotors) + a re-forming **fighter-jet
->   show** — replaces the flat 2D SVG airfield, which is KEPT and toggleable at
->   **Travels ▸ Settings ▸ Data ▸ Appearance** (`ui.atmos` = `3d` | `2d` | `off`).
+> - **Atmosphere — the 2D airfield is the DEFAULT** (owner directive, 2026-07-29).
+>   `companies/travels/app/atmosphere/travels-scene.{js,css}` — the flat SVG dusk
+>   airfield — is what every user gets out of the box, and it is the version that
+>   gets fixed/tuned. The 3D airport (`platform/atmosphere/ambient3d.js`, three.js:
+>   runway/taxiway/tower/terminal/hangar/skyline + take-off, landing, taxi, cruise,
+>   cargo, helicopter + the re-forming **fighter-jet show**) is **opt-in** from
+>   **Travels ▸ Settings ▸ Background Animation** (`ui.atmos` = `2d` (default) |
+>   `3d` | `off`). The default lives in one place: `atmosMode()` in `ambient3d.js`.
+>   A **one-time reset** at the top of that file drops a stale stored `"3d"` once
+>   per browser (flag `ui.atmosDefault2d`) — browsers that used the app while 3D
+>   was the default were otherwise pinned to it forever; a 3D pick made after the
+>   reset sticks normally.
 >   three.js is loaded `defer` from a CDN in `index.html`; ambient3d no-ops
 >   gracefully if three.js is unavailable (2D stays).
 >
@@ -1622,7 +1629,8 @@ so the work is preserved; `composer install` regenerates vendor on the server at
 >    Tweak `ambient3d.js` (materials `M.white`/`M.blue`, camera, per-craft path fns).
 > 2. **GitHub Pages builds get CANCELLED by rapid pushes** (why the live site lagged
 >    all session). Batch commits, push once, wait ~2 min. Verify live by: sidebar
->    shows "**Setup**", tables have no bottom scrollbar, background is the 3D airfield.
+>    shows "**Setup**", tables have no bottom scrollbar, background is the 2D airfield
+>    (the default; the 3D airport only appears if Settings has been switched to it).
 > 3. Optional upgrade: swap the procedural airliner for a real glTF (CesiumGS
 >    `Cesium_Air.glb`, CC-BY, jsDelivr-verified 200+CORS) — needs a live orientation
 >    check. Loader: `three@0.128.0/examples/js/loaders/GLTFLoader.js`.

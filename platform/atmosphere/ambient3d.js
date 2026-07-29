@@ -21,9 +21,29 @@
 (function () {
   'use strict';
 
+  /* OWNER DIRECTIVE: the 2D airfield is the DEFAULT scene everyone gets. The 3D
+   * airport is opt-in from Settings ▸ Background Animation (it stays selected
+   * once chosen — `ui.atmos` is what the buttons write). */
+
+  /* ONE-TIME RESET (2026-07-29). 3D used to be the default, so a browser that
+   * ever opened Settings ▸ Background Animation while it was selected still
+   * carries `ui.atmos = "3d"` and would keep landing on the 3D airport no
+   * matter how often the site is reloaded or re-logged-in. Drop that one stale
+   * value exactly once per browser, then stamp a flag so a DELIBERATE 3D pick
+   * made from here on is never touched again. 'off' is left alone — that is a
+   * choice this directive says nothing about. */
+  try {
+    if (!localStorage.getItem('epal.v1.ui.atmosDefault2d')) {
+      localStorage.setItem('epal.v1.ui.atmosDefault2d', '1');
+      var stale = localStorage.getItem('epal.v1.ui.atmos');           // JSON: '"3d"'
+      try { stale = JSON.parse(stale); } catch (e2) {}                 // tolerate a raw '3d'
+      if (stale === '3d') localStorage.removeItem('epal.v1.ui.atmos');
+    }
+  } catch (e) {}
+
   function atmosMode() {
     try { var m = localStorage.getItem('epal.v1.ui.atmos'); if (m) return JSON.parse(m); } catch (e) {}
-    return '3d';
+    return '2d';
   }
   function atmosOpacity(kind) {                       // 15..100 (%), per layer
     try { var v = JSON.parse(localStorage.getItem('epal.v1.ui.atmosOp' + kind) || '100'); return Math.max(15, Math.min(100, +v || 100)); } catch (e) { return 100; }

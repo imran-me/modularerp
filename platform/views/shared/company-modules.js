@@ -1239,10 +1239,10 @@
         el('span.card-sub', { text: 'applies instantly — no reload' }) ]), body ]);
     function build() {
       body.innerHTML = '';
-      body.appendChild(el('p.text-mute.sm.mb-2', { text: 'The scene behind the app. The 3D airport needs WebGL; the 2D airfield is the classic hand-drawn scene.' }));
-      // the three mode buttons
+      body.appendChild(el('p.text-mute.sm.mb-2', { text: 'The scene behind the app. The 2D airfield is the default hand-drawn scene; the 3D airport needs WebGL.' }));
+      // the three mode buttons — default first
       var row = el('div.flex.gap-2.flex-wrap.mb-3');
-      [['3d', 'airplane-engines', '3D Airport (Live)'], ['2d', 'image', '2D Airfield (Classic)'], ['off', 'slash-circle', 'No Background']].forEach(function (o) {
+      [['2d', 'image', '2D Airfield (Default)'], ['3d', 'airplane-engines', '3D Airport (Live)'], ['off', 'slash-circle', 'No Background']].forEach(function (o) {
         row.appendChild(el('button.btn' + (mode === o[0] ? '.btn-primary' : '.btn-outline'), {
           html: ui.icon(o[1]) + ' ' + o[2],
           onclick: function () { mode = o[0]; A.setMode(o[0]); ui.toast('Background: ' + o[2], 'success'); build(); }
@@ -1260,8 +1260,8 @@
         return el('div.flex.items-center.gap-2.mb-2' + (active ? '' : '.text-mute'), null, [
           el('span.sm', { style: { minWidth: '150px' }, text: label }), range, out ]);
       }
-      body.appendChild(sliderRow('3d', '3D scene opacity'));
       body.appendChild(sliderRow('2d', '2D scene opacity'));
+      body.appendChild(sliderRow('3d', '3D scene opacity'));
     }
     build();
     return card;
