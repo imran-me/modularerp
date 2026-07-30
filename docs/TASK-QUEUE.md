@@ -45,7 +45,7 @@ Two separate treatments, and not every table earns both:
 |---|---|---|---|---|
 | P1 ✅ | Overview · month drill | Monthly Register · Salary Register | done | `PR-MR` · `PR-SR` |
 | P2 ✅ | Salary Manage | Payroll History | done | reuses `PR-MR` (same `monthSeries()`) |
-| P3 | Salary Manage | **Salary sheet** | ⏭ | ⏭ **the disbursement sheet** — wants a signature column per employee; this is what gets signed when cash goes out |
+| P3 ✅ | Salary Manage | **Salary sheet** | done (`sheetTotals`) | **`PR-DS` Salary Disbursement Sheet** — signature line per employee |
 | P4 | Staff | **Staff Accounts** | ⏭ | ⏭ staff payroll position statement |
 | P5 | Loans | staff-loans · loan-register · emi-history · loan payments (modal) · loan transactions | ⏭ ×5 | ⏭ **Loan Book** |
 | P6 | Advance | advance outstanding · advance requests · advance transactions | ⏭ ×3 | ⏭ **Advance Register** |
@@ -56,6 +56,46 @@ The Payslip already has its own printed artifact (`EPAL.people.payslipPrint`), s
 needs footing only. Each phase is one commit, verified the same way: sweep both
 themes + a driver that checks the footed figure against an INDEPENDENT sum out of
 the store.
+
+### T-PAY-P3 — the Salary Disbursement Sheet ✅ (2026-07-30)
+Owner: *"P3 Salary Manage · Salary sheet — the disbursement sheet, wants a
+signature column per employee. continue this one."*
+
+The sheet's own **foot was already done** (`sheetTotals`, added in the parallel
+session), so P3 was the document — and it is a THIRD document, not the register
+with a column bolted on. `PR-DS-<YYYY>-<MM>`, and it is the one artifact on the
+desk that leaves the building **unfinished**: out with a blank column, back as the
+receipt.
+
+- **Columns are the cashier's, not the accountant's:** `#` to tick down · Employee
+  (ID beneath) · Company · Department · Net payable · Recovered (advance + EMI, in
+  brackets) · Already paid · **To hand over** (the only bold figure on the row) ·
+  Through (the account a paid row actually left by) · **Signature and date** —
+  a dotted rule in the widest column after the name. The full earnings breakdown
+  stays in `PR-SR`; putting it here would push the signature off the paper.
+- **Rows are tall** (`.rp-tall`, 2.6mm top and bottom) because somebody has to
+  write on them. That costs pages — 17 people over 3 — which is correct for a
+  sheet that gets signed.
+- Net payable is already net of advance and EMI (the engine's `slipPayable`), so
+  "to hand over" needs no arithmetic in the cashier's head. Recovered is printed
+  for the EMPLOYEE's benefit.
+- Panels: *How this sheet adds up* (gross → net → cash to hand over; the
+  adjustments line is the residual, so the panel foots to the engine's net rather
+  than to my arithmetic) and *Paid so far, through which account* (a mini-table
+  built from the payslips' own `payMethod`, so it can only name accounts that
+  really carried money).
+- Sign-off is the CASH chain: Prepared by · **Cash handed over by** · Checked by ·
+  Approved by. "Recommended by" is not a step in handing money over.
+- **Print centre gained a third level** — Summary · Employee-level detail ·
+  **Disbursement sheet** — and Print in the sheet's own toolbar opens it there by
+  default. Pair with **Only unpaid** and it is exactly the sheet for today's
+  payout. The control bar's older "Print Sheet" (tick the columns) is untouched.
+- Verified: sweep 253/253 × both themes, 0 errors; driver confirms the level
+  default, 17 signature lines for 17 rows, and totals net ৳8,04,066 · recovered
+  ৳1,27,666 · paid ৳3,40,750 · **to hand over ৳4,63,316** against an independent
+  sum out of `pay_slips`. Filtering to *Only unpaid* (11 of 17) leaves cash to hand
+  over **unchanged at ৳4,63,316** — as it must, since a fully-paid employee is
+  owed nothing.
 
 ### T-PAY-HISTORY — Payroll History prints the same register ✅ (2026-07-30)
 Owner: *"the one you have done already is in Overview the Monthly Register Table.

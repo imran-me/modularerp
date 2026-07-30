@@ -96,6 +96,12 @@
     /* WIDE — 15+ columns. The only thing that shrinks is the gutter; type stays
        at 8.5pt, because a payroll register that needs a magnifier is not one. */
     '.rp-tbl.rp-wide th,.rp-tbl.rp-wide td{padding-left:.8mm;padding-right:.8mm;}',
+    /* TALL — a row somebody has to WRITE on. A disbursement sheet is signed line
+       by line as the money is handed over, and a 4mm row leaves nowhere to sign;
+       this gives every row a thumb's worth of height and puts a dotted rule in
+       the signature cell so the eye knows where the pen goes. */
+    '.rp-tbl.rp-tall td{padding-top:2.6mm;padding-bottom:2.6mm;}',
+    '.rp-sigline{display:block;border-bottom:.4pt dotted #7A8798;margin-top:3.4mm;}',
     '.rp-tbl td{font-size:8.5pt;padding:1.35mm 1.3mm;border-bottom:.3pt solid #D8E0EA;vertical-align:top;',
     'overflow-wrap:anywhere;}',
     '.rp-tbl td.num{text-align:right;font-family:Consolas,"Roboto Mono",monospace;font-variant-numeric:tabular-nums;',
@@ -103,6 +109,9 @@
     '.rp-tbl tbody tr:nth-child(even) td{background:#F7F9FB;}',
     '.rp-tbl .rp-strong{font-weight:700;}',
     '.rp-tbl .rp-sub{display:block;font-size:6.5pt;color:#3C4A5E;}',
+    // the same sub-label inside a column head sits on the navy band, where a dark
+    // grey is dark-on-dark — it lightens instead of disappearing
+    '.rp-tbl th .rp-sub{color:rgba(255,255,255,.74);}',
     '.rp-tot td{background:#EDF1F7;border-top:1.5pt solid #0B2545;border-bottom:1.5pt solid #0B2545;font-weight:700;}',
     // tag+class, to out-specify table.rp-tbl's own top margin — a panel's table
     // butts straight onto the panel heading, with no white band between them
@@ -369,7 +378,7 @@
 
     if (spec.table) {
       var t = spec.table;
-      var TCLS = 'table.rp-tbl' + (t.wide ? '.rp-wide' : '');
+      var TCLS = 'table.rp-tbl' + (t.wide ? '.rp-wide' : '') + (t.tall ? '.rp-tall' : '');
       var table = newTable(t, TCLS), tbody = el('tbody');
       table.appendChild(tbody);
       place(table);

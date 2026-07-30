@@ -490,6 +490,45 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · THE SALARY DISBURSEMENT SHEET (P3)
+
+**A third document, not a variant.** `PR-DS-<YYYY>-<MM>` is the only artifact on
+the desk that leaves the building UNFINISHED: it goes out with a blank column and
+comes back as the receipt, one signature per employee, which is what makes a cash
+payroll auditable. The Salary sheet's own foot was already in place
+(`sheetTotals`), so P3 was purely the document.
+
+**Its columns are the cashier's, not the accountant's** — `#` to tick down ·
+Employee with the ID beneath · Company · Department · Net payable · Recovered
+(advance + EMI, bracketed) · Already paid · **To hand over**, the only bold figure
+on the row · Through (the account a paid row actually left by) · **Signature and
+date**, a dotted rule in the widest column after the name. The full earnings
+breakdown stays in `PR-SR`: putting it here would push the signature off the paper.
+Rows are TALL (`.rp-tall`) because somebody has to write on them — 17 people over
+3 pages, which is the right trade for a sheet that gets signed.
+
+Net payable is already net of advance and EMI (the engine's `slipPayable`), so "to
+hand over" needs no arithmetic in the cashier's head; Recovered is printed for the
+EMPLOYEE's benefit. The *How this sheet adds up* panel takes its adjustments line
+as the RESIDUAL, so it foots to the engine's net rather than to my own arithmetic.
+*Paid so far, through which account* is built from the payslips' own `payMethod`,
+so it can only ever name accounts that really carried money this month. The sign-off
+is the cash chain: Prepared by · **Cash handed over by** · Checked by · Approved by.
+
+**The print centre now has three levels** — Summary · Employee-level detail ·
+Disbursement sheet — and Print in the sheet's own toolbar opens it at the third by
+default. Paired with **Only unpaid** it is exactly the sheet for today's payout.
+The control bar's older tick-the-columns "Print Sheet" is untouched.
+
+Verified: sweep 253/253 × both themes, 0 errors; the driver confirms the level
+default, 17 signature lines for 17 rows, and totals net ৳8,04,066 · recovered
+৳1,27,666 · paid ৳3,40,750 · **to hand over ৳4,63,316** against an independent sum
+out of `pay_slips`. Filtering to Only unpaid (11 of 17) leaves cash to hand over
+**unchanged at ৳4,63,316** — as it must, because a fully-paid employee is owed
+nothing. Both variants were rendered at 1:1 and read page by page.
+
+---
+
 ## 🆕 SESSION — 2026-07-30 · PAYROLL HISTORY PRINTS THE SAME REGISTER (+ the plan for the other 26 tables)
 
 **The owner's check** — *"the one you have done already is in Overview the Monthly

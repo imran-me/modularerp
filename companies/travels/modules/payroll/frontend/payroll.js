@@ -2869,6 +2869,17 @@ function manageView(page) {
      * filtered set — search or filter the sheet and the foot follows it. The two
      * count columns are not money and say what they count instead. */
     totals: sheetTotals,
+    /* PRINT — the DISBURSEMENT SHEET, beside Export and PDF where the reader looks
+     * for this table's outputs. It opens the print centre on this month at
+     * disbursement level: one row per employee, what to hand over, and a signature
+     * line each. "Only unpaid" in the centre narrows it to the people actually
+     * being paid today.
+     * The control bar's older "Print Sheet" (tick the columns → a plain sheet) is
+     * untouched: it answers "give me these columns quickly", which is a different
+     * question from "give me the document the cashier signs". */
+    toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+      title: 'Print the disbursement sheet — signature line per employee (approved runs only)',
+      onclick: function () { printCentre({ from: 'disburse', ym: ym }); } }),
     exportName: 'salary-sheet-' + ym + '.csv', pdfTitle: 'Salary Sheet — ' + PR().mLabel(ym),
     onRow: function (s) { var e = empById(s.empId); if (e) statement(e, ym); },
     actions: (canCreate() ? [{ icon: 'wallet2', title: 'Manage salary — pay / partial / due / advance / status', onClick: function (s) { manageSalary(s, ym); } }] : []).concat(ui.actions({
@@ -4884,6 +4895,170 @@ function payDetailReport(ym, slips, allInMonth, pickLabel) {
   };
 }
 
+/* ---------------------------------------------------------------------------
+ * REPORT 3 — the SALARY DISBURSEMENT SHEET (owner 2026-07-30: "the disbursement
+ * sheet — wants a signature column per employee")
+ * ---------------------------------------------------------------------------
+ * This is the one document on the desk that leaves the building UNFINISHED: it
+ * goes out with a blank column and comes back as the receipt, one signature per
+ * employee, which is what makes a cash payroll auditable. So it is not the Salary
+ * Register with a column bolted on — it carries only what a person handing money
+ * over needs, in the order they need it:
+ *   a serial to tick down · who · what they are owed · what was taken back ·
+ *   what has already been paid · WHAT TO HAND OVER NOW · through which account ·
+ *   and the line they sign.
+ * The full earnings breakdown belongs to the register (PR-SR); putting it here
+ * would push the signature column off the paper.
+ *
+ * Net payable is ALREADY net of the advance and the loan EMI recovered this month
+ * (the engine's slipPayable), so "to hand over" needs no further arithmetic — the
+ * Recovered column is printed for the employee's benefit, not the cashier's.
+ * ------------------------------------------------------------------------- */
+function payDisburseReport(ym, slips, allInMonth, pickLabel) {
+  var co = isAll();
+  var T = { gross: 0, otb: 0, adv: 0, emi: 0, absent: 0, other: 0, net: 0, paid: 0, due: 0, encash: 0, short: 0 };
+  slips.forEach(function (s) {
+    T.gross += s.gross || 0; T.otb += (s.overtime || 0) + bonusOf(s); T.adv += advOf(s); T.emi += emiOf(s);
+    T.absent += s.absentDeduction || 0; T.other += otherOf(s); T.net += PR().slipPayable(s);
+    T.paid += paidOf(s); T.due += dueOf(s); T.encash += s.encashAmt || 0; T.short += shortOf(s);
+  });
+  var partial = slips.length !== allInMonth.length;
+  var id = payReportId('DS', ym), rev = payRev(id);
+
+  /* # · Employee · [Company] · Department · Net payable · Recovered · Paid ·
+   * To hand over · Through · Signature — the signature gets the widest column of
+   * the lot after the name, because a signature needs room and a number does not. */
+  var w = payWidths(co ? [3, 15, 8, 9, 8.5, 8, 8.5, 9, 11, 19.5] : [3, 17, 10, 9, 8, 9, 9.5, 12, 22.5]);
+  var head = [{ label: '#', width: w[0] }, { label: 'Employee', sub: 'ID', width: w[1] }]
+    .concat(co ? [{ label: 'Company', width: w[2] }] : [])
+    .concat([{ label: 'Department' }, { label: 'Net payable', num: true },
+      { label: 'Recovered', sub: 'advance + EMI', num: true }, { label: 'Already paid', num: true },
+      { label: 'To hand over', num: true }, { label: 'Through' },
+      { label: 'Signature', sub: 'and date' }].map(function (h, i) { h.width = w[i + (co ? 3 : 2)]; return h; }));
+
+  var rows = slips.map(function (s, i) {
+    var rec = advOf(s) + emiOf(s), out = dueOf(s);
+    return [{ v: String(i + 1), num: true }, { v: esc(s.empName), strong: true, sub: esc(s.empId) }]
+      .concat(co ? [{ v: esc(coShort(s.companyId)) }] : [])
+      .concat([
+        { v: esc(s.dept || '—') },
+        { v: payMoney(PR().slipPayable(s)), num: true },
+        { v: payBrk(rec), num: true },
+        { v: payMoney(paidOf(s)), num: true },
+        // the figure the money is counted against — the only bold one on the row
+        { v: payMoney(out), num: true, strong: true },
+        { v: esc(paidOf(s) > 0 ? paidFrom(s.payMethod) : '') },
+        { v: '<span class="rp-sigline"></span>' }
+      ]);
+  });
+  var totals = [{ v: '' }, { v: 'Total — ' + slips.length + ' employee' + (slips.length === 1 ? '' : 's') }]
+    .concat(co ? [{ v: '' }] : [])
+    .concat([{ v: '' }, { v: payMoney(T.net), num: true }, { v: payBrk(T.adv + T.emi), num: true },
+      { v: payMoney(T.paid), num: true }, { v: payMoney(T.due), num: true }, { v: '' }, { v: '' }]);
+
+  /* WHERE THE MONEY WENT — the accounts the paid rows actually left through, which
+   * is the half of a disbursement sheet the cashier does not have to sign for.
+   * Built from the payslips' own payMethod, so it can only name accounts that
+   * really carried money this month. */
+  var byAcct = {};
+  slips.forEach(function (s) {
+    if (paidOf(s) <= 0) return;
+    var k = paidFrom(s.payMethod) || 'Unstated';
+    var a = byAcct[k] || (byAcct[k] = { n: 0, amt: 0 });
+    a.n++; a.amt += paidOf(s);
+  });
+  var acctKeys = Object.keys(byAcct).sort(function (a, b) { return byAcct[b].amt - byAcct[a].amt; });
+  var aw = payWidths([52, 16, 32]);
+
+  /* The panel foots to the engine's own net, never to my arithmetic: whatever the
+   * six lines above do not explain is the month's adjustments, and naming it is
+   * how the panel stays honest. */
+  var derived = T.gross + T.otb - T.adv - T.emi - T.absent - T.other;
+  var adjust = T.net - derived;
+
+  return {
+    docTitle: payFileName('DisbursementSheet', ym, ym),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Salary Disbursement Sheet — ' + PR().mLabel(ym) + (isAll() ? '' : ' · ' + coFull(CID)),
+    scope: [
+      PR().mLabel(ym) + ' · ' + slips.length + ' employee' + (slips.length === 1 ? '' : 's') + ' · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)) +
+        ' · run ' + cap(runInfo(ym).status),
+      'Each row is signed by the employee when the money is handed over. Net payable is already net of the ' +
+        'advance and the loan EMI recovered this month, so "to hand over" is the cash to count out. Leave ' +
+        'encashment (' + payMoney(T.encash) + ' accrued) is a liability, is not part of this sheet and is not paid here.'
+    ],
+    notice: partial ? 'Partial selection — ' + slips.length + ' of ' + allInMonth.length +
+      ' employees' + (pickLabel ? ', ' + pickLabel : '') + '. Totals below reflect the selected rows only.' : null,
+    kpis: [
+      { label: 'Employees on this sheet', value: String(slips.length), sub: partial ? 'of ' + allInMonth.length + ' in the run' : 'the whole run' },
+      { label: 'Net payable', value: payMoney(T.net), sub: 'after advance and EMI recovery' },
+      { label: 'Already paid', value: payMoney(T.paid), sub: T.net ? payPct(T.paid / T.net * 100) + ' of net payable' : '' },
+      { label: 'To hand over', value: payMoney(T.due), sub: slips.filter(function (s) { return dueOf(s) > 0; }).length + ' employees still to be paid' }
+    ],
+    table: { tall: true, wide: false,
+      groups: [{ span: co ? 4 : 3 }, { label: 'What is owed', span: 2 },
+        { label: 'Settlement', span: 2 }, { label: 'Received by the employee', span: 2 }],
+      head: head, rows: rows, totals: totals },
+    panelPairs: [[
+      { title: 'How this sheet adds up', lines: [
+        { k: 'Gross for the month', v: payMoney(T.gross) },
+        { k: 'Add: overtime and bonus', v: payMoney(T.otb) },
+        { k: 'Add: adjustments', v: payMoney(adjust) },
+        { k: 'Less: advance recovered', v: payBrk(T.adv) },
+        { k: 'Less: loan EMI recovered', v: payBrk(T.emi) },
+        { k: 'Less: absence', v: payBrk(T.absent) },
+        { k: 'Less: tax, PF and other deductions', v: payBrk(T.other) },
+        { k: 'Net payable', v: payMoney(T.net), rule: true },
+        { k: 'Less: already paid', v: payBrk(T.paid) },
+        { k: 'Cash to hand over', v: payMoney(T.due), close: true }
+      ] },
+      acctKeys.length
+        ? { title: 'Paid so far, through which account', table: {
+            head: [{ label: 'Account', width: aw[0] }, { label: 'Staff', num: true, width: aw[1] },
+              { label: 'Amount', num: true, width: aw[2] }],
+            rows: acctKeys.map(function (k) {
+              return [{ v: esc(k) }, { v: String(byAcct[k].n), num: true }, { v: payMoney(byAcct[k].amt), num: true }];
+            }),
+            totals: [{ v: 'Total' }, { v: String(sum(acctKeys, function (k) { return byAcct[k].n; })), num: true },
+              { v: payMoney(T.paid), num: true }] } }
+        : { title: 'Paid so far, through which account', lines: [
+            { k: 'Nothing has been disbursed from this run yet', v: '–' },
+            { k: 'Cash to hand over', v: payMoney(T.due), close: true } ] }
+    ]],
+    notesTitle: 'Before the money is handed over',
+    notes: payDisburseNotes(ym, slips, partial, allInMonth, pickLabel, T),
+    /* A disbursement sheet is signed by the people who touch the CASH — the
+     * register's "Recommended by" is not a step in handing money over. */
+    signoff: [{ role: 'Prepared by', name: payUser() }, { role: 'Cash handed over by', name: 'Cashier' },
+      { role: 'Checked by', name: 'Accounts' }, { role: 'Approved by', name: 'Managing Director' }],
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · signed on receipt',
+    previewTitle: 'Salary Disbursement Sheet — print preview'
+  };
+}
+
+function payDisburseNotes(ym, slips, partial, allInMonth, pickLabel, T) {
+  var out = [];
+  var unpaid = slips.filter(function (s) { return dueOf(s) > 0; });
+  if (unpaid.length) out.push({ tag: 'PAY', text: unpaid.length + ' of ' + slips.length + ' employees are to be paid ' +
+    payMoney(T.due) + ' against this sheet. Count each row out against the figure in "to hand over" and take the signature beside it.' });
+  else out.push({ tag: 'NOTE', text: 'Every employee on this sheet has been paid in full — it is a receipt record, ' +
+    'not a payment instruction.' });
+  slips.forEach(function (s) {
+    if (shortOf(s) > 0) out.push({ tag: 'WATCH', text: s.empName + ': ' + payMoney(shortOf(s)) +
+      ' of this month\'s advance / loan recovery did not fit the pay and stays outstanding — it comes off next month, ' +
+      'so do not deduct it in cash here.' });
+  });
+  if (partial) out.push({ tag: 'NOTE', text: 'Partial selection: ' + slips.length + ' of ' + allInMonth.length +
+    ' employees in this run' + (pickLabel ? ' (' + pickLabel + ')' : '') + '. The totals row covers the printed rows only.' });
+  out.push({ tag: 'NOTE', text: 'Only approved runs are disbursed against. A signature on this sheet is the ' +
+    'employee\'s receipt for the amount in the "to hand over" column of that row, and nothing else.' });
+  return out.slice(0, 8);
+}
+
 function payDetailNotes(ym, slips, partial, allInMonth, pickLabel) {
   var out = [];
   slips.forEach(function (s) {
@@ -4923,10 +5098,15 @@ function printCentre(opts) {
   /* Launched from the Salary Register (one month on screen) → that month only,
    * at employee level. Launched from the Monthly Register → every month, as the
    * summary. Either way the reader can change it below. */
-  var fromSheet = opts.from === 'sheet' && opts.ym;
-  var pick = {}, level = fromSheet ? 'detail' : 'summary', q = '', rowPick = null;
-  all.forEach(function (m) { pick[m.ym] = fromSheet ? (m.ym === opts.ym) : true; });
-  if (fromSheet && !pick[opts.ym]) { ui.toast('That month is not an approved run yet', 'warn'); return; }
+  /* WHERE IT WAS LAUNCHED FROM decides the default, because that is what the
+   * reader already has on screen: the Monthly Register wants the summary of every
+   * month; the Salary Register wants one month, per employee; the Salary Manage
+   * sheet wants the DISBURSEMENT sheet for the month being paid. */
+  var oneMonth = (opts.from === 'sheet' || opts.from === 'disburse') && opts.ym;
+  var pick = {}, level = opts.from === 'disburse' ? 'disburse' : (opts.from === 'sheet' ? 'detail' : 'summary');
+  var q = '', rowPick = null;
+  all.forEach(function (m) { pick[m.ym] = oneMonth ? (m.ym === opts.ym) : true; });
+  if (oneMonth && !pick[opts.ym]) { ui.toast('That month is not an approved run yet — finalize it first', 'warn'); return; }
 
   var body = el('div.pay-print');
   var mCount = el('div.pay-print-count'), rCount = el('div.pay-print-count');
@@ -4937,6 +5117,8 @@ function printCentre(opts) {
 
   function picked() { return all.filter(function (m) { return pick[m.ym]; }); }
   function oneYm() { var p = picked(); return p.length === 1 ? p[0].ym : null; }
+  // two of the three levels print one row per person, so both need step 4
+  function perEmployee() { return level === 'detail' || level === 'disburse'; }
   function monthSlips() {
     var ym = oneYm(); if (!ym) return [];
     return slipsIn(ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
@@ -4990,7 +5172,11 @@ function printCentre(opts) {
   /* ---- step 3 · detail level (only when the selection is ONE month, because
    * an employee-level register of six months is six registers) -------------- */
   var radios = [['summary', 'Summary row only', 'the register line for that month, its totals and the control panels'],
-    ['detail', 'Employee-level detail', 'the full Salary Register — one row per employee']];
+    ['detail', 'Employee-level detail', 'the full Salary Register — one row per employee'],
+    /* The third level is a different DOCUMENT, not a longer version of the second:
+     * it goes out with a blank column and comes back as the receipt. Pair it with
+     * "Only unpaid" below and it is exactly the sheet the cashier carries. */
+    ['disburse', 'Disbursement sheet', 'what the cashier carries — net payable, what to hand over, and a signature line per employee']];
   secLevel.appendChild(el('div.pay-print-h', { text: '3 · Detail level' }));
   radios.forEach(function (r) {
     var rb = el('input', { type: 'radio', name: 'paylvl', checked: level === r[0] ? 'checked' : null,
@@ -5076,7 +5262,7 @@ function printCentre(opts) {
    * can be pressed. It is what a tick calls. sync() adds the structural half:
    * which steps exist at all, and rebuilding the employee list under them. */
   function syncCounts() {
-    var p = picked(), one = oneYm(), wantRows = !!one && level === 'detail';
+    var p = picked(), one = oneYm(), wantRows = !!one && perEmployee();
     mCount.textContent = p.length + ' of ' + all.length + ' month' + (all.length === 1 ? '' : 's') + ' selected' +
       (p.length ? ' · net payable ' + ui.money(sum(p, function (m) { return m.net; })) : '');
     if (wantRows) {
@@ -5093,7 +5279,7 @@ function printCentre(opts) {
     // step 3 only exists for a single month; two or more always print the summary
     secLevel.style.display = one ? '' : 'none';
     if (!one) level = 'summary';
-    var wantRows = !!one && level === 'detail';
+    var wantRows = !!one && perEmployee();
     secRows.style.display = wantRows ? '' : 'none';
     if (wantRows) { fillBulkSelects(); drawRows(); }
     syncCounts();
@@ -5107,10 +5293,10 @@ function printCentre(opts) {
           var p = picked();
           if (!p.length) { ui.toast('Tick at least one month', 'error'); return false; }
           var one = oneYm();
-          if (one && level === 'detail') {
+          if (one && perEmployee()) {
             var sel = pickedSlips();
             if (!sel.length) { ui.toast('Tick at least one employee', 'error'); return false; }
-            EPAL.report.open(payDetailReport(one, sel, ensureRowPick(), pickWas));
+            EPAL.report.open((level === 'disburse' ? payDisburseReport : payDetailReport)(one, sel, ensureRowPick(), pickWas));
           } else {
             EPAL.report.open(paySummaryReport(p));
           }
