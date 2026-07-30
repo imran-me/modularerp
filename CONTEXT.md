@@ -490,6 +490,47 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · P8, AND THE TABLE PASS IS DONE
+
+**29 tables · 28 footed · 1 that should not be · 8 printed documents.** No document
+in this phase: a drill-down is not something you hand to anybody.
+
+The three that needed thought rather than a `SUM()`: *month transactions* foots the
+sheet's own THREE totals — what was listed, what cash left, what came back, and
+**what was recovered inside a payment and moved no cash at all** (`৳4,68,416 ·
+৳3,38,750 cash out · ৳1,29,666 netted in pay`), because one figure there would be
+four questions answered as one; *employee money movements* says how much MOVED and
+then splits it, since its rows run both ways; and *salary templates* foots DRIFT —
+the gap between what the templates say and what the employees' recorded salaries say
+— which matters because the pay follows the TEMPLATE.
+
+⚠ **Salary structures gets NO totals row, and that is the answer, not an omission.**
+Every column is a rate or a rule — basic %, tax %, PF %, the tax-free threshold,
+leave days, the pay-by day. Adding six companies' basic percentages gives 268%, and
+averaging them describes a company that does not exist. It is documented in the code
+so nobody "fixes" it later.
+
+**Two verification notes worth keeping.** The Payroll ↔ Ledger variance modal is
+UNREACHABLE on this data — the books reconcile, so the "why?" link is absent by
+design — so it was exercised by knocking one payslip's `paid` down ৳5,000 inside the
+disposable browser profile, after which its foot read ৳4,68,316, exactly the
+perturbed `sheetOwed`. And the blocked-approval table only exists when a month fails
+its arithmetic check; no month here does, so its foot is written and follows the same
+pattern but has not been seen on screen.
+
+**THE WHOLE PASS, for the record.** Eight documents now come off this desk:
+`PR-MR` Monthly Register · `PR-SR` Salary Register · `PR-DS` Disbursement Sheet ·
+`PR-SP` Staff Position Statement · `PR-LB` Loan Book · `PR-AR` Advance Register ·
+`PR-EL` Encashment Liability Schedule · `PR-PA` Payroll Cash & Ledger Reconciliation.
+Along the way the foots found: a **money bug** (`loanOutstanding` dropped every cash
+repayment, ৳2.67 lakh, and would have kept deducting EMI from cleared loans), two
+**label lies** on the advance register, a column that **stopped footing to itself**,
+two **same-name-different-number** collisions caught before they reached paper
+(staff net position, encashment provision), and a compiled `view.js` that was never
+rebuilt. That is the argument for putting a total under every column.
+
+---
+
 ## 🆕 SESSION — 2026-07-30 · THE REPORTS TAB (P7) — SEVEN FOOTS, TWO AUDIT DOCUMENTS
 
 **Seven tables footed, and three of them REFUSE to sum a column** — which is the

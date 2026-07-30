@@ -1148,6 +1148,20 @@ function monthTxnsModal(ym) {
       { key: 'from', label: 'Paid from' },
       { key: 'amount', label: 'Amount', num: true, money: true }
     ], null, 2),
+    /* THE FOOT — the sheet's own three totals, which monthTotals() already keeps
+     * apart for exactly this reason: what was LISTED, what cash actually left, what
+     * came back, and what was recovered inside a payment and moved no cash at all.
+     * A single figure here would be four different questions answered as one. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      var t = monthTotals(rs);
+      return { label: rs.length + (rs.length === 1 ? ' transaction' : ' transactions'), values: {
+        amount: '<span class="num">' + ui.money(t.listed) + '</span>' +
+          '<div class="xs text-mute nowrap">' + ui.money(t.out) + ' cash out' +
+          (t.inn ? ' · ' + ui.money(t.inn) + ' back in' : '') +
+          (t.internal ? ' · ' + ui.money(t.internal) + ' netted in pay' : '') + '</div>'
+      } };
+    },
     rows: rows, searchKeys: ['empName', 'empId', 'purpose', 'from', 'memo'], pageSize: 12,
     totalKey: 'amount', exportName: 'payroll-transactions-' + ym + '.csv',
     onRow: function (r) { txnDetailModal(r); },
@@ -1608,6 +1622,16 @@ function varianceExplainer(P, variance) {
       { key: 'sheet', label: 'Sheet says owed', num: true, money: true },
       { key: 'drafts', label: 'Draft payslips', num: true, render: function (r) { return r.drafts ? String(r.drafts) : '—'; } }
     ],
+    /* The point of the modal is a comparison, so the sheet column MUST foot: this
+     * total is the "sheet says owed" figure in the sentence above the table, and a
+     * reader has to be able to check that claim against the rows. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      return { label: rs.length + (rs.length === 1 ? ' month' : ' months'), values: {
+        sheet: ui.money(sum(rs, function (r) { return r.sheet || 0; })),
+        drafts: '<span class="xs text-mute">' + sum(rs, function (r) { return r.drafts || 0; }) + ' draft payslips</span>'
+      } };
+    },
     rows: rows, pageSize: 12, empty: { icon: 'journal', title: 'No months to compare' }
   }).el);
   ui.modal({ title: 'Payroll ↔ Ledger — where the difference is', icon: 'shield-exclamation', size: 'md', body: body, footer: false });
@@ -1870,6 +1894,18 @@ function monthView(page) {
       { key: 'method', label: 'Through', badge: {} },
       { key: 'amount', label: 'Amount', num: true, money: true }
     ], null, 2),
+    /* THE FOOT — these rows run BOTH WAYS (a loan repayment comes back, an advance
+     * goes out), so the total says how much money moved and then splits it, rather
+     * than netting a repayment against a disbursement and calling it "amount". */
+    totals: function (xs) {
+      if (!xs.length) return null;
+      var back = sum(xs.filter(function (x) { return x.type === 'loan-repay'; }), function (x) { return +x.amount || 0; });
+      var out = sum(xs, function (x) { return +x.amount || 0; }) - back;
+      return { label: xs.length + (xs.length === 1 ? ' movement' : ' movements'), values: {
+        amount: '<span class="num">' + ui.money(out + back) + ' <span class="xs text-mute">moved</span></span>' +
+          (back ? '<div class="xs text-mute nowrap">' + ui.money(out) + ' out · ' + ui.money(back) + ' back</div>' : '')
+      } };
+    },
     rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, totalKey: 'amount',
     exportName: 'payroll-movements-' + ym + '.csv',
     onRow: function (x) { showEmp(x.empId); },
@@ -1890,6 +1926,13 @@ function monthView(page) {
       { key: 'memo', label: 'Posting' },
       { key: 'amount', label: 'Amount', num: true, money: true }
     ]),
+    /* Each row is one journal's DEBIT side, so the column sums to what payroll
+     * posted into the books that month — the figure to hold against the register. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      return { label: rs.length + (rs.length === 1 ? ' journal' : ' journals'), values: {
+        amount: ui.money(sum(rs, function (r) { return r.amount || 0; })) } };
+    },
     rows: posts, searchKeys: ['ref', 'memo'], pageSize: 10, totalKey: 'amount',
     exportName: 'payroll-postings-' + ym + '.csv',
     onRow: function () { EPAL.router.navigate('group/master-accounts/journals'); },
@@ -2491,6 +2534,21 @@ function tplListView(page) {
       num: true, render: function (r) { return r[k] ? '<span class="num">' + ui.money(r[k]) + '</span>' : '<span class="text-mute">' + ui.money(0) + '</span>'; } };
   }
   var tbl = EPAL.table({
+    /* Every component of every package sums to the payroll the templates commit the
+     * company to. DRIFT foots too, and it is the one that matters: it is the gap
+     * between what the templates say and what the employees' recorded salaries say,
+     * and the pay follows the TEMPLATE. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      function S(k) { return ui.money(sum(rs, function (r) { return r[k] || 0; })); }
+      var drift = sum(rs, function (r) { return r.drift || 0; });
+      return { label: rs.length + (rs.length === 1 ? ' package' : ' packages'), values: {
+        basic: S('basic'), house: S('house'), medical: S('medical'), conveyance: S('conveyance'),
+        other: S('other'), bonus: S('bonus'), fine: S('fine'), total: S('total'),
+        drift: drift ? '<span class="num">' + (drift > 0 ? '+' : '−') + ui.money(Math.abs(drift)) + '</span>' +
+          '<div class="xs text-mute nowrap">template vs recorded</div>' : '—'
+      } };
+    },
     rows: rows, pageSize: 12, sortDefault: 'none', exportName: 'salary-templates-' + CID,
     searchKeys: ['name', 'empName', 'empId'],
     empty: { icon: 'list-ul', title: 'No salary templates yet', hint: canCreate() ? 'Add one and assign it to an employee — it becomes their pay.' : 'Nobody is on a fixed salary package yet.' },
@@ -2750,6 +2808,12 @@ function structureCompare(page) {
     ],
     rows: rows, pageSize: 10, exportName: 'salary-structures.csv',
     pdfTitle: scopeFull() + ' — Salary Structures',
+    /* ⚠ NO TOTALS ROW HERE, and that is the answer rather than an omission (owner's
+     * table pass, 2026-07-30). Every column on this table is a RATE or a RULE —
+     * basic %, tax %, PF %, the tax-free threshold, annual leave days, the pay-by
+     * day. Adding six companies' basic percentages together produces 268%, and
+     * averaging them describes a company that does not exist. The only honest foot
+     * would be the row count, which the toolbar already prints. */
     empty: { icon: 'sliders', title: 'No company has a salary structure yet' }
   }).el);
   slot(card, 'body').appendChild(el('p.text-mute.xs.mt-2', { text:
@@ -3114,7 +3178,16 @@ function blockedApproval(chk, ym) {
       { key: 'expected', label: 'Should be', num: true, render: function (r) { return '<span class="num strong">' + ui.money(r.expected) + '</span>'; } },
       { key: 'actual', label: 'Sheet says', num: true, money: true },
       { key: 'diff', label: 'Off by', num: true, render: function (r) { return '<span class="num strong text-bad">' + ui.money(r.diff) + '</span>'; } }
-    ], rows: chk.failed, pageSize: 10, exportName: 'payroll-check-' + ym + '.csv'
+    ], rows: chk.failed, pageSize: 10, exportName: 'payroll-check-' + ym + '.csv',
+    /* "OFF BY" foots on purpose: one row out by ৳2 is a rounding remnant, but the
+     * total is the size of the problem holding the whole month up. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      function S(k) { return ui.money(sum(rs, function (r) { return r[k] || 0; })); }
+      return { label: rs.length + (rs.length === 1 ? ' row fails' : ' rows fail'), values: {
+        earnings: S('earnings'), deductions: S('deductions'), expected: S('expected'),
+        actual: S('actual'), diff: S('diff') } };
+    }
   }).el);
   ui.modal({ title: 'Approval blocked — ' + PR().mLabel(ym), icon: 'shield-exclamation', size: 'lg', body: body, footer: false });
 }
@@ -4357,6 +4430,21 @@ function payslipView(page) {
       { key: 'encashAmt', label: 'Leave Encash', num: true, money: true },
       { key: 'status', label: 'Status', badge: { accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
     ]),
+    /* Gross, net and encashment all sum over whatever is filtered — pick one month
+     * or one status and the foot follows it. Encashment sums here because each row
+     * is that month's ACCRUAL, not a running balance. */
+    totals: function (ss) {
+      if (!ss.length) return null;
+      var byStatus = {};
+      ss.forEach(function (x) { byStatus[x.status] = (byStatus[x.status] || 0) + 1; });
+      return { label: ss.length + (ss.length === 1 ? ' payslip' : ' payslips'), values: {
+        earnedGross: ui.money(sum(ss, function (x) { return x.earnedGross || 0; })),
+        net: ui.money(sum(ss, function (x) { return PR().slipPayable(x); })),
+        encashAmt: ui.money(sum(ss, function (x) { return x.encashAmt || 0; })),
+        status: '<span class="xs text-mute">' + Object.keys(byStatus).sort().map(function (k) {
+          return byStatus[k] + ' ' + k; }).join(' · ') + '</span>'
+      } };
+    },
     rows: slips, searchKeys: ['empName', 'empId'], quickFilter: 'status', pageSize: 12, exportName: 'payslips.csv',
     filters: coFilter(), filterPanel: isAll(),
     pdfTitle: isAll() ? scopeFull() + ' — Payslips' : 'Travels Payslips',

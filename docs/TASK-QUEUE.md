@@ -50,12 +50,54 @@ Two separate treatments, and not every table earns both:
 | P5 ✅ | Loans | staff-loans · loan-register · emi-history · loan payments (modal) · loan transactions | done ×5 | **`PR-LB` Staff Loan Book** |
 | P6 ✅ | Advance | advance outstanding · advance requests · advance transactions | done ×3 | **`PR-AR` Advance Salary Register** |
 | P7 ✅ | Reports | payroll-by-account (+ its drill) · encashment liability · loan outstanding · department cost · increment history · simpleTbl lists | done ×7 | **`PR-EL` Encashment Liability Schedule** + **`PR-PA` Payroll Cash & Ledger Reconciliation** |
-| P8 | drills & modals | month transactions · money movements · ledger postings · variance explainer · payslip list · template list · structure compare · blocked-approval check | ⏭ ×8 | none — a drill is not a document |
+| P8 ✅ | drills & modals | month transactions · money movements · ledger postings · variance explainer · payslip list · template list · structure compare · blocked-approval check | done ×7 + 1 declined | none — a drill is not a document |
 
 The Payslip already has its own printed artifact (`EPAL.people.payslipPrint`), so it
 needs footing only. Each phase is one commit, verified the same way: sweep both
 themes + a driver that checks the footed figure against an INDEPENDENT sum out of
 the store.
+
+### T-PAY-P8 — the drills and modals foot, and one table refuses ✅ (2026-07-30)
+**T-PAY-TABLES IS COMPLETE: 29 tables · 28 footed · 1 that should not be · 8 printed
+documents.** No document in this phase — a drill-down is not something you hand to
+anybody.
+
+- *Employee money movements* — the rows run both ways, so it says how much MOVED and
+  then splits it (`৳1,44,666 moved · ৳15,000 out · ৳1,29,666 back`).
+- *Ledger postings* — each row is one journal's debit side, so the column sums to
+  what payroll posted into the books that month: the figure to hold against the
+  register.
+- *Month transactions* (the drill behind a Payroll History row) — foots the sheet's
+  own THREE totals, which `monthTotals()` already keeps apart for this reason: what
+  was listed, what cash left, what came back, and **what was recovered inside a
+  payment and moved no cash at all** (`৳4,68,416 · ৳3,38,750 cash out · ৳1,29,666
+  netted in pay`). One figure there would be four questions answered as one.
+- *Payroll ↔ Ledger variance modal* — the sheet column MUST foot, because that total
+  is the "sheet says owed" figure in the sentence above the table and a reader has to
+  be able to check the claim against the rows.
+- *Payslip list* — gross, net and encashment sum over whatever is filtered; status
+  counts (`8 accrued · 108 paid · 3 partial`).
+- *Salary templates* — every package component sums to the payroll the templates
+  commit the company to, and **DRIFT foots too** — the gap between what the templates
+  say and what the employees' recorded salaries say, which matters because the pay
+  follows the TEMPLATE.
+- *Blocked-approval check* — "off by" foots on purpose: one row out by ৳2 is a
+  rounding remnant, but the total is the size of the problem holding the month up.
+- ⚠ **Salary structures gets NO totals row, and that is the answer.** Every column is
+  a RATE or a RULE — basic %, tax %, PF %, the tax-free threshold, leave days, the
+  pay-by day. Adding six companies' basic percentages gives 268%, and averaging them
+  describes a company that does not exist. Documented in the code so nobody "fixes"
+  it later.
+- Verified: sweep 253/253 × both themes, 0 errors. Payslips foot to an independent
+  sum over `pay_slips` (119 · ৳71,99,496 gross · ৳56,35,044 net · ৳4,70,918
+  encashment); packages foot to ৳10,53,000 with ৳0 drift; structures correctly has no
+  `<tfoot>`. The variance modal is UNREACHABLE on this data — the books reconcile, so
+  the "why?" link is absent by design — so it was exercised by knocking one payslip's
+  `paid` down ৳5,000 **inside the disposable browser profile**, after which its foot
+  read ৳4,68,316, exactly the perturbed `sheetOwed`.
+- 🔎 **Not exercised, and honestly so:** the blocked-approval table only exists when a
+  month fails its arithmetic check, and no month in this data does. The foot is
+  written and follows the same pattern; it will show the first time a run is blocked.
 
 ### T-PAY-P7 — the Reports tab: seven foots and the two audit documents ✅ (2026-07-30)
 
