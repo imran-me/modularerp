@@ -46,7 +46,7 @@ Two separate treatments, and not every table earns both:
 | P1 ✅ | Overview · month drill | Monthly Register · Salary Register | done | `PR-MR` · `PR-SR` |
 | P2 ✅ | Salary Manage | Payroll History | done | reuses `PR-MR` (same `monthSeries()`) |
 | P3 ✅ | Salary Manage | **Salary sheet** | done (`sheetTotals`) | **`PR-DS` Salary Disbursement Sheet** — signature line per employee |
-| P4 | Staff | **Staff Accounts** | ⏭ | ⏭ staff payroll position statement |
+| P4 ✅ | Staff | **Staff Accounts** | done | **`PR-SP` Staff Position Statement** — as at, not per month |
 | P5 | Loans | staff-loans · loan-register · emi-history · loan payments (modal) · loan transactions | ⏭ ×5 | ⏭ **Loan Book** |
 | P6 | Advance | advance outstanding · advance requests · advance transactions | ⏭ ×3 | ⏭ **Advance Register** |
 | P7 | Reports | payroll-by-account (+ its drill) · encashment liability · loan outstanding · department cost · increment history · simpleTbl lists | ⏭ ×7 | ⏭ **Encashment liability schedule** + **Payroll ↔ ledger reconciliation** (the two an auditor asks for by name) |
@@ -56,6 +56,41 @@ The Payslip already has its own printed artifact (`EPAL.people.payslipPrint`), s
 needs footing only. Each phase is one commit, verified the same way: sweep both
 themes + a driver that checks the footed figure against an INDEPENDENT sum out of
 the store.
+
+### T-PAY-P4 — the Staff Position Statement ✅ (2026-07-30)
+The first document on the desk that is **not about a month**. Staff Accounts is a
+set of BALANCES, so `PR-SP` is dated *as at* — no month to tick, no run to approve,
+no signature to collect.
+
+- **Its own picker** (`staffPrintCentre`), not `printCentre`: scope + as-at, then
+  who — Everyone · Clear all · **Only with a balance** · **Only owed salary** ·
+  add by company / department, with the same live counter (`17 of 18 people ·
+  people carrying a balance only · net position ৳12,22,730 owed to staff`).
+  Same classes, same vocabulary, different questions.
+- **Columns:** `#` · Employee (ID) · Company · Designation (dept) · Monthly salary
+  · Salary due · Advance out · Loan out (EMI beneath) · Encashment accrued (days
+  beneath) · **Net position** (`we owe / (they owe)`) · Status.
+- **THE SIGN CONVENTION IS THE DOCUMENT:** the screen says owed/owes in green and
+  red, which a photocopier throws away, so here it is the bracket plus the words
+  under the figure, and the scope line states the rule before the first row.
+- **The trap this build hit, and the fix:** the table's Net position column is the
+  employee LEDGER balance (whole history, everything earned less everything handed
+  over) = ৳12,22,730, while netting today's balances gives ৳5,71,387. Two figures,
+  one name, one page — a control failure. So the KPI band now carries the LEDGER
+  balance (tying to the table's own foot), the panel is named *"What each side is
+  owed, today"* closing on *"Owed to staff, less recoverables"*, and a NOTE states
+  why the two differ before anybody calls one of them a bug.
+- **Foot:** money sums, plus the signed net printed as its net AND both gross
+  sides (`৳12,24,323 we owe · ৳1,593 they owe`) — a total that showed one
+  direction while hiding the other would be worse than none. Non-money columns
+  say what they count: *1 never paid · 18 active*.
+- **Exceptions it raises by itself:** a LEAVER still owing money (no pay left to
+  recover from), an advance bigger than a month's salary, **a loan with no EMI
+  set** (five people, caught on the first run), and anyone with no salary on record.
+- Verified: sweep 253/253 × both themes, 0 errors; the foot matches an independent
+  sum over `employees` (18 people · salary ৳10,53,000 · due ৳4,63,316 · loans
+  ৳3,59,505 · encashment ৳4,67,576 · ledger ৳12,22,730), *Only with a balance*
+  picks 17 of 18, and the printed pages were read at 1:1.
 
 ### T-PAY-P3 — the Salary Disbursement Sheet ✅ (2026-07-30)
 Owner: *"P3 Salary Manage · Salary sheet — the disbursement sheet, wants a

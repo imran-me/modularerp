@@ -490,6 +490,48 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · THE STAFF POSITION STATEMENT (P4)
+
+**The first payroll document that is not about a month.** Staff Accounts is a set
+of BALANCES, so `PR-SP` is dated *as at* — no month to tick, no run to approve, no
+signature to collect. It gets its own smaller picker (`staffPrintCentre`) rather
+than contorting the month-based `printCentre`: scope and as-at, then who —
+Everyone · Clear all · **Only with a balance** · **Only owed salary** · add by
+company or department — with the same live counter the payroll centre taught.
+
+Columns: `#` · Employee (ID beneath) · Company · Designation (department beneath) ·
+Monthly salary · Salary due · Advance out · Loan out (EMI beneath) · Encashment
+accrued (days beneath) · **Net position** · Status. The screen says owed/owes in
+green and red, which a photocopier throws away, so on paper the sign convention IS
+the document: a plain figure is owed by the group to the employee, a bracketed one
+by the employee, the words sit under every figure, and the scope line states the
+rule before the first row.
+
+**THE TRAP THIS BUILD HIT.** The table's Net position column is the employee LEDGER
+balance — the whole history, everything earned and accrued less everything handed
+over — which footed to ৳12,22,730, while my panel netted TODAY's balances and got
+৳5,71,387. Two different figures under one name on one page is a control failure,
+not a rounding difference. So the KPI band now carries the LEDGER balance (tying to
+the table's own foot), the panel is named *"What each side is owed, today"* and
+closes on *"Owed to staff, less recoverables"*, and a NOTE states why the two
+differ — before anybody decides one of them is a bug.
+
+The foot prints the signed net AND both gross sides (`৳12,24,323 we owe · ৳1,593
+they owe`): a total that showed one direction while hiding the other would be worse
+than no total. Non-money columns say what they count — *1 never paid · 18 active*.
+
+It also raises exceptions nothing else on the desk was raising: a LEAVER still
+owing money (after the last payslip there is no pay to recover from), an advance
+bigger than a month's salary, **a loan with no EMI set** — five people, caught on
+the first run — and anyone with no salary on record.
+
+Verified: sweep 253/253 × both themes, 0 errors; the foot matches an independent
+sum over `employees` (18 people · salary ৳10,53,000 · due ৳4,63,316 · loans
+৳3,59,505 · encashment ৳4,67,576 · ledger ৳12,22,730), *Only with a balance* picks
+17 of 18, and the printed pages were read at 1:1.
+
+---
+
 ## 🆕 SESSION — 2026-07-30 · THE SALARY DISBURSEMENT SHEET (P3)
 
 **A third document, not a variant.** `PR-DS-<YYYY>-<MM>` is the only artifact on

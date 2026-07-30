@@ -2013,6 +2013,38 @@ function staffView(page) {
     rows: rows, searchKeys: ['name', 'id', 'dept', 'designation'], quickFilter: 'status', filterPanel: true,
     filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }].concat(coFilter()),
     pageSize: 15, exportName: 'staff-accounts.csv', pdfTitle: scopeFull() + ' — Staff Payroll Accounts',
+    /* PRINT — the STAFF POSITION STATEMENT, as at today. Not a month's document:
+     * this table is a set of BALANCES, so its report is dated "as at" and has no
+     * month to choose. Beside Export and PDF, where this table's outputs live. */
+    toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+      title: 'Print the staff position statement — everyone, or just those carrying a balance',
+      onclick: function () { staffPrintCentre(rows); } }),
+    /* THE FOOT. Money columns sum. The two that cannot:
+     *  · NET POSITION is SIGNED — positive is owed to the employee, negative is
+     *    owed by them — so the column's net is the answer, and the gross of each
+     *    side is printed under it. A total that said "৳2.1L" while hiding
+     *    ৳40,000 owed the other way would be worse than no total at all.
+     *  · LAST PAID and STATUS are not money; they say what they count. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      function S(f) { return sum(rs, f); }
+      var net = S(function (r) { return r.netDue; });
+      var weOwe = S(function (r) { return Math.max(0, r.netDue); });
+      var theyOwe = S(function (r) { return Math.max(0, -r.netDue); });
+      return { label: rs.length + (rs.length === 1 ? ' person' : ' people'), values: {
+        salary: ui.money(S(function (r) { return r.salary; })),
+        netDue: '<span class="num">' + ui.money(Math.abs(net)) + ' <span class="xs text-mute">' +
+          (net >= 0 ? 'we owe' : 'they owe') + '</span></span>' +
+          '<div class="xs text-mute nowrap">' + ui.money(weOwe) + ' we owe · ' + ui.money(theyOwe) + ' they owe</div>',
+        salaryDue: ui.money(S(function (r) { return r.salaryDue; })),
+        advance: ui.money(S(function (r) { return r.advance; })),
+        loan: ui.money(S(function (r) { return r.loan; })),
+        encash: ui.money(S(function (r) { return r.encash; })),
+        movements: String(S(function (r) { return r.movements; })),
+        lastPaid: '<span class="xs text-mute">' + rs.filter(function (r) { return !r.lastPaid; }).length + ' never paid</span>',
+        status: '<span class="xs text-mute">' + rs.filter(function (r) { return r.status === 'active'; }).length + ' active</span>'
+      } };
+    },
     // the row and the name both open the file UNDER the table, not a modal
     onRow: function (r) { openFile(r.id, true); },
     actions: (canCreate() ? [
@@ -5098,6 +5130,287 @@ function payDetailNotes(ym, slips, partial, allInMonth, pickLabel) {
     'charged to expense and credited to Leave Encashment Payable, and settles once in December. It is not ' +
     'part of Net Payable and is not disbursed with this month\'s salary.' });
   return out.slice(0, 8);
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 4 — the STAFF POSITION STATEMENT  (owner 2026-07-30, P4)
+ * ---------------------------------------------------------------------------
+ * The first document on the desk that is NOT about a month. Staff Accounts is a
+ * set of BALANCES — what each person is owed, what they owe back, what has
+ * accrued for them — so its report is dated "as at" and has no month to choose,
+ * no run to approve and no signature to collect.
+ *
+ * THE SIGN CONVENTION IS THE WHOLE DOCUMENT: a positive net position is owed BY
+ * the group TO the employee; a bracketed one is owed BY the employee. The screen
+ * says that in green and red, which a photocopier throws away, so here it is the
+ * bracket plus the words under the figure — and the scope line states the rule in
+ * one sentence before the reader reaches the first row.
+ * ------------------------------------------------------------------------- */
+function payStaffReport(rows, allRows, pickLabel) {
+  var co = isAll(), asAt = today();
+  var T = { salary: 0, salaryDue: 0, advance: 0, loan: 0, emi: 0, encash: 0, net: 0, weOwe: 0, theyOwe: 0 };
+  rows.forEach(function (r) {
+    T.salary += r.salary; T.salaryDue += r.salaryDue; T.advance += r.advance; T.loan += r.loan;
+    T.emi += r.emi; T.encash += r.encash; T.net += r.netDue;
+    T.weOwe += Math.max(0, r.netDue); T.theyOwe += Math.max(0, -r.netDue);
+  });
+  var partial = rows.length !== allRows.length;
+  var id = payReportId('SP', asAt.slice(0, 7)), rev = payRev(id);
+  var owedTo = T.salaryDue + T.encash, owedBy = T.advance + T.loan;
+
+  var w = payWidths(co ? [3, 14, 7, 11, 8, 8, 8, 8.5, 8.5, 9.5, 6] : [3, 15.5, 12, 8.5, 8.5, 8.5, 9, 9, 10.5, 6]);
+  var head = [{ label: '#', width: w[0] }, { label: 'Employee', sub: 'ID', width: w[1] }]
+    .concat(co ? [{ label: 'Company', width: w[2] }] : [])
+    .concat([{ label: 'Designation', sub: 'department' }, { label: 'Monthly salary', num: true },
+      { label: 'Salary due', num: true }, { label: 'Advance out', num: true },
+      { label: 'Loan out', sub: 'EMI a month', num: true }, { label: 'Encashment', sub: 'accrued', num: true },
+      { label: 'Net position', sub: 'we owe / (they owe)', num: true }, { label: 'Status' }]
+      .map(function (h, i) { h.width = w[i + (co ? 3 : 2)]; return h; }));
+
+  var rowCells = rows.map(function (r, i) {
+    return [{ v: String(i + 1), num: true }, { v: esc(r.name), strong: true, sub: esc(r.id) }]
+      .concat(co ? [{ v: esc(coShort(r.companyId)) }] : [])
+      .concat([
+        { v: esc(r.designation), sub: esc(r.dept) },
+        { v: payMoney(r.salary), num: true },
+        { v: payMoney(r.salaryDue), num: true },
+        { v: payMoney(r.advance), num: true },
+        { v: payMoney(r.loan), num: true, sub: r.emi ? payMoney(r.emi) : '' },
+        { v: payMoney(r.encash), num: true, sub: r.encash ? r.encashDays.toFixed(1) + 'd' : '' },
+        // signed, and the words carry what the screen says in colour
+        { v: payMoney(r.netDue), num: true, strong: true, sub: r.netDue ? (r.netDue > 0 ? 'we owe' : 'they owe') : '' },
+        { v: esc(cap(r.status)) }
+      ]);
+  });
+  var totals = [{ v: '' }, { v: 'Total — ' + rows.length + (rows.length === 1 ? ' person' : ' people') }]
+    .concat(co ? [{ v: '' }] : [])
+    .concat([{ v: '' }, { v: payMoney(T.salary), num: true }, { v: payMoney(T.salaryDue), num: true },
+      { v: payMoney(T.advance), num: true }, { v: payMoney(T.loan), num: true, sub: payMoney(T.emi) },
+      { v: payMoney(T.encash), num: true },
+      { v: payMoney(T.net), num: true, sub: payMoney(T.weOwe) + ' / (' + payMoney(T.theyOwe) + ')' },
+      { v: rows.filter(function (r) { return r.status === 'active'; }).length + ' active' }]);
+
+  /* A CUT THAT MEANS SOMETHING: on All Companies the reader wants the position by
+   * CONCERN (each one carries its own liability); inside one company they want it
+   * by DEPARTMENT. Same five figures either way, footed to the table above. */
+  var cutKey = co ? function (r) { return coShort(r.companyId); } : function (r) { return r.dept || '—'; };
+  var cuts = {};
+  rows.forEach(function (r) {
+    var k = cutKey(r), c = cuts[k] || (cuts[k] = { n: 0, salary: 0, to: 0, by: 0 });
+    c.n++; c.salary += r.salary; c.to += r.salaryDue + r.encash; c.by += r.advance + r.loan;
+  });
+  var cutKeys = Object.keys(cuts).sort(function (a, b) { return (cuts[b].to - cuts[b].by) - (cuts[a].to - cuts[a].by); });
+  var cw = payWidths([30, 10, 20, 20, 20]);
+
+  return {
+    docTitle: payFileName('StaffPosition', asAt.slice(0, 7), asAt.slice(0, 7)),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Staff Position Statement' + (isAll() ? '' : ' — ' + coFull(CID)),
+    scope: [
+      'As at ' + ui.date(asAt, 'long') + ' · ' + rows.length + (rows.length === 1 ? ' person' : ' people') + ' · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)),
+      'Net position is signed: a plain figure is owed BY the group TO the employee, a bracketed one is owed by the ' +
+        'employee. Leave encashment is an accrued liability that settles in December and is not payable on demand; ' +
+        'advances and loans are recovered from future pay, not billed.'
+    ],
+    notice: partial ? 'Partial selection — ' + rows.length + ' of ' + allRows.length +
+      ' people' + (pickLabel ? ', ' + pickLabel : '') + '. Totals below reflect the selected rows only.' : null,
+    kpis: [
+      { label: 'People on this statement', value: String(rows.length), sub: partial ? 'of ' + allRows.length + ' on the payroll' : 'the whole payroll' },
+      { label: 'Monthly payroll', value: payMoney(T.salary), sub: 'contract salary, before movement' },
+      { label: 'Owed to staff', value: payMoney(owedTo), sub: 'unpaid salary + encashment accrued' },
+      { label: 'Owed by staff', value: payMoney(owedBy), sub: 'advances + loans outstanding' },
+      /* THE FIFTH KPI IS THE TABLE'S OWN FOOT, not my arithmetic. The Net position
+       * column is the employee LEDGER balance — everything earned and accrued over
+       * the whole history, less everything handed over — which is a different
+       * question from "current balances, netted", and the two need not agree. A
+       * document that printed both under one name would be worse than useless, so
+       * the band carries the ledger figure, the panel carries the netting, they are
+       * named apart, and a NOTE says why. */
+      { label: 'Ledger balance', value: payMoney(T.net),
+        sub: payMoney(T.weOwe) + ' we owe · ' + payMoney(T.theyOwe) + ' they owe' }
+    ],
+    table: { wide: true,
+      groups: [{ span: co ? 4 : 3 }, { label: 'Pay', span: 2 },
+        { label: 'Recoverable from the employee', span: 2 }, { label: 'Accrued for the employee', span: 1 },
+        { label: 'Position', span: 2 }],
+      head: head, rows: rowCells, totals: totals },
+    panelPairs: [[
+      { title: 'What each side is owed, today', lines: [
+        { k: 'Unpaid salary', v: payMoney(T.salaryDue) },
+        { k: 'Leave encashment accrued', v: payMoney(T.encash) },
+        { k: 'Owed to staff', v: payMoney(owedTo), rule: true },
+        { k: 'Advances outstanding', v: payBrk(T.advance) },
+        { k: 'Loans outstanding', v: payBrk(T.loan) },
+        { k: 'Owed by staff', v: payBrk(owedBy), rule: true },
+        { k: 'Owed to staff, less recoverables', v: payMoney(owedTo - owedBy), close: true },
+        { k: 'Recoverable next month at current EMI', v: payMoney(T.emi) }
+      ] },
+      { title: co ? 'By concern' : 'By department', table: {
+        head: [{ label: co ? 'Concern' : 'Department', width: cw[0] }, { label: 'Staff', num: true, width: cw[1] },
+          { label: 'Monthly salary', num: true, width: cw[2] }, { label: 'Owed to', num: true, width: cw[3] },
+          { label: 'Owed by', num: true, width: cw[4] }],
+        rows: cutKeys.map(function (k) {
+          return [{ v: esc(k) }, { v: String(cuts[k].n), num: true }, { v: payMoney(cuts[k].salary), num: true },
+            { v: payMoney(cuts[k].to), num: true }, { v: payBrk(cuts[k].by), num: true }];
+        }),
+        totals: [{ v: 'Total' }, { v: String(rows.length), num: true }, { v: payMoney(T.salary), num: true },
+          { v: payMoney(owedTo), num: true }, { v: payBrk(owedBy), num: true }] } }
+    ]],
+    notesTitle: 'Exceptions requiring attention',
+    notes: payStaffNotes(rows, partial, allRows, pickLabel),
+    signoff: [{ role: 'Prepared by', name: payUser() }, { role: 'Checked by', name: 'Accounts' },
+      { role: 'Verified by', name: 'Head of HR & Admin' }, { role: 'Approved by', name: 'Managing Director' }],
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · balances as at ' + ui.date(asAt),
+    previewTitle: 'Staff Position Statement — print preview'
+  };
+}
+
+function payStaffNotes(rows, partial, allRows, pickLabel) {
+  var out = [];
+  /* A LEAVER STILL CARRYING A BALANCE is the one exception on this statement that
+   * cannot wait: after the last payslip there is no pay left to recover from. */
+  rows.forEach(function (r) {
+    if (r.status !== 'active' && (r.advance > 0 || r.loan > 0)) out.push({ tag: 'HIGH', text: r.name +
+      ' is ' + r.status + ' and still owes ' + payMoney(r.advance + r.loan) + ' (advance ' + payMoney(r.advance) +
+      ' · loan ' + payMoney(r.loan) + '). There is no further pay to recover it from.' });
+  });
+  rows.forEach(function (r) {
+    if (r.status !== 'active' && r.netDue > 0) out.push({ tag: 'HIGH', text: r.name + ' is ' + r.status +
+      ' and is still owed ' + payMoney(r.netDue) + ' — a final settlement closes it.' });
+  });
+  rows.forEach(function (r) {
+    if (r.advance > 0 && r.salary > 0 && r.advance > r.salary) out.push({ tag: 'WATCH', text: r.name +
+      ' holds an advance of ' + payMoney(r.advance) + ' against a ' + payMoney(r.salary) +
+      ' salary — it cannot clear in one payslip.' });
+  });
+  rows.forEach(function (r) {
+    if (r.loan > 0 && !r.emi) out.push({ tag: 'WATCH', text: r.name + ' owes ' + payMoney(r.loan) +
+      ' with no EMI set, so nothing is being recovered each month.' });
+  });
+  rows.forEach(function (r) { if (!r.salary) out.push({ tag: 'WATCH', text: r.name +
+    ' has no salary on record, so no payslip can be generated for them.' }); });
+  if (partial) out.push({ tag: 'NOTE', text: 'Partial selection: ' + rows.length + ' of ' + allRows.length +
+    ' people on the payroll' + (pickLabel ? ' (' + pickLabel + ')' : '') + '. The totals row covers the printed rows only.' });
+  /* THE TWO FIGURES A READER WILL COMPARE. Print the reason they differ before
+   * somebody decides one of them is a bug. */
+  out.push({ tag: 'NOTE', text: 'The Net position column is the employee\'s LEDGER balance — everything earned and ' +
+    'accrued over their whole history, less everything handed over. The panel beside it nets only TODAY\'S balances: ' +
+    'unpaid salary and encashment accrued against advances and loans outstanding. The two answer different questions ' +
+    'and are not expected to agree.' });
+  out.push({ tag: 'NOTE', text: 'Advances and loans are recovered from future pay, capped at what each month can ' +
+    'bear; leave encashment accrues monthly against a 12-month service condition and settles in December.' });
+  return out.slice(0, 9);
+}
+
+/* ---------------------------------------------------------------------------
+ * THE STAFF PRINT PICKER — who is on the statement, and nothing else
+ * ---------------------------------------------------------------------------
+ * A separate, smaller centre than printCentre() on purpose: there is no month to
+ * tick, no run to approve and no detail level to choose. What a reader DOES want
+ * is the same set-picking vocabulary they learned on the payroll centre — all,
+ * none, only the people carrying something — so the steps, the classes and the
+ * live counter are the same, and only the questions differ.
+ * ------------------------------------------------------------------------- */
+function staffPrintCentre(rows) {
+  if (!rows || !rows.length) { ui.toast('No staff on this payroll to print', 'warn'); return; }
+  var sorted = rows.slice().sort(function (a, b) { return (a.name || '') < (b.name || '') ? -1 : 1; });
+  var pick = {}, q = '', pickWas = null;
+  sorted.forEach(function (r) { pick[r.id] = true; });
+  function carries(r) { return r.salaryDue > 0 || r.advance > 0 || r.loan > 0 || r.encash > 0 || r.netDue !== 0; }
+  function chosen() { return sorted.filter(function (r) { return pick[r.id]; }); }
+
+  var body = el('div.pay-print'), rowHost = el('div.pay-print-rows'), rCount = el('div.pay-print-count');
+  var searchIn = el('input.input', { placeholder: 'Search name, ID, designation or department…',
+    oninput: ui.debounce(function () { q = searchIn.value.toLowerCase(); drawRows(); }, 120) });
+  var goBtn = null;
+
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '1 · Scope and date' }),
+    el('div.pay-print-scope', null, [
+      el('div', null, [ el('strong', { text: scopeFull() }),
+        el('div.text-mute.sm', { text: 'balances as at ' + ui.date(today(), 'long') +
+          ' · report id ' + payReportId('SP', today().slice(0, 7)) }) ]),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-left-right') + ' Change company',
+        onclick: function () { m.close(); ui.toast('Pick the company from the switcher above, then print again', 'info'); } })
+    ])
+  ]));
+
+  function drawRows() {
+    rowHost.innerHTML = '';
+    var shown = sorted.filter(function (r) {
+      if (!q) return true;
+      return (r.name + ' ' + r.id + ' ' + r.designation + ' ' + r.dept).toLowerCase().indexOf(q) >= 0;
+    });
+    shown.forEach(function (r) {
+      var cb = el('input', { type: 'checkbox', checked: pick[r.id] ? 'checked' : null,
+        onchange: function () { pick[r.id] = cb.checked; pickWas = null; syncCounts(); } });
+      rowHost.appendChild(el('label.pay-print-row', null, [ cb,
+        el('span.pay-print-row-n', { text: r.name }),
+        isAll() ? el('span.badge', { text: coShort(r.companyId) }) : null,
+        el('span.text-mute.xs', { text: r.dept }),
+        r.status !== 'active' ? el('span.badge.badge-bad', { text: cap(r.status) }) : null,
+        el('span.pay-print-row-v', { text: r.netDue ? ui.money(Math.abs(r.netDue)) + (r.netDue > 0 ? ' owed' : ' owes') : '—' })
+      ].filter(Boolean)));
+    });
+    if (!shown.length) rowHost.appendChild(el('div.text-mute.sm', { text: 'Nobody matches “' + q + '”.' }));
+  }
+  function only(fn, label) { sorted.forEach(function (r) { pick[r.id] = !!fn(r); }); pickWas = label || null; drawRows(); syncCounts(); }
+  function add(fn) { sorted.forEach(function (r) { if (fn(r)) pick[r.id] = true; }); pickWas = null; drawRows(); syncCounts(); }
+  var byCoSel = el('select.select', { onchange: function () {
+    var v = byCoSel.value; if (v !== '__') add(function (r) { return r.companyId === v; }); byCoSel.value = '__'; } });
+  var byDeptSel = el('select.select', { onchange: function () {
+    var v = byDeptSel.value; if (v !== '__') add(function (r) { return (r.dept || '—') === v; }); byDeptSel.value = '__'; } });
+  (function fillSelects() {
+    var cos = {}, depts = {};
+    sorted.forEach(function (r) { cos[r.companyId] = 1; depts[r.dept || '—'] = 1; });
+    byCoSel.appendChild(el('option', { value: '__', text: 'Add by company…' }));
+    Object.keys(cos).sort().forEach(function (c) { byCoSel.appendChild(el('option', { value: c, text: coShort(c) })); });
+    byDeptSel.appendChild(el('option', { value: '__', text: 'Add by department…' }));
+    Object.keys(depts).sort().forEach(function (d) { byDeptSel.appendChild(el('option', { value: d, text: d })); });
+    byCoSel.style.display = isAll() ? '' : 'none';
+  })();
+
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '2 · Who is on the statement' }),
+    el('div.pay-print-bulk', null, [ searchIn,
+      el('button.btn.btn-sm.btn-ghost', { text: 'Everyone', onclick: function () { only(function () { return true; }, null); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () { only(function () { return false; }, null); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('wallet2') + ' Only with a balance',
+        title: 'Anyone owed salary, holding an advance or a loan, or carrying an encashment accrual',
+        onclick: function () { only(carries, 'people carrying a balance only'); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('exclamation-circle') + ' Only owed salary',
+        onclick: function () { only(function (r) { return r.salaryDue > 0; }, 'people owed salary only'); } }),
+      byCoSel, byDeptSel ]),
+    rowHost, rCount
+  ]));
+
+  function syncCounts() {
+    var sel = chosen();
+    var net = sum(sel, function (r) { return r.netDue; });
+    rCount.textContent = sel.length + ' of ' + sorted.length + (sorted.length === 1 ? ' person' : ' people') +
+      ' selected' + (pickWas ? ' · ' + pickWas : '') + ' · net position ' + ui.money(Math.abs(net)) +
+      (net >= 0 ? ' owed to staff' : ' owed by staff');
+    if (goBtn) { goBtn.disabled = !sel.length; goBtn.style.opacity = sel.length ? 1 : .5; }
+  }
+
+  var m = ui.modal({
+    title: 'Print staff position — ' + scopeShort(), icon: 'printer', size: 'lg', body: body,
+    actions: [
+      { label: 'Cancel', onClick: function () {} },
+      { label: 'Preview', icon: 'eye', variant: 'primary', onClick: function () {
+          var sel = chosen();
+          if (!sel.length) { ui.toast('Tick at least one person', 'error'); return false; }
+          EPAL.report.open(payStaffReport(sel, sorted, pickWas));
+        } }
+    ]
+  });
+  goBtn = m.box.querySelector('.modal-foot .btn-primary');
+  drawRows(); syncCounts();
+  return m;
 }
 
 /* ---------------------------------------------------------------------------
