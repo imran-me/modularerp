@@ -49,13 +49,65 @@ Two separate treatments, and not every table earns both:
 | P4 ✅ | Staff | **Staff Accounts** | done | **`PR-SP` Staff Position Statement** — as at, not per month |
 | P5 ✅ | Loans | staff-loans · loan-register · emi-history · loan payments (modal) · loan transactions | done ×5 | **`PR-LB` Staff Loan Book** |
 | P6 ✅ | Advance | advance outstanding · advance requests · advance transactions | done ×3 | **`PR-AR` Advance Salary Register** |
-| P7 | Reports | payroll-by-account (+ its drill) · encashment liability · loan outstanding · department cost · increment history · simpleTbl lists | ⏭ ×7 | ⏭ **Encashment liability schedule** + **Payroll ↔ ledger reconciliation** (the two an auditor asks for by name) |
+| P7 ✅ | Reports | payroll-by-account (+ its drill) · encashment liability · loan outstanding · department cost · increment history · simpleTbl lists | done ×7 | **`PR-EL` Encashment Liability Schedule** + **`PR-PA` Payroll Cash & Ledger Reconciliation** |
 | P8 | drills & modals | month transactions · money movements · ledger postings · variance explainer · payslip list · template list · structure compare · blocked-approval check | ⏭ ×8 | none — a drill is not a document |
 
 The Payslip already has its own printed artifact (`EPAL.people.payslipPrint`), so it
 needs footing only. Each phase is one commit, verified the same way: sweep both
 themes + a driver that checks the footed figure against an INDEPENDENT sum out of
 the store.
+
+### T-PAY-P7 — the Reports tab: seven foots and the two audit documents ✅ (2026-07-30)
+
+**Seven tables footed, and three of them refuse to sum a column** — which is the
+point of doing this by hand rather than with a blanket `SUM()`:
+- *Where the money went* — every account column sums (each is cash that really left
+  or came back), and "came back in" stays its own column rather than a negative so
+  the two never net by accident.
+- *One account's transactions* (the drill) — the rows run BOTH ways through the
+  account, so it foots **net with each direction beneath**.
+- *Leave encashment liability* — days and value sum; **Eligibility counts**
+  (`17 eligible · 0 accruing`), which is the whole point of that column.
+- *Loan outstanding* — money sums; EMI sums only where a plan exists.
+- *Department cost* — headcount really does sum here (departments are disjoint,
+  unlike months, where the same person recurs).
+- *Increment history* — **"From" and "To" REFUSE to sum**: they are salary LEVELS at
+  two moments, and adding fifteen of them describes nobody. Only the change sums,
+  and the foot says which way the revisions went (`N up · M down`).
+- *Salary due / Advance held* lists — one money column, one sum, people counted.
+
+**`PR-EL` Leave Encashment Liability Schedule** — the schedule an auditor asks for
+by name: accrued days, **day rate at today's salary**, accrued value and the
+12-month condition, per person. Its totals row prints `–` for the day rate, because
+averaging a per-person rate describes nobody.
+⚠ **It prints its own control.** The engine has two roads to this number — this
+schedule (leaveState per employee, days × today's rate) and
+`encashmentLiability(company)`, the provision the books carry. The panel prints
+BOTH and the difference, and a HIGH note explains why they can drift (the schedule
+revalues at today's salary; the provision was charged at each month's salary, so an
+increment moves one and not the other). On this data they agree exactly —
+৳4,67,576 — so the note stays quiet.
+Picker: Everyone · Clear all · **Only encashable now** · **Only still accruing**.
+
+**`PR-PA` Payroll Cash & Ledger Reconciliation** — "where the money went", printed,
+with the sheet-to-ledger control beside it. Table: one row per ACCOUNT (movement
+count beneath the name) × salary · advance · staff loan · bonus · other · total out
+· came back in. Panels: *Sheet against the ledger* (sheet says owed vs Salary
+Payable 2100, the variance printed **whether or not it is zero** — a control that
+only appears when it fails is not a control — plus statutory withheld and
+advances/loans both ways) and *Cash out, by what it was for*.
+**No picker, deliberately:** its only two variables, the company and the period, are
+already chosen on the screen it prints from (the switcher and the period select in
+that table's own toolbar), so a modal would be a step that changes nothing.
+- Verified: sweep 253/253 × both themes, 0 errors. Encashment foots match an
+  independent walk of `leaveState()` (17 people · 225.14 days · ৳4,67,576 ·
+  17 eligible · provision ৳4,67,576 · gap ৳0); the reconciliation's control lands on
+  **sheet ৳4,63,316 = ledger 2100 ৳4,63,316 → "They agree"**; account columns add
+  across to the ৳65,78,809 total out. Both documents read at 1:1.
+- Fixed in its own output: the scope sentence read *"– was recovered INSIDE a salary
+  payment"* when nothing had been — a dash mid-prose reads as a missing figure,
+  which is the opposite of what the dash convention means. The clause now only
+  appears when there is a recovery to describe.
 
 ### T-PAY-P6 — the Advance Salary Register ✅ (2026-07-30)
 **Per PERSON, not per transaction — and that is the difference from the loan book.**

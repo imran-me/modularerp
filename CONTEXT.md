@@ -490,6 +490,51 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · THE REPORTS TAB (P7) — SEVEN FOOTS, TWO AUDIT DOCUMENTS
+
+**Seven tables footed, and three of them REFUSE to sum a column** — which is the
+argument for doing this by hand rather than with a blanket `SUM()`. The account
+drill foots NET with both directions beneath (its rows run both ways through the
+account). *Eligibility* counts rather than totals (`17 eligible · 0 accruing`).
+And on *Increment history*, **"From" and "To" refuse to sum at all** — they are
+salary LEVELS at two moments, and adding fifteen of them describes nobody; only the
+change sums, and the foot says which way the revisions went. Department cost is the
+opposite case, and worth noting: headcount really does sum there, because
+departments are disjoint, unlike months, where the same person recurs.
+
+**`PR-EL` Leave Encashment Liability Schedule** — accrued days, **day rate at
+today's salary**, accrued value, and the 12-month condition, per person. The totals
+row prints `–` for the day rate: averaging a per-person rate describes nobody.
+⚠ **It prints its own control.** The engine has two roads to this number — this
+schedule (leaveState per employee, days × today's rate) and
+`encashmentLiability(company)`, the provision the books carry. The panel prints BOTH
+and the difference, and a HIGH note explains the drift when it exists (the schedule
+revalues at today's salary; the provision was charged at each month's salary, so an
+increment moves one and not the other). On this data they agree to the taka —
+৳4,67,576 — so the note stays quiet. Picker: Everyone · **Only encashable now** ·
+**Only still accruing**.
+
+**`PR-PA` Payroll Cash & Ledger Reconciliation** — "where the money went", printed,
+with the sheet-to-ledger control beside it. One row per ACCOUNT (movement count
+under the name) × salary · advance · staff loan · bonus · other · total out · came
+back in. The control panel prints the variance **whether or not it is zero**,
+because a control that only appears when it fails is not a control; here it lands on
+sheet ৳4,63,316 = ledger 2100 ৳4,63,316, *"They agree"*. **No picker, deliberately:**
+its only two variables — company and period — are already chosen on the screen it
+prints from, so a modal would be a step that changes nothing.
+
+Fixed in its own output: the scope sentence read *"– was recovered INSIDE a salary
+payment"* when nothing had been. A dash mid-prose reads as a missing figure, which is
+the opposite of what the dash convention means, so the clause now only appears when
+there is a recovery to describe.
+
+Verified: sweep 253/253 × both themes, 0 errors; encashment foots match an
+independent walk of `leaveState()` (17 people · 225.14 days · ৳4,67,576 · 17 eligible
+· provision ৳4,67,576 · gap ৳0); account columns add across to ৳65,78,809 out; both
+documents read at 1:1.
+
+---
+
 ## 🆕 SESSION — 2026-07-30 · THE ADVANCE SALARY REGISTER (P6)
 
 **Per PERSON, not per transaction — and that is the difference from the loan book.**

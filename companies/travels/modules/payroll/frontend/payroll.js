@@ -4418,8 +4418,16 @@ function sourceCard() {
   slot(c, 'sub').textContent = 'every payroll taka by the account it left, on the day it moved — click an account for its transactions';
   // the period rides IN the table's own toolbar, beside Search (owner 2026-07-29:
   // "all in one row") — on its own line above it cost a whole row to one control
+  /* PRINT rides IN the toolbar beside the period select — the table takes one
+   * toolbarEl, so the two controls travel as one node. Straight to the preview,
+   * with no picker: this report's only two variables are the company and the
+   * period, and both are already chosen — the switcher above and this very select.
+   * A modal asking again would be a step that changes nothing. */
+  var srcPrint = el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+    title: 'Print the payroll cash and ledger reconciliation for this period',
+    onclick: function () { EPAL.report.open(payAccountReport(sourceRollup(srcMonths), srcMonths)); } });
   slot(c, 'body').appendChild(EPAL.table({
-    toolbarEl: sel,
+    toolbarEl: el('div.flex.gap-1.items-center', null, [sel, srcPrint]),
     columns: [
       { key: 'from', label: 'Paid from', render: function (r) { return '<span class="strong">' + esc(r.from) + '</span>'; } },
       moneyCol('salary', 'Salary'), moneyCol('advance', 'Advance'), moneyCol('loan', 'Staff loan'),
@@ -4429,6 +4437,17 @@ function sourceCard() {
       { key: 'back', label: 'Came back in', num: true, sortVal: function (r) { return r.back; },
         render: function (r) { return r.back ? '<span class="text-good">' + ui.money(r.back) + '</span>' : '—'; } }
     ],
+    /* THE FOOT — every account column sums, because each is cash that really left
+     * (or came back into) that account in the period. "Came back in" is a separate
+     * column rather than a negative, so the two never net each other by accident. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      function S(k) { return ui.money(sum(rs, function (r) { return r[k] || 0; })); }
+      return { label: rs.length + (rs.length === 1 ? ' account' : ' accounts'), values: {
+        salary: S('salary'), advance: S('advance'), loan: S('loan'), bonus: S('bonus'),
+        other: S('other'), out: S('out'), back: S('back')
+      } };
+    },
     rows: res.rows, pageSize: 10, totalKey: 'out', searchKeys: ['from'],
     exportName: 'payroll-by-account.csv', pdfTitle: scopeFull() + ' — Payroll by account',
     onRow: function (r) { sourceDrill(r); },
@@ -4458,6 +4477,18 @@ function sourceDrill(row) {
       { key: 'cash', label: 'Amount', num: true, sortVal: function (r) { return r.cash; },
         render: function (r) { return '<span class="num strong ' + (r.dir === 'in' ? 'text-good' : '') + '">' + ui.money(r.cash) + '</span>'; } }
     ],
+    /* THE FOOT — the rows run BOTH WAYS through this account (a loan repayment
+     * comes back in), so the total is the NET with each direction printed under it,
+     * the same rule as the loan transactions table. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      var out = sum(rs.filter(function (r) { return r.dir !== 'in'; }), function (r) { return r.cash || 0; });
+      var back = sum(rs.filter(function (r) { return r.dir === 'in'; }), function (r) { return r.cash || 0; });
+      return { label: rs.length + (rs.length === 1 ? ' transaction' : ' transactions'), values: {
+        cash: '<span class="num">' + ui.money(out - back) + ' <span class="xs text-mute">net</span></span>' +
+          (back ? '<div class="xs text-mute nowrap">' + ui.money(out) + ' out · ' + ui.money(back) + ' in</div>' : '')
+      } };
+    },
     rows: row.txns.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; }),
     searchKeys: ['empName', 'purpose', 'memo'], pageSize: 12, totalKey: 'cash',
     exportName: 'payroll-account.csv',
@@ -4521,6 +4552,21 @@ function reportsView(page) {
       { key: 'value', label: 'Value', num: true, money: true },
       { key: 'eligible', label: 'Eligibility', render: function (r) { return r.eligible ? '<span class="badge badge-good">Eligible</span>' : '<span class="badge badge-warn">Accruing</span>'; } }
     ]),
+    /* THE FOOT — days and value both sum (they are quantities, not balances), and
+     * ELIGIBILITY counts: the split between who could be paid out today and who is
+     * still inside the 12-month service condition is the whole point of the column. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      var elig = rs.filter(function (r) { return r.eligible; }).length;
+      return { label: rs.length + (rs.length === 1 ? ' employee' : ' employees'), values: {
+        days: sum(rs, function (r) { return r.days; }).toFixed(2),
+        value: ui.money(sum(rs, function (r) { return r.value; })),
+        eligible: '<span class="xs text-mute">' + elig + ' eligible · ' + (rs.length - elig) + ' accruing</span>'
+      } };
+    },
+    toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+      title: 'Print the leave encashment liability schedule',
+      onclick: function () { encashPrintCentre(encRows, liability); } }),
     rows: encRows, pageSize: 10, exportName: 'leave-encashment-liability.csv',
     filters: coFilter(), filterPanel: isAll(), pdfTitle: 'Leave Encashment Liability' + (isAll() ? ' — ' + scopeFull() : ''),
     actions: ui.actions({ edit: canCreate() ? function (r) { payEncashFlow(r.e); } : null }),
@@ -4553,6 +4599,19 @@ function reportsView(page) {
         { key: 'emi', label: 'EMI', num: true, sortVal: function (L) { return L.emi; },
           render: function (L) { return L.emi ? '<span class="num">' + ui.money(L.emi) + '/mo</span>' : '<span class="text-mute">no plan</span>'; } }
       ]),
+      /* Same rules as the Loans tab's register — the money columns sum, and the EMI
+       * column sums only where a plan exists (a loan with no plan contributes
+       * nothing, which is exactly what "no plan" means). */
+      totals: function (ls) {
+        if (!ls.length) return null;
+        function S(f) { return ui.money(sum(ls, f)); }
+        return { label: ls.length + (ls.length === 1 ? ' loan' : ' loans'), values: {
+          principal: S(function (L) { return L.principal; }),
+          paid: S(function (L) { return L.paid; }),
+          due: S(function (L) { return L.due; }),
+          emi: S(function (L) { return +L.emi || 0; })
+        } };
+      },
       rows: openLoans, pageSize: 8, exportName: 'loan-outstanding.csv', pdfTitle: 'Loan Outstanding — ' + scopeFull(),
       filters: coFilter(), filterPanel: isAll(),
       onRow: function (L) { loanDetailModal(L); },
@@ -4566,6 +4625,15 @@ function reportsView(page) {
     columns: [ { key: 'dept', label: 'Department', render: function (r) { return '<span class="strong">' + esc(r.dept) + '</span>'; } },
       { key: 'heads', label: 'Headcount', num: true, render: function (r) { return String(t.filter(function (e) { return (e.dept || '—') === r.dept; }).length); } },
       { key: 'cost', label: 'Monthly Cost', num: true, money: true } ],
+    /* Departments are disjoint, so the headcount column really does sum to the
+     * payroll — unlike a month-by-month headcount, which would double-count people. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      return { label: rs.length + (rs.length === 1 ? ' department' : ' departments'), values: {
+        heads: String(sum(rs, function (r) { return t.filter(function (e) { return (e.dept || '—') === r.dept; }).length; })),
+        cost: ui.money(sum(rs, function (r) { return r.cost; }))
+      } };
+    },
     rows: dc, pageSize: 10, exportName: 'department-cost.csv', empty: { icon: 'diagram-3', title: 'No data' }
   });
   page.appendChild(reportCard('Department Cost (monthly gross)', 'diagram-3', 'salary cost by department', dcTbl.el));
@@ -4577,6 +4645,19 @@ function reportsView(page) {
       columns: withCo([ { key: 'date', label: 'Date', date: true }, { key: 'name', label: 'Employee' },
         { key: 'from', label: 'From', num: true, money: true }, { key: 'to', label: 'To', num: true, money: true },
         { key: 'change', label: 'Change', num: true, sortVal: function (r) { return (r.to || 0) - (r.from || 0); }, render: function (r) { var d = (r.to || 0) - (r.from || 0); return '<span class="num ' + (d >= 0 ? 'text-good' : 'text-bad') + '">' + (d >= 0 ? '+' : '') + ui.money(d) + '</span>'; } } ], null, 2),
+      /* FROM and TO ARE NOT SUMMABLE — they are salary LEVELS at two moments, and
+       * adding fifteen "from" figures together describes nobody. Only the change
+       * sums, and the foot says which way the revisions went. */
+      totals: function (rs) {
+        if (!rs.length) return null;
+        var up = rs.filter(function (r) { return (r.to || 0) >= (r.from || 0); }).length;
+        var net = sum(rs, function (r) { return (r.to || 0) - (r.from || 0); });
+        return { label: rs.length + (rs.length === 1 ? ' revision' : ' revisions'), values: {
+          from: '<span class="xs text-mute">levels, not a sum</span>', to: '',
+          change: '<span class="num">' + (net >= 0 ? '+' : '−') + ui.money(Math.abs(net)) + '</span>' +
+            '<div class="xs text-mute nowrap">' + up + ' up · ' + (rs.length - up) + ' down</div>'
+        } };
+      },
       rows: incRows, pageSize: 10, exportName: 'increment-history.csv',
       filters: coFilter(), filterPanel: isAll(), empty: { icon: 'graph-up-arrow', title: 'No increments' }
     });
@@ -4588,6 +4669,11 @@ function reportCard(title, icon, sub, node) {
 }
 function simpleTbl(rows, label) {
   return EPAL.table({ columns: withCo([ { key: 'name', label: 'Employee', render: function (r) { return EPAL.people ? EPAL.people.linkify(r.name, r.id || r.name) : '<span class="strong">' + esc(r.name) + '</span>'; } }, { key: 'dept', label: 'Dept', badge: {} }, { key: 'amt', label: label, num: true, money: true } ]),
+    totals: function (rs) {
+      if (!rs.length) return null;
+      return { label: rs.length + (rs.length === 1 ? ' person' : ' people'), values: {
+        amt: ui.money(sum(rs, function (r) { return r.amt || 0; })) } };
+    },
     rows: rows, pageSize: 8, filters: coFilter(), filterPanel: isAll(), empty: { icon: 'inbox', title: 'Nothing outstanding' } }).el;
 }
 function payEncashFlow(e) {
@@ -5401,6 +5487,335 @@ function payStaffNotes(rows, partial, allRows, pickLabel) {
   out.push({ tag: 'NOTE', text: 'Advances and loans are recovered from future pay, capped at what each month can ' +
     'bear; leave encashment accrues monthly against a 12-month service condition and settles in December.' });
   return out.slice(0, 9);
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 7 — the LEAVE ENCASHMENT LIABILITY SCHEDULE  (owner 2026-07-30, P7)
+ * ---------------------------------------------------------------------------
+ * The schedule an auditor asks for by name: what the group owes its staff in
+ * accrued leave, person by person, at today's day-rate, with the 12-month service
+ * condition marked on every row.
+ *
+ * ⚠ IT PRINTS ITS OWN CONTROL. The engine has two roads to this number — this
+ * schedule (leaveState per employee, accrued days × today's rate) and
+ * encashmentLiability(company), the provision the books carry. The desk's own KPI
+ * band notes they need not reconcile. A document that quietly printed one of them
+ * would be hiding the question, so the panel prints BOTH and the difference.
+ * ------------------------------------------------------------------------- */
+function payEncashReport(rows, allRows, pickLabel, provision) {
+  var co = isAll(), asAt = today();
+  var T = { days: 0, value: 0 };
+  rows.forEach(function (r) { T.days += r.days || 0; T.value += r.value || 0; });
+  var elig = rows.filter(function (r) { return r.eligible; });
+  var eligValue = sum(elig, function (r) { return r.value; });
+  var partial = rows.length !== allRows.length;
+  var id = payReportId('EL', asAt.slice(0, 7)), rev = payRev(id);
+  var gap = provision - T.value;
+
+  var w = payWidths(co ? [3, 18, 9, 12, 11, 12, 14, 11] : [3, 20, 13, 12, 13, 15, 12]);
+  var head = [{ label: '#', width: w[0] }, { label: 'Employee', sub: 'ID', width: w[1] }]
+    .concat(co ? [{ label: 'Company', width: w[2] }] : [])
+    .concat([{ label: 'Department' }, { label: 'Accrued days', num: true },
+      { label: 'Day rate', sub: 'at today\'s salary', num: true }, { label: 'Accrued value', num: true },
+      { label: 'Eligibility' }].map(function (h, i) { h.width = w[i + (co ? 3 : 2)]; return h; }));
+
+  var rowCells = rows.map(function (r, i) {
+    return [{ v: String(i + 1), num: true }, { v: esc(r.name), strong: true, sub: esc(r.e.id) }]
+      .concat(co ? [{ v: esc(coShort(r.companyId)) }] : [])
+      .concat([
+        { v: esc(r.dept || '—') },
+        { v: r.days.toFixed(2), num: true },
+        { v: r.days ? payMoney(r.value / r.days) : '–', num: true },
+        { v: payMoney(r.value), num: true, strong: true },
+        { v: r.eligible ? 'Encashable now' : 'Inside 12 months' }
+      ]);
+  });
+  var totals = [{ v: '' }, { v: 'Total — ' + rows.length + (rows.length === 1 ? ' employee' : ' employees') }]
+    .concat(co ? [{ v: '' }] : [])
+    // a day RATE is per person: averaging it would describe nobody, so it prints a dash
+    .concat([{ v: '' }, { v: T.days.toFixed(2), num: true }, { v: '–', num: true },
+      { v: payMoney(T.value), num: true }, { v: elig.length + ' encashable now' }]);
+
+  var cutKey = co ? function (r) { return coShort(r.companyId); } : function (r) { return r.dept || '—'; };
+  var cuts = {};
+  rows.forEach(function (r) {
+    var k = cutKey(r), c = cuts[k] || (cuts[k] = { n: 0, days: 0, value: 0 });
+    c.n++; c.days += r.days; c.value += r.value;
+  });
+  var cutKeys = Object.keys(cuts).sort(function (a, b) { return cuts[b].value - cuts[a].value; });
+  var cw = payWidths([38, 14, 22, 26]);
+
+  return {
+    docTitle: payFileName('EncashmentSchedule', asAt.slice(0, 7), asAt.slice(0, 7)),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Leave Encashment Liability Schedule' + (isAll() ? '' : ' — ' + coFull(CID)),
+    scope: [
+      'As at ' + ui.date(asAt, 'long') + ' · ' + rows.length + (rows.length === 1 ? ' employee' : ' employees') +
+        ' accruing · ' + elig.length + ' encashable now · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)),
+      'Leave accrues monthly and is valued at TODAY\'S salary, so the figure moves with every increment. It is ' +
+        'charged to expense as it accrues and credited to Leave Encashment Payable; it is subject to a 12-month ' +
+        'service condition and settles once, in December, or pro-rata on resignation.'
+    ],
+    notice: partial ? 'Partial selection — ' + rows.length + ' of ' + allRows.length +
+      ' employees' + (pickLabel ? ', ' + pickLabel : '') + '. Totals below reflect the selected rows only.' : null,
+    kpis: [
+      { label: 'Employees accruing', value: String(rows.length), sub: partial ? 'of ' + allRows.length + ' with an accrual' : 'everyone with an accrual' },
+      { label: 'Accrued days', value: T.days.toFixed(2), sub: rows.length ? (T.days / rows.length).toFixed(2) + ' days each on average' : '' },
+      { label: 'Accrued value', value: payMoney(T.value), sub: 'at today\'s day rates' },
+      { label: 'Encashable now', value: payMoney(eligValue), sub: elig.length + ' past the 12-month condition' },
+      { label: 'Provision on the books', value: payMoney(provision), sub: Math.abs(gap) < 1 ? 'agrees with this schedule' : payMoney(Math.abs(gap)) + (gap > 0 ? ' more than' : ' less than') + ' this schedule' }
+    ],
+    table: { groups: [{ span: co ? 4 : 3 }, { label: 'Accrual', span: 3 }, { label: '', span: 1 }],
+      head: head, rows: rowCells, totals: totals },
+    panelPairs: [[
+      /* THE CONTROL. Two roads to one number, printed side by side — see the header
+       * note. If they disagree the document says by how much rather than choosing. */
+      { title: 'The provision, and its control', lines: [
+        { k: 'Accrued value, this schedule', v: payMoney(T.value) },
+        { k: 'Provision carried on the books', v: payMoney(provision), rule: true },
+        { k: Math.abs(gap) < 1 ? 'The two agree' : 'Difference to investigate', v: Math.abs(gap) < 1 ? '–' : payMoney(gap), close: true },
+        { k: 'Of the schedule, encashable now', v: payMoney(eligValue) },
+        { k: 'Still inside the 12-month condition', v: payMoney(T.value - eligValue) },
+        { k: 'Settles in full', v: 'December, or on resignation' }
+      ] },
+      { title: co ? 'By concern' : 'By department', table: {
+        head: [{ label: co ? 'Concern' : 'Department', width: cw[0] }, { label: 'Staff', num: true, width: cw[1] },
+          { label: 'Days', num: true, width: cw[2] }, { label: 'Accrued value', num: true, width: cw[3] }],
+        rows: cutKeys.map(function (k) {
+          return [{ v: esc(k) }, { v: String(cuts[k].n), num: true }, { v: cuts[k].days.toFixed(2), num: true },
+            { v: payMoney(cuts[k].value), num: true }];
+        }),
+        totals: [{ v: 'Total' }, { v: String(rows.length), num: true }, { v: T.days.toFixed(2), num: true },
+          { v: payMoney(T.value), num: true }] } }
+    ]],
+    notesTitle: 'Exceptions requiring attention',
+    notes: payEncashNotes(rows, elig, partial, allRows, pickLabel, gap),
+    signoff: [{ role: 'Prepared by', name: payUser() }, { role: 'Checked by', name: 'Accounts' },
+      { role: 'Verified by', name: 'Head of HR & Admin' }, { role: 'Approved by', name: 'Managing Director' }],
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · accrual as at ' + ui.date(asAt),
+    previewTitle: 'Leave Encashment Liability Schedule — print preview'
+  };
+}
+
+function payEncashNotes(rows, elig, partial, allRows, pickLabel, gap) {
+  var out = [];
+  if (Math.abs(gap) >= 1) out.push({ tag: 'HIGH', text: 'The provision on the books and this schedule differ by ' +
+    payMoney(Math.abs(gap)) + '. The schedule values accrued days at TODAY\'S salary; the provision is what has been ' +
+    'charged month by month, at the salary of each month. An increment moves the first and not the second.' });
+  rows.forEach(function (r) {
+    if ((r.e.status || 'active') !== 'active' && r.value > 0) out.push({ tag: 'HIGH', text: r.name + ' is ' +
+      (r.e.status || 'inactive') + ' and still carries ' + payMoney(r.value) + ' of accrued leave — a resignation ' +
+      'settles it pro-rata and it should not still be accruing.' });
+  });
+  if (elig.length) out.push({ tag: 'WATCH', text: elig.length + (elig.length === 1 ? ' employee has' : ' employees have') +
+    ' passed the 12-month condition and can be paid out on demand — ' +
+    payMoney(sum(elig, function (r) { return r.value; })) + ' of the provision is callable today.' });
+  if (partial) out.push({ tag: 'NOTE', text: 'Partial selection: ' + rows.length + ' of ' + allRows.length +
+    ' employees with an accrual' + (pickLabel ? ' (' + pickLabel + ')' : '') + '. The totals row covers the printed rows only.' });
+  out.push({ tag: 'NOTE', text: 'Only employees with a non-zero accrual are listed. Leave encashment never forms part ' +
+    'of Net Payable and is not disbursed with salary — paying it out is a separate posting against the payable account.' });
+  return out.slice(0, 9);
+}
+
+function encashPrintCentre(rows, provision) {
+  if (!rows || !rows.length) { ui.toast('Nothing has accrued yet', 'warn'); return; }
+  var list = rows.slice().sort(function (a, b) { return b.value - a.value; });
+  var pick = {}, q = '', pickWas = null;
+  list.forEach(function (r) { pick[r.e.id] = true; });
+  function chosen() { return list.filter(function (r) { return pick[r.e.id]; }); }
+
+  var body = el('div.pay-print'), rowHost = el('div.pay-print-rows'), rCount = el('div.pay-print-count');
+  var searchIn = el('input.input', { placeholder: 'Search name or department…',
+    oninput: ui.debounce(function () { q = searchIn.value.toLowerCase(); drawRows(); }, 120) });
+  var goBtn = null;
+
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '1 · Scope and date' }),
+    el('div.pay-print-scope', null, [
+      el('div', null, [ el('strong', { text: scopeFull() }),
+        el('div.text-mute.sm', { text: 'accrual as at ' + ui.date(today(), 'long') +
+          ' · provision on the books ' + ui.money(provision) }) ]),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-left-right') + ' Change company',
+        onclick: function () { m.close(); ui.toast('Pick the company from the switcher above, then print again', 'info'); } })
+    ])
+  ]));
+
+  function drawRows() {
+    rowHost.innerHTML = '';
+    var shown = list.filter(function (r) {
+      if (!q) return true;
+      return (r.name + ' ' + (r.dept || '')).toLowerCase().indexOf(q) >= 0;
+    });
+    shown.forEach(function (r) {
+      var cb = el('input', { type: 'checkbox', checked: pick[r.e.id] ? 'checked' : null,
+        onchange: function () { pick[r.e.id] = cb.checked; pickWas = null; syncCounts(); } });
+      rowHost.appendChild(el('label.pay-print-row', null, [ cb,
+        el('span.pay-print-row-n', { text: r.name }),
+        isAll() ? el('span.badge', { text: coShort(r.companyId) }) : null,
+        el('span.text-mute.xs', { text: r.days.toFixed(2) + 'd' }),
+        el('span.badge' + (r.eligible ? '.badge-good' : '.badge-warn'), { text: r.eligible ? 'Eligible' : 'Accruing' }),
+        el('span.pay-print-row-v', { text: ui.money(r.value) })
+      ].filter(Boolean)));
+    });
+    if (!shown.length) rowHost.appendChild(el('div.text-mute.sm', { text: 'Nobody matches “' + q + '”.' }));
+  }
+  function only(fn, label) { list.forEach(function (r) { pick[r.e.id] = !!fn(r); }); pickWas = label || null; drawRows(); syncCounts(); }
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '2 · Who is on the schedule' }),
+    el('div.pay-print-bulk', null, [ searchIn,
+      el('button.btn.btn-sm.btn-ghost', { text: 'Everyone', onclick: function () { only(function () { return true; }, null); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () { only(function () { return false; }, null); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('check2-circle') + ' Only encashable now',
+        title: 'Past the 12-month service condition — this part of the provision is callable today',
+        onclick: function () { only(function (r) { return !!r.eligible; }, 'encashable now only'); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('hourglass-split') + ' Only still accruing',
+        onclick: function () { only(function (r) { return !r.eligible; }, 'inside the 12-month condition only'); } })
+    ]),
+    rowHost, rCount
+  ]));
+
+  function syncCounts() {
+    var sel = chosen();
+    rCount.textContent = sel.length + ' of ' + list.length + (list.length === 1 ? ' employee' : ' employees') +
+      ' selected' + (pickWas ? ' · ' + pickWas : '') + ' · accrued ' +
+      ui.money(sum(sel, function (r) { return r.value; })) + ' over ' +
+      sum(sel, function (r) { return r.days; }).toFixed(2) + ' days';
+    if (goBtn) { goBtn.disabled = !sel.length; goBtn.style.opacity = sel.length ? 1 : .5; }
+  }
+
+  var m = ui.modal({
+    title: 'Print the encashment schedule — ' + scopeShort(), icon: 'printer', size: 'lg', body: body,
+    actions: [
+      { label: 'Cancel', onClick: function () {} },
+      { label: 'Preview', icon: 'eye', variant: 'primary', onClick: function () {
+          var sel = chosen();
+          if (!sel.length) { ui.toast('Tick at least one employee', 'error'); return false; }
+          EPAL.report.open(payEncashReport(sel, list, pickWas, provision));
+        } }
+    ]
+  });
+  goBtn = m.box.querySelector('.modal-foot .btn-primary');
+  drawRows(); syncCounts();
+  return m;
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 8 — PAYROLL CASH & LEDGER RECONCILIATION  (owner 2026-07-30, P7)
+ * ---------------------------------------------------------------------------
+ * "Where the money went", printed — the owner's most-asked question — with the
+ * sheet-to-ledger control beside it, which is the other half nobody can answer
+ * from a screen: payroll cash left THESE accounts, and the books say the company
+ * still owes THIS much.
+ *
+ * NO PICKER on this one, deliberately. Its two variables — the company and the
+ * period — are both already chosen on the screen it prints from (the switcher and
+ * the period select in the table's own toolbar), so a modal asking again would be
+ * a step that changes nothing.
+ * ------------------------------------------------------------------------- */
+function payAccountReport(res, months) {
+  var win = monthsUpTo(months), first = win[0], last = win[win.length - 1];
+  var P = position();
+  var T = { salary: 0, advance: 0, loan: 0, bonus: 0, other: 0, out: 0, back: 0 };
+  res.rows.forEach(function (r) {
+    T.salary += r.salary; T.advance += r.advance; T.loan += r.loan; T.bonus += r.bonus;
+    T.other += r.other; T.out += r.out; T.back += r.back;
+  });
+  var id = payReportId('PA', last), rev = payRev(id);
+  var variance = P.glPayable - P.sheetOwed;
+
+  var w = payWidths([22, 13, 11, 11, 10, 10, 12, 11]);
+  var head = [{ label: 'Paid from', sub: 'account', width: w[0] },
+    { label: 'Salary', num: true, width: w[1] }, { label: 'Advance', num: true, width: w[2] },
+    { label: 'Staff loan', num: true, width: w[3] }, { label: 'Bonus', num: true, width: w[4] },
+    { label: 'Other', num: true, width: w[5] }, { label: 'Total paid out', num: true, width: w[6] },
+    { label: 'Came back in', num: true, width: w[7] }];
+
+  var rowCells = res.rows.map(function (r) {
+    return [{ v: esc(r.from), strong: true, sub: r.txns.length + (r.txns.length === 1 ? ' movement' : ' movements') },
+      { v: payMoney(r.salary), num: true }, { v: payMoney(r.advance), num: true },
+      { v: payMoney(r.loan), num: true }, { v: payMoney(r.bonus), num: true },
+      { v: payMoney(r.other), num: true }, { v: payMoney(r.out), num: true, strong: true },
+      { v: payMoney(r.back), num: true }];
+  });
+  var totals = [{ v: 'Total — ' + res.rows.length + (res.rows.length === 1 ? ' account' : ' accounts') },
+    { v: payMoney(T.salary), num: true }, { v: payMoney(T.advance), num: true },
+    { v: payMoney(T.loan), num: true }, { v: payMoney(T.bonus), num: true },
+    { v: payMoney(T.other), num: true }, { v: payMoney(T.out), num: true },
+    { v: payMoney(T.back), num: true }];
+
+  return {
+    docTitle: payFileName('PayrollByAccount', first, last),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Payroll Cash & Ledger Reconciliation' + (isAll() ? '' : ' — ' + coFull(CID)),
+    scope: [
+      'Cash movements ' + PR().mLabel(first) + ' – ' + PR().mLabel(last) + ' · ' + res.rows.length +
+        (res.rows.length === 1 ? ' account' : ' accounts') + ' · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)),
+      /* the internal-recovery sentence only exists when there IS one — a dash in the
+       * middle of prose ("– was recovered inside a salary payment") reads as a
+       * missing figure, which is the opposite of what the dash convention means */
+      'Every figure below is cash that actually moved, on the day it moved. Salary that is accrued but unpaid never ' +
+        'leaves an account and is not here — it is in the ledger control panel instead. ' +
+        (res.tot.internal > 0
+          ? payMoney(res.tot.internal) + ' was recovered INSIDE a salary payment (an advance or an EMI netted off the ' +
+            'pay) and touched no account at all.'
+          : 'Nothing in this period was recovered inside a salary payment, so every recovery shows against an account.')
+    ],
+    kpis: [
+      { label: 'Left these accounts', value: payMoney(T.out), sub: PR().mLabel(first) + ' – ' + PR().mLabel(last) },
+      { label: 'Came back in', value: payMoney(T.back), sub: 'loan repayments received' },
+      { label: 'Net cash out', value: payMoney(T.out - T.back), sub: 'what payroll really cost the accounts' },
+      { label: 'Netted inside pay', value: payMoney(res.tot.internal), sub: 'recovered without touching an account' },
+      { label: 'Still owed to staff', value: payMoney(P.sheetOwed), sub: 'the sheet, drafts excluded' }
+    ],
+    table: { groups: [{ span: 1 }, { label: 'What the money was for', span: 5 }, { label: 'Net movement', span: 2 }],
+      head: head, rows: rowCells, totals: totals },
+    panelPairs: [[
+      /* THE CONTROL PANEL — the sheet against the books. It prints the variance
+       * whether or not it is zero: a reconciliation that only appears when it fails
+       * is not a control, and the causes are named so nobody has to guess. */
+      { title: 'Sheet against the ledger', lines: [
+        { k: 'Salary sheet says still owed', v: payMoney(P.sheetOwed) },
+        { k: 'Ledger, Salary Payable 2100', v: payMoney(P.glPayable) },
+        { k: Math.abs(variance) < 1 ? 'They agree' : 'Variance to explain', v: Math.abs(variance) < 1 ? '–' : payMoney(variance), close: true },
+        { k: 'Statutory withheld, not yet remitted', v: payMoney(P.glStatutory) },
+        { k: 'Advances and loans on the books', v: payMoney(P.glAdvLoan) },
+        { k: 'Advances and loans, per the desk', v: payMoney(P.advOut + P.loanOut) }
+      ] },
+      { title: 'Cash out, by what it was for', lines: [
+        { k: 'Salary', v: payMoney(T.salary) },
+        { k: 'Advance', v: payMoney(T.advance) },
+        { k: 'Staff loan', v: payMoney(T.loan) },
+        { k: 'Bonus', v: payMoney(T.bonus) },
+        { k: 'Other, including settlements and encashment', v: payMoney(T.other) },
+        { k: 'Total out of the accounts', v: payMoney(T.out), rule: true },
+        { k: 'Less: came back in', v: payBrk(T.back) },
+        { k: 'Net cash out', v: payMoney(T.out - T.back), close: true }
+      ] }
+    ]],
+    notesTitle: 'How to read the variance',
+    notes: [
+      { tag: 'NOTE', text: 'Salary Payable 2100 is what the general ledger says the company owes staff; the sheet adds ' +
+        'up what every payslip still has outstanding. They should be the same figure' +
+        (Math.abs(variance) < 1 ? ', and here they are.' : ', and here they differ by ' + payMoney(variance) + '.') },
+      { tag: 'NOTE', text: 'The usual causes: a month accrued and its payslips adjusted afterwards; a payment posted ' +
+        'straight into the ledger instead of through this desk; or DRAFT months, which are correctly excluded from ' +
+        'the sheet figure and are not on the books either.' },
+      { tag: 'NOTE', text: 'An advance or an EMI recovered out of a salary payment moves no cash: the employee simply ' +
+        'receives less. Those recoveries are the "netted inside pay" figure and appear in no account column.' }
+    ],
+    signoff: [{ role: 'Prepared by', name: payUser() }, { role: 'Checked by', name: 'Accounts' },
+      { role: 'Reconciled by', name: 'Finance' }, { role: 'Approved by', name: 'Managing Director' }],
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · cash movements only',
+    previewTitle: 'Payroll Cash & Ledger Reconciliation — print preview'
+  };
 }
 
 /* ---------------------------------------------------------------------------
