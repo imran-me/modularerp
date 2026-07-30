@@ -48,7 +48,7 @@ Two separate treatments, and not every table earns both:
 | P3 ✅ | Salary Manage | **Salary sheet** | done (`sheetTotals`) | **`PR-DS` Salary Disbursement Sheet** — signature line per employee |
 | P4 ✅ | Staff | **Staff Accounts** | done | **`PR-SP` Staff Position Statement** — as at, not per month |
 | P5 ✅ | Loans | staff-loans · loan-register · emi-history · loan payments (modal) · loan transactions | done ×5 | **`PR-LB` Staff Loan Book** |
-| P6 | Advance | advance outstanding · advance requests · advance transactions | ⏭ ×3 | ⏭ **Advance Register** |
+| P6 ✅ | Advance | advance outstanding · advance requests · advance transactions | done ×3 | **`PR-AR` Advance Salary Register** |
 | P7 | Reports | payroll-by-account (+ its drill) · encashment liability · loan outstanding · department cost · increment history · simpleTbl lists | ⏭ ×7 | ⏭ **Encashment liability schedule** + **Payroll ↔ ledger reconciliation** (the two an auditor asks for by name) |
 | P8 | drills & modals | month transactions · money movements · ledger postings · variance explainer · payslip list · template list · structure compare · blocked-approval check | ⏭ ×8 | none — a drill is not a document |
 
@@ -56,6 +56,50 @@ The Payslip already has its own printed artifact (`EPAL.people.payslipPrint`), s
 needs footing only. Each phase is one commit, verified the same way: sweep both
 themes + a driver that checks the footed figure against an INDEPENDENT sum out of
 the store.
+
+### T-PAY-P6 — the Advance Salary Register ✅ (2026-07-30)
+**Per PERSON, not per transaction — and that is the difference from the loan book.**
+A loan is a thing with a plan and a maturity, so its book is one row per loan. An
+advance is not: it is pay not yet earned, taken as often as the boss allows and
+recovered whole from the very next payslip. The question is always *who is holding
+what, and what comes back this month* — so `PR-AR` is one row per person who has
+ever taken one (a cleared advance still shows: the history is the point of a
+register).
+
+Columns: `#` · Employee (ID) · Company · Designation (dept) · Monthly salary ·
+Advances (times taken, last date beneath) · Given all time · Recovered (% beneath) ·
+**Outstanding** · **This month** (recovered or planned).
+Picker: Everyone · Clear all · **Only still holding** · **Only over a month's pay** ·
+add by company.
+
+**Three tables footed:**
+- *Outstanding advances* — one money column, one sum, and the count of people behind it.
+- *Decided requests* — "asked for" sums every decided row, **"approved" sums only the
+  approved ones** (adding a declined row's nothing into the total is how a decline
+  turns into a discount), and the foot prints **the gap** — `৳45,000 not advanced` —
+  plus `0 approved · 1 declined`.
+- *Advance transactions* — a plain sum is honest here (every row is money going out,
+  unlike loan transactions where the rows run both ways).
+
+**Two label bugs this build caught in its own output, both fixed:**
+1. The last column was called *"Coming back — this payslip"*, but on a month already
+   paid that figure is what the payslip ALREADY took. One column, two tenses → now
+   **"This month · recovered or planned"**, and the panel treats it as CONTEXT inside
+   the reconciliation rather than a second subtraction (deducting it again would
+   understate the outstanding by exactly one month).
+2. The cell printed `–` whenever nothing was outstanding — so an advance cleared BY
+   this month's payslip showed a dash while its ৳15,000 sat in the total, and **the
+   column stopped footing to itself**. The figure comes first now; "no run" is
+   reserved for a balance with no payslip to take it.
+
+**Also learned from the data:** every advance in this book is fully recovered
+(৳1,46,000 given, ৳0 outstanding), which means the *Outstanding advances* card does
+not render at all — so the register's Print also rides the **transactions** table,
+which is always there. And 2 pending requests worth ৳32,000 are deliberately NOT in
+the register, with a note saying so: an ask is not an advance.
+- Verified: sweep 253/253 × both themes, 0 errors; foots match an independent walk of
+  `pay_txns` + `advanceOutstanding()` (6 people · 7 advances · ৳1,46,000 given · ৳0
+  outstanding · 2 pending / 0 approved / 1 declined); pages read at 1:1.
 
 ### T-PAY-P5 — the Loan Book, and the engine bug footing it found ✅ (2026-07-30)
 

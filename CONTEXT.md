@@ -490,6 +490,45 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · THE ADVANCE SALARY REGISTER (P6)
+
+**Per PERSON, not per transaction — and that is the difference from the loan book.**
+A loan is a thing with a plan and a maturity, so its book is one row per loan. An
+advance is not: it is pay not yet earned, taken as often as the boss allows and
+recovered whole from the very next payslip. So `PR-AR` is one row per person who has
+ever taken one — a cleared advance still shows, because the history is the point of a
+register — and the columns answer *who is holding what, and what comes back this
+month*. Picker: Everyone · Only still holding · **Only over a month's pay** · add by
+company.
+
+**Three tables footed**, including the one that needed a judgement: on *Decided
+requests*, "asked for" sums every decided row but **"approved" sums only the approved
+ones** — adding a declined row's nothing into the total is how a decline turns into a
+discount — and the foot prints the gap (`৳45,000 not advanced · 0 approved · 1
+declined`).
+
+**Two label bugs this build caught in its OWN output.** The last column said *"Coming
+back — this payslip"*, but on a month already paid that figure is what the payslip
+ALREADY took: one column, two tenses. It is now **"This month · recovered or
+planned"**, and the panel treats it as context inside the reconciliation rather than a
+second subtraction — deducting it again would understate the outstanding by exactly
+one month. Then the cell printed `–` whenever nothing was outstanding, so an advance
+cleared BY this month's payslip showed a dash while its ৳15,000 sat in the total and
+**the column stopped footing to itself**. The figure comes first now; "no run" is kept
+for a balance with no payslip to take it.
+
+**What the data said:** every advance here is fully recovered (৳1,46,000 given, ৳0
+outstanding), so the *Outstanding advances* card does not render at all — which is why
+the register's Print also rides the transactions table, the one card always on the
+tab. Two pending requests worth ৳32,000 are deliberately excluded, with a note: an ask
+is not an advance.
+
+Verified: sweep 253/253 × both themes, 0 errors; foots match an independent walk of
+`pay_txns` + `advanceOutstanding()` (6 people · 7 advances · ৳1,46,000 given · ৳0
+outstanding · 2 pending / 0 approved / 1 declined); pages read at 1:1.
+
+---
+
 ## 🆕 SESSION — 2026-07-30 · THE LOAN BOOK (P5) — AND THE MONEY BUG ITS FOOT FOUND
 
 **This is why the totals rows are worth building.** The loan register footed

@@ -4027,7 +4027,22 @@ function advanceView(page) {
     var at = EPAL.table({
       columns: withCo([ { key: 'name', label: 'Employee', render: function (r) { return '<span class="strong">' + esc(r.e.name) + '</span>'; } },
         { key: 'out', label: 'Outstanding', num: true, render: function (r) { return '<span class="num strong text-warn">' + ui.money(r.out) + '</span>'; }, sortVal: function (r) { return r.out; } } ]),
-      rows: active, pageSize: 8, filters: coFilter(), filterPanel: isAll(), empty: { icon: 'cash', title: 'No outstanding advances' }
+      rows: active, pageSize: 8, filters: coFilter(), filterPanel: isAll(), empty: { icon: 'cash', title: 'No outstanding advances' },
+      /* THE FOOT — one money column, so one sum, and the count says how many
+       * people are behind it. This card only exists when somebody is holding an
+       * advance, so the foot is never a row of dashes. */
+      totals: function (rs) {
+        if (!rs.length) return null;
+        return { label: rs.length + (rs.length === 1 ? ' person' : ' people'), values: {
+          out: ui.money(sum(rs, function (r) { return r.out; }))
+        } };
+      },
+      /* PRINT — the ADVANCE REGISTER, from the card that asks the register's own
+       * question: who is holding what. It also rides the transactions table below,
+       * because that card is here even when nothing is outstanding. */
+      toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+        title: 'Print the advance register — everyone who has ever taken one, or only those still holding',
+        onclick: function () { advancePrintCentre(); } })
     });
     var ac = frag('reg-card'); slot(ac, 'title').innerHTML = ui.icon('people') + ' Outstanding advances';
     slot(ac, 'sub').textContent = 'recovered automatically from the next salary' + (isAll() ? ' · every company' : '');
@@ -4110,6 +4125,22 @@ function advRequestHistory(page) {
     rows: rows, searchKeys: ['empName', 'reason', 'note'], quickFilter: 'status', pageSize: 10,
     filters: coFilter(), filterPanel: isAll(),
     exportName: 'advance-requests.csv', pdfTitle: scopeFull() + ' — Advance Salary Requests',
+    /* THE FOOT. "Asked for" sums every decided row; "Approved" sums ONLY the
+     * approved ones — adding a rejected row's approved figure of nothing into an
+     * average is how a decline turns into a discount. The gap between the two is
+     * the interesting number, so the foot prints it. */
+    totals: function (rs) {
+      if (!rs.length) return null;
+      var ok = rs.filter(function (r) { return r.status === 'approved'; });
+      var asked = sum(rs, function (r) { return r.amount || 0; });
+      var appr = sum(ok, function (r) { return r.approvedAmount || 0; });
+      return { label: rs.length + (rs.length === 1 ? ' decision' : ' decisions'), values: {
+        amount: ui.money(asked),
+        approvedAmount: '<span class="num">' + ui.money(appr) + '</span>' +
+          '<div class="xs text-mute nowrap">' + ui.money(asked - appr) + ' not advanced</div>',
+        status: '<span class="xs text-mute">' + ok.length + ' approved · ' + (rs.length - ok.length) + ' declined</span>'
+      } };
+    },
     empty: { icon: 'inbox', title: 'Nothing decided yet' }
   });
   var card = frag('reg-card');
@@ -4246,7 +4277,19 @@ function txnTable(title, txns) {
       { key: 'memo', label: 'Note' }, { key: 'method', label: 'Method', badge: {} },
       { key: 'amount', label: 'Amount', num: true, money: true } ], null, 2),
     rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, exportName: 'payroll-txns.csv',
-    filters: coFilter(), filterPanel: isAll(), empty: { icon: 'journal', title: 'No transactions' }
+    filters: coFilter(), filterPanel: isAll(), empty: { icon: 'journal', title: 'No transactions' },
+    /* Every row here is money going OUT to an employee (this table lists advances
+     * only — see its one caller), so a plain sum is the honest total, unlike the
+     * loan transactions table where the rows run both ways. */
+    totals: function (xs) {
+      if (!xs.length) return null;
+      return { label: xs.length + (xs.length === 1 ? ' transaction' : ' transactions'), values: {
+        amount: ui.money(sum(xs, function (x) { return +x.amount || 0; }))
+      } };
+    },
+    toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+      title: 'Print the advance register — who holds what, and what is being recovered',
+      onclick: function () { advancePrintCentre(); } })
   });
   var card2 = frag('head-card'); slot(card2, 'title').innerHTML = ui.icon('journal-text') + ' ' + title + (isAll() ? ' — every company' : ''); slot(card2, 'body').appendChild(tbl.el); return card2;
 }
@@ -5377,6 +5420,271 @@ function payStaffNotes(rows, partial, allRows, pickLabel) {
   out.push({ tag: 'NOTE', text: 'Advances and loans are recovered from future pay, capped at what each month can ' +
     'bear; leave encashment accrues monthly against a 12-month service condition and settles in December.' });
   return out.slice(0, 9);
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 6 — the ADVANCE REGISTER  (owner 2026-07-30, P6)
+ * ---------------------------------------------------------------------------
+ * Per PERSON, not per transaction — and that is the difference from the loan book.
+ * A loan is a thing with a plan and a maturity, so the book is one row per loan. An
+ * advance is not: it is money against pay not yet earned, taken as often as the
+ * boss allows and recovered whole from the very next payslip. The question is
+ * therefore always "who is holding what, and what comes back next month".
+ *
+ * The row set is everyone who has EVER taken one, so a register that shows a
+ * cleared advance still shows the person — the history is the point of a register.
+ * ------------------------------------------------------------------------- */
+function advanceRows() {
+  var out = [];
+  team().forEach(function (e) {
+    var mine = S.list('pay_txns').filter(function (x) { return x.empId === e.id && x.type === 'advance'; })
+      .sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    if (!mine.length) return;                       // never taken one → not on the register
+    var given = sum(mine, function (x) { return +x.amount || 0; });
+    var out2 = PR().advanceOutstanding(e.id);
+    var slip = PR().slip(e.id, PR().curYm());
+    out.push({ id: e.id, emp: e, name: e.name, companyId: e.companyId, dept: e.dept || '—',
+      designation: e.designation || '—', status: e.status || 'active', salary: +e.salary || 0,
+      given: given, taken: mine.length, last: mine[0].date, out: out2, back: Math.max(0, given - out2),
+      // what the CURRENT month's payslip is actually taking back, if there is one
+      nextBack: slip ? advOf(slip) : 0, hasSlip: !!slip,
+      months: mine.map(function (x) { return String(x.memo || ''); }).join(' · ') });
+  });
+  return out.sort(function (a, b) { return b.out - a.out || (a.name < b.name ? -1 : 1); });
+}
+
+function payAdvanceReport(rows, allRows, pickLabel) {
+  var co = isAll(), asAt = today();
+  var T = { given: 0, back: 0, out: 0, nextBack: 0, taken: 0 };
+  rows.forEach(function (r) {
+    T.given += r.given; T.back += r.back; T.out += r.out; T.nextBack += r.nextBack; T.taken += r.taken;
+  });
+  var holding = rows.filter(function (r) { return r.out > 0; });
+  var partial = rows.length !== allRows.length;
+  var id = payReportId('AR', asAt.slice(0, 7)), rev = payRev(id);
+  var reqs = (PR().advRequests({}) || []).filter(function (r) { return inScope(r.companyId); });
+  function reqCut(st) { return reqs.filter(function (r) { return r.status === st; }); }
+
+  var w = payWidths(co ? [3, 15, 7.5, 10, 8.5, 8, 9, 9, 10, 10] : [3, 16, 11, 9.5, 9, 9.5, 9.5, 11, 11.5]);
+  var head = [{ label: '#', width: w[0] }, { label: 'Employee', sub: 'ID', width: w[1] }]
+    .concat(co ? [{ label: 'Company', width: w[2] }] : [])
+    .concat([{ label: 'Designation', sub: 'department' }, { label: 'Monthly salary', num: true },
+      { label: 'Advances', sub: 'times taken', num: true }, { label: 'Given', sub: 'all time', num: true },
+      { label: 'Recovered', num: true }, { label: 'Outstanding', num: true },
+      /* NOT "coming back": on a month already paid this figure is what the payslip
+       * ALREADY took, and on an unpaid one it is what the run plans to take. One
+       * column, two tenses, so the label says both rather than picking the wrong one. */
+      { label: 'This month', sub: 'recovered or planned', num: true }]
+      .map(function (h, i) { h.width = w[i + (co ? 3 : 2)]; return h; }));
+
+  var rowCells = rows.map(function (r, i) {
+    return [{ v: String(i + 1), num: true }, { v: esc(r.name), strong: true, sub: esc(r.id) }]
+      .concat(co ? [{ v: esc(coShort(r.companyId)) }] : [])
+      .concat([
+        { v: esc(r.designation), sub: esc(r.dept) },
+        { v: payMoney(r.salary), num: true },
+        { v: String(r.taken), num: true, sub: 'last ' + ui.date(r.last) },
+        { v: payMoney(r.given), num: true },
+        { v: payMoney(r.back), num: true, sub: r.given ? Math.round(r.back / r.given * 100) + '%' : '' },
+        { v: payMoney(r.out), num: true, strong: true },
+        /* THE FIGURE FIRST, always — an advance cleared BY this month's payslip has
+         * nothing outstanding and everything to do with this column, and hiding it
+         * behind the outstanding test made the column stop footing to its own
+         * total. "no run" only when there is a balance and no payslip to take it. */
+        { v: r.nextBack ? payMoney(r.nextBack) : (r.out > 0 && !r.hasSlip ? 'no run' : '–'), num: true }
+      ]);
+  });
+  var totals = [{ v: '' }, { v: 'Total — ' + rows.length + (rows.length === 1 ? ' person' : ' people') }]
+    .concat(co ? [{ v: '' }] : [])
+    .concat([{ v: '' }, { v: payMoney(sum(rows, function (r) { return r.salary; })), num: true },
+      { v: String(T.taken), num: true }, { v: payMoney(T.given), num: true },
+      { v: payMoney(T.back), num: true, sub: T.given ? Math.round(T.back / T.given * 100) + '%' : '' },
+      { v: payMoney(T.out), num: true, sub: holding.length + ' holding' },
+      { v: payMoney(T.nextBack), num: true }]);
+
+  var aw = payWidths([44, 18, 38]);
+  return {
+    docTitle: payFileName('AdvanceRegister', asAt.slice(0, 7), asAt.slice(0, 7)),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Advance Salary Register' + (isAll() ? '' : ' — ' + coFull(CID)),
+    scope: [
+      'As at ' + ui.date(asAt, 'long') + ' · ' + rows.length + (rows.length === 1 ? ' person' : ' people') +
+        ' · ' + holding.length + ' still holding an advance · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)),
+      'An advance is pay not yet earned. It is recovered from the very next payslip in full, capped at what that ' +
+        'month can bear — so an advance bigger than a month\'s salary cannot clear in one run. No interest is charged.'
+    ],
+    notice: partial ? 'Partial selection — ' + rows.length + ' of ' + allRows.length +
+      ' people' + (pickLabel ? ', ' + pickLabel : '') + '. Totals below reflect the selected rows only.' : null,
+    kpis: [
+      { label: 'On this register', value: String(rows.length), sub: holding.length + ' still holding · ' + T.taken + ' advances taken' },
+      { label: 'Given', value: payMoney(T.given), sub: 'all time' },
+      { label: 'Recovered', value: payMoney(T.back), sub: T.given ? payPct(T.back / T.given * 100) + ' of everything advanced' : '' },
+      { label: 'Outstanding', value: payMoney(T.out), sub: 'to come off future pay' },
+      { label: 'Recovery this month', value: payMoney(T.nextBack), sub: PR().mLabel(PR().curYm()) + '\'s payslips, recovered or planned' }
+    ],
+    table: { wide: true,
+      groups: [{ span: co ? 4 : 3 }, { label: 'The person', span: 1 },
+        { label: 'Advanced', span: 2 }, { label: 'Recovery', span: 3 }],
+      head: head, rows: rowCells, totals: totals },
+    panelPairs: [[
+      /* A RECONCILIATION, and this month's recovery is CONTEXT inside it, not a
+       * further subtraction: whatever the current payslip has taken is already
+       * inside "recovered from pay", so deducting it again would understate the
+       * outstanding by exactly one month. */
+      { title: 'The advance book, both ways', lines: [
+        { k: 'Advanced, all time', v: payMoney(T.given) },
+        { k: 'Recovered from pay', v: payBrk(T.back) },
+        { k: 'Outstanding', v: payMoney(T.out), close: true },
+        { k: 'of which, ' + PR().mLabel(PR().curYm()) + '\'s payslips account for', v: payMoney(T.nextBack) },
+        { k: 'Advances taken, all time', v: String(T.taken) }
+      ] },
+      { title: 'Requests, and what was decided', table: {
+        head: [{ label: 'Status', width: aw[0] }, { label: 'Requests', num: true, width: aw[1] },
+          { label: 'Amount', num: true, width: aw[2] }],
+        rows: [['pending', 'Waiting on a decision'], ['approved', 'Approved'], ['rejected', 'Declined']]
+          .map(function (p) {
+            var list = reqCut(p[0]);
+            var amt = p[0] === 'approved'
+              ? sum(list, function (r) { return r.approvedAmount || 0; })
+              : sum(list, function (r) { return r.amount || 0; });
+            return [{ v: p[1] }, { v: String(list.length), num: true }, { v: payMoney(amt), num: true }];
+          }),
+        // the approved figure is what was APPROVED, the others what was ASKED —
+        // so the column has no meaningful total and says so instead
+        totals: [{ v: 'All requests raised' }, { v: String(reqs.length), num: true }, { v: '–' }] } }
+    ]],
+    notesTitle: 'Exceptions requiring attention',
+    notes: payAdvanceNotes(rows, holding, partial, allRows, pickLabel, reqCut('pending')),
+    signoff: [{ role: 'Prepared by', name: payUser() }, { role: 'Checked by', name: 'Accounts' },
+      { role: 'Verified by', name: 'Head of HR & Admin' }, { role: 'Approved by', name: 'Managing Director' }],
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · balances as at ' + ui.date(asAt),
+    previewTitle: 'Advance Salary Register — print preview'
+  };
+}
+
+function payAdvanceNotes(rows, holding, partial, allRows, pickLabel, pending) {
+  var out = [];
+  holding.forEach(function (r) {
+    if (r.status !== 'active') out.push({ tag: 'HIGH', text: r.name + ' is ' + r.status + ' and still holds ' +
+      payMoney(r.out) + ' of advance. The payslip that would have recovered it has stopped.' });
+  });
+  holding.forEach(function (r) {
+    if (r.salary > 0 && r.out > r.salary) out.push({ tag: 'HIGH', text: r.name + ' holds ' + payMoney(r.out) +
+      ' against a ' + payMoney(r.salary) + ' salary — more than a month\'s pay, so it cannot clear in one run.' });
+  });
+  holding.forEach(function (r) {
+    if (r.out > 0 && !r.hasSlip) out.push({ tag: 'WATCH', text: r.name + ' has ' + payMoney(r.out) +
+      ' outstanding but no payslip in ' + PR().mLabel(PR().curYm()) + ' — nothing is recovering it this month.' });
+  });
+  holding.forEach(function (r) {
+    if (r.hasSlip && r.out > 0 && r.nextBack <= 0) out.push({ tag: 'WATCH', text: r.name + ': ' + payMoney(r.out) +
+      ' outstanding, but this month\'s payslip is recovering nothing — the pay could not bear it, or the recovery was capped to zero.' });
+  });
+  if (pending.length) out.push({ tag: 'NOTE', text: pending.length + ' advance request' +
+    (pending.length === 1 ? '' : 's') + ' worth ' + payMoney(sum(pending, function (r) { return r.amount; })) +
+    ' are still waiting on a decision and are NOT included above — an ask is not an advance.' });
+  if (partial) out.push({ tag: 'NOTE', text: 'Partial selection: ' + rows.length + ' of ' + allRows.length +
+    ' people on the register' + (pickLabel ? ' (' + pickLabel + ')' : '') + '. The totals row covers the printed rows only.' });
+  out.push({ tag: 'NOTE', text: 'Recovery comes off the next payslip automatically and is capped at what that month ' +
+    'can bear; whatever does not fit stays outstanding and comes off the month after.' });
+  return out.slice(0, 9);
+}
+
+/* THE ADVANCE REGISTER PICKER — same shape as the loan and staff pickers. */
+function advancePrintCentre() {
+  var rows = advanceRows();
+  if (!rows.length) { ui.toast('No advance has been given yet', 'warn'); return; }
+  var pick = {}, q = '', pickWas = null;
+  rows.forEach(function (r) { pick[r.id] = true; });
+  function chosen() { return rows.filter(function (r) { return pick[r.id]; }); }
+
+  var body = el('div.pay-print'), rowHost = el('div.pay-print-rows'), rCount = el('div.pay-print-count');
+  var searchIn = el('input.input', { placeholder: 'Search name, ID or department…',
+    oninput: ui.debounce(function () { q = searchIn.value.toLowerCase(); drawRows(); }, 120) });
+  var goBtn = null;
+
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '1 · Scope and date' }),
+    el('div.pay-print-scope', null, [
+      el('div', null, [ el('strong', { text: scopeFull() }),
+        el('div.text-mute.sm', { text: 'balances as at ' + ui.date(today(), 'long') +
+          ' · report id ' + payReportId('AR', today().slice(0, 7)) }) ]),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-left-right') + ' Change company',
+        onclick: function () { m.close(); ui.toast('Pick the company from the switcher above, then print again', 'info'); } })
+    ])
+  ]));
+
+  function drawRows() {
+    rowHost.innerHTML = '';
+    var shown = rows.filter(function (r) {
+      if (!q) return true;
+      return (r.name + ' ' + r.id + ' ' + r.dept + ' ' + r.designation).toLowerCase().indexOf(q) >= 0;
+    });
+    shown.forEach(function (r) {
+      var cb = el('input', { type: 'checkbox', checked: pick[r.id] ? 'checked' : null,
+        onchange: function () { pick[r.id] = cb.checked; pickWas = null; syncCounts(); } });
+      rowHost.appendChild(el('label.pay-print-row', null, [ cb,
+        el('span.pay-print-row-n', { text: r.name }),
+        isAll() ? el('span.badge', { text: coShort(r.companyId) }) : null,
+        el('span.text-mute.xs', { text: r.taken + (r.taken === 1 ? ' advance' : ' advances') }),
+        r.status !== 'active' ? el('span.badge.badge-bad', { text: cap(r.status) }) : null,
+        el('span.pay-print-row-v', { text: r.out > 0 ? ui.money(r.out) + ' out' : 'cleared' })
+      ].filter(Boolean)));
+    });
+    if (!shown.length) rowHost.appendChild(el('div.text-mute.sm', { text: 'Nobody matches “' + q + '”.' }));
+  }
+  function only(fn, label) { rows.forEach(function (r) { pick[r.id] = !!fn(r); }); pickWas = label || null; drawRows(); syncCounts(); }
+  function add(fn) { rows.forEach(function (r) { if (fn(r)) pick[r.id] = true; }); pickWas = null; drawRows(); syncCounts(); }
+  var byCoSel = el('select.select', { onchange: function () {
+    var v = byCoSel.value; if (v !== '__') add(function (r) { return r.companyId === v; }); byCoSel.value = '__'; } });
+  (function fill() {
+    var cos = {};
+    rows.forEach(function (r) { cos[r.companyId] = 1; });
+    byCoSel.appendChild(el('option', { value: '__', text: 'Add by company…' }));
+    Object.keys(cos).sort().forEach(function (c) { byCoSel.appendChild(el('option', { value: c, text: coShort(c) })); });
+    byCoSel.style.display = isAll() ? '' : 'none';
+  })();
+
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '2 · Who is on the register' }),
+    el('div.pay-print-bulk', null, [ searchIn,
+      el('button.btn.btn-sm.btn-ghost', { text: 'Everyone', onclick: function () { only(function () { return true; }, null); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () { only(function () { return false; }, null); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('cash') + ' Only still holding',
+        onclick: function () { only(function (r) { return r.out > 0; }, 'people still holding an advance only'); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('exclamation-circle') + ' Only over a month\'s pay',
+        title: 'Advances bigger than the salary they are recovered from — they cannot clear in one run',
+        onclick: function () { only(function (r) { return r.out > 0 && r.salary > 0 && r.out > r.salary; }, 'advances over a month\'s pay only'); } }),
+      byCoSel ]),
+    rowHost, rCount
+  ]));
+
+  function syncCounts() {
+    var sel = chosen();
+    rCount.textContent = sel.length + ' of ' + rows.length + (rows.length === 1 ? ' person' : ' people') +
+      ' selected' + (pickWas ? ' · ' + pickWas : '') + ' · outstanding ' +
+      ui.money(sum(sel, function (r) { return r.out; }));
+    if (goBtn) { goBtn.disabled = !sel.length; goBtn.style.opacity = sel.length ? 1 : .5; }
+  }
+
+  var m = ui.modal({
+    title: 'Print the advance register — ' + scopeShort(), icon: 'printer', size: 'lg', body: body,
+    actions: [
+      { label: 'Cancel', onClick: function () {} },
+      { label: 'Preview', icon: 'eye', variant: 'primary', onClick: function () {
+          var sel = chosen();
+          if (!sel.length) { ui.toast('Tick at least one person', 'error'); return false; }
+          EPAL.report.open(payAdvanceReport(sel, rows, pickWas));
+        } }
+    ]
+  });
+  goBtn = m.box.querySelector('.modal-foot .btn-primary');
+  drawRows(); syncCounts();
+  return m;
 }
 
 /* ---------------------------------------------------------------------------
