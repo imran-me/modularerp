@@ -814,8 +814,15 @@ drift apart. One edit ships to all six companies.
   reusing it makes Payroll pixel-consistent with Banks for free and forks zero rules.
   The `pay-*` classes alongside carry no styling; they are override hooks.
 - **NEW TAB · Payroll Overview** (now the landing tab, first in `TABS`) — the dashboard
-  row, a narrated **digest** (`.brief-hero`, every figure computed live), **Payroll
-  Autopilot**, **Anomaly Radar**, the **Monthly Register** and department cost.
+  row, the **brief row**, the **Monthly Register** and department cost.
+- **THE BRIEF ROW** (`.pay-brief-row`, owner 2026-07-30) — **Payroll Autopilot** ·
+  **Anomaly Radar** · the narrated **digest**, three cards in ONE row of a fixed height
+  (`max-height:264px`), each scrolling inside its own `.card-body`. The digest used to be a
+  full-width navy `.brief-hero` above the row; it is the same live narrative, now the third
+  card (`.pay-digest-scope` + `.pay-digest-text`, emphasis in `--accent` because gold on a
+  white card is unreadable). Autopilot and radar are sorted **critical first** by
+  `bySeverity()` (high → med → low, stable), and the radar sorts BEFORE its `slice(0,12)`
+  so the twelve that survive the cut are the twelve that matter.
 - **Payroll ↔ Ledger reconciliation** — the piece no off-the-shelf payroll ships. Salary
   Payable **2100** vs what the payslips still say is outstanding, plus advances+loans
   (1250/1260) and the variance, with a **"why?"** explainer that lists the months where the

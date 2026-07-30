@@ -276,15 +276,11 @@
   <!-- 1 · the four-card dashboard row (cloned from [data-shell="dash"]) -->
   <div data-fill="dash"></div>
 
-  <!-- 2 · the narrated digest — every figure computed live from the books -->
-  <div class="brief-hero">
-    <div class="brief-date" data-k="digest-date"></div>
-    <h2 data-k="digest-title"></h2>
-    <div class="brief-narrative" data-k="digest-text"></div>
-  </div>
-
-  <!-- 3 · Autopilot (what should happen next) + Radar (what looks wrong) -->
-  <div class="two-col">
+  <!-- 2 · the brief row (owner 2026-07-30): Autopilot (what should happen next),
+       Radar (what looks wrong) and the narrated Digest (the month in words), as
+       THREE cards in ONE row of a fixed height. Each card scrolls inside itself,
+       so a long autopilot can never push the register down the page. -->
+  <div class="pay-brief-row">
 
     <div class="card">
       <div class="card-head">
@@ -322,9 +318,21 @@
       </div>
     </div>
 
+    <!-- the digest, every figure computed live from the books -->
+    <div class="card">
+      <div class="card-head">
+        <h3 data-k="digest-title"></h3>
+        <span class="card-sub" data-k="digest-sub"></span>
+      </div>
+      <div class="card-body">
+        <div class="pay-digest-scope" data-k="digest-scope"></div>
+        <div class="pay-digest-text" data-k="digest-text"></div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- 4 · the last 12 payroll months, and where the money goes by department -->
+  <!-- 3 · the last 12 payroll months, and where the money goes by department -->
   <div class="card mb-3">
     <div class="card-head">
       <h3 data-k="trend-title"></h3>

@@ -27,8 +27,10 @@
  * OVERVIEW (owner 2026-07-28) — the payroll command centre, built to the same
  * design language as Manage Banks: a four-card dashboard row (identity panel
  * with a hero figure + drill facts + the last payroll event · a mirrored
- * sparkline · a reconciliation against the general ledger · a mini stack), a
- * narrated digest, an AUTOPILOT of proposed next actions and an anomaly RADAR.
+ * sparkline · a reconciliation against the general ledger · a mini stack), then
+ * the BRIEF ROW (owner 2026-07-30): an AUTOPILOT of proposed next actions, an
+ * anomaly RADAR and the narrated DIGEST, three cards of one fixed height that
+ * scroll inside themselves, each list critical-first.
  * The autopilot never posts by itself — every proposal is a button (owner:
  * "automation will [be] on overview, summary"). Salary Manage heads with the
  * same dashboard row, scoped to the selected month.
@@ -1214,10 +1216,7 @@ function overviewView(page) {
     ]
   }));
 
-  /* ---- 2 · the narrated digest ------------------------------------------ */
-  digest(s, P, ym, series);
-
-  /* ---- 3 · autopilot (what to do next) + radar (what looks wrong) ------- */
+  /* ---- 2 · the brief row: autopilot · radar · digest --------------------- */
   fillH(s, 'auto-title', ui.icon('magic') + ' Payroll Autopilot');
   fillK(s, 'auto-sub', 'proposals only — nothing posts until you click');
   rowsInto(box(s, 'auto'), autopilot(ym, P), 'Nothing to do — this payroll is up to date.');
@@ -1226,7 +1225,9 @@ function overviewView(page) {
   fillK(s, 'radar-sub', 'click to open the employee');
   rowsInto(box(s, 'radar'), radar(P), 'No anomalies in the payroll book.');
 
-  /* ---- 4 · the Monthly Register + department cost ----------------------- */
+  digest(s, P, ym, series);
+
+  /* ---- 3 · the Monthly Register + department cost ----------------------- */
   fillH(s, 'trend-title', ui.icon('calendar3') + ' Monthly Register');
   fillK(s, 'trend-sub', 'click a month for every employee, every transaction, every figure');
   box(s, 'trend').appendChild(registerTable(monthSeries()));
@@ -1320,9 +1321,27 @@ function digest(s, P, ym, series) {
     ? 'The salary sheet and the general ledger ' + b('agree') + ' to the taka.'
     : 'The ledger and the sheet disagree by ' + b(ui.money(variance)) + ' — worth opening before month-end.');
 
-  fillK(s, 'digest-date', 'PAYROLL DIGEST · ' + ui.date(today(), 'long'));
-  fillK(s, 'digest-title', scopeFull() + ' — ' + PR().mLabel(ym));
+  // the digest is the third card of the brief row (owner 2026-07-30) — the date
+  // it was read on rides in the card sub, the scope and month head the narrative
+  fillH(s, 'digest-title', ui.icon('journal-text') + ' Payroll Digest');
+  fillK(s, 'digest-sub', ui.date(today(), 'long'));
+  fillK(s, 'digest-scope', scopeFull() + ' — ' + PR().mLabel(ym));
   fillH(s, 'digest-text', lines.join(' '));
+}
+
+/* CRITICAL FIRST (owner 2026-07-30). The autopilot and the radar are read three
+ * rows at a time inside a capped card now, so what is wrong must be at the top
+ * of the scroll, not wherever the checks happen to run. High before medium
+ * before low; inside one severity the original order stands, which keeps the
+ * month's own proposals (finalize, pay) above the standing housekeeping ones. */
+function bySeverity(list) {
+  var rank = { high: 0, med: 1, low: 2 };
+  return list.map(function (it, i) { return { it: it, i: i }; })
+    .sort(function (a, b) {
+      var d = (rank[a.it.sev] == null ? 3 : rank[a.it.sev]) - (rank[b.it.sev] == null ? 3 : rank[b.it.sev]);
+      return d || a.i - b.i;                       // stable: ties keep their order
+    })
+    .map(function (x) { return x.it; });
 }
 
 /* AUTOPILOT — everything the payroll calendar and the books say SHOULD happen
@@ -1416,7 +1435,7 @@ function autopilot(ym, P) {
       why: 'Salary Payable (2100) says ' + ui.money(P.glPayable) + ', the payslips say ' + ui.money(P.sheetOwed) + '.',
       action: 'Show me why', actionIcon: 'question-circle', on: function () { varianceExplainer(P, variance); } });
   }
-  return out;
+  return bySeverity(out);
 }
 
 /* RADAR — the things nobody asked about that a payroll manager would want to be
@@ -1466,7 +1485,8 @@ function radar(P) {
       why: ui.money(s.absentDeduction || 0) + ' deducted. Repeated months are an attendance conversation, not a payroll one.',
       on: (function (ss) { return function () { if (EPAL.people) EPAL.people.statement(ss.empId, ss.ym); }; })(s) });
   });
-  return out.slice(0, 12);
+  // sorted BEFORE the cut, so the twelve that survive are the twelve that matter
+  return bySeverity(out).slice(0, 12);
 }
 
 /* Why the ledger and the sheet differ — the honest answer, month by month, so

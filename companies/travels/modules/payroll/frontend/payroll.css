@@ -13,6 +13,49 @@
  * Only add here what genuinely has no house equivalent.
  * ========================================================================== */
 
+/* ============ THE BRIEF ROW — autopilot · radar · digest (owner 2026-07-30) ==
+   "The anomaly and autopilot section can take up to that much space… if the list
+   is long, just give a scroll bar… make total 3 card there, one for autopilot,
+   then anomaly, then digest." So the three answers the overview owes — what to
+   do next, what looks wrong, and the month in words — sit side by side in ONE
+   row of a FIXED height, and the LIST is what scrolls, never the page. A twelve
+   row autopilot used to push the Monthly Register a screen and a half down.
+
+   The digest moved in here out of the full-width navy .brief-hero it used to
+   own; it is the same live narrative, now the third card of the row.
+
+   No house equivalent: .two-col is a 1.6fr/1fr split and .three-col three equal
+   thirds, and neither CAPS its cards. The proportions are the owner's marked
+   boxes — the autopilot carries a sentence per row, the radar a name. */
+.pay-brief-row {
+  display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 18px; margin-bottom: 18px;
+  align-items: stretch;                 /* three cards, one height, one baseline */
+}
+/* THE CAP. The card becomes a column so the head stays put and only the body
+   travels; min-height:0 is what actually lets a grid child scroll — without it a
+   grid/flex item refuses to shrink below its content and grows instead. */
+.pay-brief-row > .card { max-height: 264px; display: flex; flex-direction: column; min-height: 0; }
+.pay-brief-row .card-head { flex: none; }
+.pay-brief-row .card-body { overflow-y: auto; min-height: 0; }
+/* the last row of a scrolled list keeps a margin the eye reads as a gap under
+   the card, and the reader cannot tell whether more follows — drop it, so the
+   list ends exactly where the scroll ends */
+.pay-brief-row .card-body > .brief-exc:last-child { margin-bottom: 0; }
+
+/* THE DIGEST CARD. On the navy hero the figures were gold on dark; on a white
+   card that is unreadable, so the emphasis is the accent at body weight — the
+   same treatment every other number on this desk gets. */
+.pay-digest-scope { font-weight: 700; font-size: var(--fs-small); margin-bottom: 6px; }
+.pay-digest-text { font-size: var(--fs-small); line-height: 1.75; color: var(--text-dim); }
+.pay-digest-text strong { color: var(--accent); font-weight: 700; }
+
+@media (max-width: 1100px) {
+  /* stacked, and the cap comes off — a phone scrolls the page, not three boxes */
+  .pay-brief-row { grid-template-columns: 1fr; }
+  .pay-brief-row > .card { max-height: none; }
+  .pay-brief-row .card-body { overflow-y: visible; }
+}
+
 /* WHERE THE MONEY GOES — the department doughnut beside its table.
    The ring carries the PROPORTION, the table the precise figures; the chart runs
    with its legend switched off because the table beside it already names every
