@@ -26,11 +26,33 @@
 
 ## ⏭️ STILL OPEN
 
-### T-PAY-TABLES — every table on the payroll desk, footed and printable (PLAN, 2026-07-30)
+### T-PAY-TABLES — every table on the payroll desk, footed and printable ✅ COMPLETE (2026-07-30)
 Owner: *"which table we work on same way?? … you go check the overall payroll, list
 how many we have and do plan."*
 
-**The count: 29 tables on the desk. 3 are footed and printable. 26 are not.**
+**DONE, all eight phases: 29 tables · 28 footed · 1 that should not be · 8 printed
+documents** (`PR-MR` · `PR-SR` · `PR-DS` · `PR-SP` · `PR-LB` · `PR-AR` · `PR-EL` ·
+`PR-PA`). It started at 3 footed and 26 not; the phase table below is the record.
+What the foots caught on the way: a money bug in `loanOutstanding` (every cash
+repayment dropped — ৳2.67 lakh — and EMI kept being taken from cleared loans), two
+label lies, a column that stopped footing to itself, two same-name-different-number
+collisions caught before they reached paper, and a compiled `view.js` that had never
+been rebuilt.
+
+**What is still open on the printing work — all owner calls, none of them blocking:**
+- Each concern's **own address / licence numbers** for its letterhead. A
+  single-company report currently prints its own name over the GROUP's contact block,
+  which is true but probably not what you want on a Travels document.
+- Whether the sign-off blocks should carry **real names** instead of the role labels
+  ("Accounts", "Head of HR & Admin", "Managing Director").
+- **EMI rounding:** `round(principal ÷ months)` can miss the principal by a taka or
+  two (two loans sit at ৳2). It self-heals through the recovery cap; say the word and
+  the last instalment absorbs the remainder instead.
+- Known and by design: PDF is the browser's own Save-as-PDF (no library — the site
+  stays a free static deploy), and `pay_prints` (the `Rev n` counter and print audit
+  trail) is browser-local until the backend owns it.
+- Unexercised, honestly: the blocked-approval foot only appears when a month fails
+  its arithmetic check, and no month in this data does.
 
 Two separate treatments, and not every table earns both:
 - **FOOT IT** — a totals row via `EPAL.table`'s `opts.totals(rows)`. Cheap, and
