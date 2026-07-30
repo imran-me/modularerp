@@ -130,12 +130,20 @@
 
   It reuses .brief-exc (the autopilot/radar row) deliberately — same voice, same
   spacing, and not one new CSS rule.
+
+  COLLAPSED BY DEFAULT (owner 2026-07-30: "make the marked icon placed here while
+  in all companies, clicking it will expand its card"). The note is read once and
+  then known, so it starts as nothing but its (i) — sitting on the exact spot the
+  full card's icon occupies, so expanding it grows the card DOWN from the icon
+  rather than moving anything sideways. The icon is therefore the [data-el="tog"]
+  BUTTON itself, not a div beside one: one element, both states.
 --------------------------------------------------------------------------- -->
-<div data-shell="scopenote" class="card mb-3">
+<div data-shell="scopenote" class="card mb-3 scopenote">
   <div class="card-body">
     <div class="brief-exc">
-      <div class="brief-exc-ico" data-k="ico"></div>
-      <div class="brief-exc-body">
+      <button type="button" class="brief-exc-ico scopenote-ico" data-el="tog" data-k="ico"
+              aria-expanded="false"></button>
+      <div class="brief-exc-body" data-el="body">
         <strong data-k="title"></strong>
         <span data-k="why"></span>
       </div>

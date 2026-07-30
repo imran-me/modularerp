@@ -490,6 +490,42 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · THE ALL-COMPANIES NOTE IS AN (i), AND THE CARD OPENS FROM IT
+
+**The ask** (owner, screenshot of Master Payroll ▸ Overview ▸ All Companies with the
+note's icon circled and an arrow drawn at it): *"make the marked icon placed here
+while in all companies, clicking it will expand its card."*
+
+The all-companies note ("Combined payroll — Group · Travels · …" and the paragraph
+explaining that a RUN belongs to one company) is a paragraph you read once and then
+know. It now ships **shut**: nothing but its info button, sitting on the exact spot
+the open card's icon occupied, so clicking it grows the card DOWN from the icon and
+nothing on the page moves sideways. Measured shut: **34×34 at x=366** — where the
+owner's arrow pointed; open: the same 944×156 card, same words, same place.
+
+One function, so all five tabs that show a note (Overview · Salary Manage · Loans ·
+Advance · Reports) got it at once, and it is the ONLY note of its kind in the repo —
+`grep data-shell="scopenote"` matches nothing outside `travels/modules/payroll`, and
+that desk is what Master Payroll and every company's Accounts ▸ Payroll tab mount.
+
+- The icon IS the toggle (`<button class="brief-exc-ico scopenote-ico" data-el="tog"
+  data-k="ico">`) — one element in both states, so `fillH(n,'ico',…)` is unchanged.
+- Shut, the `.card` skin is dropped (`.scopenote.is-shut` → no background/border/
+  shadow, `width:max-content`) rather than the element removed: it has to keep its
+  place in the flow. The body is hidden by an EXPLICIT `display:none` on the shut
+  class, not `[hidden]` — the trap already documented in `rowsInto`.
+- Open/shut lives in a module var (`noteShut`, default true), so shutting it on
+  Overview and walking to Loans does not hand you the paragraph again. Deliberately
+  NOT persisted to the store: the first sight of all-mode in a session still offers
+  the explanation. Nothing about single-company mode changed — the note never renders
+  there.
+
+**Verified:** boot sweep **253/253 routes × both themes, 0 console errors, 0 render
+failures**; a CDP driver clicks All Companies, screenshots shut and open in light and
+dark, toggles, and walks to Loans with 0 console errors and the state carried over.
+
+---
+
 ## 🆕 SESSION — 2026-07-29 · EVERY PAYROLL TRANSACTION SAYS WHERE IT WAS DONE FROM
 
 **The ask** (owner, on the employee file › Accounts tab): *"all transactions across

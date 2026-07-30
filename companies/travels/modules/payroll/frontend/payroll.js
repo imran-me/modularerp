@@ -220,12 +220,30 @@ function empCo(empId) { var e = empById(empId); return (e && e.companyId) || (is
 
 /* The panel that says what all-mode is showing and what it deliberately will not
  * do. It is a note, not a disabled button: the control has not been taken away,
- * it has been told which question it belongs to. */
+ * it has been told which question it belongs to.
+ *
+ * It starts SHUT — the (i) alone, on the spot the open card's icon occupies —
+ * because the note answers a question you ask once per desk, not once per tab
+ * (owner 2026-07-30). The open/shut choice is remembered in a module var, so it
+ * survives a tab click and a repaint: shutting it on Overview and walking to
+ * Loans does not hand you the long paragraph again. It is deliberately NOT
+ * persisted to the store — the first sight of all-companies mode in a session
+ * should still offer the explanation. */
+var noteShut = true;
 function scopeNote(title, why) {
   var n = shell('scopenote');
   fillH(n, 'ico', ui.icon('info-circle'));
   fillK(n, 'title', title);
   fillK(n, 'why', why);
+  var tog = part(n, 'tog');
+  function paint() {
+    n.classList.toggle('is-shut', noteShut);
+    tog.setAttribute('aria-expanded', noteShut ? 'false' : 'true');
+    tog.setAttribute('aria-label', noteShut ? 'What this tab is showing' : 'Hide this note');
+    tog.title = noteShut ? title : 'Hide this note';
+  }
+  tog.addEventListener('click', function () { noteShut = !noteShut; paint(); });
+  paint();
   return n;
 }
 /* TAB LABELS (owner 2026-07-29: "why scroll bar in the nav???? I said to make

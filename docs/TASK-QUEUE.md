@@ -26,6 +26,25 @@
 
 ## ⏭️ STILL OPEN
 
+### T-ALLCO-NOTE — the all-companies note collapses to its (i) ✅ (2026-07-30)
+Owner screenshot of Master Payroll ▸ Overview ▸ **All Companies**, the note's info
+icon circled with an arrow drawn at it: *"make the marked icon placed here while in
+all companies, clicking it will expand its card."*
+
+- The note now ships **shut** — nothing but the (i), on the exact spot the open
+  card's icon occupied (measured 34×34 at x=366), so expanding grows the card down
+  from the icon and nothing shifts sideways. Clicking again shuts it.
+- One `scopeNote()`, so all five tabs that show a note (Overview · Salary Manage ·
+  Loans · Advance · Reports) behave identically; the open card is the same 944×156
+  card with the same words as before.
+- The open/shut choice is remembered for the session (module var, not the store), so
+  it does not re-open on every tab click. Single-company mode is untouched — the note
+  only ever renders in all-companies mode.
+- Sources: `frontend/template.html` (the icon IS the toggle button) ·
+  `frontend/payroll.css` (`.scopenote.is-shut`) · `frontend/payroll.js` (`noteShut`),
+  rebuilt into `view.js`. Sweep 253/253 × both themes, 0 errors; shut/open
+  screenshotted in light and dark.
+
 ### T-ALLCO-PAYROLL — an "All Company" button before Group, giving a combined view ✅ (2026-07-29)
 Owner, with a screenshot of Master Accounts ▸ Master Payroll ▸ Loans and six red
 arrows drawn at the company switcher: *"the company switcher works fine, I am
