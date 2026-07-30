@@ -1040,7 +1040,19 @@
   function loanOutstanding(empId, exceptSlip) {
     var t = txnsFor(empId);
     var given = t.filter(function (x) { return x.type === 'loan'; }).reduce(function (a, x) { return a + x.amount; }, 0);
-    var repaid = t.filter(function (x) { return x.type === 'loan-repay' && x.slipId !== exceptSlip; }).reduce(function (a, x) { return a + x.amount; }, 0);
+    /* ⚠ THE BUG THIS GUARD FIXES (found 2026-07-30 by footing the loan register:
+     * the register summed ৳92,004 still due while this function said ৳3,59,505).
+     * A MANUAL repayment — cash or bank, not deducted from a payslip — carries no
+     * slipId. The test used to be `x.slipId !== exceptSlip`, and with no
+     * exceptSlip passed that reads `undefined !== undefined`, which is FALSE — so
+     * every hand-recorded repayment was silently dropped and the loan stayed
+     * outstanding at its full principal for ever. It also fed emiInstallment(),
+     * which caps the monthly deduction at this figure, so payroll would keep
+     * recovering EMI from a loan the employee had already paid off in cash.
+     * Exclude a slip's own repayment ONLY when a slip is actually being sized. */
+    var repaid = t.filter(function (x) {
+      return x.type === 'loan-repay' && !(exceptSlip && x.slipId === exceptSlip);
+    }).reduce(function (a, x) { return a + x.amount; }, 0);
     var settled = t.filter(function (x) { return x.type === 'settlement'; }).reduce(function (a, x) { return a + (x.loanCleared || 0); }, 0);
     return Math.max(0, given - repaid - settled);
   }

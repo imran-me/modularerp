@@ -3716,6 +3716,19 @@ function loanDetailModal(L) {
       ],
       rows: L.payments, pageSize: 8, totalKey: 'amount', exportName: 'loan-payments-' + L.empId + '.csv',
       pdfTitle: 'Loan payments — ' + L.empName,
+      /* THE FOOT: "paid" sums, and "due after this" shows the CLOSING balance — the
+       * last row's, which is where the loan actually stands. Adding a running
+       * balance column together is the classic wrong total (see the encashment
+       * column on the Monthly Register). */
+      totals: function (ps) {
+        if (!ps.length) return null;
+        var last = ps.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; })[ps.length - 1];
+        return { label: ps.length + (ps.length === 1 ? ' payment' : ' payments'), values: {
+          amount: ui.money(sum(ps, function (p) { return +p.amount || 0; })),
+          balance: '<span class="num">' + ui.money(last.balance) + '</span>' +
+            '<div class="xs text-mute nowrap">closing balance</div>'
+        } };
+      },
       empty: { icon: 'hourglass-split', title: 'Nothing repaid yet', hint: L.emi ? 'The next payroll run deducts ' + ui.money(L.emi) + '.' : 'No EMI plan — record a repayment when the money comes in.' }
     }).el ])
   ]));
@@ -3825,6 +3838,21 @@ function loansView(page) {
       // a company. Search is untouched (the table always has it).
       filters: coFilter(), filterPanel: isAll(),
       exportName: 'staff-loans.csv', pdfTitle: 'Staff loans outstanding' + (isAll() ? ' — ' + scopeFull() : ''),
+      /* THE FOOT. "Repaid via" is the one column a single figure cannot carry, so
+       * it foots as the SPLIT — how much of the money came back out of salary and
+       * how much was handed in — which is the whole reason the column exists. */
+      totals: function (rs) {
+        if (!rs.length) return null;
+        function S(f) { return sum(rs, f); }
+        return { label: rs.length + (rs.length === 1 ? ' person' : ' people'), values: {
+          taken: ui.money(S(function (r) { return r.taken; })),
+          back: ui.money(S(function (r) { return r.back; })),
+          out: ui.money(S(function (r) { return r.out; })),
+          via: '<span class="xs text-mute">salary ' + ui.money(S(function (r) { return r.viaSalary; })) +
+            ' · cash ' + ui.money(S(function (r) { return r.viaCash; })) + '</span>',
+          emi: ui.money(S(function (r) { return PR().emiInstallment(r.e.id); }))
+        } };
+      },
       actions: ui.actions({ edit: canCreate() ? function (r) { moneyForm(r.e, 'loan-repay'); } : null }), empty: { icon: 'bank', title: 'No active loans' }
     });
     var lc = frag('reg-card'); slot(lc, 'title').innerHTML = ui.icon('people') + ' Employees with loans';
@@ -3856,6 +3884,27 @@ function loansView(page) {
       rows: book, pageSize: 8, searchKeys: ['empName', 'empId', 'memo'], sortKey: 'date', sortDir: -1,
       filters: coFilter(), filterPanel: isAll(),
       exportName: 'loan-register.csv', pdfTitle: 'Staff Loan Register — ' + scopeFull(),
+      /* PRINT — the LOAN BOOK, as at today. The register IS the book, so its own
+       * toolbar is where the document belongs. */
+      toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+        title: 'Print the loan book — every loan, only the running ones, or only those with no EMI plan',
+        onclick: function () { loanPrintCentre(book); } }),
+      /* THE FOOT: the three money columns sum; STATUS counts instead, because
+       * "running or cleared" has no total — and a book whose foot says how many of
+       * its loans are still alive is answering the question the total raises. */
+      totals: function (ls) {
+        if (!ls.length) return null;
+        function S(f) { return sum(ls, f); }
+        var open = ls.filter(function (L) { return !L.closed; }).length;
+        return { label: ls.length + (ls.length === 1 ? ' loan' : ' loans'), values: {
+          principal: ui.money(S(function (L) { return L.principal; })),
+          paid: ui.money(S(function (L) { return L.paid; })),
+          due: ui.money(S(function (L) { return L.due; })),
+          via: '<span class="xs text-mute">salary ' + ui.money(S(function (L) { return L.viaSalary; })) +
+            ' · cash ' + ui.money(S(function (L) { return L.viaCash; })) + '</span>',
+          status: '<span class="xs text-mute">' + open + ' running · ' + (ls.length - open) + ' cleared</span>'
+        } };
+      },
       onRow: function (L) { loanDetailModal(L); },
       actions: [{ icon: 'eye', title: 'Open this loan', onClick: function (L) { loanDetailModal(L); } }],
       empty: { icon: 'bank', title: 'No loan has been disbursed yet' }
@@ -3886,6 +3935,16 @@ function loansView(page) {
       ], null, 2),
       rows: emis, pageSize: 8, totalKey: 'amount', exportName: 'emi-history.csv',
       filters: coFilter(), filterPanel: isAll(),
+      /* THE FOOT: the EMI column sums, and "loan due after" deliberately does not
+       * — it is a per-loan BALANCE at a moment in time, and adding fifteen of them
+       * together would produce a figure that never existed. */
+      totals: function (xs) {
+        if (!xs.length) return null;
+        return { label: xs.length + (xs.length === 1 ? ' deduction' : ' deductions'), values: {
+          amount: ui.money(sum(xs, function (x) { return +x.amount || 0; })),
+          after: '<span class="xs text-mute">a balance, not a sum</span>'
+        } };
+      },
       pdfTitle: 'Loan EMI Deduction History' + (isAll() ? ' — ' + scopeFull() : ''),
       onRow: function (x) { var h = (payIx[x.id] || [])[0]; if (h) loanDetailModal(h.L); },
       empty: { icon: 'bank', title: 'No EMI deductions yet' }
@@ -4138,6 +4197,20 @@ function loanTxnTable(txns, book, payIx) {
     rows: txns, searchKeys: ['empName', 'empId', 'memo'], pageSize: 10, exportName: 'loan-transactions.csv',
     filters: coFilter(), filterPanel: isAll(),
     pdfTitle: 'Loan transactions — ' + scopeFull(),
+    /* THE FOOT, and the one table on this tab where a single Amount total would be
+     * a LIE: these rows run in both directions — money lent out and money coming
+     * back — so summing the column nets a disbursement against a repayment and
+     * calls the result "amount". It foots as the two directions plus the net. */
+    totals: function (xs) {
+      if (!xs.length) return null;
+      var lent = sum(xs.filter(function (x) { return x.type === 'loan'; }), function (x) { return +x.amount || 0; });
+      var back = sum(xs.filter(function (x) { return x.type === 'loan-repay'; }), function (x) { return +x.amount || 0; });
+      return { label: xs.length + (xs.length === 1 ? ' transaction' : ' transactions'), values: {
+        amount: '<span class="num">' + ui.money(lent - back) + ' <span class="xs text-mute">net</span></span>' +
+          '<div class="xs text-mute nowrap">' + ui.money(lent) + ' lent · ' + ui.money(back) + ' repaid</div>',
+        lpaid: '', ldue: '<span class="xs text-mute">balances, not sums</span>'
+      } };
+    },
     onRow: function (x) { var h = hitsOf(x)[0]; if (h) loanDetailModal(h.L); },
     empty: { icon: 'journal', title: 'No transactions' }
   });
@@ -5285,6 +5358,266 @@ function payStaffNotes(rows, partial, allRows, pickLabel) {
   out.push({ tag: 'NOTE', text: 'Advances and loans are recovered from future pay, capped at what each month can ' +
     'bear; leave encashment accrues monthly against a 12-month service condition and settles in December.' });
   return out.slice(0, 9);
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 5 — the LOAN BOOK  (owner 2026-07-30, P5)
+ * ---------------------------------------------------------------------------
+ * One row per LOAN, not per person: "how much of the ৳20,000 taken in May is
+ * left" is a question about a loan, and a person can hold three of them. Dated
+ * "as at", like the staff statement, because a loan book is a set of balances.
+ *
+ * The column that makes it a BOOK rather than a list is "months to clear": at the
+ * EMI actually set, when does this debt end? A loan with no EMI plan has no
+ * answer, and that is exactly the row a reader needs to see — so it prints
+ * "no plan" and the same loan is named again in the exceptions.
+ * ------------------------------------------------------------------------- */
+function payLoanReport(loans, allLoans, pickLabel) {
+  var co = isAll(), asAt = today();
+  var T = { principal: 0, paid: 0, due: 0, emi: 0, viaSalary: 0, viaCash: 0 };
+  loans.forEach(function (L) {
+    T.principal += L.principal || 0; T.paid += L.paid || 0; T.due += L.due || 0;
+    T.viaSalary += L.viaSalary || 0; T.viaCash += L.viaCash || 0;
+    if (!L.closed) T.emi += +L.emi || 0;
+  });
+  var open = loans.filter(function (L) { return !L.closed; });
+  var noPlan = open.filter(function (L) { return !(+L.emi > 0); });
+  var partial = loans.length !== allLoans.length;
+  var id = payReportId('LB', asAt.slice(0, 7)), rev = payRev(id);
+  // months to clear the WHOLE open book at the EMI currently scheduled
+  var bookMonths = T.emi > 0 ? Math.ceil(sum(open, function (L) { return L.due; }) / T.emi) : null;
+
+  var w = payWidths(co ? [3, 14, 7, 9.5, 9, 9, 9, 8.5, 8, 12, 8] : [3, 15, 10, 9.5, 9.5, 9.5, 9, 8.5, 13, 8.5]);
+  var head = [{ label: '#', width: w[0] }, { label: 'Employee', sub: 'ID', width: w[1] }]
+    .concat(co ? [{ label: 'Company', width: w[2] }] : [])
+    .concat([{ label: 'Taken on', sub: 'EMI plan' }, { label: 'Principal', num: true },
+      { label: 'Repaid', num: true }, { label: 'Still due', num: true },
+      { label: 'EMI a month', num: true }, { label: 'Months to clear', num: true },
+      { label: 'Repaid via' }, { label: 'Status' }]
+      .map(function (h, i) { h.width = w[i + (co ? 3 : 2)]; return h; }));
+
+  var rowCells = loans.map(function (L, i) {
+    var months = L.closed ? '–' : (+L.emi > 0 ? String(Math.ceil(L.due / L.emi)) : 'no plan');
+    var via = [];
+    if (L.viaSalary > 0) via.push('salary ' + payMoney(L.viaSalary));
+    if (L.viaCash > 0) via.push('cash ' + payMoney(L.viaCash));
+    return [{ v: String(i + 1), num: true }, { v: esc(L.empName), strong: true, sub: esc(L.empId) }]
+      .concat(co ? [{ v: esc(coShort(L.companyId)) }] : [])
+      .concat([
+        { v: esc(ui.date(L.date)), sub: L.emiMonths ? L.emiMonths + '-month plan' : 'no plan' },
+        { v: payMoney(L.principal), num: true },
+        { v: payMoney(L.paid), num: true, sub: L.principal ? loanPct(L) + '%' : '' },
+        { v: payMoney(L.due), num: true, strong: true },
+        { v: payMoney(L.emi), num: true },
+        { v: months, num: true },
+        { v: via.length ? esc(via.join(' · ')) : '–' },
+        { v: L.closed ? 'Cleared' : 'Running' }
+      ]);
+  });
+  var totals = [{ v: '' }, { v: 'Total — ' + loans.length + (loans.length === 1 ? ' loan' : ' loans') }]
+    .concat(co ? [{ v: '' }] : [])
+    .concat([{ v: '' }, { v: payMoney(T.principal), num: true }, { v: payMoney(T.paid), num: true },
+      { v: payMoney(T.due), num: true }, { v: payMoney(T.emi), num: true },
+      // NOT a sum of the column: the book's own runway at the scheduled EMI
+      { v: bookMonths == null ? '–' : String(bookMonths), num: true, sub: 'at this EMI' },
+      { v: 'salary ' + payMoney(T.viaSalary) + ' · cash ' + payMoney(T.viaCash) },
+      { v: open.length + ' running · ' + (loans.length - open.length) + ' cleared' }]);
+
+  /* THE AGE OF THE DEBT — a book is judged by how old its outstanding money is,
+   * and nothing else on the desk answers it. Buckets by when the loan was taken. */
+  var buckets = [['Taken this year', 0, 12], ['1 to 2 years old', 12, 24], ['Over 2 years old', 24, 1e4]];
+  var nowMs = new Date(asAt).getTime();
+  function ageMonths(L) { return Math.max(0, Math.round((nowMs - new Date(L.date).getTime()) / 2629800000)); }
+  var bw = payWidths([40, 14, 23, 23]);
+  var bucketRows = buckets.map(function (b) {
+    var inB = open.filter(function (L) { var a = ageMonths(L); return a >= b[1] && a < b[2]; });
+    return [{ v: b[0] }, { v: String(inB.length), num: true },
+      { v: payMoney(sum(inB, function (L) { return L.principal; })), num: true },
+      { v: payMoney(sum(inB, function (L) { return L.due; })), num: true }];
+  });
+
+  return {
+    docTitle: payFileName('LoanBook', asAt.slice(0, 7), asAt.slice(0, 7)),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Staff Loan Book' + (isAll() ? '' : ' — ' + coFull(CID)),
+    scope: [
+      'As at ' + ui.date(asAt, 'long') + ' · ' + loans.length + (loans.length === 1 ? ' loan' : ' loans') +
+        ' · ' + open.length + ' still running · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)),
+      'A staff loan is interest-free and recovered from pay at the EMI set when it was disbursed, capped each month ' +
+        'at what the salary can bear; a repayment can also be handed in as cash. "Months to clear" is what the ' +
+        'CURRENT EMI implies, not a contractual maturity.'
+    ],
+    notice: partial ? 'Partial selection — ' + loans.length + ' of ' + allLoans.length +
+      ' loans' + (pickLabel ? ', ' + pickLabel : '') + '. Totals below reflect the selected rows only.' : null,
+    kpis: [
+      { label: 'Loans on this book', value: String(loans.length), sub: open.length + ' running · ' + (loans.length - open.length) + ' cleared' },
+      { label: 'Disbursed', value: payMoney(T.principal), sub: 'principal, all time' },
+      { label: 'Repaid', value: payMoney(T.paid), sub: T.principal ? payPct(T.paid / T.principal * 100) + ' of what was lent' : '' },
+      { label: 'Outstanding', value: payMoney(T.due), sub: 'still recoverable from staff' },
+      { label: 'Scheduled EMI', value: payMoney(T.emi), sub: bookMonths == null ? 'no EMI set on the open book' : 'clears the book in about ' + bookMonths + ' months' }
+    ],
+    table: { wide: true,
+      groups: [{ span: co ? 4 : 3 }, { label: 'The loan', span: 3 },
+        { label: 'Recovery', span: 3 }, { label: '', span: 1 }],
+      head: head, rows: rowCells, totals: totals },
+    panelPairs: [[
+      { title: 'The book, both ways', lines: [
+        { k: 'Disbursed, all time', v: payMoney(T.principal) },
+        { k: 'Recovered from salary', v: payBrk(T.viaSalary) },
+        { k: 'Recovered as cash or bank', v: payBrk(T.viaCash) },
+        { k: 'Outstanding', v: payMoney(T.due), rule: true },
+        { k: 'EMI scheduled a month', v: payMoney(T.emi) },
+        { k: 'Loans with no EMI plan', v: noPlan.length ? String(noPlan.length) + ' · ' + payMoney(sum(noPlan, function (L) { return L.due; })) : '–' },
+        { k: bookMonths == null ? 'Runway at current EMI' : 'Clears in about', v: bookMonths == null ? 'not recoverable on a schedule' : bookMonths + ' months', close: true }
+      ] },
+      { title: 'How old the outstanding money is', table: {
+        head: [{ label: 'Taken', width: bw[0] }, { label: 'Loans', num: true, width: bw[1] },
+          { label: 'Principal', num: true, width: bw[2] }, { label: 'Still due', num: true, width: bw[3] }],
+        rows: bucketRows,
+        totals: [{ v: 'Running loans' }, { v: String(open.length), num: true },
+          { v: payMoney(sum(open, function (L) { return L.principal; })), num: true },
+          { v: payMoney(sum(open, function (L) { return L.due; })), num: true }] } }
+    ]],
+    notesTitle: 'Exceptions requiring attention',
+    notes: payLoanNotes(loans, open, noPlan, partial, allLoans, pickLabel, ageMonths),
+    signoff: [{ role: 'Prepared by', name: payUser() }, { role: 'Checked by', name: 'Accounts' },
+      { role: 'Verified by', name: 'Head of HR & Admin' }, { role: 'Approved by', name: 'Managing Director' }],
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · balances as at ' + ui.date(asAt),
+    previewTitle: 'Staff Loan Book — print preview'
+  };
+}
+
+function payLoanNotes(loans, open, noPlan, partial, allLoans, pickLabel, ageMonths) {
+  var out = [];
+  /* A LEAVER WITH A RUNNING LOAN is the one that cannot wait: the recovery route
+   * is the payslip, and there are no more payslips. */
+  open.forEach(function (L) {
+    var st = L.emp ? (L.emp.status || 'active') : 'active';
+    if (st !== 'active') out.push({ tag: 'HIGH', text: L.empName + ' is ' + st + ' and still owes ' +
+      payMoney(L.due) + ' on the loan taken ' + ui.date(L.date) + '. Salary recovery has ended — settle it separately.' });
+  });
+  noPlan.forEach(function (L) {
+    out.push({ tag: 'HIGH', text: L.empName + ': ' + payMoney(L.due) + ' outstanding with NO EMI plan, so nothing ' +
+      'is recovered from pay each month. Set an instalment or it stays where it is.' });
+  });
+  open.forEach(function (L) {
+    if (+L.emi > 0 && L.due / L.emi > 24) out.push({ tag: 'WATCH', text: L.empName + '\'s loan runs past two years — ' +
+      payMoney(L.due) + ' at ' + payMoney(L.emi) + ' a month is ' + Math.ceil(L.due / L.emi) + ' more instalments.' });
+  });
+  open.forEach(function (L) {
+    if (ageMonths(L) >= 24) out.push({ tag: 'WATCH', text: L.empName + '\'s loan was taken ' + ui.date(L.date) +
+      ' — over two years ago — and ' + payMoney(L.due) + ' is still outstanding.' });
+  });
+  open.forEach(function (L) {
+    if (!L.paid) out.push({ tag: 'WATCH', text: L.empName + ': nothing has been repaid on the ' +
+      payMoney(L.principal) + ' taken ' + ui.date(L.date) + '.' });
+  });
+  if (partial) out.push({ tag: 'NOTE', text: 'Partial selection: ' + loans.length + ' of ' + allLoans.length +
+    ' loans in the book' + (pickLabel ? ' (' + pickLabel + ')' : '') + '. The totals row covers the printed rows only.' });
+  out.push({ tag: 'NOTE', text: 'Staff loans carry no interest. Recovery is capped each month at what the salary can ' +
+    'bear, so an instalment that does not fit is carried to the next month rather than deducted in part.' });
+  return out.slice(0, 9);
+}
+
+/* THE LOAN BOOK PICKER — which loans, and nothing else. Same shape as the staff
+ * picker: no month, no run, just the set. */
+function loanPrintCentre(book) {
+  if (!book || !book.length) { ui.toast('No loan has been disbursed yet', 'warn'); return; }
+  var loans = book.slice();          // already newest-first from loanRows()
+  var pick = {}, q = '', pickWas = null;
+  loans.forEach(function (L) { pick[L.id] = true; });
+  function chosen() { return loans.filter(function (L) { return pick[L.id]; }); }
+
+  var body = el('div.pay-print'), rowHost = el('div.pay-print-rows'), rCount = el('div.pay-print-count');
+  var searchIn = el('input.input', { placeholder: 'Search name, ID or note…',
+    oninput: ui.debounce(function () { q = searchIn.value.toLowerCase(); drawRows(); }, 120) });
+  var goBtn = null;
+
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '1 · Scope and date' }),
+    el('div.pay-print-scope', null, [
+      el('div', null, [ el('strong', { text: scopeFull() }),
+        el('div.text-mute.sm', { text: 'balances as at ' + ui.date(today(), 'long') +
+          ' · report id ' + payReportId('LB', today().slice(0, 7)) }) ]),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-left-right') + ' Change company',
+        onclick: function () { m.close(); ui.toast('Pick the company from the switcher above, then print again', 'info'); } })
+    ])
+  ]));
+
+  function drawRows() {
+    rowHost.innerHTML = '';
+    var shown = loans.filter(function (L) {
+      if (!q) return true;
+      return (L.empName + ' ' + L.empId + ' ' + (L.memo || '')).toLowerCase().indexOf(q) >= 0;
+    });
+    shown.forEach(function (L) {
+      var cb = el('input', { type: 'checkbox', checked: pick[L.id] ? 'checked' : null,
+        onchange: function () { pick[L.id] = cb.checked; pickWas = null; syncCounts(); } });
+      rowHost.appendChild(el('label.pay-print-row', null, [ cb,
+        el('span.pay-print-row-n', { text: L.empName }),
+        isAll() ? el('span.badge', { text: coShort(L.companyId) }) : null,
+        el('span.text-mute.xs', { text: ui.date(L.date) }),
+        el('span.badge' + (L.closed ? '.badge-good' : '.badge-warn'), { text: L.closed ? 'Cleared' : 'Running' }),
+        +L.emi > 0 ? null : el('span.badge.badge-bad', { text: 'No EMI' }),
+        el('span.pay-print-row-v', { text: ui.money(L.due) + (L.closed ? '' : ' due') })
+      ].filter(Boolean)));
+    });
+    if (!shown.length) rowHost.appendChild(el('div.text-mute.sm', { text: 'No loan matches “' + q + '”.' }));
+  }
+  function only(fn, label) { loans.forEach(function (L) { pick[L.id] = !!fn(L); }); pickWas = label || null; drawRows(); syncCounts(); }
+  function add(fn) { loans.forEach(function (L) { if (fn(L)) pick[L.id] = true; }); pickWas = null; drawRows(); syncCounts(); }
+  var byCoSel = el('select.select', { onchange: function () {
+    var v = byCoSel.value; if (v !== '__') add(function (L) { return L.companyId === v; }); byCoSel.value = '__'; } });
+  (function fill() {
+    var cos = {};
+    loans.forEach(function (L) { cos[L.companyId] = 1; });
+    byCoSel.appendChild(el('option', { value: '__', text: 'Add by company…' }));
+    Object.keys(cos).sort().forEach(function (c) { byCoSel.appendChild(el('option', { value: c, text: coShort(c) })); });
+    byCoSel.style.display = isAll() ? '' : 'none';
+  })();
+
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '2 · Which loans' }),
+    el('div.pay-print-bulk', null, [ searchIn,
+      el('button.btn.btn-sm.btn-ghost', { text: 'Everything lent', onclick: function () { only(function () { return true; }, null); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () { only(function () { return false; }, null); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('hourglass-split') + ' Only running',
+        onclick: function () { only(function (L) { return !L.closed; }, 'running loans only'); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('check2-circle') + ' Only cleared',
+        onclick: function () { only(function (L) { return !!L.closed; }, 'cleared loans only'); } }),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('exclamation-triangle') + ' Only without an EMI plan',
+        title: 'Running loans with no instalment set — nothing is being recovered from pay',
+        onclick: function () { only(function (L) { return !L.closed && !(+L.emi > 0); }, 'loans with no EMI plan only'); } }),
+      byCoSel ]),
+    rowHost, rCount
+  ]));
+
+  function syncCounts() {
+    var sel = chosen();
+    rCount.textContent = sel.length + ' of ' + loans.length + (loans.length === 1 ? ' loan' : ' loans') +
+      ' selected' + (pickWas ? ' · ' + pickWas : '') + ' · still due ' +
+      ui.money(sum(sel, function (L) { return L.due; }));
+    if (goBtn) { goBtn.disabled = !sel.length; goBtn.style.opacity = sel.length ? 1 : .5; }
+  }
+
+  var m = ui.modal({
+    title: 'Print the loan book — ' + scopeShort(), icon: 'printer', size: 'lg', body: body,
+    actions: [
+      { label: 'Cancel', onClick: function () {} },
+      { label: 'Preview', icon: 'eye', variant: 'primary', onClick: function () {
+          var sel = chosen();
+          if (!sel.length) { ui.toast('Tick at least one loan', 'error'); return false; }
+          EPAL.report.open(payLoanReport(sel, loans, pickWas));
+        } }
+    ]
+  });
+  goBtn = m.box.querySelector('.modal-foot .btn-primary');
+  drawRows(); syncCounts();
+  return m;
 }
 
 /* ---------------------------------------------------------------------------

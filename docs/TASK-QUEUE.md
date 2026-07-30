@@ -47,7 +47,7 @@ Two separate treatments, and not every table earns both:
 | P2 ✅ | Salary Manage | Payroll History | done | reuses `PR-MR` (same `monthSeries()`) |
 | P3 ✅ | Salary Manage | **Salary sheet** | done (`sheetTotals`) | **`PR-DS` Salary Disbursement Sheet** — signature line per employee |
 | P4 ✅ | Staff | **Staff Accounts** | done | **`PR-SP` Staff Position Statement** — as at, not per month |
-| P5 | Loans | staff-loans · loan-register · emi-history · loan payments (modal) · loan transactions | ⏭ ×5 | ⏭ **Loan Book** |
+| P5 ✅ | Loans | staff-loans · loan-register · emi-history · loan payments (modal) · loan transactions | done ×5 | **`PR-LB` Staff Loan Book** |
 | P6 | Advance | advance outstanding · advance requests · advance transactions | ⏭ ×3 | ⏭ **Advance Register** |
 | P7 | Reports | payroll-by-account (+ its drill) · encashment liability · loan outstanding · department cost · increment history · simpleTbl lists | ⏭ ×7 | ⏭ **Encashment liability schedule** + **Payroll ↔ ledger reconciliation** (the two an auditor asks for by name) |
 | P8 | drills & modals | month transactions · money movements · ledger postings · variance explainer · payslip list · template list · structure compare · blocked-approval check | ⏭ ×8 | none — a drill is not a document |
@@ -56,6 +56,66 @@ The Payslip already has its own printed artifact (`EPAL.people.payslipPrint`), s
 needs footing only. Each phase is one commit, verified the same way: sweep both
 themes + a driver that checks the footed figure against an INDEPENDENT sum out of
 the store.
+
+### T-PAY-P5 — the Loan Book, and the engine bug footing it found ✅ (2026-07-30)
+
+**⚠ THE FOOT FOUND A MONEY BUG.** The loan register footed **৳92,004** still due
+while the tab's own KPI and Staff Accounts said **৳3,59,505** — two readers of the
+same loans, ৳2.67L apart. Cause, in `platform/engines-library/payroll.js`:
+
+```js
+// before
+x.type === 'loan-repay' && x.slipId !== exceptSlip
+```
+A **manual** repayment (cash or bank, not deducted from a payslip) carries no
+`slipId`. With no `exceptSlip` passed, that test reads `undefined !== undefined` →
+**false**, so every hand-recorded repayment was silently dropped and the loan
+stayed outstanding at its full principal for ever. It also fed `emiInstallment()`,
+which caps the monthly deduction at that figure — so **payroll would keep
+recovering EMI from a loan the employee had already paid off in cash**.
+
+Fixed to `!(exceptSlip && x.slipId === exceptSlip)` — exclude a slip's own
+repayment only when a slip is actually being sized. After it, a per-employee probe
+finds **zero** disagreement between `loanOutstanding()` and the rebuilt loan book,
+and both tables foot to ৳92,004. Knock-on: "Employees with loans" drops from 10
+people to the 4 who really owe; the Loans KPI, Staff Accounts' *Loan out* and P4's
+*Owed by staff* all fall to the true figure; and P4's five "loan with no EMI set"
+exceptions disappear, because those loans were repaid, not unscheduled.
+
+**Five tables footed**, each by what its columns actually mean:
+- *Employees with loans* — taken · repaid · still due · EMI sum, and **Repaid via
+  foots as the split** (`salary ৳0 · cash ৳3,72,996`), which is the only honest
+  total for a column that exists to say HOW the money came back.
+- *Loan register* — the three money columns, and **Status counts** (`5 running ·
+  8 cleared`) instead of pretending to a total.
+- *EMI history* — the EMI column sums; **"loan due after" refuses to**, because it
+  is a per-loan balance at a moment and adding fifteen of them invents a figure.
+- *Loan payments* (per-loan modal) — paid sums, "due after this" shows the
+  **closing balance**, the same rule as the encashment column.
+- *Loan transactions* — the one table where a single Amount total would be a LIE:
+  the rows run both ways, so it foots **net, with both directions beneath**
+  (`৳92,004 net · ৳10,92,000 lent · ৳9,99,996 repaid`).
+
+**`PR-LB` Staff Loan Book** — one row per LOAN, not per person ("how much of the
+৳20,000 taken in May is left" is a question about a loan, and one person can hold
+three). As at, like the staff statement. Columns: `#` · Employee (ID) · Company ·
+Taken on (EMI plan) · Principal · Repaid (% beneath) · **Still due** · EMI a month
+· **Months to clear** · Repaid via · Status. The totals row's *months to clear* is
+NOT a column sum — it is the whole open book's runway at the EMI actually
+scheduled. Panels: *The book, both ways* (disbursed → recovered from salary and
+from cash → outstanding → runway) and **How old the outstanding money is** (buckets
+by when each loan was taken — nothing else on the desk answered that).
+Picker: Everything lent · Clear all · **Only running** · **Only cleared** · **Only
+without an EMI plan** · add by company.
+- Verified: sweep 253/253 × both themes, 0 errors; foots match an independent walk
+  of `loanBook()` over every employee (13 loans · ৳10,92,000 disbursed · ৳9,99,996
+  repaid · ৳92,004 outstanding · 5 running), *Only running* prints 5 of 13, and the
+  pages were read at 1:1.
+- 🔎 **Small thing spotted, not changed:** EMI is `round(principal ÷ months)`, so
+  months × EMI can miss the principal by a taka or two (two loans here sit at ৳2
+  still due). It self-heals — the cap means the next deduction takes exactly the
+  remainder — but if the owner wants the last instalment to absorb the rounding,
+  say so and it is a one-line change in the engine.
 
 ### T-PAY-P4 — the Staff Position Statement ✅ (2026-07-30)
 The first document on the desk that is **not about a month**. Staff Accounts is a

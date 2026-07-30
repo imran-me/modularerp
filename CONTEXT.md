@@ -490,6 +490,51 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · THE LOAN BOOK (P5) — AND THE MONEY BUG ITS FOOT FOUND
+
+**This is why the totals rows are worth building.** The loan register footed
+**৳92,004** still due while the Loans KPI and Staff Accounts said **৳3,59,505** —
+two readers of the same loans, ৳2.67 lakh apart, and nobody could see it until the
+column had a total under it.
+
+**The cause, in `platform/engines-library/payroll.js`:** `loanOutstanding()` tested
+`x.slipId !== exceptSlip` to skip a slip's own repayment. A MANUAL repayment — cash
+or bank, not deducted from a payslip — carries no `slipId`, so with no `exceptSlip`
+passed the test read `undefined !== undefined`, which is **false**, and every
+hand-recorded repayment was silently dropped: the loan stayed outstanding at its
+full principal for ever. It also fed `emiInstallment()`, which caps the monthly
+deduction at that figure — so **payroll would keep recovering EMI from a loan the
+employee had already paid off in cash**. Now `!(exceptSlip && x.slipId ===
+exceptSlip)`: exclude a slip's own repayment only when a slip is actually being
+sized. A per-employee probe afterwards finds ZERO disagreement between the function
+and the rebuilt loan book. Knock-on: *Employees with loans* drops from 10 to the 4
+who really owe, and P4's five "loan with no EMI set" exceptions vanish — those loans
+were repaid, not unscheduled.
+
+**Five tables footed, each by what its columns mean:** *Repaid via* foots as the
+SPLIT (`salary ৳0 · cash ৳3,72,996`) because that column exists to say how the
+money came back; *Status* counts (`5 running · 8 cleared`) rather than pretending to
+a total; *loan due after* REFUSES to sum, being a per-loan balance at a moment; the
+per-loan payments table shows a CLOSING balance; and *Loan transactions* — where a
+single Amount total would be a lie, the rows running both ways — foots net with both
+directions beneath it (`৳92,004 net · ৳10,92,000 lent · ৳9,99,996 repaid`).
+
+**`PR-LB` Staff Loan Book** — one row per LOAN, not per person, because "how much of
+the ৳20,000 taken in May is left" is a question about a loan and one person can hold
+three. Its *months to clear* total is not a column sum but the open book's runway at
+the EMI actually scheduled, and a second panel buckets the outstanding money by AGE
+— nothing else on the desk answered that. Picker: Everything lent · Only running ·
+Only cleared · **Only without an EMI plan** · add by company.
+
+Verified: sweep 253/253 × both themes, 0 errors; every foot matches an independent
+walk of `loanBook()` over every employee (13 loans · ৳10,92,000 disbursed ·
+৳9,99,996 repaid · ৳92,004 outstanding · 5 running); pages read at 1:1.
+🔎 Noted, not changed: EMI is `round(principal ÷ months)`, so two loans here sit at
+৳2 still due. It self-heals through the recovery cap; say the word and the last
+instalment can absorb the rounding instead.
+
+---
+
 ## 🆕 SESSION — 2026-07-30 · THE STAFF POSITION STATEMENT (P4)
 
 **The first payroll document that is not about a month.** Staff Accounts is a set
