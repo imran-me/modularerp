@@ -1192,6 +1192,25 @@ drift apart. One edit ships to all six companies.
   each is off by. · **`emiGap()`** audits every non-draft slip ever written: EMI a sheet
   SHOWED against EMI that actually moved. Harness: `node tools/verify/books.mjs payslip`
   (the arithmetic, the ledger, the loan book, the owner's reported rows) and `… emigap`.
+- **THE PAYROLL AUDIT** (`node tools/verify/payroll-audit.mjs [--verbose]`, 2026-07-30) —
+  every payroll account and every table that restates a payslip, footed against the ledger
+  in a booted app: 1250 · 1260 · 2100 · 2110 · 2120 · 2150 against the records; the row
+  maths on every slip ever written; every journal balancing; the sheet, monthly register,
+  loan register, arrears, printed payslip and employee ledger agreeing; and the sanity
+  rules (nothing negative, no orphan slip, no EMI over what is owed). **It found four real
+  faults**, all fixed: (1) `platform/kit/loans.js`'s one-time "detach the loans desk from
+  the GL" cleanup matched `^GL-(LNOPEN|LOAN|LREP|LNWO)-` and so **deleted PAYROLL's
+  staff-loan journals** — ৳92,000 of loans with a record and no journal, 1260 reading ৳4
+  against a register of ৳92,004 (it now excludes `source==='payroll'`); (2) the journal id
+  for a loan/advance/repayment/bonus was built from a COUNT, so deleting one money event
+  made the next posting **overwrite a live journal** — ids now derive from the txn's own id
+  (`txnGlId`); (3) the employee ledger credited a **bonus** that `bonus()` had already paid
+  out and never debited it, and never credited back a **recovered advance** (a loan had its
+  repayment row, an advance had none) — one ledger closed ৳39,000 high, another ৳33,000
+  low; (4) the loan register filed an EMI taken at accrual as a **cash** repayment because
+  it sniffed the memo for `EMI auto-deducted from ` (now `isEmiRepay`, which reads the
+  slipId the txn carries). `EPAL.payroll.journalGap()` reports money events with no journal
+  — read-only, because posting a journal for a record is a decision about someone's books.
 - **Payroll ↔ Ledger reconciliation** — the piece no off-the-shelf payroll ships. Salary
   Payable **2100** vs what the payslips still say is outstanding, plus advances+loans
   (1250/1260) and the variance, with a **"why?"** explainer that lists the months where the

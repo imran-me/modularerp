@@ -680,6 +680,41 @@
     return out;
   }
 
+  /* ============ MONEY EVENTS WITH NO JOURNAL (audit 2026-07-30) ==============
+   * The books can only be trusted if every advance, loan, repayment and bonus in
+   * pay_txns has an entry behind it. This finds the ones that do not — by AMOUNT
+   * against the account each type must have touched, so it catches a journal that
+   * was overwritten (see txnGlId) as well as one that was never written.
+   * READ-ONLY on purpose: it reports, it does not post. Posting a journal for a
+   * record is a decision about someone's books, not a repair a page load makes. */
+  function journalGap(opts) {
+    opts = opts || {};
+    var WANT = { advance: { acct: '1250', side: 'dr' }, loan: { acct: '1260', side: 'dr' },
+                 'loan-repay': { acct: '1260', side: 'cr' }, bonus: { acct: '5100', side: 'dr' } };
+    var entries = (L() && L().entries) ? L().entries() : [];
+    var used = {};
+    var out = { total: 0, rows: [] };
+    S.list('pay_txns').filter(function (x) {
+      return WANT[x.type] && (!opts.companyId || x.companyId === opts.companyId);
+    }).sort(function (a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; }).forEach(function (x) {
+      // an EMI deducted from a payslip is carried by that month's ACCRUAL entry,
+      // not by one of its own — it is not missing, it is somewhere else
+      if (x.type === 'loan-repay' && x.slipId) return;
+      var w = WANT[x.type], amt = round(x.amount);
+      var hit = entries.filter(function (e) {
+        if (used[e.id]) return false;
+        if (e.party && x.empId && e.party !== x.empId) return false;
+        return (e.lines || []).some(function (l) { return l.account === w.acct && Math.abs(round(l[w.side] || 0) - amt) < 1; });
+      })[0];
+      if (hit) { used[hit.id] = true; return; }
+      out.total += amt;
+      out.rows.push({ txnId: x.id, type: x.type, ym: String(x.date || '').slice(0, 7), date: x.date,
+        empId: x.empId, empName: x.empName, companyId: x.companyId, amount: amt, memo: x.memo || '' });
+    });
+    out.total = round(out.total);
+    return out;
+  }
+
   // Finalize: lock the run and ACCRUE every payslip into the GL (idempotent per head).
   // The row-by-row proof runs FIRST and a failure blocks the approval outright —
   // an unbalanced row must not reach the general ledger.
@@ -875,15 +910,34 @@
     }
     return { account: acct, name: src && src.bank ? src.bank.name : '' };
   }
+  /* ============ A JOURNAL ID IS AN IDENTITY, NOT A COUNT ====================
+   * (audit 2026-07-30 — the demo book shipped ৳92,000 of staff loans that had a
+   * pay_txns record and NO journal, so 1260 read ৳4 while the loan register read
+   * ৳92,004.)
+   *
+   * Every one of these postings used to name its entry
+   * GL-LOAN-<emp>-<how many loans this person already has + 1>. A COUNT IS NOT AN
+   * IDENTITY: delete or reorder one money event — unpay() deletes repayment rows,
+   * a correction removes an advance — and the next posting computes a number that
+   * is already in use. glPost upserts by id, so it does not ADD an entry, it
+   * OVERWRITES the live one: the record survives, its journal does not, and the
+   * ledger silently understates by exactly that amount. Proved with two loans and
+   * one deletion.
+   *
+   * The txn's own id is unique for ever (PT-<time36>-<random>), so the entry is
+   * built FROM it and can never collide. Rows posted under the old scheme keep
+   * their ids — nothing re-posts them — so no history moves. */
+  function txnGlId(prefix, rec) { return 'GL-' + prefix + '-' + rec.id; }
   function advance(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
-    var glId = 'GL-ADV-' + empId + '-' + ((txnsFor(empId).filter(function (t) { return t.type === 'advance'; }).length) + 1);
+    var rec = txn({ type: 'advance', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Advance salary' });
+    var glId = txnGlId('ADV', rec);
     var src = payThrough(opts, 'out', amount, 'ADV-' + empId, 'Advance salary', empId, cid, glId);
     glPost(glId, opts.date || today(), cid, 'ADV-' + empId,
       'Advance salary · ' + empName(empId) + (src.name ? ' · ' + src.name : ''), 'payroll', empId,
       [{ account: '1250', dr: amount, cr: 0 }, { account: src.account, dr: 0, cr: amount }]);
-    return txn({ type: 'advance', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Advance salary' });
+    return rec;
   }
   /* ====================================================================== *
    * ADVANCE SALARY REQUESTS — the ask, and the decision on it
@@ -995,32 +1049,35 @@
   function loan(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
-    var glId = 'GL-LOAN-' + empId + '-' + ((txnsFor(empId).filter(function (t) { return t.type === 'loan'; }).length) + 1);
+    var rec = txn({ type: 'loan', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Staff loan', emiMonths: +opts.emiMonths || 0 });
+    var glId = txnGlId('LOAN', rec);
     var src = payThrough(opts, 'out', amount, 'LOAN-' + empId, 'Staff loan', empId, cid, glId);
     glPost(glId, opts.date || today(), cid, 'LOAN-' + empId,
       'Staff loan · ' + empName(empId) + (src.name ? ' · ' + src.name : ''), 'payroll', empId,
       [{ account: '1260', dr: amount, cr: 0 }, { account: src.account, dr: 0, cr: amount }]);
-    return txn({ type: 'loan', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Staff loan', emiMonths: +opts.emiMonths || 0 });
+    return rec;
   }
   function repayLoan(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
-    var glId = 'GL-LREP-' + empId + '-' + ((txnsFor(empId).filter(function (t) { return t.type === 'loan-repay'; }).length) + 1);
+    var rec = txn({ type: 'loan-repay', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Loan repayment' });
+    var glId = txnGlId('LREP', rec);
     var src = payThrough(opts, 'in', amount, 'LREP-' + empId, 'Staff loan repayment', empId, cid, glId);
     glPost(glId, opts.date || today(), cid, 'LREP-' + empId,
       'Loan repayment · ' + empName(empId) + (src.name ? ' · ' + src.name : ''), 'payroll', empId,
       [{ account: src.account, dr: amount, cr: 0 }, { account: '1260', dr: 0, cr: amount }]);
-    return txn({ type: 'loan-repay', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Loan repayment' });
+    return rec;
   }
   function bonus(empId, amount, opts) {
     opts = opts || {}; amount = round(amount); if (amount <= 0) return null;
     var cid = compOf(empId);
-    var glId = 'GL-BON-' + empId + '-' + ((txnsFor(empId).filter(function (t) { return t.type === 'bonus'; }).length) + 1);
+    var rec = txn({ type: 'bonus', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Bonus' });
+    var glId = txnGlId('BON', rec);
     var src = payThrough(opts, 'out', amount, 'BON-' + empId, 'Bonus', empId, cid, glId);
     glPost(glId, opts.date || today(), cid, 'BON-' + empId,
       'Bonus · ' + empName(empId) + (src.name ? ' · ' + src.name : ''), 'payroll', empId,
       [{ account: '5100', dr: amount, cr: 0 }, { account: src.account, dr: 0, cr: amount }]);
-    return txn({ type: 'bonus', empId: empId, empName: empName(empId), companyId: cid, date: opts.date || today(), amount: amount, method: opts.method || 'Bank', memo: opts.memo || 'Bonus' });
+    return rec;
   }
 
   /* ----------------------------------------------------- derived balances */
@@ -1082,7 +1139,16 @@
    * payments:[{ date, amount, kind:'salary'|'cash'|'settlement', method, memo,
    * balance }] }.
    */
-  function isEmiMemo(memo) { return String(memo || '').indexOf('EMI auto-deducted from ') === 0; }
+  /* IS THIS REPAYMENT A SALARY DEDUCTION, or money the employee handed back?
+   * The loan register answers "repaid via" from this, and it used to answer by
+   * sniffing the memo for one exact phrase. Since the deduction moved to the
+   * ACCRUAL (owner 2026-07-30) the phrase changed — "EMI deducted from July 2026
+   * salary", no "auto-" — and every EMI taken out of a payslip was being filed as
+   * cash the employee walked in with. The txn now SAYS which it is: an accrual
+   * repayment carries the slip it came out of. The memo test stays for the rows
+   * written before that field existed. */
+  function isEmiRepay(x) { return !!(x && (x.slipId || isEmiMemo(x.memo))); }
+  function isEmiMemo(memo) { return /^EMI (auto-)?deducted from /.test(String(memo || '')); }
   function loanBook(empId) {
     var t = txnsFor(empId).slice().sort(function (a, b) {
       if (a.date === b.date) return String(a.id) < String(b.id) ? -1 : 1;
@@ -1099,7 +1165,7 @@
           method: x.method || '', source: methodSource(x.method), memo: x.memo || '', seq: loans.length + 1,
           closed: false, closedOn: '', lastPaidOn: '', viaSalary: 0, viaCash: 0, payments: [] });
       } else if (x.type === 'loan-repay') {
-        var emi = isEmiMemo(x.memo);
+        var emi = isEmiRepay(x);
         pays.push({ txnId: x.id, date: x.date, amount: round(x.amount), method: x.method || '',
           memo: x.memo || '', kind: emi ? 'salary' : 'cash',
           // where the money came back FROM: the salary it was deducted out of, or
@@ -1207,7 +1273,8 @@
     return { names: names, label: names.join(' + '), net: net };
   }
   // 'EMI auto-deducted from July 2026 salary' → 'July 2026 salary'
-  function emiFrom(memo) { return String(memo || '').slice('EMI auto-deducted from '.length) || 'the salary'; }
+  // "EMI deducted from July 2026 salary" / the older "auto-deducted" form → "July 2026 salary"
+  function emiFrom(memo) { return String(memo || '').replace(/^EMI (auto-)?deducted from /, '') || 'the salary'; }
 
   /* Where ONE salary payment row came from. A month can be paid in instalments,
    * so every live GL-PAYP journal for the slip is read and the accounts are
@@ -1392,12 +1459,37 @@
       if (s.encashAmt) rows.push(withSource({ date: s.ym + '-01', ref: s.id, kind: 'Leave encashment', memo: mLabel(s.ym) + ' leave accrual', credit: s.encashAmt, debit: 0 }, accrualSource('Leave Encashment Payable')));
       if (settled) rows.push(withSource({ date: s.paidDate || (s.ym + '-10'), ref: s.id, kind: 'Salary paid',
         memo: mLabel(s.ym) + ' salary' + (slipPaid(s) > 0 ? ' paid' : ' applied to advance / loan'), credit: 0, debit: settled }, slipPaidSource(s)));
+      /* AN ADVANCE THAT COMES BACK HAS TO BE CREDITED BACK (audit 2026-07-30).
+       * Handing one over is a debit — the employee holds the company's money —
+       * and taking it out of a payslip is the employee giving it back, exactly as
+       * a loan repayment is. A loan has always had its own repayment row to close
+       * that loop; an advance never did, so every advance ever recovered stayed a
+       * debit for ever and the sheet closed that much BELOW what the person was
+       * owed (one ledger closed at −৳12,875 against a true ৳20,125 of accrued
+       * leave, the ৳33,000 of recovered advances having been counted twice). */
+      var advBack = s.deductedAt ? round(s.advanceDeduct || 0) : round(s.advanceRecovered || 0);
+      if (advBack > 0) rows.push(withSource({ date: s.paidDate || (s.ym + '-10'), ref: s.id, kind: 'Advance recovered',
+        memo: 'Recovered from ' + mLabel(s.ym) + ' salary', credit: advBack, debit: 0 },
+        { source: 'Deducted from the ' + mLabel(s.ym) + ' salary', sourceKind: 'salary', sourceDir: '', sourceCash: 0, sourceOffset: advBack, sourceGuess: false }));
     });
     txnsFor(empId).forEach(function (x) {
       if (x.type === 'advance') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Advance', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
       else if (x.type === 'loan') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Loan', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
       else if (x.type === 'loan-repay') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Loan repaid', memo: x.memo, credit: x.amount, debit: 0 }, txnSource(x)));
-      else if (x.type === 'bonus') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Bonus', memo: x.memo, credit: x.amount, debit: 0 }, txnSource(x)));
+      /* A BONUS IS EARNED AND PAID IN THE SAME BREATH (audit 2026-07-30), so it
+       * needs BOTH legs. bonus() hands the money over there and then — DR 5100,
+       * CR the account it came out of — but this sheet only ever credited it, so
+       * every bonus ever paid sat in the closing balance for ever as money the
+       * company still owed. One person's ledger closed at ৳73,881 owed when the
+       * true figure was ৳34,881 of leave accrual: the ৳39,000 Eid bonus, paid in
+       * March, was still being counted as due in August. */
+      else if (x.type === 'bonus') {
+        rows.push(withSource({ date: x.date, ref: x.id, kind: 'Bonus', memo: x.memo, credit: x.amount, debit: 0 }, accrualSource('the bonus')));
+        rows.push(withSource({ date: x.date, ref: x.id, kind: 'Bonus paid', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
+      }
+      // …and a leave encashment PAID OUT settles the accrual this sheet credited
+      // as it built up, for the same reason
+      else if (x.type === 'encash-paid') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Leave encashment paid', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
       else if (x.type === 'settlement') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Final settlement', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
     });
     rows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
@@ -1484,7 +1576,9 @@
 
   /* --------------------------------------------------------------- helpers */
   function glPost(id, date, cid, ref, memo, source, party, lines) {
-    if (!L() || !L().post) return null;
+    // a money event with no journal is how a ledger quietly loses money — if the
+    // ledger is not there to take it, SAY SO rather than return in silence
+    if (!L() || !L().post) { console.warn('[payroll] no ledger to post to — ' + ref + ' left no journal'); return null; }
     bookMemo = {};              // this entry moves balances the next plan reads
     try { return L().post({ id: id || undefined, date: date, companyId: cid, ref: ref, memo: memo, source: source, party: party, lines: lines }); }
     catch (e) { console.error('[payroll] GL post failed', e, { ref: ref }); return null; }
@@ -1608,7 +1702,7 @@
      *   runCheck      the row-by-row proof that blocks an approval
      *   emiGap        EMI a sheet showed but nothing ever deducted */
     slipEarned: slipEarned, slipRecovery: slipRecovery, slipRealized: slipRealized,
-    slipPaid: slipPaid, slipDue: slipDue, runCheck: runCheck, emiGap: emiGap,
+    slipPaid: slipPaid, slipDue: slipDue, runCheck: runCheck, emiGap: emiGap, journalGap: journalGap,
     salaryPackages: salaryPackages, packageOf: packageOf, savePackage: savePackage,
     deletePackage: deletePackage, packageTotal: stTotal, fineSlip: fineSlip, slipAdj: slipAdj,
     amountInWords: amountInWords, attendanceFor: attendanceFor, saveAttendance: saveAttendance,

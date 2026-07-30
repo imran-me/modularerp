@@ -320,20 +320,34 @@
      * 5700 do not sit on the trial balance at zero, telling a half-truth. */
     if (L() && !S.get('loans_gl_detach_v1', null)) {
       try {
+        /* ⚠ "MINE" HAS TO MEAN MINE (audit 2026-07-30). This pattern also matches
+         * PAYROLL's staff-loan journals — it posts GL-LOAN-… when an employee is
+         * lent money and GL-LREP-… when they pay it back — and the cleanup was
+         * deleting them out of the general ledger while payroll's own records kept
+         * them. That is the ৳92,000 the payroll audit found: 1260 Staff Loans read
+         * ৳4 while the loan register read ৳92,004, and only the loans that happened
+         * to be posted AFTER this ran survived.
+         * Employee loans are the one kind of loan the owner ruled MUST stay on the
+         * main accounts (see the note above), so they are excluded twice over: by
+         * the source the payroll engine stamps on every entry it posts, and by the
+         * party it names. Nothing else changes — this desk's own journals still go. */
         var MINE = /^GL-(LNOPEN|LOAN|LREP|LNWO)-/;
+        var isPayroll = function (e) { return e.source === 'payroll' || /^EPL-/.test(String(e.party || '')); };
         var journals = 0, restored = 0;
         // 1) put back any bank movement this desk made (balance + register row)
-        S.list('bank_txns').filter(function (t) { return MINE.test(t.glId || ''); }).forEach(function (t) {
+        var payrollGl = {};
+        (L().entries({}) || []).forEach(function (e) { if (isPayroll(e)) payrollGl[e.id] = true; });
+        S.list('bank_txns').filter(function (t) { return MINE.test(t.glId || '') && !payrollGl[t.glId]; }).forEach(function (t) {
           var bank = db().col('banks').filter(function (x) { return x.id === t.bankId; })[0];
           if (!bank) return;
           var wasIn = t.type === 'deposit' || t.type === 'transfer-in';
           bank.balance = (+bank.balance || 0) + (wasIn ? -(+t.amount || 0) : (+t.amount || 0));
           db().save('banks', bank); restored++;
         });
-        S.set('bank_txns', S.list('bank_txns').filter(function (t) { return !MINE.test(t.glId || ''); }));
+        S.set('bank_txns', S.list('bank_txns').filter(function (t) { return !MINE.test(t.glId || '') || payrollGl[t.glId]; }));
         // 2) remove the journals themselves
         (L().entries({}) || []).forEach(function (e) {
-          if (!MINE.test(e.id)) return;
+          if (!MINE.test(e.id) || isPayroll(e)) return;      // an employee loan is not this desk's
           try { L().remove(e.id); journals++; } catch (x) {}
         });
         // 3) drop the heads only this desk used — but never one that still
