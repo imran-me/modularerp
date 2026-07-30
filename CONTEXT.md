@@ -914,6 +914,37 @@ drift apart. One edit ships to all six companies.
   white card is unreadable). Autopilot and radar are sorted **critical first** by
   `bySeverity()` (high → med → low, stable), and the radar sorts BEFORE its `slice(0,12)`
   so the twelve that survive the cut are the twelve that matter.
+- **NET PAYABLE — the formula, and where the recovery happens** (owner 2026-07-30, the
+  payslip audit). Gross + overtime + bonus **−** advance **−** loan EMI **−** absent **−**
+  every other deduction (late · fine · tax · PF · adjustment⁻) **= net payable**, and
+  **net payable − paid = due**. **Leave encashment is outside it** — a yearly accrual on
+  2150, paid once, moving none of the three.
+  · **The bug it fixes:** the advance and the EMI used to come off at PAYMENT time (`pay()`
+  split the payable into recovery + cash), so the sheet printed two deduction columns the
+  Net Payable beside them had never subtracted, and a month approved-but-unpaid showed an
+  EMI that had touched nothing — not the net, not the cash, not the loan book.
+  · **Now:** the recovery is part of the payslip. `slipRecovery(s)` is the ONE authority
+  (frozen figures once approved · what a legacy payment actually recovered · else the plan);
+  `slipPayable` = `slipEarned − advance − EMI`, floored at 0; `slipPaid` is the CASH the
+  employee got (it takes a legacy payment's recovery back out, so Due never moves on a
+  settled month); `slipDue` closes the row. The sheet columns, the payslip print, the
+  makeup card, the accrual and the approval check all read them — nothing recomputes.
+  · **The accrual books it** (`accrueSlip`): Dr 5100 · Cr 2120 tax · Cr 2110 PF ·
+  **Cr 1250 advance · Cr 1260 EMI** · Cr 2100 net payable, plus one stable
+  `PT-EMI-<emp>-<ym>` repayment so **the loan book falls the moment the month is approved**.
+  `pay()` then moves cash only, and **self-heals** a slip accrued under the old rule by
+  re-posting its accrual first (safe: nothing has moved on it). `unfinalize` gives both back.
+  · **Settled history is read, not rewritten:** a month already paid under the old rule keeps
+  its journals exactly as posted (`legacyPaid` skips the re-post) — the payment entry already
+  credited 1250/1260, so re-posting would credit them twice and drive 2100 negative.
+  · **Never negative:** the plan is capped at what the month can bear; what will not fit is
+  simply not deducted, stays outstanding, and next month's plan picks it up — `short` marks
+  the row with a caret on Net Payable. · **`runCheck(cid, ym)`** re-derives every row from
+  its own fields (never from `slipPayable` — a check that asks the function it is checking
+  proves nothing) and **blocks `finalize()`**; the desk shows the failing rows and the amount
+  each is off by. · **`emiGap()`** audits every non-draft slip ever written: EMI a sheet
+  SHOWED against EMI that actually moved. Harness: `node tools/verify/books.mjs payslip`
+  (the arithmetic, the ledger, the loan book, the owner's reported rows) and `… emigap`.
 - **Payroll ↔ Ledger reconciliation** — the piece no off-the-shelf payroll ships. Salary
   Payable **2100** vs what the payslips still say is outstanding, plus advances+loans
   (1250/1260) and the variance, with a **"why?"** explainer that lists the months where the

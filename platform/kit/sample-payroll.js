@@ -400,7 +400,7 @@
       (P.slipsFor(CID, ym) || []).forEach(function (s) {
         made.slips++;
         var payable = Math.round(P.slipPayable(s));
-        var already = Math.round(s.paid || 0);
+        var already = Math.round(P.slipPaid ? P.slipPaid(s) : (s.paid || 0));
         if (payable <= 0 || already >= payable) return;
         /* THE CURRENT MONTH IS LEFT LIVE — a couple of heads unpaid, one part-paid,
          * so the desk opens on a month with real work in it. Every earlier month is
@@ -449,7 +449,7 @@
         var slips = P.slipsFor(cid, ym) || [];
         if (!slips.length) return;
         var payable = 0, paid = 0;
-        slips.forEach(function (s) { payable += P.slipPayable(s); paid += (+s.paid || 0); });
+        slips.forEach(function (s) { payable += P.slipPayable(s); paid += (P.slipPaid ? P.slipPaid(s) : (+s.paid || 0)); });
         var run = S.list('pay_runs').filter(function (r) { return r.companyId === cid && r.ym === ym; })[0];
         rows.push({ companyId: cid, ym: ym, heads: slips.length, payable: Math.round(payable),
           paid: Math.round(paid), due: Math.round(payable - paid), status: run ? run.status : '—' });

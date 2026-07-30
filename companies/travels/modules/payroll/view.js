@@ -477,8 +477,17 @@ EPAL.payrollDesk = function (page, cid, opts) {
 // slip arithmetic, hoisted so the month register, the salary sheet and the
 // radar all read a payslip the SAME way. Mirrors the engine's slipPayable():
 // earnedGross is already net of absence, so absence is NOT re-deducted here.
-function advOf(s) { var auto = Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); return (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? auto : Math.min(auto, +s.advCap)); }
-function emiOf(s) { return (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? PR().emiInstallment(s.empId) : +s.emiCap); }
+/* THE ADVANCE AND THE EMI COME FROM THE ENGINE (owner 2026-07-30: "every
+ * deduction column that shows an amount must actually reduce net payable").
+ * These two used to work the figure out for themselves, which is exactly how the
+ * sheet came to print an EMI that the net beside it had never subtracted. They
+ * now read the same slipRecovery() the net payable, the payslip, the accrual and
+ * the approval check read, so the row adds up by construction. */
+function recOf(s) { return PR().slipRecovery(s); }
+function advOf(s) { return recOf(s).adv; }
+function emiOf(s) { return recOf(s).emi; }
+// what would not fit this month and rides on to the next (0 on a normal row)
+function shortOf(s) { return recOf(s).short || 0; }
 // (`fine` = the salary template's standing punishment + any one-off deducted on
 // this month; `tplBonus` = the template's standing monthly bonus. A slip written
 // before salary templates existed carries neither, so both read 0 and every old
@@ -487,8 +496,49 @@ function otherOf(s) { return (s.tax || 0) + (s.pf || 0) + (s.lateDeduction || 0)
 function addOf(s) { return (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0) + Math.max(0, s.adjustment || 0); }
 function dedOf(s) { return otherOf(s) + Math.max(0, -(s.adjustment || 0)); }
 function bonusOf(s) { return (s.bonus || 0) + (s.tplBonus || 0); }
-function dueOf(s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }
-function cashOf(s) { return Math.max(0, (s.paid || 0) - (s.advanceRecovered || 0) - (s.loanRecovered || 0)); }
+/* PAID = the cash that actually reached the employee, and DUE = net payable less
+ * that. On a month paid under the old rule the stored figure still carries the
+ * advance and the EMI inside it — the engine takes them back out, so Net payable
+ * − Paid = Due closes on every row ever written, and cash and paid are one
+ * number now rather than two. */
+function paidOf(s) { return PR().slipPaid(s); }
+function dueOf(s) { return PR().slipDue(s); }
+function cashOf(s) { return PR().slipPaid(s); }
+
+/* THE NET PAYABLE CELL, and the mark a carried row wears (owner 2026-07-30:
+ * "net payable must never go negative. If the deductions are larger than the
+ * earnings, deduct only what is available, carry the rest to the next month, and
+ * mark that row"). The engine has already capped the recovery at what the month
+ * can bear; what it could not take is `short`, and it stays outstanding, so next
+ * month's plan picks it up with no carry-forward record to keep in step. The
+ * mark is a caret on the figure, not a column — it is one number's story. */
+function netCell(s) {
+  var v = PR().slipPayable(s), short = shortOf(s);
+  return '<span class="num strong">' + ui.money(v) + '</span>' + (short > 0
+    ? ' <span class="text-warn" title="' + esc(ui.money(short) + ' of this month\'s advance / loan recovery did not fit — it stays outstanding and comes off next month.') + '">^</span>'
+    : '');
+}
+
+/* THE SALARY SHEET FOOT. One sum per numeric column, over the rows the table is
+ * actually showing (the kit hands us the filtered set, never the page), read
+ * through the very same helpers as the cells above them — a foot that added up
+ * differently from the column it sits under would be worse than no foot. */
+function sheetTotals(rows) {
+  if (!rows.length) return null;
+  function S(fn) { return ui.money(rows.reduce(function (a, s) { return a + (+fn(s) || 0); }, 0)); }
+  return { label: rows.length + ' employee' + (rows.length === 1 ? '' : 's'), values: {
+    gross: S(function (s) { return s.gross || 0; }),
+    overtime: S(function (s) { return s.overtime || 0; }),
+    bonus: S(bonusOf),
+    encashAmt: S(function (s) { return s.encashAmt || 0; }),
+    adv: S(advOf), emi: S(emiOf),
+    absentDeduction: S(function (s) { return s.absentDeduction || 0; }),
+    other: S(otherOf),
+    net: S(function (s) { return PR().slipPayable(s); }),
+    paid: S(paidOf), due: S(dueOf),
+    status: '<span class="xs text-mute">' + rows.filter(function (s) { return dueOf(s) > 0; }).length + ' owed</span>'
+  } };
+}
 
 function coFull(cid) { var c = EPAL.config && EPAL.config.company ? EPAL.config.company(cid) : null; return c ? (c.name || c.short || cid) : cid; }
 function coMeta(cid) {
@@ -686,10 +736,10 @@ function monthSeries(limit) {
     var m = byYm[s.ym] || (byYm[s.ym] = blankMonth(s.ym));
     m.heads++; m.gross += s.earnedGross || 0; m.adds += addOf(s); m.deds += dedOf(s);
     m.net += PR().slipPayable(s); m.encash += s.encashAmt || 0;
-    m.paid += s.paid || 0; m.due += dueOf(s);
+    m.paid += paidOf(s); m.due += dueOf(s);
     // FULLY paid, not merely part-paid: six people each given a token amount
     // must not read as "6 / 6 staff paid" while the month is still owed.
-    if ((s.paid || 0) > 0 && dueOf(s) === 0) m.paidHeads++;
+    if (paidOf(s) > 0 && dueOf(s) === 0) m.paidHeads++;
     if (s.status === 'draft') m.drafts++;
   });
   // pay_runs is the OTHER half of the union: a run can exist before any payslip
@@ -1045,6 +1095,35 @@ function payrollHistoryCard() {
     ],
     rows: months, sortKey: 'ym', sortDir: -1, pageSize: 12, totalKey: 'paid',
     exportName: 'payroll-history.csv', pdfTitle: scopeFull() + ' — Payroll History',
+    /* PRINT — the SAME document the Monthly Register raises (owner 2026-07-30:
+     * "it matches with Salary Manage's Payroll History table, check it").
+     * It does, where it counts: both tables are the same monthSeries() — the same
+     * months, the same figures, no limit on either — so there is nothing to
+     * recompute and nothing to keep in sync. This screen just shows six of those
+     * columns instead of ten, so printing here raises the FULLER register
+     * (PR-MR-…), which contains every column this card shows and four more.
+     * One payroll month register, not two variants of one.
+     * ⚠ A month with no run, or a draft one, is listed here but cannot be
+     * printed: only approved runs may leave the building. The centre says so. */
+    toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+      title: 'Print the payroll register — choose months and detail level (approved runs only)',
+      onclick: function () { printCentre({ from: 'register' }); } }),
+    /* THE FOOT — the Monthly Register's rules, applied to this card's columns:
+     * sums where a sum is the answer, and a DISTINCT count of PEOPLE, never a sum
+     * of monthly headcounts. "Staff paid" foots as the people who have nothing
+     * outstanding across the whole period over the people on the payroll in it —
+     * which is the question this card asks, asked of the period instead of a month. */
+    totals: function (ms) {
+      if (!ms.length) return null;
+      var yms = ms.map(function (m) { return m.ym; });
+      var t = { gross: 0, paid: 0, due: 0 };
+      ms.forEach(function (m) { t.gross += m.gross || 0; t.paid += m.paid || 0; t.due += m.due || 0; });
+      return { label: ms.length + ' month' + (ms.length === 1 ? '' : 's'), values: {
+        staff: '<span class="num" title="people with nothing outstanding across these months / people on the payroll in them">' +
+          distinctSettledHeads(yms) + ' / ' + distinctHeads(yms) + '</span>',
+        gross: ui.money(t.gross), paid: ui.money(t.paid), due: ui.money(t.due)
+      } };
+    },
     onRow: function (m) { monthTxnsModal(m.ym); },
     actions: [{ icon: 'list-ul', title: 'Every transaction in this month', onClick: function (m) { monthTxnsModal(m.ym); } }],
     empty: { icon: 'clock-history', title: 'No payroll history yet', hint: 'Generating a month in Salary Manage starts the history.' }
@@ -1148,7 +1227,7 @@ function txnDetailModal(r) {
       el('div.card-head', null, [el('h3', { html: ui.icon('receipt') + ' That month\'s payslip' })]),
       el('div.card-body', null, [el('div.data-list', null, [
         drow('Net payable', ui.money(PR().slipPayable(r.slip))),
-        drow('Paid in total', ui.money(r.slip.paid || 0)),
+        drow('Paid in total', ui.money(paidOf(r.slip))),
         drow('Still due', ui.money(dueOf(r.slip))),
         drow('Advance recovered', ui.money(r.slip.advanceRecovered || 0)),
         drow('Loan EMI recovered', ui.money(r.slip.loanRecovered || 0)),
@@ -1305,7 +1384,7 @@ function digest(s, P, ym, series) {
   var slips = slipsIn(ym);
   var gross = sum(slips, function (x) { return x.earnedGross; });
   var net = sum(slips, function (x) { return PR().slipPayable(x); });
-  var paid = sum(slips, function (x) { return x.paid || 0; });
+  var paid = sum(slips, paidOf);
   var due = net - paid;
   var prev = series.length > 1 ? series[series.length - 2] : null;
   function b(v) { return '<strong>' + esc(v) + '</strong>'; }
@@ -1370,7 +1449,7 @@ function autopilot(ym, P) {
   var out = [], R = runInfo(ym), run = R.run, st = R.status;
   var slips = slipsIn(ym);
   var net = sum(slips, function (s) { return PR().slipPayable(s); });
-  var paid = sum(slips, function (s) { return s.paid || 0; });
+  var paid = sum(slips, paidOf);
   var due = net - paid, td = today();
 
   if (isAll()) {
@@ -1464,9 +1543,9 @@ function radar(P) {
   function openEmp(e) { return function () { showEmp(e.id); }; }
   P.live.forEach(function (s) {
     var payable = PR().slipPayable(s);
-    if ((s.paid || 0) > payable + 1) out.push({ sev: 'high', icon: 'exclamation-octagon',
+    if (paidOf(s) > payable + 1) out.push({ sev: 'high', icon: 'exclamation-octagon',
       title: s.empName + ' was overpaid in ' + PR().mLabel(s.ym),
-      why: 'Paid ' + ui.money(s.paid) + ' against a payslip of ' + ui.money(payable) + ' — ' + ui.money(s.paid - payable) + ' more than the sheet allows.',
+      why: 'Paid ' + ui.money(paidOf(s)) + ' against a payslip of ' + ui.money(payable) + ' — ' + ui.money(paidOf(s) - payable) + ' more than the sheet allows.',
       on: function () { if (EPAL.people) EPAL.people.statement(s.empId, s.ym); } });
   });
   P.team.forEach(function (e) {
@@ -1634,7 +1713,7 @@ function monthView(page) {
   var slips = slipsIn(ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
   var gross = sum(slips, function (x) { return x.earnedGross; });
   var net = sum(slips, function (x) { return PR().slipPayable(x); });
-  var paid = sum(slips, function (x) { return x.paid || 0; });
+  var paid = sum(slips, paidOf);
   var due = net - paid;
   var adds = sum(slips, addOf), deds = sum(slips, dedOf);
   var advRec = sum(slips, advOf), emiRec = sum(slips, emiOf);
@@ -1672,7 +1751,7 @@ function monthView(page) {
     last: lastEventCfg(ym, 'Last posting this month'),
     flow: {
       title: 'Payment progress', sub: 'per employee · paid vs outstanding',
-      rows: slips.map(function (x) { return { up: x.paid || 0, down: dueOf(x), tip: x.empName + ' · paid ' + ui.money(x.paid || 0) + (dueOf(x) ? ' · due ' + ui.money(dueOf(x)) : '') }; }),
+      rows: slips.map(function (x) { return { up: paidOf(x), down: dueOf(x), tip: x.empName + ' · paid ' + ui.money(paidOf(x)) + (dueOf(x) ? ' · due ' + ui.money(dueOf(x)) : '') }; }),
       net: due > 0 ? '−' + ui.money(due, { compact: true }) : ui.money(0), netUp: due <= 0,
       inText: 'Paid ' + ui.money(paid), outText: 'Due ' + ui.money(Math.max(0, due)),
       hint: 'Manage this run', on: function () { payYm = ym; goTab('manage'); }
@@ -1729,7 +1808,7 @@ function monthView(page) {
       { key: 'adv', label: 'Advance rec.', num: true, sortVal: advOf, render: function (x) { var v = advOf(x); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'emi', label: 'Loan EMI', num: true, sortVal: emiOf, render: function (x) { var v = emiOf(x); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'cash', label: 'Cash Out', num: true, sortVal: cashOf, render: function (x) { var v = cashOf(x); return v ? '<span class="num">' + ui.money(v) + '</span>' : '—'; } },
-      { key: 'paid', label: 'Paid', num: true, sortVal: function (x) { return x.paid || 0; }, render: function (x) { return x.paid ? '<span class="text-good">' + ui.money(x.paid) + '</span>' : '—'; } },
+      { key: 'paid', label: 'Paid', num: true, sortVal: paidOf, render: function (x) { var v = paidOf(x); return v ? '<span class="text-good">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'due', label: 'Due', num: true, sortVal: dueOf, render: function (x) { var v = dueOf(x); return v ? '<span class="num strong text-bad">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'status', label: 'Status', badge: { draft: '', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
     ], null, 2),
@@ -1767,7 +1846,7 @@ function monthView(page) {
         otherDeduction: S2(function (x) { return x.otherDeduction || 0; }), fine: S2(function (x) { return x.fine || 0; }),
         deds: S2(dedOf), net: S2(function (x) { return PR().slipPayable(x); }),
         encashAmt: S2(function (x) { return x.encashAmt || 0; }), adv: S2(advOf), emi: S2(emiOf),
-        cash: S2(cashOf), paid: S2(function (x) { return x.paid || 0; }), due: S2(dueOf)
+        cash: S2(cashOf), paid: S2(paidOf), due: S2(dueOf)
       } };
     },
     exportName: 'salary-register-' + ym + '.csv', pdfTitle: scopeFull() + ' — Salary Register ' + PR().mLabel(ym),
@@ -2207,7 +2286,7 @@ function empAnalytics(e) {
    * the same book Loan Management reads, so the file and the tab agree. */
   var slips = S.list('pay_slips').filter(function (x) { return x.empId === e.id && x.status !== 'draft'; })
     .sort(function (a, b) { return a.ym < b.ym ? 1 : -1; });
-  var paidRec = slips.filter(function (x) { return (x.paid || 0) >= P.slipPayable(x); }).length;
+  var paidRec = slips.filter(function (x) { return P.slipPaid(x) > 0 && P.slipDue(x) <= 0; }).length;
   var pendRec = slips.length - paidRec;
   var totalNet = slips.filter(function (x) { return String(x.ym).slice(0, 4) === year; })
     .reduce(function (a, x) { return a + P.slipPayable(x); }, 0);
@@ -2675,7 +2754,7 @@ function manageView(page) {
   var R = runInfo(ym), run = R.run;
   var slips = slipsIn(ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
   var gross = sum(slips, function (s) { return s.earnedGross; }), net = sum(slips, function (s) { return PR().slipPayable(s); });
-  var paid = sum(slips, function (s) { return s.paid || 0; }), due = net - paid;
+  var paid = sum(slips, paidOf), due = net - paid;
   var st = R.status, inWin = R.inWindow;
 
   // THE DASHBOARD ROW (owner 2026-07-28) — the five flat KPI tiles became the
@@ -2699,7 +2778,7 @@ function manageView(page) {
     last: lastEventCfg(ym, 'Last posting this month'),
     flow: {
       title: 'Payment progress', sub: 'per employee · paid vs outstanding' + (slips.length ? '' : ' · nobody on this run'),
-      rows: slips.map(function (s) { return { up: s.paid || 0, down: dueOf(s), tip: s.empName + ' · paid ' + ui.money(s.paid || 0) + (dueOf(s) ? ' · due ' + ui.money(dueOf(s)) : '') }; }),
+      rows: slips.map(function (s) { return { up: paidOf(s), down: dueOf(s), tip: s.empName + ' · paid ' + ui.money(paidOf(s)) + (dueOf(s) ? ' · due ' + ui.money(dueOf(s)) : '') }; }),
       net: due > 0 ? '−' + ui.money(due, { compact: true }) : ui.money(0), netUp: due <= 0,
       inText: 'Paid ' + ui.money(paid), outText: 'Due ' + ui.money(Math.max(0, due)),
       hint: 'Open the full month', on: function () { ovMonth = ym; goTab('overview'); }
@@ -2738,7 +2817,7 @@ function manageView(page) {
     if (st !== 'draft') actions.appendChild(el('button.btn.btn-outline', { html: ui.icon('arrow-counterclockwise') + ' Reopen Draft',
       title: 'Rewind to the BEFORE-ACCRUED state — repeatable (demo-safe)',
       onclick: function () {
-        var paidCount = slips.filter(function (s) { return s.paid > 0; }).length;
+        var paidCount = slips.filter(function (s) { return paidOf(s) > 0; }).length;
         ui.confirm({ title: 'Reopen ' + PR().mLabel(ym) + ' as Draft?', confirmLabel: 'Reopen Draft',
           text: 'Shows the month as it was BEFORE accrual: ' + (paidCount ? paidCount + ' payment(s) are reversed, ' : '') + 'the accrual is lifted from the books, and ✎ adjustments unlock. You can Finalize & Accrue again any time — fully repeatable.' })
           .then(function (ok) { if (!ok) return; PR().unfinalize(CID, ym); ui.toast('Back to draft — before-accrued state', 'success'); EPAL.router.render(); });
@@ -2781,6 +2860,10 @@ function manageView(page) {
   // Absent | Other ded | Net Payable | Paid | Due | Status per head.
   // (advOf / emiOf / otherOf / dueOf are shared helpers — see the top of the
   // file — so the sheet, the month register and the radar read a slip alike.)
+  // Every row now adds up left to right: gross + OT + bonus − advance − EMI −
+  // absent − other = net payable, and net payable − paid = due. Encash is the
+  // one column that stands outside it: a yearly accrual, paid once, and it moves
+  // none of the three (owner 2026-07-30).
   var tbl = EPAL.table({
     columns: withCo([
       { key: 'empName', label: 'Employee', render: function (s) { return EPAL.people ? EPAL.people.linkify(s.empName, s.empId) : '<span class="strong">' + esc(s.empName) + '</span>'; } },
@@ -2792,14 +2875,19 @@ function manageView(page) {
       { key: 'emi', label: 'Loan EMI', num: true, sortVal: emiOf, render: function (s) { var v = emiOf(s); return v ? '<span class="text-warn">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'absentDeduction', label: 'Absent', num: true, sortVal: function (s) { return s.absentDeduction || 0; }, render: function (s) { return s.absentDeduction ? '<span class="text-bad">' + ui.money(s.absentDeduction) + '</span>' : '—'; } },
       { key: 'other', label: 'Other Ded.', num: true, sortVal: otherOf, render: function (s) { var v = otherOf(s); return v ? ui.money(v) : '—'; } },
-      { key: 'net', label: 'Net Payable', num: true, sortVal: function (s) { return PR().slipPayable(s); }, render: function (s) { return '<span class="num strong">' + ui.money(PR().slipPayable(s)) + '</span>'; } },
-      { key: 'paid', label: 'Paid', num: true, sortVal: function (s) { return s.paid || 0; }, render: function (s) { return s.paid ? '<span class="text-good">' + ui.money(s.paid) + '</span>' : '—'; } },
+      { key: 'net', label: 'Net Payable', num: true, sortVal: function (s) { return PR().slipPayable(s); }, render: netCell },
+      { key: 'paid', label: 'Paid', num: true, sortVal: paidOf, render: function (s) { var v = paidOf(s); return v ? '<span class="text-good">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'due', label: 'Due', num: true, sortVal: dueOf, render: function (s) { var v = dueOf(s); return v ? '<span class="num strong text-bad">' + ui.money(v) + '</span>' : '—'; } },
       { key: 'status', label: 'Status', badge: { draft: '', accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
     ]),
     rows: slips, searchKeys: ['empName', 'empId', 'dept'], quickFilter: 'status', filterPanel: true,
     filters: [{ key: 'dept', label: 'Dept' }].concat(coFilter()),
     totalKey: 'net',
+    /* THE FOOT (owner 2026-07-30: "add a totals row at the bottom of the table
+     * that sums every numeric column"). Every money column is a plain sum of the
+     * filtered set — search or filter the sheet and the foot follows it. The two
+     * count columns are not money and say what they count instead. */
+    totals: sheetTotals,
     exportName: 'salary-sheet-' + ym + '.csv', pdfTitle: 'Salary Sheet — ' + PR().mLabel(ym),
     onRow: function (s) { var e = empById(s.empId); if (e) statement(e, ym); },
     actions: (canCreate() ? [{ icon: 'wallet2', title: 'Manage salary — pay / partial / due / advance / status', onClick: function (s) { manageSalary(s, ym); } }] : []).concat(ui.actions({
@@ -2815,7 +2903,7 @@ function manageView(page) {
   slot(scard, 'body').appendChild(tbl.el);
   page.appendChild(scard);
 
-  page.appendChild(monthMakeupCard(slips, ym, net, paid, advRec, emiRec));
+  page.appendChild(monthMakeupCard(slips, ym, net, paid));
 
   // PAYROLL HISTORY sits directly under the sheet (owner 2026-07-28). It goes in
   // BEFORE the pay-individual-salaries grid on purpose: that grid only exists
@@ -2825,7 +2913,7 @@ function manageView(page) {
 
   if (st !== 'draft' && due > 0 && canCreate()) {
     var pgrid = frag('grid-auto-compact');
-    slips.forEach(function (s) { var payable = PR().slipPayable(s), out = payable - (s.paid || 0); if (out <= 0) return;
+    slips.forEach(function (s) { var out = dueOf(s); if (out <= 0) return;
       var card2 = frag('pay-tier-card');
       slot(card2, 'name').textContent = s.empName;
       slot(card2, 'out').textContent = 'Outstanding ' + ui.money(out);
@@ -2867,7 +2955,7 @@ function manageView(page) {
  * headless driver caught: it walked to ৳197,493 against a stated ৳202,093, short
  * by the ৳4,600 of absence. Every other card on this screen keeps reading
  * `earnedGross`; only this one, which has to be added up by eye, opens on gross. */
-function monthMakeupCard(slips, ym, net, paid, advRec, emiRec) {
+function monthMakeupCard(slips, ym, net, paid) {
   var f = function (fn) { return sum(slips, fn); };
   var gross = f(function (s) { return s.gross; });
   var adds = [
@@ -2875,7 +2963,14 @@ function monthMakeupCard(slips, ym, net, paid, advRec, emiRec) {
     ['Bonus', f(bonusOf)],
     ['Salary adjustment', f(function (s) { return Math.max(0, s.adjustment || 0); })]
   ];
+  /* THE ADVANCE AND THE EMI ARE DEDUCTIONS ON THIS CARD NOW (owner 2026-07-30).
+   * They used to sit BELOW the net as a separate recovery block, because the net
+   * did not carry them; now that it does, leaving them down there would take them
+   * off twice and the card would walk to a figure the sheet never shows. They
+   * lead the column, in the owner's order: advance, then EMI, then the rest. */
   var deds = [
+    ['Advance', f(advOf)],
+    ['Loan EMI', f(emiOf)],
     ['Absent', f(function (s) { return s.absentDeduction; })],
     ['Late', f(function (s) { return s.lateDeduction; })],
     ['Early leave', f(function (s) { return s.earlyDeduction; })],
@@ -2925,17 +3020,16 @@ function monthMakeupCard(slips, ym, net, paid, advRec, emiRec) {
     ]),
     anchor('Net payable to staff', net)
   ];
-  var recov = [];
-  if (advRec) recov.push(line('Advance recovered', advRec, '−'));
-  if (emiRec) recov.push(line('Loan EMI recovered', emiRec, '−'));
-  if (recov.length) body.push(el('div.makeup-recov', null, recov));
-  body.push(anchor('Cash to hand out', Math.max(0, net - advRec - emiRec), '.is-cash'));
+  /* …which is also the cash, and the card says so rather than quietly printing
+   * one figure twice: the recoveries are in the column above, so nothing is left
+   * to take off between the net and the money that leaves an account. */
+  body.push(anchor('Cash to hand out', Math.max(0, net), '.is-cash'));
   var c = frag('reg-card');
   slot(c, 'title').innerHTML = ui.icon('calculator') + ' How ' + PR().mLabel(ym) + ' is made up';
   slot(c, 'sub').textContent = 'what is added, what is deducted, and what actually leaves an account';
   slot(c, 'body').appendChild(el('div.makeup', null, body));
   slot(c, 'body').appendChild(el('p.text-mute.xs.mt-2', { text:
-    'Advance and loan EMI come back to the company out of the salary, so they are deducted from the cash but not from the cost. Paid so far: '
+    'Advance and loan EMI come back to the company out of the salary, so they are deducted from the net payable but not from the cost — the ledger books them against the advance and the loan, not against salary expense. Paid so far: '
     + ui.money(paid) + ' of ' + ui.money(net) + '.' }));
   return c;
 }
@@ -2950,8 +3044,36 @@ function needsOneCompany(what) {
 }
 function finalizeRun(ym, net) {
   if (needsOneCompany('Finalizing a payroll month')) return;
-  ui.confirm({ title: 'Finalize ' + PR().mLabel(ym) + '?', text: 'Locks corrections and accrues salaries + leave encashment to the ledger. Net ' + ui.money(net) + '.', confirmLabel: 'Finalize' })
-    .then(function (ok) { if (!ok) return; try { PR().finalize(CID, ym); ui.toast('Payroll finalized', 'success'); EPAL.router.render(); } catch (e) { ui.toast(e.message || 'Failed', 'error'); } });
+  /* THE ROW-BY-ROW PROOF RUNS BEFORE THE QUESTION IS EVEN ASKED (owner
+   * 2026-07-30: "before a payroll run can be approved, check every row: earnings
+   * − all deductions = net payable. If any row fails, block approval and show
+   * which rows and by how much"). The engine re-derives every row from its own
+   * fields and refuses to accrue a month that does not add up; this is the same
+   * verdict, shown before anything is posted rather than as a toast afterwards. */
+  var chk = PR().runCheck(CID, ym);
+  if (!chk.ok) { blockedApproval(chk, ym); return; }
+  ui.confirm({ title: 'Finalize ' + PR().mLabel(ym) + '?', text: 'Locks corrections and accrues salaries + leave encashment to the ledger. Net ' + ui.money(net) + '. The advance and loan EMI on the sheet are deducted now — they come off the loan book with it.', confirmLabel: 'Finalize' })
+    .then(function (ok) { if (!ok) return;
+      try { PR().finalize(CID, ym); ui.toast('Payroll finalized', 'success'); EPAL.router.render(); }
+      catch (e) { if (e && e.check) blockedApproval(e.check, ym); else ui.toast(e.message || 'Failed', 'error'); } });
+}
+/* WHICH ROWS FAILED, AND BY HOW MUCH — the block, in one modal. It names the
+ * employee, what the row should come to, what it says, and the difference. */
+function blockedApproval(chk, ym) {
+  var body = el('div');
+  body.appendChild(el('p.text-mute.sm', { html: '<b>' + chk.failed.length + ' row(s)</b> do not add up, so ' +
+    esc(PR().mLabel(ym)) + ' cannot be approved. Earnings less every deduction must equal net payable on every row.' }));
+  body.appendChild(EPAL.table({
+    columns: [
+      { key: 'empName', label: 'Employee' },
+      { key: 'earnings', label: 'Earnings', num: true, money: true },
+      { key: 'deductions', label: 'Deductions', num: true, money: true },
+      { key: 'expected', label: 'Should be', num: true, render: function (r) { return '<span class="num strong">' + ui.money(r.expected) + '</span>'; } },
+      { key: 'actual', label: 'Sheet says', num: true, money: true },
+      { key: 'diff', label: 'Off by', num: true, render: function (r) { return '<span class="num strong text-bad">' + ui.money(r.diff) + '</span>'; } }
+    ], rows: chk.failed, pageSize: 10, exportName: 'payroll-check-' + ym + '.csv'
+  }).el);
+  ui.modal({ title: 'Approval blocked — ' + PR().mLabel(ym), icon: 'shield-exclamation', size: 'lg', body: body, footer: false });
 }
 function payAll(ym) {
   if (needsOneCompany('Paying a whole payroll run')) return;
@@ -3125,7 +3247,7 @@ function manageSalary(s, ym) {
   // THE SLIP'S OWN COMPANY, not the desk's scope: this modal is about one
   // person's month, and on All Companies the desk has no single run to read
   var run = PR().getRun(s.companyId || CID, ym), st = run ? run.status : 'draft';
-  var payable = PR().slipPayable(s), out = Math.max(0, payable - (s.paid || 0));
+  var payable = PR().slipPayable(s), out = dueOf(s);
   var advOut = PR().advanceOutstanding(e.id), arrears = PR().previousDue(e.id, ym);
   var body = el('div');
   // 'md' → 'lg': the modal now carries the full record read-out and the month-by-
@@ -3143,7 +3265,7 @@ function manageSalary(s, ym) {
     ]),
     el('div.stat-row.mb-3', null, [
       el('div.stat', null, [el('div.stat-label', { text: 'Net payable' }), el('div.stat-value', { text: ui.money(payable) })]),
-      el('div.stat', null, [el('div.stat-label', { text: 'Paid' }), el('div.stat-value', { text: ui.money(s.paid || 0) })]),
+      el('div.stat', null, [el('div.stat-label', { text: 'Paid' }), el('div.stat-value', { text: ui.money(paidOf(s)) })]),
       el('div.stat', null, [el('div.stat-label', { text: 'Due (this month)' }), el('div.stat-value', { text: ui.money(out) })]),
       el('div.stat', null, [el('div.stat-label', { text: 'Advance out' }), el('div.stat-value', { text: ui.money(advOut) })]),
       arrears ? el('div.stat', null, [el('div.stat-label', { text: 'Past-months due' }), el('div.stat-value', { text: ui.money(arrears) })]) : null
@@ -3220,15 +3342,11 @@ function factCard(title, sub, facts, note) {
   if (note) slot(c, 'body').appendChild(el('p.text-mute.xs.mt-2', { text: note }));
   return c;
 }
-// what the company agreed to take back this month — the actual recovery once the
-// month is paid, otherwise the projection the payslip prints (same rule as statement)
-function advLineOf(s) {
-  var auto = Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s)));
-  return (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? auto : Math.min(auto, +s.advCap));
-}
-function emiLineOf(s) {
-  return (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? PR().emiInstallment(s.empId) : +s.emiCap);
-}
+// what the company takes back this month — the frozen figure once the month is
+// approved, otherwise the plan. One engine call, so the payslip, the sheet and
+// the net payable can never print three different deductions.
+function advLineOf(s) { return advOf(s); }
+function emiLineOf(s) { return emiOf(s); }
 function dedTotalOf(s) {
   return (s.absentDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0)
     + (s.tax || 0) + (s.pf || 0) + (s.otherDeduction || 0) + (s.fine || 0);
@@ -3329,13 +3447,13 @@ function printSheetForm(slips, ym) {
     ['overtime', 'Overtime', function (s) { return s.overtime || 0; }],
     ['bonus', 'Bonus', function (s) { return bonusOf(s); }],
     ['encash', 'Leave Encashment', function (s) { return s.encashAmt || 0; }],
-    ['advance', 'Advance', function (s) { return (s.paid > 0) ? (s.advanceRecovered || 0) : Math.min(PR().advanceOutstanding(s.empId), Math.max(0, PR().slipPayable(s))); }],
-    ['emi', 'Loan EMI', function (s) { return (s.paid > 0) ? (s.loanRecovered || 0) : PR().emiInstallment(s.empId); }],
+    ['advance', 'Advance', advOf],
+    ['emi', 'Loan EMI', emiOf],
     ['absent', 'Absent', function (s) { return s.absentDeduction || 0; }],
     ['other', 'Other Ded.', function (s) { return otherOf(s); }],
     ['net', 'Net Payable', function (s) { return PR().slipPayable(s); }],
-    ['paid', 'Paid', function (s) { return s.paid || 0; }],
-    ['due', 'Due', function (s) { return Math.max(0, PR().slipPayable(s) - (s.paid || 0)); }],
+    ['paid', 'Paid', paidOf],
+    ['due', 'Due', dueOf],
     ['status', 'Status', function (s) { return cap(s.status || ''); }]
   ];
   var record = {}; COLS.forEach(function (c) { record['col_' + c[0]] = true; });
@@ -4448,6 +4566,19 @@ function distinctHeads(yms) {
   yms.forEach(function (y) { want[y] = 1; });
   scoped('pay_slips').forEach(function (s) { if (want[s.ym]) ids[s.empId] = 1; });
   return Object.keys(ids).length;
+}
+/* People with NOTHING outstanding across a set of months — the honest foot for a
+ * "staff paid" column. Summing the monthly counts would report 119 people out of
+ * seven months of 17, and one month settled does not settle a person. */
+function distinctSettledHeads(yms) {
+  var want = {}, all = {}, owed = {};
+  yms.forEach(function (y) { want[y] = 1; });
+  scoped('pay_slips').forEach(function (s) {
+    if (!want[s.ym]) return;
+    all[s.empId] = 1;
+    if (dueOf(s) > 0) owed[s.empId] = 1;
+  });
+  return Object.keys(all).filter(function (id) { return !owed[id]; }).length;
 }
 // column widths as weights, normalised — table-layout is fixed, so they must add up
 function payWidths(ws) {

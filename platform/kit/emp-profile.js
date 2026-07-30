@@ -459,8 +459,8 @@
           columns: [
             { key: 'ym', label: 'Month', render: function (s) { return '<span class="strong">' + P.mLabel(s.ym) + '</span>'; } },
             { key: 'net', label: 'Net', num: true, sortVal: function (s) { return P.slipPayable(s); }, render: function (s) { return '<span class="num strong">' + money(P.slipPayable(s)) + '</span>'; } },
-            { key: 'paid', label: 'Paid', num: true, render: function (s) { return s.paid ? '<span class="text-good">' + money(s.paid) + '</span>' : '—'; }, sortVal: function (s) { return s.paid || 0; } },
-            { key: 'due', label: 'Due', num: true, sortVal: function (s) { return Math.max(0, P.slipPayable(s) - (s.paid || 0)); }, render: function (s) { var d = Math.max(0, P.slipPayable(s) - (s.paid || 0)); return d ? '<span class="num strong text-bad">' + money(d) + '</span>' : '—'; } },
+            { key: 'paid', label: 'Paid', num: true, render: function (s) { var v = P.slipPaid(s); return v ? '<span class="text-good">' + money(v) + '</span>' : '—'; }, sortVal: function (s) { return P.slipPaid(s); } },
+            { key: 'due', label: 'Due', num: true, sortVal: function (s) { return P.slipDue(s); }, render: function (s) { var d = P.slipDue(s); return d ? '<span class="num strong text-bad">' + money(d) + '</span>' : '—'; } },
             { key: 'status', label: 'Status', badge: { accrued: 'info', partial: 'warn', due: 'bad', paid: 'good' } }
           ],
           rows: slips, pageSize: 8, onRow: function (s) { statement(e, s.ym); },

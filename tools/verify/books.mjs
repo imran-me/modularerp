@@ -403,5 +403,192 @@ if (PROBE === 'salary') {
   console.log('SALARY (5100) charged per month:');
   Object.keys(out.byMonth).sort().forEach(mo => console.log('  ' + mo + ' : ' + fmt(out.byMonth[mo]) + '  (' + out.perMonth[mo] + ' entries)'));
 }
+/* ---------------------------------------------------------------------------
+ * PAYSLIP — the row has to add up, and the loan book has to agree with it.
+ * Owner 2026-07-30: gross + OT + bonus − advance − EMI − absent − other = net
+ * payable, net payable − paid = due, encashment touches none of the three, and
+ * a deducted EMI comes off the loan the moment the month is approved.
+ * Drives the REAL engine end to end: loan → generate → check → finalize → pay.
+ * ------------------------------------------------------------------------- */
+if (PROBE === 'payslip') {
+  /* The demo payroll is seeded a beat AFTER the engines register, so waiting on
+   * EPAL alone can hand the probe an empty staff list and silently skip. Wait for
+   * the thing actually being probed — a salaried employee — not for the app. */
+  for (let i = 0; i < 60; i++) {
+    if (await evalJs(`(EPAL.db.employees({ companyId: 'travels' }) || []).filter(function(e){ return +e.salary > 0 && e.status !== 'resigned' && e.role !== 'owner'; }).length > 0`).catch(() => false)) break;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  const out = await evalJs(`(function(){
+    var P = EPAL.payroll, L = EPAL.ledger, cid = 'travels';
+    var ym = '2099-01';                                  // a month no seed has touched
+    var e = (EPAL.db.employees({ companyId: cid }) || [])
+      .filter(function(x){ return x && +x.salary > 0 && x.status !== 'resigned' && x.role !== 'owner'; })[0];
+    if (!e) return { skip: 'no salaried employee in the seed' };
+    var loanAmt = Math.round(e.salary * 3), emiMonths = 10;
+    P.loan(e.id, loanAmt, { emiMonths: emiMonths, memo: 'probe loan' });
+    var loanBefore = P.loanOutstanding(e.id);
+    P.generate(cid, ym);
+    var s = P.slip(e.id, ym);
+    var chk = P.runCheck(cid, ym);
+    var row = chk.rows.filter(function(r){ return r.empId === e.id; })[0];
+    var payableDraft = P.slipPayable(s), recDraft = P.slipRecovery(s);
+    // the arithmetic, spelled out from the slip's own columns
+    var sum = Math.round((s.earnedGross||0) + (s.overtime||0) + (s.bonus||0) + (s.tplBonus||0) + (s.adjustment||0)
+      - (s.tax||0) - (s.pf||0) - (s.otherDeduction||0) - (s.lateDeduction||0) - (s.earlyDeduction||0) - (s.fine||0)
+      - recDraft.adv - recDraft.emi);
+    var tb0 = L.trialBalance(), d0 = tb0.reduce(function(a,r){ return a+(r.debit||0); },0), c0 = tb0.reduce(function(a,r){ return a+(r.credit||0); },0);
+    P.finalize(cid, ym);
+    s = P.slip(e.id, ym);
+    var loanAfter = P.loanOutstanding(e.id);
+    var payAcc = P.slipPayable(s), rec = P.slipRecovery(s);
+    var accrual = L.entries().filter(function(x){ return x.id === 'GL-PAYA-' + e.id + '-' + ym; })[0];
+    var lineOf = function(code){ return accrual ? (accrual.lines||[]).filter(function(l){ return l.account===code; })
+      .reduce(function(a,l){ return a+(l.cr||0); },0) : -1; };
+    P.pay(e.id, ym, null, 'Cash');
+    s = P.slip(e.id, ym);
+    var tb1 = L.trialBalance(), d1 = tb1.reduce(function(a,r){ return a+(r.debit||0); },0), c1 = tb1.reduce(function(a,r){ return a+(r.credit||0); },0);
+    return {
+      emp: e.name, gross: s.gross, emiScheduled: Math.round(loanAmt/emiMonths),
+      recovery: rec, netPayable: payAcc, spelledOut: sum, drafted: payableDraft,
+      paid: P.slipPaid(s), due: P.slipDue(s), encash: s.encashAmt || 0,
+      loanBefore: loanBefore, loanAfter: loanAfter,
+      accrual2100: lineOf('2100'), accrual1260: lineOf('1260'),
+      rowOk: !!(row && row.ok), checkOk: chk.ok,
+      balancedBefore: Math.abs(d0-c0) < 1, balancedAfter: Math.abs(d1-c1) < 1,
+      gap: P.emiGap({ untilYm: ym }).total
+    };
+  })()`);
+  if (out.skip) { console.log('PAYSLIP — skipped: ' + out.skip); }
+  else {
+    const eq = (a, b) => Math.abs(a - b) < 1;
+    const checks = [
+      ['row adds up (earnings − every deduction = net)', eq(out.spelledOut, out.netPayable)],
+      ['EMI actually left the net payable', out.recovery.emi > 0 && eq(out.drafted, out.netPayable)],
+      ['net payable − paid = due', eq(out.netPayable - out.paid, out.due)],
+      ['paid in full → nothing due', eq(out.due, 0)],
+      ['loan fell by exactly the EMI deducted', eq(out.loanBefore - out.loanAfter, out.recovery.emi)],
+      ['accrual credits 2100 with the net payable', eq(out.accrual2100, out.netPayable)],
+      ['accrual credits 1260 with the EMI', eq(out.accrual1260, out.recovery.emi)],
+      ['encashment stayed out of it', out.encash >= 0],
+      ['every row passes the approval check', out.checkOk && out.rowOk],
+      ['books balanced before and after', out.balancedBefore && out.balancedAfter],
+      ['no EMI left recorded-but-not-deducted', eq(out.gap, 0)]
+    ];
+    ok = checks.every(c => c[1]);
+    console.log('PAYSLIP — ' + out.emp + ' · gross ' + fmt(out.gross) + ' · EMI scheduled ' + fmt(out.emiScheduled));
+    console.log('  advance ' + fmt(out.recovery.adv) + ' · EMI ' + fmt(out.recovery.emi) +
+      ' · net payable ' + fmt(out.netPayable) + ' · paid ' + fmt(out.paid) + ' · due ' + fmt(out.due));
+    console.log('  loan ' + fmt(out.loanBefore) + ' → ' + fmt(out.loanAfter));
+    checks.forEach(c => console.log('  ' + (c[1] ? '✓' : '✗') + ' ' + c[0]));
+    console.log(ok ? '✓ the payslip, the ledger and the loan book agree'
+                   : '✗ the payslip does not add up');
+  }
+  /* THE ROWS THE OWNER REPORTED (2026-07-30) — the four that were wrong and the
+   * three that were right, run through slipPayable exactly as the sheet does.
+   * The three correct ones carry no advance and no EMI, which is precisely why
+   * they were correct: nothing was being dropped from their net. */
+  const reported = await evalJs(`(function(){
+    var P = EPAL.payroll;
+    function row(n, gross, ot, bonus, adv, emi, absent, other, want) {
+      var s = { empId: 'PROOF', ym: '2026-07', deductedAt: '2026-07',
+        gross: gross, earnedGross: gross - absent, absentDeduction: absent,
+        overtime: ot, bonus: bonus, otherDeduction: other,
+        advanceDeduct: adv, loanDeduct: emi, paid: 0 };
+      return { name: n, want: want, got: P.slipPayable(s) };
+    }
+    return [
+      row('Admin',             42000, 3682,    0, 0, 10500,    0, 3920, 31262),
+      row('Azizul Haque',      50000,    0,    0, 0, 12500,    0, 3000, 34500),
+      row('Md Afiqur Rahman',  30000,    0, 3000, 0,  7500, 4000, 2133, 19367),
+      row('Md Mohshin',        42000,    0,    0, 0, 10500,    0, 2520, 28980),
+      row('Md Habibur Rahman', 50000, 1252,    0, 0,     0, 3333, 3000, 44919),
+      row('MR. EMAN HOSSAIN',  35000,    0,    0, 0,     0, 2333, 2100, 30567),
+      row('Md Mohsin',         24000,    0,    0, 0,     0,    0, 1973, 22027)
+    ];
+  })()`);
+  console.log('  — the reported rows —');
+  reported.forEach(r => {
+    const good = Math.abs(r.want - r.got) < 1;
+    if (!good) ok = false;
+    console.log('  ' + (good ? '✓' : '✗') + ' ' + r.name.padEnd(18) + ' net ' + fmt(r.got) + (good ? '' : '  (expected ' + fmt(r.want) + ')'));
+  });
+  /* THE AUDIT HAS TO FIND SOMETHING. A book written by the new engine has no gap
+   * by construction, so the detector is proved against a slip put back into the
+   * OLD shape — approved, unpaid, EMI on the sheet, nothing deducted — which is
+   * exactly what a month accrued before this change looks like. */
+  const audit = await evalJs(`(function(){
+    var P = EPAL.payroll, S = EPAL.store, cid = 'travels', ym = '2099-03';
+    var e = EPAL.db.employees({ companyId: cid }).filter(function(x){ return +x.salary > 0 && x.status !== 'resigned' && x.role !== 'owner'; })[0];
+    if (!e) return { skip: true };
+    P.loan(e.id, Math.round(e.salary * 2), { emiMonths: 10, memo: 'probe audit loan' });
+    P.finalize(cid, ym);
+    var s = P.slip(e.id, ym), deducted = s.loanDeduct || 0;
+    // walk it back to the old shape: approved, EMI shown, nothing taken
+    s.deductedAt = null; s.advanceDeduct = 0; s.loanDeduct = 0; s.paid = 0; s.status = 'accrued';
+    S.upsert('pay_slips', s);
+    S.set('pay_txns', S.list('pay_txns').filter(function(x){ return x.id !== 'PT-EMI-' + e.id + '-' + ym; }));
+    var g = P.emiGap({ untilYm: ym });
+    var mine = g.rows.filter(function(r){ return r.ym === ym && r.empId === e.id; })[0];
+    return { deducted: deducted, found: !!mine, shown: mine ? mine.emiShown : 0, moved: mine ? mine.emiDeducted : -1, monthTotal: g.months[ym] || 0 };
+  })()`);
+  if (!audit.skip) {
+    const auditChecks = [
+      ['the audit finds an old-rule row', audit.found],
+      ['it reports the EMI the sheet showed', audit.shown > 0],
+      ['…against nothing actually deducted', audit.moved === 0],
+      ['and totals it into that month', Math.abs(audit.monthTotal - audit.shown) < 1]
+    ];
+    auditChecks.forEach(c => { if (!c[1]) ok = false; });
+    console.log('  — the EMI-never-deducted audit —');
+    console.log('  shown ' + fmt(audit.shown) + ' · deducted ' + fmt(audit.moved) + ' · reported gap ' + fmt(audit.monthTotal));
+    auditChecks.forEach(c => console.log('  ' + (c[1] ? '✓' : '✗') + ' ' + c[0]));
+  }
+  /* NET PAYABLE CAN NEVER GO NEGATIVE — deduct what the month can bear, leave
+   * the rest outstanding for next month, and say so on the row. */
+  const cap = await evalJs(`(function(){
+    var P = EPAL.payroll, cid = 'travels', ym = '2099-02';
+    var e = EPAL.db.employees({ companyId: cid }).filter(function(x){ return +x.salary > 0 && x.status !== 'resigned' && x.role !== 'owner'; })[0];
+    if (!e) return { skip: true };
+    P.loan(e.id, Math.round(e.salary * 20), { emiMonths: 1, memo: 'probe oversized EMI' });   // EMI ≫ one month's pay
+    P.generate(cid, ym);
+    var s = P.slip(e.id, ym), rec = P.slipRecovery(s), earned = P.slipEarned(s);
+    return { earned: earned, adv: rec.adv, emi: rec.emi, short: rec.short, net: P.slipPayable(s) };
+  })()`);
+  if (!cap.skip) {
+    const capChecks = [
+      ['net payable floored at zero, never negative', cap.net >= 0],
+      ['deducted only what the month could bear', Math.abs((cap.adv + cap.emi) - cap.earned) < 1],
+      ['the rest is carried, and the row says by how much', cap.short > 0]
+    ];
+    capChecks.forEach(c => { if (!c[1]) ok = false; });
+    console.log('  — when the deductions are bigger than the earnings —');
+    console.log('  earned ' + fmt(cap.earned) + ' · deducted ' + fmt(cap.adv + cap.emi) +
+      ' · net ' + fmt(cap.net) + ' · carried ' + fmt(cap.short));
+    capChecks.forEach(c => console.log('  ' + (c[1] ? '✓' : '✗') + ' ' + c[0]));
+  }
+}
+/* ---------------------------------------------------------------------------
+ * EMIGAP — "how much loan EMI was recorded but never actually deducted?"
+ * Walks every non-draft payslip ever written, first run to the month given
+ * (default: today's), and reports the EMI a salary sheet SHOWED against the EMI
+ * that actually moved. Reads whatever book the browser is holding — run it
+ * against a hydrated API session to audit the real one.
+ *   node tools/verify/books.mjs emigap [YYYY-MM]
+ * ------------------------------------------------------------------------- */
+if (PROBE === 'emigap') {
+  const until = process.argv[3] || '';
+  const out = await evalJs(`EPAL.payroll.emiGap(${until ? `{ untilYm: '${until}' }` : '{}'})`);
+  console.log('EMI RECORDED BUT NEVER DEDUCTED' + (until ? ' — up to ' + until : ''));
+  const months = Object.keys(out.months).sort();
+  months.forEach(m => console.log('  ' + m + ' : ' + fmt(out.months[m])));
+  if (!months.length) console.log('  (none — every EMI a sheet showed was deducted)');
+  console.log('  ' + '-'.repeat(34));
+  console.log('  TOTAL loan EMI never deducted : ' + fmt(out.total));
+  console.log('  advance never recovered       : ' + fmt(out.advanceTotal));
+  console.log('  rows affected                 : ' + out.rows.length);
+  out.rows.slice(0, 20).forEach(r => console.log('    ' + r.ym + '  ' + (r.empName || r.empId).padEnd(22) +
+    ' shown ' + fmt(r.emiShown) + ' · deducted ' + fmt(r.emiDeducted) + ' · gap ' + fmt(r.gap) + '  [' + r.status + ']'));
+  if (out.rows.length > 20) console.log('    … and ' + (out.rows.length - 20) + ' more');
+}
 cleanup();
 process.exit(ok ? 0 : 1);

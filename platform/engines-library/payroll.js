@@ -292,14 +292,109 @@
       net: net, encashDays: encashDays, perDay: round(perDayF), encashAmt: encashAmt
     };
   }
-  // The single source of truth for the net owed to an employee for a month.
-  // Old slips (no late/early/adjustment fields) compute identically since the new
-  // fields default to 0 and earnedGross === gross − absentDeduction.
-  // (a slip written before salary packages existed carries no tplBonus/fine, so
-  // both default to 0 and it computes to exactly the figure it always did)
-  function slipPayable(s) {
+  /* EARNINGS LESS THE MONTH'S OWN DEDUCTIONS — everything except the two
+   * RECOVERIES (advance, loan EMI), which slipPayable takes off next.
+   * Old slips (no late/early/adjustment fields) compute identically since the new
+   * fields default to 0 and earnedGross === gross − absentDeduction.
+   * (a slip written before salary packages existed carries no tplBonus/fine, so
+   * both default to 0 and it computes to exactly the figure it always did) */
+  function slipEarned(s) {
     return round((s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0) + (s.adjustment || 0)
       - (s.tax || 0) - (s.pf || 0) - (s.otherDeduction || 0) - (s.lateDeduction || 0) - (s.earlyDeduction || 0) - (s.fine || 0));
+  }
+
+  /* ====================== THE TWO RECOVERIES (owner 2026-07-30) ===============
+   * "Loan EMI is displayed in the table but is not being subtracted from net
+   * payable… every deduction column that shows an amount must actually reduce
+   * net payable." It did not, and neither did the advance: until now BOTH came
+   * off at PAYMENT time — pay() split the payable into advance recovery + EMI +
+   * cash, so the sheet's Net Payable was the figure BEFORE the two columns
+   * printed beside it. The row did not add up, and a month that was accrued but
+   * not yet paid had an EMI on the sheet that had touched nothing.
+   *
+   * The recovery is now part of the payslip: net payable IS the cash to hand
+   * over, the accrual credits 1250/1260 the moment the month is approved, and
+   * the loan balance falls when the EMI is deducted — not a payment later.
+   *
+   * WHICH FIGURE a slip carries depends on where it stands, and this is the ONE
+   * place that decides (the sheet columns, the payslip, the ledger and the
+   * approval check all read it, so they cannot disagree):
+   *   · deducted at accrual  → the FROZEN figures the accrual posted
+   *   · paid under the old rule → what the payment actually recovered, so a
+   *     settled month keeps the books and the Due it always had
+   *   · anything else        → the PLAN: what this month would take, capped by
+   *     what this month can bear
+   * ENCASHMENT is not here and never was: it accrues to 2150 as a yearly
+   * liability and is paid once, so it moves neither net payable, paid nor due. */
+  function planRecovery(s) {
+    var empId = s.empId;
+    // what the company means to take: the schedule, unless Edit Salary agreed
+    // a different figure for this month (advCap / emiCap)
+    var advOut = advanceOutstanding(empId, s.id);
+    var advWant = (s.advCap == null || s.advCap === '') ? advOut : Math.min(advOut, round(+s.advCap));
+    var emiOut = loanOutstanding(empId, s.id);
+    var emiWant = (s.emiCap == null || s.emiCap === '') ? emiInstallment(empId, s.id) : Math.min(emiOut, round(+s.emiCap));
+    /* …and never more than the BOOKS say is outstanding (2026-07-28).
+     * advanceOutstanding/emiInstallment read the pay_txns trail; 1250 and 1260 are
+     * what the ledger actually carries, and on an imported or seeded book the two
+     * can disagree. Recovering past the ledger balance drives an ASSET negative —
+     * the company appears to collect back money it never lent. */
+    advWant = Math.max(0, Math.min(advWant, onBooks('1250', s.companyId)));
+    emiWant = Math.max(0, Math.min(emiWant, onBooks('1260', s.companyId)));
+    /* NET PAYABLE CAN NEVER GO NEGATIVE (owner 2026-07-30): "deduct only what is
+     * available, carry the rest to the next month, and mark that row." The month
+     * can only bear what is left after its own deductions; whatever the schedule
+     * asked for beyond that is simply NOT deducted, which leaves it outstanding —
+     * so next month's plan picks it up by itself, no carry-forward record to keep
+     * in step with anything. `short` is what was left behind, for the mark. */
+    var room = Math.max(0, slipEarned(s));
+    var adv = clamp(advWant, 0, room);
+    var emi = clamp(emiWant, 0, room - adv);
+    return { adv: round(adv), emi: round(emi), short: round((advWant - adv) + (emiWant - emi)) };
+  }
+  /* THE LEDGER CEILING, READ ONCE PER CHANGE. ledger.balance walks every journal
+   * line in the book, and the salary sheet now asks for it while drawing each of
+   * a hundred rows (net payable, the two columns, the foot). Cached per account
+   * per company and dropped the moment ANY store changes — the bus is synchronous,
+   * so a posting inside a finalize loop invalidates this before the next slip is
+   * planned, and no row is ever sized from a stale balance. */
+  var bookMemo = {};
+  bus.on('data:changed', function () { bookMemo = {}; });
+  function onBooks(code, cid) {
+    var k = code + '|' + (cid || '');
+    if (k in bookMemo) return bookMemo[k];
+    var v;
+    try { v = Math.max(0, round(L().balance(code, { companyId: cid }))); }
+    catch (e) { v = Infinity; }                       // ledger unavailable → old behaviour
+    bookMemo[k] = v; return v;
+  }
+  function slipRecovery(s) {
+    if (s.deductedAt) return { adv: round(s.advanceDeduct || 0), emi: round(s.loanDeduct || 0), short: round(s.carryShort || 0), frozen: true };
+    if ((s.paid || 0) > 0) return { adv: round(s.advanceRecovered || 0), emi: round(s.loanRecovered || 0), short: 0, legacy: true };
+    return planRecovery(s);
+  }
+
+  // The single source of truth for the net owed to an employee for a month —
+  // the CASH to hand over: earnings − the month's deductions − advance − EMI.
+  function slipPayable(s) {
+    var r = slipRecovery(s);
+    return Math.max(0, round(slipEarned(s) - r.adv - r.emi));
+  }
+  /* What the employee actually RECEIVED. Under the old rule pay() booked the
+   * whole payable as `paid` and handed over less, because the advance and the EMI
+   * came out of it; those months keep their journals untouched and are simply
+   * READ correctly here, so Net payable − Paid = Due holds on every row ever
+   * written. A month deducted at accrual recovers nothing at payment, so its
+   * `paid` is already the cash and this returns it unchanged. */
+  function slipPaid(s) {
+    var legacy = s.deductedAt ? 0 : ((s.advanceRecovered || 0) + (s.loanRecovered || 0));
+    return Math.max(0, round((s.paid || 0) - legacy));
+  }
+  function slipDue(s) { return Math.max(0, round(slipPayable(s) - slipPaid(s))); }
+  // the recovery that has actually HAPPENED on a slip (a plan has not happened)
+  function slipRealized(s) {
+    return s.deductedAt ? round((s.advanceDeduct || 0) + (s.loanDeduct || 0))
+      : round((s.advanceRecovered || 0) + (s.loanRecovered || 0));
   }
   // Amount in words (Bangladeshi numbering: crore / lakh / thousand) for payslips.
   var W1 = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -459,10 +554,28 @@
   function accrueSlip(s, cid, ym) {
     var adjPos = Math.max(0, s.adjustment || 0), adjNeg = Math.max(0, -(s.adjustment || 0));
     var recovered = (s.otherDeduction || 0) + (s.lateDeduction || 0) + (s.earlyDeduction || 0) + (s.fine || 0) + adjNeg;
+    /* THE MONTH'S ADVANCE + EMI ARE DEDUCTED HERE (owner 2026-07-30), not at
+     * payment. Approving the month is what makes the deduction real, so this is
+     * where the two asset accounts come down and where the loan book is told.
+     * The figures are FROZEN onto the slip: re-posting reads the same numbers,
+     * and the plan excludes the slip's own deduction so a re-post cannot shrink
+     * the balance it is sized from.
+     *
+     * A MONTH THAT WAS ALREADY PAID UNDER THE OLD RULE IS LEFT EXACTLY AS IT WAS
+     * POSTED. Its payment journal has already credited 1250/1260 with what it
+     * recovered and debited 2100 with the pre-recovery figure; re-posting the new
+     * shape over it would credit both assets a second time and drive 2100
+     * negative. Settled history is read correctly (slipRecovery/slipPaid) — it is
+     * not rewritten. */
+    var legacyPaid = !s.deductedAt && (s.paid || 0) > 0;
+    var rec = legacyPaid
+      ? { adv: round(s.advanceRecovered || 0), emi: round(s.loanRecovered || 0), short: 0 }
+      : planRecovery(s);
+    if (!legacyPaid) { s.advanceDeduct = rec.adv; s.loanDeduct = rec.emi; s.carryShort = rec.short; s.deductedAt = ym; }
     // AUDIT FIX: recovered deductions REDUCE salary cost — they are not income.
     // (Booking them to 4900 Other Income inflated the group's topline.)
-    // Net expense = earned + OT + bonus + adj⁺ − recovered = tax + pf + payable,
-    // so the entry balances by construction with just three credit lines.
+    // Net expense = earned + OT + bonus + adj⁺ − recovered = tax + pf + advance +
+    // EMI + payable, so the entry balances by construction.
     var expense = (s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0) + adjPos - recovered;
     var payable = slipPayable(s);
     var lines;
@@ -478,18 +591,106 @@
       if (s.pf) lines.push({ account: '2110', dr: 0, cr: s.pf });
       lines.push({ account: '4900', dr: 0, cr: recovered });
     }
+    if (!legacyPaid && rec.adv > 0) lines.push({ account: '1250', dr: 0, cr: rec.adv });   // the advance comes back
+    if (!legacyPaid && rec.emi > 0) lines.push({ account: '1260', dr: 0, cr: rec.emi });   // …and so does the loan
     lines.push({ account: '2100', dr: 0, cr: payable });
     glPost('GL-PAYA-' + s.empId + '-' + ym, ym + '-01', cid, 'PAY-' + ym, 'Salary accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId, lines);
     if (s.encashAmt > 0) glPost('GL-ENC-' + s.empId + '-' + ym, ym + '-01', cid, 'ENC-' + ym, 'Leave encashment accrual · ' + s.empName + ' · ' + ym, 'payroll', s.empId,
       [{ account: '5150', dr: s.encashAmt, cr: 0 }, { account: '2150', dr: 0, cr: s.encashAmt }]);
-    s.status = (s.paid || 0) >= payable ? 'paid' : ((s.paid || 0) > 0 ? 'partial' : 'accrued');
+    /* THE LOAN BOOK IS TOLD THE SAME MOMENT (owner: "the loan ledger and the
+     * payroll must always agree"). One repayment per slip under a STABLE id, so
+     * re-posting the accrual restates it instead of adding a second one, and
+     * `slipId` is what lets the plan and unfinalize find their own row again. */
+    var emiTxnId = 'PT-EMI-' + s.empId + '-' + ym;
+    if (!legacyPaid) {
+      if (rec.emi > 0) {
+        S.upsert('pay_txns', { id: emiTxnId, type: 'loan-repay', empId: s.empId, empName: s.empName, companyId: cid,
+          date: ym + '-01', amount: rec.emi, slipId: s.id, method: 'Salary deduction',
+          memo: 'EMI deducted from ' + mLabel(ym) + ' salary' });
+      } else {
+        S.set('pay_txns', S.list('pay_txns').filter(function (x) { return x.id !== emiTxnId; }));
+      }
+      bus.emit('data:changed', { store: 'pay_txns' });
+    }
+    var paidCash = slipPaid(s);
+    s.status = paidCash >= payable ? 'paid' : (paidCash > 0 ? 'partial' : 'accrued');
     S.upsert('pay_slips', s);
   }
 
+  /* ============ THE ROW-BY-ROW PROOF (owner 2026-07-30) ======================
+   * "Before a payroll run can be approved, check every row: earnings − all
+   * deductions = net payable. If any row fails, block approval and show which
+   * rows and by how much."
+   *
+   * It re-derives the arithmetic from the slip's own fields rather than calling
+   * slipPayable — a check that asks the same function it is checking proves
+   * nothing. A row fails if the two disagree by a taka or more, if the net is
+   * negative, or if the month tried to recover more than the employee owes.
+   * Returns { ok, rows[], failed[], shorted[] } and never throws: the caller
+   * decides what to do with a failure. */
+  function runCheck(cid, ym) {
+    var rows = slipsFor(cid, ym).map(function (s) {
+      var r = slipRecovery(s);
+      var earnings = round((s.earnedGross || 0) + (s.overtime || 0) + (s.bonus || 0) + (s.tplBonus || 0) + Math.max(0, s.adjustment || 0));
+      var deductions = round((s.tax || 0) + (s.pf || 0) + (s.otherDeduction || 0) + (s.lateDeduction || 0)
+        + (s.earlyDeduction || 0) + (s.fine || 0) + Math.max(0, -(s.adjustment || 0)) + r.adv + r.emi);
+      var expected = round(earnings - deductions), actual = slipPayable(s);
+      var diff = round(actual - expected);
+      return { empId: s.empId, empName: s.empName, earnings: earnings, deductions: deductions,
+        advance: r.adv, emi: r.emi, expected: expected, actual: actual, diff: diff,
+        negative: expected < 0, short: r.short || 0,
+        ok: Math.abs(diff) < 1 && expected >= 0 };
+    });
+    var failed = rows.filter(function (r) { return !r.ok; });
+    return { ok: !failed.length, cid: cid, ym: ym, rows: rows, failed: failed,
+      shorted: rows.filter(function (r) { return r.short > 0; }) };
+  }
+
+  /* ================ EMI RECORDED BUT NEVER DEDUCTED (owner 2026-07-30) ========
+   * "Recheck every past month from the first run to July 2026 and tell me the
+   * total amount of loan EMI that was recorded but never actually deducted."
+   *
+   * Under the old rule the EMI came off at PAYMENT time, so every month that was
+   * approved and not yet paid printed an EMI on the salary sheet that had touched
+   * neither the net, the cash nor the loan book. This walks every non-draft slip
+   * ever written and reports, per month and per person, the EMI the sheet showed
+   * against the EMI that actually moved. A slip approved under the new rule shows
+   * a gap of zero by construction — the accrual deducted it. */
+  function emiGap(opts) {
+    opts = opts || {};
+    var out = { total: 0, advanceTotal: 0, months: {}, rows: [] };
+    S.list('pay_slips').filter(function (s) {
+      return s.status !== 'draft' && (!opts.companyId || s.companyId === opts.companyId)
+        && (!opts.untilYm || s.ym <= opts.untilYm);
+    }).sort(function (a, b) { return a.ym < b.ym ? -1 : (a.ym > b.ym ? 1 : 0); }).forEach(function (s) {
+      var shown = s.deductedAt ? round(s.loanDeduct || 0)
+        : ((s.paid || 0) > 0 ? round(s.loanRecovered || 0) : planRecovery(s).emi);
+      var moved = round((s.deductedAt ? (s.loanDeduct || 0) : 0) + (s.deductedAt ? 0 : (s.loanRecovered || 0)));
+      var advShown = s.deductedAt ? round(s.advanceDeduct || 0)
+        : ((s.paid || 0) > 0 ? round(s.advanceRecovered || 0) : planRecovery(s).adv);
+      var advMoved = round((s.deductedAt ? (s.advanceDeduct || 0) : 0) + (s.deductedAt ? 0 : (s.advanceRecovered || 0)));
+      var gap = round(shown - moved), advGap = round(advShown - advMoved);
+      if (gap <= 0 && advGap <= 0) return;
+      out.total += gap; out.advanceTotal += advGap;
+      out.months[s.ym] = round((out.months[s.ym] || 0) + gap);
+      out.rows.push({ ym: s.ym, empId: s.empId, empName: s.empName, companyId: s.companyId,
+        status: s.status, emiShown: shown, emiDeducted: moved, gap: gap, advanceGap: advGap });
+    });
+    out.total = round(out.total); out.advanceTotal = round(out.advanceTotal);
+    return out;
+  }
+
   // Finalize: lock the run and ACCRUE every payslip into the GL (idempotent per head).
+  // The row-by-row proof runs FIRST and a failure blocks the approval outright —
+  // an unbalanced row must not reach the general ledger.
   function finalize(cid, ym) {
     var run = generate(cid, ym);
     if (run.status !== 'draft') return run;
+    var chk = runCheck(cid, ym);
+    if (!chk.ok) {
+      var err = new Error('Payroll check failed on ' + chk.failed.length + ' row(s) — approval blocked.');
+      err.check = chk; throw err;
+    }
     slipsFor(cid, ym).forEach(function (s) { accrueSlip(s, cid, ym); });
     run.status = 'finalized'; run.finalizedAt = today(); S.upsert('pay_runs', run);
     bus.emit('data:changed', { store: 'pay_runs' });
@@ -512,8 +713,16 @@
           EPAL.ledger.remove('GL-ENC-' + s.empId + '-' + ym);
         }
       } catch (e) {}
+      /* …and UN-DEDUCT the month. The accrual is what took the advance and the
+       * EMI (owner 2026-07-30), so walking back past it must give both back:
+       * the frozen figures come off the slip and the salary repayment leaves the
+       * loan book, which is the only thing keeping the loan ledger and the
+       * payroll in step. Re-finalizing plans and posts them again. */
+      S.set('pay_txns', S.list('pay_txns').filter(function (x) { return x.id !== 'PT-EMI-' + s.empId + '-' + ym; }));
+      s.deductedAt = null; s.advanceDeduct = 0; s.loanDeduct = 0; s.carryShort = 0;
       s.status = 'draft'; S.upsert('pay_slips', s);
     });
+    bus.emit('data:changed', { store: 'pay_txns' });
     run.status = 'draft'; run.finalizedAt = null; S.upsert('pay_runs', run);
     bus.emit('data:changed', { store: 'pay_runs' });
     return run;
@@ -538,29 +747,32 @@
     var s = slip(empId, ym); if (!s) throw new Error('No payslip for ' + empId + ' ' + ym);
     var run = getRun(s.companyId, ym);
     if (!run || run.status === 'draft') throw new Error('Finalize the payroll before paying.');
+    /* A MONTH ACCRUED UNDER THE OLD RULE HEALS ITSELF HERE (owner 2026-07-30).
+     * Its accrual credited 2100 with the pre-recovery figure and told 1250/1260
+     * nothing; paying it as cash-only would leave the advance and the EMI stranded
+     * in Salary Payable for ever. Nothing has moved on it yet (paid is 0), so
+     * re-posting the accrual under its stable id is safe and exact: the entry is
+     * restated, the loan book is told, and the payment below is plain cash. */
+    if (!s.deductedAt && !(s.paid > 0)) { accrueSlip(s, s.companyId, ym); s = slip(empId, ym) || s; }
     var payable = slipPayable(s);
-    var outstanding = payable - (s.paid || 0);
+    var outstanding = payable - slipPaid(s);
     var amt = amount == null ? outstanding : clamp(round(amount), 0, outstanding);
     if (amt <= 0) return s;
-    // AUTO deductions, but the company decides how much it agrees to take this
-    // month: slip.advCap / slip.emiCap (set in Edit Salary) override the autos.
-    var advOut = advanceOutstanding(empId);
-    var advWant = (s.advCap == null || s.advCap === '') ? advOut : Math.min(advOut, round(+s.advCap));
-    var emiWant = (s.emiCap == null || s.emiCap === '') ? emiInstallment(empId) : round(+s.emiCap);
-    /* …and never recover more than the BOOKS say is outstanding (2026-07-28).
-     * emiInstallment/advanceOutstanding read the pay_txns trail; 1250 and 1260 are
-     * what the ledger actually carries, and on an imported or seeded book the two
-     * can disagree. Recovering past the ledger balance drives an ASSET negative —
-     * the company appears to collect back money it never lent. Whichever is
-     * smaller is the honest ceiling. */
-    function onBooks(code) {
-      try { return Math.max(0, round(L().balance(code, { companyId: s.companyId }))); }
-      catch (e) { return Infinity; }                    // ledger unavailable → old behaviour
+    /* THE RECOVERIES ARE ALREADY OFF THE PAYABLE. Net payable IS the cash to hand
+     * over (the advance and the EMI came off when the month was approved), so a
+     * payment moves cash and nothing else. Only a slip still running under the old
+     * rule — one that was part-paid before this change — keeps the old split, so
+     * a half-settled month is never re-cut mid-flight. */
+    var legacy = !s.deductedAt && (s.paid || 0) > 0;
+    var recover = 0, emiRecover = 0;
+    if (legacy) {
+      var advWant = (s.advCap == null || s.advCap === '') ? advanceOutstanding(empId, s.id) : Math.min(advanceOutstanding(empId, s.id), round(+s.advCap));
+      var emiWant = (s.emiCap == null || s.emiCap === '') ? emiInstallment(empId, s.id) : round(+s.emiCap);
+      advWant = Math.min(advWant, onBooks('1250', s.companyId));
+      emiWant = Math.min(emiWant, onBooks('1260', s.companyId));
+      recover = clamp(advWant, 0, amt);                // agreed advance recovery out of this pay
+      emiRecover = clamp(emiWant, 0, amt - recover);   // agreed loan EMI installment
     }
-    advWant = Math.min(advWant, onBooks('1250'));
-    emiWant = Math.min(emiWant, onBooks('1260'));
-    var recover = clamp(advWant, 0, amt);                // agreed advance recovery out of this pay
-    var emiRecover = clamp(emiWant, 0, amt - recover);   // agreed loan EMI installment
     var cash = amt - recover - emiRecover;
     // WHICH account pays the salary. 'bank:<id>' names a real one; anything else
     // keeps the old generic behaviour (Cash → 1000, everything else → 1010).
@@ -584,7 +796,7 @@
     if (emiRecover > 0) txn({ type: 'loan-repay', empId: empId, empName: s.empName, companyId: s.companyId, date: when, amount: emiRecover, memo: 'EMI auto-deducted from ' + mLabel(ym) + ' salary' });
     s.paid = (s.paid || 0) + amt; s.advanceRecovered = (s.advanceRecovered || 0) + recover; s.loanRecovered = (s.loanRecovered || 0) + emiRecover;
     s.payMethod = method || s.payMethod || 'Bank'; s.payCount = (s.payCount || 0) + 1; s.paidDate = when;
-    s.status = s.paid >= payable ? 'paid' : 'partial';
+    s.status = slipPaid(s) >= payable ? 'paid' : 'partial';
     S.upsert('pay_slips', s);
     refreshRunStatus(s.companyId, ym);
     bus.emit('data:changed', { store: 'pay_slips' });
@@ -604,9 +816,13 @@
         'Payment reversal · ' + s.empName + ' · ' + mLabel(ym), 'payroll', empId,
         entry.lines.map(function (l) { return { account: l.account, dr: l.cr, cr: l.dr }; }));
     }
-    // drop the auto-EMI txns this month's payments recorded (loan balance restores)
+    // drop the auto-EMI txns this month's PAYMENTS recorded (loan balance restores).
+    // The accrual's own repayment (PT-EMI-…, written when the month was approved)
+    // is deliberately spared: un-paying a month does not un-approve it, and the
+    // deduction belongs to the accrual — unfinalize is what gives that one back.
     S.set('pay_txns', S.list('pay_txns').filter(function (x) {
-      return !(x.empId === empId && x.type === 'loan-repay' && String(x.memo || '').indexOf('EMI auto-deducted from ' + mLabel(ym)) === 0);
+      return !(x.empId === empId && x.type === 'loan-repay' && x.id !== 'PT-EMI-' + empId + '-' + ym
+        && String(x.memo || '').indexOf('EMI auto-deducted from ' + mLabel(ym)) === 0);
     }));
     s.paid = 0; s.advanceRecovered = 0; s.loanRecovered = 0; s.paidDate = null;   // payCount stays — reversal ids stay unique
     s.status = 'accrued';
@@ -809,16 +1025,22 @@
 
   /* ----------------------------------------------------- derived balances */
   function txnsFor(empId) { return S.list('pay_txns').filter(function (x) { return x.empId === empId; }); }
-  function advanceOutstanding(empId) {
+  /* `exceptSlip` — the slip currently being PLANNED or RE-ACCRUED. Its own
+   * deduction must not count against the balance it is being sized from, or
+   * re-posting an accrual would shrink the very figure it is re-posting (the
+   * second pass would deduct half, the third a quarter…). Everyone else's
+   * deduction counts, which is what makes two months in a row recover twice. */
+  function advanceOutstanding(empId, exceptSlip) {
     var given = txnsFor(empId).filter(function (x) { return x.type === 'advance'; }).reduce(function (a, x) { return a + x.amount; }, 0);
-    var recovered = S.list('pay_slips').filter(function (s) { return s.empId === empId; }).reduce(function (a, s) { return a + (s.advanceRecovered || 0); }, 0);
+    var recovered = S.list('pay_slips').filter(function (s) { return s.empId === empId && s.id !== exceptSlip; })
+      .reduce(function (a, s) { return a + (s.deductedAt ? (s.advanceDeduct || 0) : (s.advanceRecovered || 0)); }, 0);
     var settled = txnsFor(empId).filter(function (x) { return x.type === 'settlement'; }).reduce(function (a, x) { return a + (x.advanceCleared || 0); }, 0);
     return Math.max(0, given - recovered - settled);
   }
-  function loanOutstanding(empId) {
+  function loanOutstanding(empId, exceptSlip) {
     var t = txnsFor(empId);
     var given = t.filter(function (x) { return x.type === 'loan'; }).reduce(function (a, x) { return a + x.amount; }, 0);
-    var repaid = t.filter(function (x) { return x.type === 'loan-repay'; }).reduce(function (a, x) { return a + x.amount; }, 0);
+    var repaid = t.filter(function (x) { return x.type === 'loan-repay' && x.slipId !== exceptSlip; }).reduce(function (a, x) { return a + x.amount; }, 0);
     var settled = t.filter(function (x) { return x.type === 'settlement'; }).reduce(function (a, x) { return a + (x.loanCleared || 0); }, 0);
     return Math.max(0, given - repaid - settled);
   }
@@ -896,10 +1118,10 @@
 
   // the monthly EMI to auto-deduct from salary = Σ(loan amount ÷ emiMonths) for loans
   // set up with an installment plan, capped at what's still owed.
-  function emiInstallment(empId) {
+  function emiInstallment(empId, exceptSlip) {
     var emi = txnsFor(empId).filter(function (x) { return x.type === 'loan' && (+x.emiMonths || 0) > 0; })
       .reduce(function (a, x) { return a + Math.round(x.amount / x.emiMonths); }, 0);
-    return Math.min(emi, loanOutstanding(empId));
+    return Math.min(emi, loanOutstanding(empId, exceptSlip));
   }
   /* ====================================================== WHERE THE MONEY MOVED
    * Owner 2026-07-29: "all transactions across payroll should contain from where
@@ -1029,7 +1251,7 @@
   // Salary currently owed to the employee (accrued but unpaid across all months).
   function salaryDue(empId) {
     return S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; })
-      .reduce(function (a, s) { var payable = slipPayable(s); return a + Math.max(0, payable - (s.paid || 0)); }, 0);
+      .reduce(function (a, s) { return a + slipDue(s); }, 0);
   }
 
   /* --------------------------------------------------------- leave state */
@@ -1147,10 +1369,17 @@
   function empLedger(empId) {
     var rows = [];
     S.list('pay_slips').filter(function (s) { return s.empId === empId && s.status !== 'draft'; }).forEach(function (s) {
-      var payable = slipPayable(s);
-      rows.push(withSource({ date: s.ym + '-01', ref: s.id, kind: 'Salary earned', memo: mLabel(s.ym) + ' salary (net of tax/PF)', credit: payable, debit: 0 }, accrualSource('Salary Payable')));
+      /* This sheet runs on the PRE-RECOVERY figure on both sides, and has to:
+       * the advance and the loan repayment are rows of their own further down, so
+       * netting them off the salary as well would count them twice. What the
+       * employee earned is credited, and what the company settled — cash handed
+       * over PLUS whatever of it went straight onto an advance or a loan — is
+       * debited. Every historical row keeps the exact figures it always had. */
+      var settled = round(slipPaid(s) + slipRealized(s));
+      rows.push(withSource({ date: s.ym + '-01', ref: s.id, kind: 'Salary earned', memo: mLabel(s.ym) + ' salary (net of tax/PF)', credit: slipEarned(s), debit: 0 }, accrualSource('Salary Payable')));
       if (s.encashAmt) rows.push(withSource({ date: s.ym + '-01', ref: s.id, kind: 'Leave encashment', memo: mLabel(s.ym) + ' leave accrual', credit: s.encashAmt, debit: 0 }, accrualSource('Leave Encashment Payable')));
-      if (s.paid) rows.push(withSource({ date: s.paidDate || (s.ym + '-10'), ref: s.id, kind: 'Salary paid', memo: mLabel(s.ym) + ' salary paid', credit: 0, debit: s.paid }, slipPaidSource(s)));
+      if (settled) rows.push(withSource({ date: s.paidDate || (s.ym + '-10'), ref: s.id, kind: 'Salary paid',
+        memo: mLabel(s.ym) + ' salary' + (slipPaid(s) > 0 ? ' paid' : ' applied to advance / loan'), credit: 0, debit: settled }, slipPaidSource(s)));
     });
     txnsFor(empId).forEach(function (x) {
       if (x.type === 'advance') rows.push(withSource({ date: x.date, ref: x.id, kind: 'Advance', memo: x.memo, credit: 0, debit: x.amount }, txnSource(x)));
@@ -1176,7 +1405,7 @@
   function previousDue(empId, ym) {
     return S.list('pay_slips')
       .filter(function (s) { return s.empId === empId && s.ym < ym && s.status !== 'draft'; })
-      .reduce(function (a, s) { return a + Math.max(0, slipPayable(s) - (s.paid || 0)); }, 0);
+      .reduce(function (a, s) { return a + slipDue(s); }, 0);
   }
   // The arrears BREAKDOWN with dates (owner: "for every due there should be a
   // date record of WHICH month's due that is"): one row per unpaid month —
@@ -1184,24 +1413,25 @@
   // month's pay-by date), plus what was part-paid and when.
   function previousDueList(empId, ym) {
     return S.list('pay_slips')
-      .filter(function (s) { return s.empId === empId && s.ym < ym && s.status !== 'draft' && slipPayable(s) - (s.paid || 0) > 0.5; })
+      .filter(function (s) { return s.empId === empId && s.ym < ym && s.status !== 'draft' && slipDue(s) > 0.5; })
       .sort(function (a, b) { return a.ym < b.ym ? -1 : 1; })
       .map(function (s) {
         var run = getRun(s.companyId, s.ym);
-        return { ym: s.ym, label: mLabel(s.ym), amount: round(slipPayable(s) - (s.paid || 0)),
-          dueSince: (run && run.dueAfter) || (s.ym + '-10'), paid: s.paid || 0, paidDate: s.paidDate || null };
+        return { ym: s.ym, label: mLabel(s.ym), amount: slipDue(s),
+          dueSince: (run && run.dueAfter) || (s.ym + '-10'), paid: slipPaid(s), paidDate: s.paidDate || null };
       });
   }
   function statement(emp, ym) {
     var s = slip(emp.id, ym) || Object.assign({ empName: emp.name }, computeSlip(emp, ym, {}));
     var ls = leaveState(emp);
     var payable = slipPayable(s);
-    // advance/loan lines: actual recoveries once paid, else the projected AGREED
-    // recovery (auto, capped by advCap/emiCap when the company set them)
-    var advAuto = Math.min(advanceOutstanding(emp.id), Math.max(0, payable));
-    var advLine = (s.paid > 0) ? (s.advanceRecovered || 0) : ((s.advCap == null || s.advCap === '') ? advAuto : Math.min(advAuto, round(+s.advCap)));
-    var loanLine = (s.paid > 0) ? (s.loanRecovered || 0) : ((s.emiCap == null || s.emiCap === '') ? emiInstallment(emp.id) : round(+s.emiCap));
-    var cashAfter = Math.max(0, payable - advLine - loanLine);
+    /* The advance and the loan are ORDINARY DEDUCTION LINES on the payslip now
+     * (owner 2026-07-30): the same figures the salary sheet shows, already taken
+     * off the net below, so the printed slip's own arithmetic closes —
+     * earnings − every deduction = net payable = the cash handed over. */
+    var rec = slipRecovery(s);
+    var advLine = rec.adv, loanLine = rec.emi;
+    var cashAfter = payable;
     var arrears = previousDue(emp.id, ym);
     var arrearsList = previousDueList(emp.id, ym);
     return {
@@ -1227,22 +1457,23 @@
       leaveEncashment: { days: s.encashDays, amount: s.encashAmt, accruedDays: ls.encashableDays, accruedValue: ls.value, eligible: ls.eligibleFullYear, fullYearDays: ls.fullYearDays, fullYearValue: ls.fullYearValue },
       netPayable: payable, netCash: cashAfter, inWords: amountInWords(payable),
       previousDue: arrears, previousDueItems: arrearsList, totalPayable: payable + arrears, totalInWords: amountInWords(payable + arrears),
-      paid: s.paid || 0, outstanding: Math.max(0, payable - (s.paid || 0)), status: s.status || 'draft'
+      paid: slipPaid(s), outstanding: slipDue(s), status: s.status || 'draft'
     };
   }
   // Pay off every earlier month still owed (walks old unpaid/partial slips oldest-first).
   function payArrears(empId, method) {
     var owed = S.list('pay_slips')
-      .filter(function (s) { return s.empId === empId && s.status !== 'draft' && slipPayable(s) > (s.paid || 0); })
+      .filter(function (s) { return s.empId === empId && s.status !== 'draft' && slipDue(s) > 0; })
       .sort(function (a, b) { return a.ym < b.ym ? -1 : 1; });
     var total = 0;
-    owed.forEach(function (s) { try { var before = s.paid || 0; pay(empId, s.ym, null, method); var after = (slip(empId, s.ym) || {}).paid || 0; total += after - before; } catch (e) {} });
+    owed.forEach(function (s) { try { var before = slipPaid(s); pay(empId, s.ym, null, method); var after = slipPaid(slip(empId, s.ym) || s); total += after - before; } catch (e) {} });
     return total;
   }
 
   /* --------------------------------------------------------------- helpers */
   function glPost(id, date, cid, ref, memo, source, party, lines) {
     if (!L() || !L().post) return null;
+    bookMemo = {};              // this entry moves balances the next plan reads
     try { return L().post({ id: id || undefined, date: date, companyId: cid, ref: ref, memo: memo, source: source, party: party, lines: lines }); }
     catch (e) { console.error('[payroll] GL post failed', e, { ref: ref }); return null; }
   }
@@ -1354,6 +1585,18 @@
   /* --------------------------------------------------------------- API */
   EPAL.payroll = {
     template: template, saveTemplate: saveTemplate, computeSlip: computeSlip, slipPayable: slipPayable,
+    /* THE SLIP, READ ONE WAY (owner 2026-07-30). Every screen that shows an
+     * advance, an EMI, a net, a paid or a due reads these — the columns and the
+     * net payable beside them cannot disagree, because they are the same call.
+     *   slipEarned    earnings − the month's own deductions (before recovery)
+     *   slipRecovery  { adv, emi, short } — the two recoveries, and what would
+     *                 not fit this month and rides on to the next
+     *   slipPayable   the CASH to hand over = earned − advance − EMI
+     *   slipPaid      the cash actually handed over · slipDue  what is left
+     *   runCheck      the row-by-row proof that blocks an approval
+     *   emiGap        EMI a sheet showed but nothing ever deducted */
+    slipEarned: slipEarned, slipRecovery: slipRecovery, slipRealized: slipRealized,
+    slipPaid: slipPaid, slipDue: slipDue, runCheck: runCheck, emiGap: emiGap,
     salaryPackages: salaryPackages, packageOf: packageOf, savePackage: savePackage,
     deletePackage: deletePackage, packageTotal: stTotal, fineSlip: fineSlip, slipAdj: slipAdj,
     amountInWords: amountInWords, attendanceFor: attendanceFor, saveAttendance: saveAttendance,
