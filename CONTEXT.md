@@ -490,6 +490,43 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · PAYROLL HISTORY PRINTS THE SAME REGISTER (+ the plan for the other 26 tables)
+
+**The owner's check** — *"the one you have done already is in Overview the Monthly
+Register Table. It matches with Salary Manage's Payroll History table, check it.
+If matches 100%, then first make same print option there, if not, list what's the
+difference."*
+
+**It matches where it counts and nowhere else.** Both tables are the SAME
+`monthSeries()` — same months, same figures, no limit on either — so the printed
+register is a drop-in with nothing to recompute. Proven by driving both screens:
+Overview foots gross ৳71,99,496 · paid ৳52,47,059 · due ৳4,63,316 over 17 distinct
+heads, and Payroll History foots the identical three figures. The differences are
+presentational: 10 columns against 6, `heads` against `paidHeads / heads`, the
+history card alone renders "No run" and "Mixed · N runs", and the row click drills
+to the Salary Register on one and to the month's TRANSACTIONS on the other. One
+asks what the month cost and owes; the other what it paid out, and to how many.
+
+So Payroll History now raises the FULLER `PR-MR` document — it already carries
+every column that card shows and four more. One payroll month register, not two
+variants of one. Its foot follows the same rules, and "Staff paid" foots as
+**people with nothing outstanding across the period / people on the payroll in it**
+(6 / 17 — never a sum of monthly counts, which would say 119 of 119).
+⚠ A month with no run, or a draft one, is listed on that card but cannot be
+printed: only approved runs leave the building.
+
+**THE DESK HAS 29 TABLES. THREE ARE FOOTED AND PRINTABLE.** The other 26 are
+planned in `docs/TASK-QUEUE.md` as T-PAY-TABLES, in phases, with the two
+treatments kept apart on purpose: FOOT every table that carries money (cheap now
+that `EPAL.table` takes `opts.totals`), but raise a DOCUMENT only for the ones
+somebody hands to somebody — the Salary sheet (the disbursement sheet that gets
+signed, next up), Staff Accounts, the Loan Book, the Advance Register, and the two
+an auditor asks for by name: the encashment liability schedule and the payroll ↔
+ledger reconciliation. A drill-down modal is not a document and does not get
+letterhead.
+
+---
+
 ## 🆕 SESSION — 2026-07-30 · THE PAYROLL PRINT SYSTEM — A REGISTER YOU CAN FILE
 
 **The ask** — the owner wrote a full spec (`Epal-Group-Payroll-Print-Spec-Prompt.md`)

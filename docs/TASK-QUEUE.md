@@ -26,6 +26,63 @@
 
 ## ⏭️ STILL OPEN
 
+### T-PAY-TABLES — every table on the payroll desk, footed and printable (PLAN, 2026-07-30)
+Owner: *"which table we work on same way?? … you go check the overall payroll, list
+how many we have and do plan."*
+
+**The count: 29 tables on the desk. 3 are footed and printable. 26 are not.**
+
+Two separate treatments, and not every table earns both:
+- **FOOT IT** — a totals row via `EPAL.table`'s `opts.totals(rows)`. Cheap, and
+  every table with a money column owes the reader one. Same four rules every
+  time: sum what sums · re-compute percentages from the totals · a cumulative
+  accrual shows its CLOSING BALANCE · people are counted DISTINCT.
+- **PRINT IT** — a formal document through the print centre (masthead · footed
+  totals · panels · sign-off). Only for tables somebody actually hands to
+  somebody. A drill-down modal does not need letterhead.
+
+| Phase | Tab | Tables | Foot | Document |
+|---|---|---|---|---|
+| P1 ✅ | Overview · month drill | Monthly Register · Salary Register | done | `PR-MR` · `PR-SR` |
+| P2 ✅ | Salary Manage | Payroll History | done | reuses `PR-MR` (same `monthSeries()`) |
+| P3 | Salary Manage | **Salary sheet** | ⏭ | ⏭ **the disbursement sheet** — wants a signature column per employee; this is what gets signed when cash goes out |
+| P4 | Staff | **Staff Accounts** | ⏭ | ⏭ staff payroll position statement |
+| P5 | Loans | staff-loans · loan-register · emi-history · loan payments (modal) · loan transactions | ⏭ ×5 | ⏭ **Loan Book** |
+| P6 | Advance | advance outstanding · advance requests · advance transactions | ⏭ ×3 | ⏭ **Advance Register** |
+| P7 | Reports | payroll-by-account (+ its drill) · encashment liability · loan outstanding · department cost · increment history · simpleTbl lists | ⏭ ×7 | ⏭ **Encashment liability schedule** + **Payroll ↔ ledger reconciliation** (the two an auditor asks for by name) |
+| P8 | drills & modals | month transactions · money movements · ledger postings · variance explainer · payslip list · template list · structure compare · blocked-approval check | ⏭ ×8 | none — a drill is not a document |
+
+The Payslip already has its own printed artifact (`EPAL.people.payslipPrint`), so it
+needs footing only. Each phase is one commit, verified the same way: sweep both
+themes + a driver that checks the footed figure against an INDEPENDENT sum out of
+the store.
+
+### T-PAY-HISTORY — Payroll History prints the same register ✅ (2026-07-30)
+Owner: *"the one you have done already is in Overview the Monthly Register Table.
+It matches with Salary Manage's Payroll History table, check it. If matches 100%,
+then first make same print option there, if not, list what's the difference."*
+
+**Checked: same DATA, narrower VIEW.** Both tables are `monthSeries()` — the same
+months, the same figures, no limit on either — so the printed register is a
+drop-in with nothing to recompute and nothing to keep in sync. The differences are
+all presentational:
+
+| | Monthly Register (Overview) | Payroll History (Salary Manage) |
+|---|---|---|
+| Columns | 10 — Month · Run · Employees · Gross · Additions · Deductions · Encash · Net Payable · Paid · Due | 6 — Month · Staff paid (`6 / 17`) · Gross · Net paid · Still outstanding · Run status |
+| Headcount | on the payroll | fully paid / on the payroll |
+| Status | badge | badge **+ "No run" + "Mixed · N runs"** |
+| Row click | drills into that month's Salary Register | opens **every transaction** in that month |
+| Question | what the month **cost and owes** | what the month **paid out, and to how many** |
+
+So Payroll History now raises the FULLER `PR-MR` register — it carries every column
+this card shows and four more. One payroll month register, not two variants.
+Its foot follows the same rules: sums for the money, and "Staff paid" foots as
+**people with nothing outstanding across the period / people on the payroll in it**
+(6 / 17), never a sum of monthly counts.
+⚠ A month with **no run**, or a draft one, is listed on this card but cannot be
+printed — only approved runs leave the building, and the centre says so.
+
 ### T-PAY-PRINT — the payroll print system, to the owner's written spec ✅ (2026-07-30)
 Owner sent `Epal-Group-Payroll-Print-Spec-Prompt.md` (9 sections + a 13-point
 acceptance checklist) with a rendered mock-up, plus two amendments in his own
