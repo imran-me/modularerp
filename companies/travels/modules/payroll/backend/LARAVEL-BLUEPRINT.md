@@ -26,3 +26,29 @@ Settlement: DR 2100 + 2150 / CR 1250, 1260, 1010. All tagged `company_id` (party
 
 ## Scheduling
 A daily command runs `autoDue()` — after each run's `due_after` (10th) any finalized-but-unpaid payslip flips to **Due**. Leave encashment accrues 23/12 = 1.92 days per finalized month, payable in full at one completed year or pro-rata on resignation.
+
+## Printing (owner spec, 2026-07-30)
+Two formal documents, both A4 landscape, laid out by `EPAL.report`
+(`platform/kit/report-print.js`) and composed in `payroll.js`
+(`paySummaryReport` / `payDetailReport`, opened from `printCentre`):
+
+| Document | Id | Route it becomes |
+|---|---|---|
+| Payroll Monthly Register (one row per month) | `PR-MR[-<CO>]-<YYYY>-<MM>` | `GET /payroll/reports/register?months=…&company=…` |
+| Salary Register (one row per employee, one month) | `PR-SR[-<CO>]-<YYYY>-<MM>` | `GET /payroll/reports/salary/{ym}?employees=…` |
+
+- **Only approved runs** are printable (`status !== 'draft'`); the footer says so on every page.
+- The masthead reads `EPAL.config.group.letterhead` and a concern's optional
+  `company.letterhead` override → on the backend this is `companies.letterhead_*`
+  columns (address, web, email, phone, licences), editable in Settings.
+- **`pay_prints`** { id: report id, n: revision, at, by } is the revision counter
+  and the audit trail of who raised a confidential payroll document. It is written
+  when the print dialog opens, NOT when the preview is built. ⚠ Browser-local
+  today (same persistence gap as `pay_txns`); on Laravel it is a
+  `payroll_report_prints` table and `Rev n` comes from `count() + 1`.
+- Totals are **not** a blanket `SUM()`: percentages are recomputed from the
+  totals, the encashment column shows a closing balance, and headcount is
+  `COUNT(DISTINCT employee_id)`. Whatever renders the PDF server-side must keep
+  those three rules or the register will foot to figures that do not exist.
+- PDF today is the browser's own Save-as-PDF (no library — the site is a static
+  deploy). On Laravel it becomes Browsershot/dompdf over the same markup.

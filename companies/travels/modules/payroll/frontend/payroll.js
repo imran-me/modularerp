@@ -1536,6 +1536,31 @@ function registerTable(series) {
     ],
     rows: rows, pageSize: 12, totalKey: 'net', exportName: 'payroll-monthly-register.csv',
     pdfTitle: scopeFull() + ' — Payroll Monthly Register',
+    /* PRINT rides in the table's own toolbar, beside Export and PDF — it is an
+     * output of this table, and the reader looks for it where the other two are.
+     * It opens the print centre (months · detail level · people), never the
+     * printer. */
+    toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+      title: 'Print the payroll register — choose months and detail level',
+      onclick: function () { printCentre({ from: 'register' }); } }),
+    /* THE FOOT. Sums where a sum is the answer, the CLOSING BALANCE for the
+     * encashment accrual (it is a liability balance, not a monthly movement) and
+     * a DISTINCT headcount — seven months of 21 staff is 21 people. Same rules,
+     * same figures, as the printed register: see paySummaryReport(). */
+    totals: function (ms) {
+      if (!ms.length) return null;
+      var asc = ms.slice().sort(function (a, b) { return a.ym < b.ym ? -1 : 1; });
+      var cum = encashRunning(), last = asc[asc.length - 1];
+      var t = { gross: 0, adds: 0, deds: 0, net: 0, paid: 0, due: 0 };
+      asc.forEach(function (m) { t.gross += m.gross || 0; t.adds += m.adds || 0; t.deds += m.deds || 0;
+        t.net += m.net || 0; t.paid += m.paid || 0; t.due += m.due || 0; });
+      return { label: asc.length + ' run' + (asc.length === 1 ? '' : 's'), values: {
+        heads: String(distinctHeads(asc.map(function (m) { return m.ym; }))),
+        gross: ui.money(t.gross), adds: ui.money(t.adds), deds: ui.money(t.deds),
+        encash: ui.money(cum[last.ym] || 0) + ' <span class="xs text-mute">cl. bal.</span>',
+        net: ui.money(t.net), paid: ui.money(t.paid), due: ui.money(t.due)
+      } };
+    },
     onRow: function (m) { ovMonth = m.ym; repaint(); },
     actions: [{ icon: 'box-arrow-up-right', title: 'Open this month in full', onClick: function (m) { ovMonth = m.ym; repaint(); } }],
     empty: { icon: 'calendar3', title: 'No payroll months yet', hint: 'Salary Manage generates the current month.' }
@@ -1597,7 +1622,11 @@ function monthView(page) {
 
   /* ---- the control bar -------------------------------------------------- */
   act(s, 'back', function () { ovMonth = null; repaint(); }).innerHTML = ui.icon('arrow-left') + ' Monthly Register';
-  act(s, 'print', function () { printSheetForm(slips, ym); }).innerHTML = ui.icon('printer') + ' Print register';
+  /* Print opens the PRINT CENTRE with THIS month ticked and employee-level
+   * detail chosen — the reader is looking at one month's people, so that is what
+   * "print" means from here (owner spec). The legacy tick-the-columns sheet is
+   * untouched and still lives on Salary Manage › Print Sheet. */
+  act(s, 'print', function () { printCentre({ from: 'sheet', ym: ym }); }).innerHTML = ui.icon('printer') + ' Print register';
   act(s, 'open-run', function () { payYm = ym; goTab('manage'); })
     .innerHTML = ui.icon('sliders') + (isAll() ? ' Open this month' : ' Manage this run');
   var pick = part(s, 'mpick');
@@ -1688,6 +1717,32 @@ function monthView(page) {
     rows: slips, searchKeys: ['empName', 'empId', 'dept'], quickFilter: 'status', filterPanel: true,
     filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }].concat(coFilter()),
     totalKey: 'net', pageSize: 25,
+    /* THE FOOT — every money column of the register, summed over whatever is
+     * FILTERED (so filtering to one department foots that department). Encash
+     * Accrued is the exception the printed report also makes: it is a balance
+     * carried, so it is summed here only because one month's accrual for the
+     * filtered people IS this month's movement. Status has no total.
+     * No Print button in this toolbar: the screen's own "Print register" above
+     * already opens the print centre for this month, and two identical buttons
+     * on one screen is a question, not a convenience. */
+    totals: function (xs) {
+      if (!xs.length) return null;
+      function S2(f) { return ui.money(sum(xs, f)); }
+      return { label: xs.length + (xs.length === 1 ? ' employee' : ' employees'), values: {
+        gross: S2(function (x) { return x.gross || 0; }),
+        absentDeduction: S2(function (x) { return x.absentDeduction || 0; }),
+        earnedGross: S2(function (x) { return x.earnedGross || 0; }),
+        overtime: S2(function (x) { return x.overtime || 0; }), bonus: S2(bonusOf),
+        adjustment: S2(function (x) { return x.adjustment || 0; }), adds: S2(addOf),
+        lateDeduction: S2(function (x) { return x.lateDeduction || 0; }),
+        earlyDeduction: S2(function (x) { return x.earlyDeduction || 0; }),
+        tax: S2(function (x) { return x.tax || 0; }), pf: S2(function (x) { return x.pf || 0; }),
+        otherDeduction: S2(function (x) { return x.otherDeduction || 0; }), fine: S2(function (x) { return x.fine || 0; }),
+        deds: S2(dedOf), net: S2(function (x) { return PR().slipPayable(x); }),
+        encashAmt: S2(function (x) { return x.encashAmt || 0; }), adv: S2(advOf), emi: S2(emiOf),
+        cash: S2(cashOf), paid: S2(function (x) { return x.paid || 0; }), due: S2(dueOf)
+      } };
+    },
     exportName: 'salary-register-' + ym + '.csv', pdfTitle: scopeFull() + ' — Salary Register ' + PR().mLabel(ym),
     onRow: function (x) { var e = empById(x.empId); if (e) statement(e, ym); },
     actions: [{ icon: 'person-lines-fill', title: 'Open the employee\'s full file', onClick: function (x) { showEmp(x.empId); } }]
@@ -4266,6 +4321,636 @@ function payEncashFlow(e) {
   }
   ui.confirm({ title: 'Pay leave encashment — ' + e.name + '?', text: 'Pays ' + ls.encashableDays.toFixed(2) + ' accrued days = ' + ui.money(ls.value) + ' (DR Leave-Encash Payable / CR Bank) and resets the accrual.', confirmLabel: 'Pay Encashment' })
     .then(function (ok) { if (!ok) return; try { PR().payEncashment(e.id); ui.toast('Encashment paid', 'success'); EPAL.router.render(); } catch (x) { ui.toast(x.message || 'Failed', 'error'); } });
+}
+
+/* ============================================================================
+ * THE PRINTED PAYROLL  (owner 2026-07-30 — written spec + a marked-up mock-up)
+ * ----------------------------------------------------------------------------
+ * "Print" no longer prints. It opens the PRINT CENTRE: confirm the scope, tick
+ * the months, choose summary or employee-level, tick the people — then preview
+ * the REAL document and send it to the printer. Everything below is the same
+ * read the screens make, formatted for paper; nothing here invents a figure.
+ *
+ * WHAT A PAYROLL DOCUMENT MUST DO THAT A SCREEN NEED NOT
+ *  · Every numeric column FOOTS — and the foot is not always a sum. A percentage
+ *    is RE-COMPUTED from the totals (an average of row percentages is a
+ *    different, wrong number); a cumulative accrual shows its CLOSING BALANCE;
+ *    headcount is a DISTINCT count, because seven months of 21 staff is 21
+ *    people and not 147.
+ *  · A partial selection SAYS SO on the page. A payroll report that looks
+ *    complete but is not is a control failure, not a formatting one.
+ *  · Leave encashment is a LIABILITY ACCRUAL, never pay: it stays out of Net
+ *    Payable, accrues monthly and settles once in December — printed in words so
+ *    no reader mistakes it for unpaid salary.
+ *  · Only APPROVED runs print. Drafts are excluded and every page says so.
+ *  · The figures are the SHEET's. The desk's Payroll ↔ Ledger card is where the
+ *    sheet is reconciled against the books; a report that quietly mixed the two
+ *    would foot to neither.
+ *
+ * The layout itself lives in platform/kit/report-print.js (EPAL.report) — A4
+ * landscape, JS-paginated, black figures, brackets for negatives. This file
+ * decides WHAT is printed; that one decides how a page is built.
+ * ==========================================================================*/
+
+function payUser() { var u = (EPAL.auth && EPAL.auth.current && EPAL.auth.current()) || null; return (u && u.name) || 'Signed in'; }
+function payMoney(n) { return EPAL.report.money(n); }
+function payBrk(n) { return EPAL.report.brackets(n); }
+function payPct(n) { return EPAL.report.pct(n); }
+function coCode(cid) { return String(coShort(cid) || cid).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+/* THE MASTHEAD — read from the company master record (EPAL.config), never from
+ * this file, so one edit changes every document the group prints. A single
+ * concern prints its OWN name over its own contact block where it has one, and
+ * over the group's where it does not: they trade from the group's address, and
+ * printing nothing there would be less true than printing that. */
+function payLetterhead() {
+  var g = (EPAL.config && EPAL.config.group) || {}, lh = g.letterhead || {};
+  var c = isAll() ? null : (EPAL.config.company ? EPAL.config.company(CID) : null);
+  var own = (c && c.letterhead) || {};
+  var l1 = [g.legalName || '', own.address || lh.address || ''].filter(Boolean).join(' · ');
+  var l2 = [own.web || lh.web, own.email || lh.email, own.phone || lh.phone, own.licences || lh.licences]
+    .filter(Boolean).join(' · ');
+  return { name: c ? c.name : (g.name || 'Epal Group'), division: 'Human Resources & Payroll',
+    lines: [l1, l2].filter(Boolean) };
+}
+
+/* THE REPORT ID. MR = Monthly Register, SR = Salary Register — two different
+ * documents that must never be confused for one another, and a consolidated
+ * report must never be confused for one concern's: the company code sits in the
+ * id exactly when the report is scoped to a company. */
+function payReportId(kind, ym) { return 'PR-' + kind + (isAll() ? '' : '-' + coCode(CID)) + '-' + ym; }
+/* REV — how many times THIS document has been raised. Read here, committed only
+ * when the print dialog is actually opened (see onPrint), so flipping through
+ * previews does not burn revision numbers. It is also the audit trail: who
+ * raised a confidential payroll document, and when.
+ * ⚠ Browser-local until the Laravel backend owns it (same gap as pay_txns). */
+function payRev(id) { var r = S.list('pay_prints').filter(function (x) { return x.id === id; })[0]; return ((r && r.n) || 0) + 1; }
+function payRevCommit(id, rev) { S.upsert('pay_prints', { id: id, n: rev, at: Date.now(), by: payUser() }); }
+function payMetaLines(id, rev) {
+  return ['Report  ' + id + '  ·  Rev ' + (rev < 10 ? '0' + rev : rev),
+    'Generated ' + ui.date(new Date(), 'full') + ' by ' + payUser(),
+    'Currency: Bangladeshi Taka (Tk)'];
+}
+function paySignoff() {
+  return [{ role: 'Prepared by', name: payUser() }, { role: 'Checked by', name: 'Accounts' },
+    { role: 'Recommended by', name: 'Head of HR & Admin' }, { role: 'Approved by', name: 'Managing Director' }];
+}
+// the filename Chrome pre-fills in Save-as-PDF (it takes the document title)
+function payFileName(kind, first, last) {
+  var d = new Date(), p = function (n) { return n < 10 ? '0' + n : String(n); };
+  var mo = function (ym) { return PR().mLabel(ym).slice(0, 3); };      // "Jul"
+  var period = (first === last ? mo(last) : mo(first) + '-' + mo(last)) + last.slice(0, 4);
+  return ['Epal-Payroll', kind, isAll() ? 'AllCompanies' : coShort(CID).replace(/[^A-Za-z0-9]/g, ''),
+    period, d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())].filter(Boolean).join('-');
+}
+
+/* Only APPROVED (finalized and beyond) runs may be printed — a draft month is a
+ * working figure, not a document. Ascending, because a register reads forwards. */
+function approvedMonths() { return monthSeries().filter(function (m) { return m.status && m.status !== 'draft'; }); }
+function draftMonthCount() { return monthSeries().length - approvedMonths().length; }
+/* The encashment BALANCE at the end of each month — a running total over every
+ * month in the book, not over the printed selection: a balance is what the
+ * account actually holds, and unticking March does not un-accrue March. */
+function encashRunning() {
+  var run = 0, map = {};
+  monthSeries().forEach(function (m) { run += m.encash || 0; map[m.ym] = run; });
+  return map;
+}
+function distinctHeads(yms) {
+  var want = {}, ids = {};
+  yms.forEach(function (y) { want[y] = 1; });
+  scoped('pay_slips').forEach(function (s) { if (want[s.ym]) ids[s.empId] = 1; });
+  return Object.keys(ids).length;
+}
+// column widths as weights, normalised — table-layout is fixed, so they must add up
+function payWidths(ws) {
+  var t = ws.reduce(function (a, b) { return a + b; }, 0);
+  return ws.map(function (w) { return (w / t * 100).toFixed(2) + '%'; });
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 1 — the MONTHLY REGISTER (one row per month), summary level
+ * ------------------------------------------------------------------------- */
+function paySummaryReport(months) {
+  var cum = encashRunning(), first = months[0], last = months[months.length - 1];
+  var T = { gross: 0, adds: 0, deds: 0, net: 0, encash: 0, paid: 0, due: 0 };
+  months.forEach(function (m) {
+    T.gross += m.gross || 0; T.adds += m.adds || 0; T.deds += m.deds || 0; T.net += m.net || 0;
+    T.encash += m.encash || 0; T.paid += m.paid || 0; T.due += m.due || 0;
+  });
+  var heads = distinctHeads(months.map(function (m) { return m.ym; }));
+  var encBal = cum[last.ym] || 0;                       // liability carried
+  var cost = T.gross + T.adds + T.encash;               // the budgeting figure
+  var perHead = heads ? cost / heads / months.length : 0;
+  var monthly = last.encash || 0;                       // this month's flat accrual
+  var monthNo = +last.ym.slice(5, 7), left = Math.max(0, 12 - monthNo);
+  var id = payReportId('MR', last.ym), rev = payRev(id);
+  var everyMonth = approvedMonths().length === months.length;
+
+  /* Widths, as weights over 273mm of printable page. The month column carries
+   * "September 2026" and the totals row's "Total — 7 runs" on ONE line — a
+   * wrapped label in the first column makes every row of a register look like
+   * two. The figures need ~15mm for an eight-character taka amount at 8.5pt. */
+  var w = payWidths([12, 5, 5.5, 7.5, 7, 7.5, 8, 7.5, 7.5, 7, 5.5, 5.5, 6]);
+  var rows = months.map(function (m, i) {
+    var prev = i > 0 ? months[i - 1] : null;
+    var mom = (prev && prev.net) ? (m.net - prev.net) / prev.net * 100 : null;
+    return [
+      { v: esc(PR().mLabel(m.ym)), strong: true, sub: esc(m.ym) },
+      { v: esc(cap(m.status || 'draft')) },
+      { v: String(m.heads || 0), num: true },
+      { v: payMoney(m.gross), num: true },
+      { v: payMoney(m.adds), num: true },
+      { v: payBrk(m.deds), num: true },
+      { v: payMoney(m.net), num: true, strong: true },
+      { v: payMoney(cum[m.ym]), num: true },
+      { v: payMoney(m.paid), num: true },
+      { v: payMoney(m.due), num: true },
+      { v: m.net ? payPct(m.paid / m.net * 100) : '–', num: true },
+      // month-on-month wears the document's own sign convention: a fall is in
+      // brackets like every other negative on the page, never a minus sign
+      { v: i === 0 ? 'base' : (mom == null ? '–' : mom < 0 ? '(' + payPct(-mom) + ')' : '+' + payPct(mom)), num: true },
+      { v: m.gross ? payPct(m.deds / m.gross * 100) : '–', num: true }
+    ];
+  });
+
+  return {
+    docTitle: payFileName('', first.ym, last.ym),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Payroll Monthly Register' + (isAll() ? '' : ' — ' + coFull(CID)),
+    scope: [
+      'Period ' + PR().mLabel(first.ym) + ' – ' + PR().mLabel(last.ym) + ' · ' + months.length +
+        ' approved run' + (months.length === 1 ? '' : 's') + ' · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)),
+      'YTD = year to date, ' + PR().mLabel(first.ym) + ' to ' + PR().mLabel(last.ym) + '. Leave encashment is a ' +
+        'liability accrued monthly and settled once in December — it is NOT part of Net Payable and is not ' +
+        'disbursed with salary.'
+    ],
+    notice: everyMonth ? null : 'Partial selection — ' + months.length + ' of ' + approvedMonths().length +
+      ' approved months. Totals below reflect the selected months only.',
+    kpis: [
+      { label: 'Total payroll cost, YTD', value: payMoney(cost), sub: 'gross + additions + encashment accrued' },
+      { label: 'Cash disbursed, YTD', value: payMoney(T.paid), sub: 'paid out of bank and cash' },
+      { label: 'True cost per employee', value: payMoney(perHead), sub: 'per person, per month' },
+      { label: 'Deduction rate, YTD', value: T.gross ? payPct(T.deds / T.gross * 100) : '–', sub: 'deductions ÷ gross' },
+      { label: 'Payroll liability carried', value: payMoney(T.due + T.deds + encBal), sub: 'unpaid pay + withheld + encashment' }
+    ],
+    table: {
+      groups: [{ span: 3 }, { label: 'Earnings and deductions', span: 4 }, { label: 'Liability accrual', span: 1 },
+        { label: 'Settlement', span: 3 }, { label: 'Trend', span: 2 }],
+      head: [
+        { label: 'Month', width: w[0] }, { label: 'Run', width: w[1] }, { label: 'Employees', num: true, width: w[2] },
+        { label: 'Gross', num: true, width: w[3] }, { label: 'Additions', num: true, width: w[4] },
+        { label: 'Deductions', num: true, width: w[5] }, { label: 'Net payable', num: true, width: w[6] },
+        // the SCREEN's Encash column is that month's movement; the printed one is
+        // the balance it had built to, so the header says which
+        { label: 'Encashment accrued', sub: 'cumulative', num: true, width: w[7] },
+        { label: 'Paid', num: true, width: w[8] }, { label: 'Due', num: true, width: w[9] },
+        { label: 'Settled %', num: true, width: w[10] }, { label: 'MoM net', num: true, width: w[11] },
+        { label: 'Ded % of gross', num: true, width: w[12] }
+      ],
+      rows: rows,
+      /* THE FOOT. Sums where a sum is the answer; the CLOSING BALANCE for the
+       * accrual; a DISTINCT headcount; percentages re-computed from the totals;
+       * and a dash for month-on-month, which has no meaning across a period. */
+      totals: [
+        { v: 'Total — ' + months.length + ' run' + (months.length === 1 ? '' : 's') },
+        { v: '' },
+        { v: String(heads), num: true },
+        { v: payMoney(T.gross), num: true },
+        { v: payMoney(T.adds), num: true },
+        { v: payBrk(T.deds), num: true },
+        { v: payMoney(T.net), num: true },
+        { v: payMoney(encBal), num: true, sub: 'cl. bal.' },
+        { v: payMoney(T.paid), num: true },
+        { v: payMoney(T.due), num: true },
+        { v: T.net ? payPct(T.paid / T.net * 100) : '–', num: true },
+        { v: '–', num: true },
+        { v: T.gross ? payPct(T.deds / T.gross * 100) : '–', num: true }
+      ]
+    },
+    panelPairs: [
+      [
+        { title: 'Reconciliation — year-to-date control', lines: [
+          { k: 'Gross earnings', v: payMoney(T.gross) },
+          { k: 'Add: allowances, arrears, bonus', v: payMoney(T.adds) },
+          { k: 'Add: leave encashment accrued', v: payMoney(T.encash) },
+          { k: 'Total payroll charge to profit & loss', v: payMoney(cost), rule: true },
+          { k: 'Less: encashment deferred to December', v: payBrk(T.encash) },
+          { k: 'Less: employee deductions withheld', v: payBrk(T.deds) },
+          { k: 'Net payable to staff', v: payMoney(T.net), close: true }
+        ] },
+        { title: 'Liability position at ' + PR().mLabel(last.ym), lines: [
+          { k: 'Salary payable — ' + PR().mLabel(last.ym) + ' run', v: payMoney(last.due) },
+          { k: 'Deductions withheld, not yet remitted', v: payMoney(T.deds) },
+          { k: 'Leave encashment payable, ' + months.length + ' month' + (months.length === 1 ? '' : 's'), v: payMoney(encBal) },
+          { k: 'Total payroll liability carried', v: payMoney(last.due + T.deds + encBal), rule: true },
+          { k: 'Encashment monthly accrual, flat', v: payMoney(monthly) },
+          { k: 'Still to accrue, ' + left + ' month' + (left === 1 ? '' : 's') + ' to December', v: payMoney(monthly * left) }
+        ] }
+      ],
+      [
+        { title: 'Cash settlement', lines: [
+          { k: 'Net payable to staff', v: payMoney(T.net) },
+          { k: 'Less: disbursed by bank and cash', v: payBrk(T.paid) },
+          { k: 'Still owed to staff', v: payMoney(T.due), close: true }
+        ] },
+        { title: 'Encashment obligation', lines: [
+          { k: 'Full-year obligation, settles December', v: payMoney(monthly * 12) },
+          { k: 'Encashment per employee, full year', v: heads ? payMoney(monthly * 12 / heads) : '–' },
+          { k: 'Accrued to date', v: payMoney(encBal) },
+          { k: 'Charged to expense monthly, not disbursed', v: payMoney(monthly) }
+        ] }
+      ]
+    ],
+    notesTitle: 'Exceptions requiring attention',
+    notes: paySummaryNotes(months, T, everyMonth),
+    signoff: paySignoff(),
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · approved runs only',
+    previewTitle: 'Payroll Monthly Register — print preview'
+  };
+}
+
+/* The exceptions list. HIGH first, then WATCH, then NOTE — and every one of them
+ * is a fact already on the desk (the anomaly radar, the run statuses, the
+ * selection), never a judgement invented for the page. */
+function paySummaryNotes(months, T, everyMonth) {
+  var out = [], P = position();
+  months.forEach(function (m) {
+    if (m.due > 0) out.push({ tag: 'HIGH', text: PR().mLabel(m.ym) + ' is still owed ' + payMoney(m.due) +
+      ' of ' + payMoney(m.net) + ' net payable — ' + (m.heads - m.paidHeads) + ' of ' + m.heads + ' staff unpaid.' });
+  });
+  radar(P).filter(function (r) { return r.sev === 'high'; }).slice(0, 3).forEach(function (r) {
+    out.push({ tag: 'HIGH', text: r.title + ' — ' + String(r.why || '').replace(/<[^>]+>/g, '') });
+  });
+  months.forEach(function (m) {
+    if (m.status === 'mixed') out.push({ tag: 'WATCH', text: PR().mLabel(m.ym) +
+      ' is not at the same stage in every concern — the run is closed in some and open in others.' });
+  });
+  if (draftMonthCount()) out.push({ tag: 'WATCH', text: draftMonthCount() + ' month' +
+    (draftMonthCount() === 1 ? ' is' : 's are') + ' still in draft and therefore excluded from this report.' });
+  if (!everyMonth) out.push({ tag: 'NOTE', text: 'This is a partial selection of the approved months. ' +
+    'Every figure above, including the totals row, covers the selected months only.' });
+  out.push({ tag: 'NOTE', text: 'Leave encashment is charged to expense each month and credited to Leave ' +
+    'Encashment Payable. It is subject to the 12-month service condition, is not part of Net Payable, and the ' +
+    'accrued balance settles once, in December.' });
+  out.push({ tag: 'NOTE', text: 'Deductions withheld remain a liability of the group until they are remitted to ' +
+    'the relevant authority; they are not a reduction in payroll cost. True cost = gross + additions + encashment accrual.' });
+  return out;
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 2 — the SALARY REGISTER (one row per employee), a single month
+ * ------------------------------------------------------------------------- */
+function payDetailReport(ym, slips, allInMonth) {
+  var co = isAll();
+  var T = { gross: 0, absent: 0, earned: 0, ot: 0, bonus: 0, adj: 0, adds: 0, late: 0, early: 0,
+    tax: 0, pf: 0, other: 0, deds: 0, net: 0, paid: 0, due: 0, encash: 0 };
+  slips.forEach(function (s) {
+    T.gross += s.gross || 0; T.absent += s.absentDeduction || 0; T.earned += s.earnedGross || 0;
+    T.ot += s.overtime || 0; T.bonus += bonusOf(s); T.adj += s.adjustment || 0; T.adds += addOf(s);
+    T.late += s.lateDeduction || 0; T.early += s.earlyDeduction || 0; T.tax += s.tax || 0; T.pf += s.pf || 0;
+    T.other += (s.otherDeduction || 0) + (s.fine || 0); T.deds += dedOf(s); T.net += PR().slipPayable(s);
+    T.paid += s.paid || 0; T.due += dueOf(s); T.encash += s.encashAmt || 0;
+  });
+  var partial = slips.length !== allInMonth.length;
+  var id = payReportId('SR', ym), rev = payRev(id);
+  /* THE COLUMN COUNT IS A BUDGET, and 273mm of printable width is all there is.
+   * An eight-figure taka amount needs ~15mm at 8.5pt, and the spec is explicit
+   * that type does not shrink to buy a column — a column goes instead. So:
+   *   · the employee ID rides UNDER the name rather than in a column of its own
+   *     (it is still printed, on every row, and the name gets the width it needs
+   *     to stay on one line);
+   *   · the ADDITIONS subtotal is dropped, because its three components —
+   *     overtime, bonus and adjustment — are each printed beside it and the
+   *     total appears twice more: in the KPI band and in "How the month adds up".
+   * Nothing else in the spec's column list is left out. */
+  /* Measured, not guessed: an eight-character taka figure at 8.5pt Consolas is
+   * 13.2mm and needs ~14.8mm of column, so the fourteen money columns are the
+   * fixed cost and the three text columns share what is left — "Nasir Uddin
+   * Ahmed" in 28mm, "IT Solutions" and "Construction" in 19mm, both on one line. */
+  var w = payWidths(co ? [10.5, 7, 6.6, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.8, 5.4, 5.4]
+    : [12, 8, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.9, 5.5, 5.5]);
+  var head = [{ label: 'Employee', sub: 'ID', width: w[0] }]
+    .concat(co ? [{ label: 'Company', width: w[1] }] : [])
+    .concat([{ label: 'Department' }, { label: 'Gross', num: true }, { label: 'Absent', num: true },
+      { label: 'Earned gross', num: true }, { label: 'Overtime', num: true }, { label: 'Bonus', num: true },
+      { label: 'Adjustment', num: true }, { label: 'Late', num: true },
+      { label: 'Early', num: true }, { label: 'Tax', num: true }, { label: 'PF', num: true },
+      { label: 'Other ded.', num: true }, { label: 'Net payable', num: true }, { label: 'Paid', num: true },
+      { label: 'Due', num: true }].map(function (h, i) { h.width = w[i + (co ? 2 : 1)]; return h; }));
+
+  var rows = slips.map(function (s) {
+    return [{ v: esc(s.empName), strong: true, sub: esc(s.empId) }]
+      .concat(co ? [{ v: esc(coShort(s.companyId)) }] : [])
+      .concat([
+        { v: esc(s.dept || '—') },
+        { v: payMoney(s.gross), num: true },
+        { v: payBrk(s.absentDeduction), num: true },
+        { v: payMoney(s.earnedGross), num: true },
+        { v: payMoney(s.overtime), num: true },
+        { v: payMoney(bonusOf(s)), num: true },
+        { v: payMoney(s.adjustment), num: true },
+        { v: payBrk(s.lateDeduction), num: true },
+        { v: payBrk(s.earlyDeduction), num: true },
+        { v: payBrk(s.tax), num: true },
+        { v: payBrk(s.pf), num: true },
+        { v: payBrk((s.otherDeduction || 0) + (s.fine || 0)), num: true },
+        { v: payMoney(PR().slipPayable(s)), num: true, strong: true },
+        { v: payMoney(s.paid), num: true },
+        { v: payMoney(dueOf(s)), num: true }
+      ]);
+  });
+  var totals = [{ v: 'Total — ' + slips.length + ' employee' + (slips.length === 1 ? '' : 's') }]
+    .concat(co ? [{ v: '' }] : [])
+    .concat([{ v: '' },
+      { v: payMoney(T.gross), num: true }, { v: payBrk(T.absent), num: true }, { v: payMoney(T.earned), num: true },
+      { v: payMoney(T.ot), num: true }, { v: payMoney(T.bonus), num: true }, { v: payMoney(T.adj), num: true },
+      { v: payBrk(T.late), num: true }, { v: payBrk(T.early), num: true },
+      { v: payBrk(T.tax), num: true }, { v: payBrk(T.pf), num: true }, { v: payBrk(T.other), num: true },
+      { v: payMoney(T.net), num: true }, { v: payMoney(T.paid), num: true }, { v: payMoney(T.due), num: true }]);
+
+  /* THE DEPARTMENTAL SUMMARY — the same rows, grouped, so the register can be
+   * read by cost centre without adding it up by hand. It foots to the register
+   * above by construction: it is built from the very same slips. */
+  var byDept = {};
+  slips.forEach(function (s) {
+    var d = byDept[s.dept || '—'] || (byDept[s.dept || '—'] = { heads: 0, gross: 0, deds: 0, net: 0 });
+    d.heads++; d.gross += s.earnedGross || 0; d.deds += dedOf(s); d.net += PR().slipPayable(s);
+  });
+  var dw = payWidths([34, 12, 18, 18, 18]);
+  var deptRows = Object.keys(byDept).sort(function (a, b) { return byDept[b].net - byDept[a].net; })
+    .map(function (k) {
+      var d = byDept[k];
+      return [{ v: esc(k) }, { v: String(d.heads), num: true }, { v: payMoney(d.gross), num: true },
+        { v: payBrk(d.deds), num: true }, { v: payMoney(d.net), num: true }];
+    });
+
+  return {
+    docTitle: payFileName('SalaryRegister', ym, ym),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Salary Register — ' + PR().mLabel(ym) + (isAll() ? '' : ' · ' + coFull(CID)),
+    scope: [
+      PR().mLabel(ym) + ' · ' + slips.length + ' employee' + (slips.length === 1 ? '' : 's') + ' · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)) +
+        ' · run ' + cap(runInfo(ym).status),
+      'Gross is the contract gross; earned gross is gross less absence, and the net is built from it. Leave ' +
+        'encashment accrued this month (' + payMoney(T.encash) + ') is a liability and is NOT part of Net Payable.'
+    ],
+    notice: partial ? 'Partial selection — ' + slips.length + ' of ' + allInMonth.length +
+      ' employees. Totals below reflect the selected rows only.' : null,
+    kpis: [
+      { label: 'Employees printed', value: String(slips.length), sub: partial ? 'of ' + allInMonth.length + ' in the run' : 'the whole run' },
+      { label: 'Gross', value: payMoney(T.earned), sub: 'earned gross, after absence' },
+      { label: 'Total deductions', value: payMoney(T.deds), sub: T.earned ? payPct(T.deds / T.earned * 100) + ' of earned gross' : '' },
+      { label: 'Net payable', value: payMoney(T.net), sub: payMoney(T.paid) + ' paid · ' + payMoney(T.due) + ' due' }
+    ],
+    table: { wide: true,          // 17 columns — the gutters give way, not the type
+      groups: [{ span: co ? 3 : 2 }, { label: 'Earnings and additions', span: 6 },
+        { label: 'Deductions', span: 5 }, { label: 'Settlement', span: 3 }],
+      head: head, rows: rows, totals: totals },
+    panelPairs: [[
+      { title: 'Departmental summary', table: { head: [{ label: 'Department', width: dw[0] },
+        { label: 'Staff', num: true, width: dw[1] }, { label: 'Gross', num: true, width: dw[2] },
+        { label: 'Deductions', num: true, width: dw[3] }, { label: 'Net payable', num: true, width: dw[4] }],
+        rows: deptRows,
+        totals: [{ v: 'Total' }, { v: String(slips.length), num: true }, { v: payMoney(T.earned), num: true },
+          { v: payBrk(T.deds), num: true }, { v: payMoney(T.net), num: true }] } },
+      { title: 'How the month adds up', lines: [
+        { k: 'Contract gross', v: payMoney(T.gross) },
+        { k: 'Less: absence', v: payBrk(T.absent) },
+        { k: 'Earned gross', v: payMoney(T.earned), rule: true },
+        { k: 'Add: overtime, bonus and adjustments', v: payMoney(T.adds) },
+        { k: 'Less: deductions withheld', v: payBrk(T.deds) },
+        { k: 'Net payable', v: payMoney(T.net), rule: true },
+        { k: 'Less: paid', v: payBrk(T.paid) },
+        { k: 'Still owed', v: payMoney(T.due), close: true }
+      ] }
+    ]],
+    notesTitle: 'Exceptions requiring attention',
+    notes: payDetailNotes(ym, slips, partial, allInMonth),
+    signoff: paySignoff(),
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · approved run only',
+    previewTitle: 'Salary Register — print preview'
+  };
+}
+
+function payDetailNotes(ym, slips, partial, allInMonth) {
+  var out = [];
+  slips.forEach(function (s) {
+    var payable = PR().slipPayable(s);
+    if ((s.paid || 0) > payable + 1) out.push({ tag: 'HIGH', text: s.empName + ' was paid ' + payMoney(s.paid) +
+      ' against a payslip of ' + payMoney(payable) + ' — ' + payMoney(s.paid - payable) + ' more than the sheet allows.' });
+  });
+  var unpaid = slips.filter(function (s) { return dueOf(s) > 0; });
+  if (unpaid.length) out.push({ tag: 'HIGH', text: unpaid.length + ' of ' + slips.length +
+    ' employees are still owed ' + payMoney(sum(unpaid, dueOf)) + ' for ' + PR().mLabel(ym) + '.' });
+  slips.forEach(function (s) {
+    if ((s.leaveDeductDays || 0) >= 5) out.push({ tag: 'WATCH', text: s.empName + ' was absent ' +
+      s.leaveDeductDays + ' days — ' + payMoney(s.absentDeduction) + ' deducted.' });
+  });
+  if (partial) out.push({ tag: 'NOTE', text: 'Partial selection: ' + slips.length + ' of ' + allInMonth.length +
+    ' employees in this run. The totals row covers the printed rows only.' });
+  out.push({ tag: 'NOTE', text: 'Leave encashment accrues monthly against a 12-month service condition, is ' +
+    'charged to expense and credited to Leave Encashment Payable, and settles once in December. It is not ' +
+    'part of Net Payable and is not disbursed with this month\'s salary.' });
+  return out.slice(0, 8);
+}
+
+/* ---------------------------------------------------------------------------
+ * THE PRINT CENTRE — scope → months → detail level → rows → preview
+ * ---------------------------------------------------------------------------
+ * Print never prints straight away (owner): a payroll document goes out under
+ * somebody's name, so the scope is confirmed, the months are chosen and, at
+ * employee level, the people are chosen — with the net payable of the CURRENT
+ * ticks shown live, so what the printed totals row will say is known before the
+ * paper exists.
+ * ------------------------------------------------------------------------- */
+function printCentre(opts) {
+  opts = opts || {};
+  var all = approvedMonths();
+  if (!all.length) { ui.toast('No approved payroll run to print — finalize a month first', 'warn'); return; }
+
+  /* Launched from the Salary Register (one month on screen) → that month only,
+   * at employee level. Launched from the Monthly Register → every month, as the
+   * summary. Either way the reader can change it below. */
+  var fromSheet = opts.from === 'sheet' && opts.ym;
+  var pick = {}, level = fromSheet ? 'detail' : 'summary', q = '', rowPick = null;
+  all.forEach(function (m) { pick[m.ym] = fromSheet ? (m.ym === opts.ym) : true; });
+  if (fromSheet && !pick[opts.ym]) { ui.toast('That month is not an approved run yet', 'warn'); return; }
+
+  var body = el('div.pay-print');
+  var mCount = el('div.pay-print-count'), rCount = el('div.pay-print-count');
+  var secLevel = el('div.pay-print-step'), secRows = el('div.pay-print-step'), rowHost = el('div.pay-print-rows');
+  var searchIn = el('input.input', { placeholder: 'Search name, ID or department…',
+    oninput: ui.debounce(function () { q = searchIn.value.toLowerCase(); drawRows(); }, 120) });
+  var goBtn = null;
+
+  function picked() { return all.filter(function (m) { return pick[m.ym]; }); }
+  function oneYm() { var p = picked(); return p.length === 1 ? p[0].ym : null; }
+  function monthSlips() {
+    var ym = oneYm(); if (!ym) return [];
+    return slipsIn(ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
+  }
+  function ensureRowPick() {
+    var list = monthSlips();
+    if (!rowPick) { rowPick = {}; list.forEach(function (s) { rowPick[s.empId] = true; }); }   // ALL ticked by default
+    return list;
+  }
+  function pickedSlips() { var list = ensureRowPick(); return list.filter(function (s) { return rowPick[s.empId]; }); }
+
+  /* ---- step 1 · scope (read-only — you cannot print the wrong entity by
+   * accident, and changing it is a deliberate act on the switcher) ---------- */
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '1 · Scope' }),
+    el('div.pay-print-scope', null, [
+      el('div', null, [ el('strong', { text: scopeFull() }),
+        el('div.text-mute.sm', { text: isAll() ? scopeCids().length + ' concerns consolidated — ' + scopeNames()
+          : 'this concern only · report id ' + payReportId('MR', all[all.length - 1].ym) }) ]),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-left-right') + ' Change company',
+        onclick: function () { m.close(); ui.toast('Pick the company from the switcher above, then print again', 'info'); } })
+    ])
+  ]));
+
+  /* ---- step 2 · months --------------------------------------------------- */
+  var monthHost = el('div.pay-print-months');
+  all.slice().reverse().forEach(function (mo) {                      // newest first
+    var cb = el('input', { type: 'checkbox', checked: pick[mo.ym] ? 'checked' : null,
+      onchange: function () { pick[mo.ym] = cb.checked; rowPick = null; sync(); } });
+    mo._cb = cb;
+    monthHost.appendChild(el('label.pay-print-mo', null, [ cb,
+      el('span.pay-print-mo-n', { text: PR().mLabel(mo.ym) }),
+      el('span.badge', { text: cap(mo.status) }),
+      el('span.text-mute.xs', { text: mo.heads + ' staff · ' + ui.money(mo.net) }) ]));
+  });
+  function setAll(fn) { all.forEach(function (mo) { pick[mo.ym] = fn(mo); if (mo._cb) mo._cb.checked = pick[mo.ym]; }); rowPick = null; sync(); }
+  function lastN(n) { var keep = {}; all.slice(-n).forEach(function (mo) { keep[mo.ym] = 1; }); setAll(function (mo) { return !!keep[mo.ym]; }); }
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '2 · Months' }),
+    el('div.pay-print-bulk', null, [
+      el('button.btn.btn-sm.btn-ghost', { text: 'Select all', onclick: function () { setAll(function () { return true; }); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () { setAll(function () { return false; }); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Last 3', onclick: function () { lastN(3); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Last 6', onclick: function () { lastN(6); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'This year', onclick: function () {
+        var y = all[all.length - 1].ym.slice(0, 4); setAll(function (mo) { return mo.ym.slice(0, 4) === y; }); } })
+    ]),
+    monthHost, mCount
+  ]));
+
+  /* ---- step 3 · detail level (only when the selection is ONE month, because
+   * an employee-level register of six months is six registers) -------------- */
+  var radios = [['summary', 'Summary row only', 'the register line for that month, its totals and the control panels'],
+    ['detail', 'Employee-level detail', 'the full Salary Register — one row per employee']];
+  secLevel.appendChild(el('div.pay-print-h', { text: '3 · Detail level' }));
+  radios.forEach(function (r) {
+    var rb = el('input', { type: 'radio', name: 'paylvl', checked: level === r[0] ? 'checked' : null,
+      onchange: function () { if (rb.checked) { level = r[0]; sync(); } } });
+    secLevel.appendChild(el('label.pay-print-lvl', null, [ rb,
+      el('span', null, [ el('strong', { text: r[1] }), el('div.text-mute.sm', { text: r[2] }) ]) ]));
+  });
+  body.appendChild(secLevel);
+
+  /* ---- step 4 · rows ----------------------------------------------------- */
+  function drawRows() {
+    var list = ensureRowPick();
+    rowHost.innerHTML = '';
+    var shown = list.filter(function (s) {
+      if (!q) return true;
+      return (s.empName + ' ' + s.empId + ' ' + (s.dept || '')).toLowerCase().indexOf(q) >= 0;
+    });
+    shown.forEach(function (s) {
+      /* ticking a person updates the COUNTER, never the list: redrawing 21 rows
+       * under the cursor loses the scroll position and steals the next click */
+      var cb = el('input', { type: 'checkbox', checked: rowPick[s.empId] ? 'checked' : null,
+        onchange: function () { rowPick[s.empId] = cb.checked; syncCounts(); } });
+      rowHost.appendChild(el('label.pay-print-row', null, [ cb,
+        el('span.pay-print-row-n', { text: s.empName }),
+        el('span.text-mute.xs', { text: s.empId }),
+        isAll() ? el('span.badge', { text: coShort(s.companyId) }) : null,
+        el('span.text-mute.xs', { text: s.dept || '—' }),
+        el('span.pay-print-row-v', { text: ui.money(PR().slipPayable(s)) }) ].filter(Boolean)));
+    });
+    if (!shown.length) rowHost.appendChild(el('div.text-mute.sm', { text: 'No employee matches “' + q + '”.' }));
+  }
+  function bulkRows(fn) { ensureRowPick().forEach(function (s) { if (fn(s)) rowPick[s.empId] = true; }); drawRows(); sync(); }
+  var byCoSel = el('select.select', { onchange: function () {
+    var v = byCoSel.value; if (v !== '__') bulkRows(function (s) { return s.companyId === v; }); byCoSel.value = '__'; } });
+  var byDeptSel = el('select.select', { onchange: function () {
+    var v = byDeptSel.value; if (v !== '__') bulkRows(function (s) { return (s.dept || '—') === v; }); byDeptSel.value = '__'; } });
+  function fillBulkSelects() {
+    var list = ensureRowPick(), cos = {}, depts = {};
+    list.forEach(function (s) { cos[s.companyId] = 1; depts[s.dept || '—'] = 1; });
+    byCoSel.innerHTML = ''; byCoSel.appendChild(el('option', { value: '__', text: 'Select by company…' }));
+    Object.keys(cos).sort().forEach(function (c) { byCoSel.appendChild(el('option', { value: c, text: coShort(c) })); });
+    byDeptSel.innerHTML = ''; byDeptSel.appendChild(el('option', { value: '__', text: 'Select by department…' }));
+    Object.keys(depts).sort().forEach(function (d) { byDeptSel.appendChild(el('option', { value: d, text: d })); });
+    byCoSel.style.display = isAll() ? '' : 'none';
+  }
+  secRows.appendChild(el('div.pay-print-h', { text: '4 · Employees' }));
+  secRows.appendChild(el('div.pay-print-bulk', null, [ searchIn,
+    el('button.btn.btn-sm.btn-ghost', { text: 'Select all', onclick: function () { bulkRows(function () { return true; }); } }),
+    el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () {
+      ensureRowPick(); Object.keys(rowPick).forEach(function (k) { rowPick[k] = false; }); drawRows(); sync(); } }),
+    byCoSel, byDeptSel ]));
+  secRows.appendChild(rowHost);
+  secRows.appendChild(rCount);
+  body.appendChild(secRows);
+
+  /* ---- what the reader is told, live -------------------------------------
+   * syncCounts() is the cheap half — the two live counters and whether Preview
+   * can be pressed. It is what a tick calls. sync() adds the structural half:
+   * which steps exist at all, and rebuilding the employee list under them. */
+  function syncCounts() {
+    var p = picked(), one = oneYm(), wantRows = !!one && level === 'detail';
+    mCount.textContent = p.length + ' of ' + all.length + ' month' + (all.length === 1 ? '' : 's') + ' selected' +
+      (p.length ? ' · net payable ' + ui.money(sum(p, function (m) { return m.net; })) : '');
+    if (wantRows) {
+      var sel = pickedSlips();
+      rCount.textContent = sel.length + ' of ' + ensureRowPick().length + ' employees selected · net payable ' +
+        ui.money(sum(sel, function (s) { return PR().slipPayable(s); }));
+      if (goBtn) goBtn.disabled = !sel.length;
+    } else if (goBtn) goBtn.disabled = !p.length;
+    if (goBtn) goBtn.style.opacity = goBtn.disabled ? .5 : 1;
+  }
+  function sync() {
+    var one = oneYm();
+    // step 3 only exists for a single month; two or more always print the summary
+    secLevel.style.display = one ? '' : 'none';
+    if (!one) level = 'summary';
+    var wantRows = !!one && level === 'detail';
+    secRows.style.display = wantRows ? '' : 'none';
+    if (wantRows) { fillBulkSelects(); drawRows(); }
+    syncCounts();
+  }
+
+  var m = ui.modal({
+    title: 'Print payroll — ' + scopeShort(), icon: 'printer', size: 'lg', body: body,
+    actions: [
+      { label: 'Cancel', onClick: function () {} },
+      { label: 'Preview', icon: 'eye', variant: 'primary', onClick: function () {
+          var p = picked();
+          if (!p.length) { ui.toast('Tick at least one month', 'error'); return false; }
+          var one = oneYm();
+          if (one && level === 'detail') {
+            var sel = pickedSlips();
+            if (!sel.length) { ui.toast('Tick at least one employee', 'error'); return false; }
+            EPAL.report.open(payDetailReport(one, sel, ensureRowPick()));
+          } else {
+            EPAL.report.open(paySummaryReport(p));
+          }
+        } }
+    ]
+  });
+  goBtn = m.box.querySelector('.modal-foot .btn-primary');
+  sync();
+  return m;
 }
 
 /* ---- small helpers ----------------------------------------------------*/

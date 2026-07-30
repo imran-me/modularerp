@@ -155,6 +155,19 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-small); 
 .tbl td.num, .tbl thead th.num { text-align: right; white-space: nowrap; overflow-wrap: normal; }
 .tbl td.num { color: var(--text); }
 .tbl .row-click { cursor: pointer; }
+/* THE TOTALS ROW (opt-in via EPAL.table's opts.totals — owner 2026-07-30: "every
+   numeric column must foot"). Footed the way an accountant expects to see it:
+   a rule above, a banded row, and figures at the same weight as the column head
+   they close. It is a <tfoot>, so it sits under the last body row on screen and
+   repeats nowhere — the printed register carries its own. Sticky-bottom so the
+   figure stays in view while a long table scrolls inside its wrapper. */
+.tbl tfoot td { padding: 9px; border-top: 2px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+  position: sticky; bottom: 0; z-index: 1; }
+.tbl tfoot td.num { text-align: right; }
+.tbl tfoot .dt-total-lbl { text-transform: uppercase; letter-spacing: .05em; font-size: var(--fs-tiny); }
+/* a totals cell states the figure, never the tone — a total is not an exception */
+.tbl tfoot td .text-good, .tbl tfoot td .text-bad, .tbl tfoot td .text-warn { color: var(--text); }
 /* left-align numeric figures in a cell while keeping tabular spacing (phones, refs) */
 .tbl td.lnum, .tnum { font-variant-numeric: tabular-nums; white-space: nowrap; }
 /* DENSE variant for very-wide financial sheets (12+ columns, e.g. the Master

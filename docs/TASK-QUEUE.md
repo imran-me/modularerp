@@ -26,6 +26,34 @@
 
 ## ⏭️ STILL OPEN
 
+### T-PAY-PRINT — the payroll print system, to the owner's written spec ✅ (2026-07-30)
+Owner sent `Epal-Group-Payroll-Print-Spec-Prompt.md` (9 sections + a 13-point
+acceptance checklist) with a rendered mock-up, plus two amendments in his own
+words: *"print layout style, just avoid too much colors. dont need the monthly
+average raw."*
+
+- **Print opens the PRINT CENTRE**, never the printer: scope → months → detail
+  level → employees → preview. All months and all rows ticked by default; the
+  live counter says what the printed totals row will say; Preview is disabled at
+  zero. Screen A (Monthly Register) defaults to summary, Screen B (Salary
+  Register) to employee-level with that month ticked.
+- **Two documents**, A4 landscape: `PR-MR-…` Monthly Register, `PR-SR-…` Salary
+  Register. Company code in the id when the scope is one concern.
+- **New shared renderer** `platform/kit/report-print.js` (`EPAL.report`) —
+  JS-paginated, footer + `Page X of Y` on every page, table header repeated, no
+  split rows, sign-off last. The preview shows the nodes that print.
+- **Totals rows on screen too** — `EPAL.table` gained opt-in `opts.totals(rows)`.
+  Sums where a sum is the answer; percentages recomputed from the totals; the
+  encashment accrual shows a closing balance; headcount is distinct.
+- **Two colours only**, every figure black, negatives in brackets, en dash for
+  nil, Bangladeshi digit grouping, no Monthly-average row.
+- Also: `EPAL.config.group.letterhead` (+ per-company override) and `pay_prints`
+  (revision + who printed what).
+- ⏭ **Owner input still wanted:** each concern's OWN address / licence numbers
+  for its letterhead (they currently print the group's), and whether the sign-off
+  roles should carry real names instead of "Accounts / Head of HR & Admin /
+  Managing Director".
+
 ### T-ALLCO-NOTE — the all-companies note collapses to its (i) ✅ (2026-07-30)
 Owner screenshot of Master Payroll ▸ Overview ▸ **All Companies**, the note's info
 icon circled with an arrow drawn at it: *"make the marked icon placed here while in

@@ -490,6 +490,83 @@ reports, analytics, crm… per `docs/FULLSTACK-REBUILD-TRACKER.md`. Autonomous, 
 
 ---
 
+## 🆕 SESSION — 2026-07-30 · THE PAYROLL PRINT SYSTEM — A REGISTER YOU CAN FILE
+
+**The ask** — the owner wrote a full spec (`Epal-Group-Payroll-Print-Spec-Prompt.md`)
+and sent a rendered mock-up with one row crossed out: *"print layout style, just
+avoid too much colors. dont need the monthly average raw."* So: build it, drop the
+Monthly-average row, and keep the palette down.
+
+**Print no longer prints.** It opens the PRINT CENTRE — scope (read-only, so you
+cannot print the wrong entity by accident) → months (all ticked, Select all /
+Clear all / Last 3 / Last 6 / This year, live counter) → detail level (only when
+exactly ONE month is ticked; two or more always print the summary) → employees
+(all ticked, search, select-by-company / by-department, and a live
+`16 of 17 selected · net payable ৳8,98,123` that is exactly what the printed
+totals row will say) → a preview of the REAL pages → Print / Save as PDF.
+
+**Two documents, both A4 landscape.** `PR-MR-…` the Payroll Monthly Register (one
+row per month) and `PR-SR-…` the Salary Register (one row per employee). The id
+carries the company code when the scope is one concern, so a consolidated report
+can never be mistaken for a company's.
+
+**THE LAYOUT ENGINE IS NEW AND SHARED — `platform/kit/report-print.js`
+(`EPAL.report`).** It paginates in JS, which is the only honest way to get
+"Page X of Y": Chrome does not support the `@page` margin boxes that would carry
+it, and a browser cannot be asked how many pages it made. Measuring the flow
+ourselves also gives a footer on EVERY page, a table header that repeats on each,
+rows that never split, and a sign-off block that always lands at the end. The
+preview shows the very nodes that print — not a mock-up of them.
+
+**Colour, per the owner: two.** Navy `#0B2545` for the header band, rules and
+panel headings; `#14365F` for the group band. Every figure is pure black, because
+a payroll register gets photocopied and a pale gold number is gone by the second
+generation. Negatives wear accounting brackets — `(69,388)`, never a minus, never
+red — nothing prints as `0` (an en dash instead), money is grouped the
+Bangladeshi way (`53,74,501`), and the currency is declared once in the masthead
+instead of in 500 cells. No gold, no zebra beyond `#F7F9FB`, no Monthly-average
+row.
+
+**THE TOTALS ROW IS NOT A SUM, and that is the whole point.** `EPAL.table` gained
+an opt-in `opts.totals(rows)` (default off — no existing table moved) and both
+payroll tables now foot ON SCREEN as well as in print, by the same four rules:
+sum what sums; RE-COMPUTE every percentage from the totals (an average of row
+percentages is a different, wrong number); show the encashment accrual's CLOSING
+BALANCE, not its column sum; and count heads DISTINCT — seven months of 17 staff
+is 17 people, not 119.
+
+**Accounting the layout had to respect:** encashment is a liability accrued
+monthly and settled once in December — out of Net Payable, printed as a balance,
+and stated in words on the page so nobody reads it as unpaid salary; deductions
+withheld stay a liability until remitted; true cost = gross + additions +
+encashment accrual, which is the KPI band's first figure and never the cash one.
+
+**Also new:** `EPAL.config.group.letterhead` (address · web · email · licences,
+from the owner's spec) with a per-company override slot, so one edit changes every
+document the group prints; and `pay_prints`, the revision counter and audit trail
+of who raised a confidential payroll document — written when the print dialog
+opens, not when a preview is flipped through.
+
+**Deviations, both forced by 273mm of paper** (the spec's own rule: drop a column
+rather than shrink the type): the employee ID prints UNDER the name instead of in
+its own column, and the ADDITIONS subtotal is dropped from the salary register —
+its three components are printed beside it and the subtotal still appears in the
+KPI band and in "How the month adds up".
+
+**Verified** — sweep 253/253 × both themes, 0 console errors; a CDP driver opens
+the centre from both screens, ticks and unticks, previews and presses Print with
+`window.open` stubbed, and asserts: the printed totals row equals an INDEPENDENT
+sum straight out of `pay_slips` (৳71,99,496 gross · ৳65,88,870 net · ৳60,48,721
+paid · 17 distinct heads), settled % = 91.80% and deduction rate = 11.02% both
+recomputed from the totals, the encashment foot is the closing balance
+(৳4,70,918) and not the column sum, `Page 1 of 2` / `Page 2 of 2` on both pages,
+the header repeating on page 2 of the 3-page salary register, the partial-selection
+notice appearing when two people are unticked, the PDF filename
+`Epal-Payroll-AllCompanies-Jan-Jul2026-20260730`, and `pay_prints` recording
+`n=1`. Both documents were also rendered at 1:1 (1123×794) and read page by page.
+
+---
+
 ## 🆕 SESSION — 2026-07-30 · THE ALL-COMPANIES NOTE IS AN (i), AND THE CARD OPENS FROM IT
 
 **The ask** (owner, screenshot of Master Payroll ▸ Overview ▸ All Companies with the

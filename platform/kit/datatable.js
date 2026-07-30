@@ -27,6 +27,10 @@
  *     opts.searchKeys (default all column keys) · opts.filters:[{key,label}]
  *     opts.pageSize · opts.onRow(row) · opts.actions:[{icon,title,onClick(row)}]
  *     opts.exportName (false disables export) · opts.empty:{icon,title,hint}
+ *     opts.totals(rows) -> { label, values:{colKey:html} } — a footed TOTALS row
+ *       over the whole filtered set (see the block that renders it: the caller
+ *       decides sum vs re-computed percentage vs closing balance vs distinct
+ *       count, because only the caller knows the accounting). Default off.
  *
  * ==> LARAVEL / PHP MAPPING: a reusable <x-data-table> Blade/Livewire component
  *     (or a Laravel Datatables / Filament Table). Search/sort/filter/paginate
@@ -332,6 +336,34 @@
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
+
+      /* ---- THE TOTALS ROW (opt-in, owner 2026-07-30) --------------------
+       * `opts.totals(rows)` is handed the WHOLE filtered set — never the page —
+       * and answers { label, values:{ colKey: html } }. The kit deliberately does
+       * NOT sum anything itself: a payroll register has columns that must be
+       * summed (Gross), columns that must be RE-COMPUTED from the totals (any
+       * percentage — an average of row percentages is a different, wrong number),
+       * columns that must show a CLOSING BALANCE (a cumulative accrual), and a
+       * headcount that must be a DISTINCT count (7 months × 21 staff is 21
+       * people, not 147). Only the caller knows which is which, so the caller
+       * decides and this renders. A column with no value prints nothing.
+       * Default off → every existing table is unchanged. */
+      if (opts.totals) {
+        var tt = opts.totals(rows);
+        if (tt) {
+          var tfoot = el('tfoot'), ftr = el('tr.dt-total'), first = true;
+          cols.forEach(function (c) {
+            var td = el('td' + (c.num ? '.num' : '') + (c.cls ? '.' + c.cls : ''));
+            var v = tt.values ? tt.values[c.key] : null;
+            if (v != null) td.innerHTML = v;
+            else if (first) td.innerHTML = '<span class="dt-total-lbl">' + ui.escapeHtml(tt.label || 'Total') + '</span>';
+            first = false;
+            ftr.appendChild(td);
+          });
+          if (opts.actions && opts.actions.length) ftr.appendChild(el('td.dt-actions'));
+          tfoot.appendChild(ftr); table.appendChild(tfoot);
+        }
+      }
       wrap.appendChild(table);
 
       // pagination footer

@@ -9,7 +9,7 @@
 (function () {
   'use strict';
   var TEMPLATE_HTML = "<!-- ============================================================================\n  TRAVELS · PAYROLL · MARKUP  (company-agnostic — registered for every concern)\n  ----------------------------------------------------------------------------\n  The screen's HTML, separated from its logic (frontend/payroll.js). Cloned +\n  filled at runtime via [data-tpl] / [data-slot] hooks.\n\n  The desk is mounted EMBEDDED — in Master Accounts and in each company's Accounts\n  module, via EPAL.payrollDesk. Its sections are the tabs listed in the TABS array\n  in payroll.js (not restated here — a count in a comment goes stale).\n  ⚠ The #/<cid>/payroll/… standalone routes 404: `payroll` is not a module in\n  platform/core/config.js. Embedded-only is the owner's decision (2026-07-29) —\n  see payroll.js's header and modules/payroll/module.json.\n\n  Every modal/form (manage-salary, correction/\n  edit, print-sheet, pay, money, encashment) keeps its legacy el()-built DOM, as\n  do the compound-styled leaf helpers formField() and field() (label+control rows\n  with inline padding/width — impractical as utilities). STYLING = the house\n  design system; the only new tw util is tw-max-w-[230px] (the run's month\n  select). The salary-sheet body keeps its .tbl-dense modifier (owner: fit\n  without h-scroll).\n\n  TWO STYLES LIVE HERE, on purpose:\n   · the [data-tpl] fragments below are the ORIGINAL screens, kept exactly as\n     they were so their proven-identical pixels do not move;\n   · everything under \"REAL-HTML BLOCKS\" is the current FRONTEND BUILD LAW —\n     whole screens written out as plain HTML. All NEW work goes there.\n\n  Each fragment is ONE line, no inter-tag whitespace — a clone is byte-for-byte\n  the DOM the old ui.el() calls produced.\n  ============================================================================ -->\n\n<!-- page shell + section band ----------------------------------------------->\n<template data-tpl=\"page\"><div class=\"page\"></div></template>\n<template data-tpl=\"nav\"><div class=\"tab-underline mb-3\"></div></template>\n<template data-tpl=\"nav-btn\"><button></button></template>\n\n<!-- KPI grid + one KPI card + a two-column row ------------------------------>\n<template data-tpl=\"kpi-grid\"><div class=\"kpi-grid kpi-compact stagger\"></div></template>\n<!-- the flat [data-tpl=\"kpi\"] tile (label · icon · figure, nothing else) was retired\n     2026-07-29 — every caller now builds [data-shell=\"kpitile\"] below, which adds the\n     trend pill, the context foot line and the sparkline. The grid itself is unchanged. -->\n<template data-tpl=\"two-col\"><div class=\"two-col\"></div></template>\n\n<!-- generic cards: plain (body), register (head+sub+body), head-only -------->\n<template data-tpl=\"card-body-card\"><div class=\"card\"><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"reg-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"head-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3></div><div class=\"card-body\" data-slot=\"body\"></div></div></template>\n\n<!-- Salary Manage: the run-control card + the .tbl-dense salary sheet -------->\n<template data-tpl=\"run-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex justify-between items-center flex-wrap gap-2\"><div class=\"flex items-center gap-2 flex-wrap\" data-slot=\"left\"></div><div class=\"flex gap-1 flex-wrap\" data-slot=\"actions\"></div></div><div class=\"text-mute sm mt-2\" data-slot=\"status\"></div></div></div></template>\n<template data-tpl=\"salary-card\"><div class=\"card\"><div class=\"card-head\"><h3 data-slot=\"title\"></h3><span class=\"card-sub\" data-slot=\"sub\"></span></div><div class=\"card-body tbl-dense\" data-slot=\"body\"></div></div></template>\n<template data-tpl=\"grid-auto-compact\"><div class=\"grid-auto kpi-compact\"></div></template>\n<template data-tpl=\"pay-tier-card\"><div class=\"card tier-card\"><div class=\"card-pad\"><div class=\"fw-700\" data-slot=\"name\"></div><div class=\"text-mute sm\" data-slot=\"out\"></div><span class=\"badge\" data-slot=\"badge\"></span></div></div></template>\n\n<!-- Payslip: the employee/month/view-statement picker row ------------------->\n<template data-tpl=\"pick-card\"><div class=\"card mb-3\"><div class=\"card-body\"><div class=\"flex gap-2 flex-wrap items-end\" data-slot=\"row\"></div></div></div></template>\n\n<!-- a plain \"New …\" button row (loans/advance disburse) -------------------->\n<template data-tpl=\"btn-row\"><div class=\"mb-3\"><button class=\"btn btn-primary\" data-slot=\"btn\"></button></div></template>\n\n\n<!-- ============================================================================\n  ▼▼ REAL-HTML BLOCKS (FRONTEND BUILD LAW, owner 2026-07-28) ▼▼\n  Everything below is the screen written out as plain HTML — not cloned\n  fragments, not el(). JS only fills the [data-k] placeholders, clones the\n  [data-proto] rows (0..N of them is DATA, not layout) and wires [data-act].\n\n  LEGEND\n    [data-shell=\"…\"]  a shared bar/panel used by more than one screen\n    [data-screen=\"…\"] one whole screen; mountScreen() moves its children onto the page\n    [data-k=\"…\"]      a text/HTML placeholder JS writes into\n    [data-fill=\"…\"]   a container JS appends a built widget (table/SVG) into\n    [data-proto=\"…\"]  a hidden prototype row — cloned once per record\n    [data-el=\"…\"]     an element JS needs a handle on (to hide, or to click-wire)\n    [data-act=\"…\"]    a click target JS binds a navigation/action to\n\n  ⚠ CLASS NAMES: the dashboard row deliberately reuses the `bank-*` component\n  vocabulary from components.css. That block is the house SUMMARY-IDENTITY-PANEL\n  design (hero figure · drill facts · last-event mini-statement · mirrored\n  sparkline · reconciliation · mini stack); Manage Banks was simply its first\n  caller. Reusing it means Payroll is pixel-consistent with Manage Banks for\n  free and forks not a single rule. The extra `pay-*` classes carry no styling —\n  they are semantic hooks for anything payroll ever needs to override.\n  ============================================================================ -->\n\n<!-- ---------------------------------------------------------------------------\n  RICH KPI TILE — the house KPI card at full strength (owner 2026-07-29, from the\n  payroll UI/UX research in docs/PAYROLL-UIUX-RESEARCH.md): the figure, a trend\n  pill against last month, a context foot line, and a sparkline bled into the\n  card's bottom edge.\n\n  It replaces the flat [data-tpl=\"kpi\"] fragment on Loan Management and Advance\n  Salary, which carried a label, an icon and a number and nothing else — you\n  could not tell whether ৳4,20,000 of loans out was climbing or clearing.\n\n  Deliberately the SAME markup as the group dashboard's kpiTile()\n  (companies/group-cockpit/modules/dashboard/view.js) so the two cannot drift.\n\n  ⚠ [data-el=\"trend\"] and [data-el=\"spark\"] are REMOVED, never hidden, when a card\n  has no honest history behind it — both because of the [hidden] trap documented\n  in payroll.js, and because a tile must never imply a trend it cannot prove.\n  (Payroll Reports is exactly that case: see reportsView.)\n--------------------------------------------------------------------------- -->\n<!-- ---------------------------------------------------------------------------\n  PAYMENT PROGRESS — appended into the Salary Manage run card (owner 2026-07-29).\n  The card already states the net and the outstanding as two separate figures;\n  this makes the RELATIONSHIP between them readable at a glance — how much of the\n  month's payroll has actually reached staff.\n\n  It is appended by JS rather than added to the [data-tpl=\"run-card\"] fragment\n  above, because that fragment is one of the ORIGINALS whose pixels must not move.\n\n  The .meter lvl-* vocabulary is risk-coloured (low = green), and that is exactly\n  right here read the right way round: the risk being metered is UNPAID SALARY.\n  Fully paid = lvl-low = green; nothing paid = lvl-high = red.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"paymeter\" class=\"pay-progress\">\n  <div class=\"pay-progress-top\">\n    <span class=\"text-mute sm\" data-k=\"label\"></span>\n    <span class=\"sm fw-600\" data-k=\"pct\"></span>\n  </div>\n  <div class=\"meter\"><span data-el=\"bar\"></span></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  ALL-COMPANIES NOTE (owner 2026-07-29) — shown only when the switcher is on\n  \"All Companies\". It says which concerns the figures above it add up, and, where\n  a control is missing, WHY: a payroll run and a salary structure belong to one\n  company, so they are asked for from a company rather than guessed at from six.\n\n  It reuses .brief-exc (the autopilot/radar row) deliberately — same voice, same\n  spacing, and not one new CSS rule.\n\n  COLLAPSED BY DEFAULT (owner 2026-07-30: \"make the marked icon placed here while\n  in all companies, clicking it will expand its card\"). The note is read once and\n  then known, so it starts as nothing but its (i) — sitting on the exact spot the\n  full card's icon occupies, so expanding it grows the card DOWN from the icon\n  rather than moving anything sideways. The icon is therefore the [data-el=\"tog\"]\n  BUTTON itself, not a div beside one: one element, both states.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"scopenote\" class=\"card mb-3 scopenote\">\n  <div class=\"card-body\">\n    <div class=\"brief-exc\">\n      <button type=\"button\" class=\"brief-exc-ico scopenote-ico\" data-el=\"tog\" data-k=\"ico\"\n              aria-expanded=\"false\"></button>\n      <div class=\"brief-exc-body\" data-el=\"body\">\n        <strong data-k=\"title\"></strong>\n        <span data-k=\"why\"></span>\n      </div>\n    </div>\n  </div>\n</div>\n\n<div data-shell=\"kpitile\" class=\"kpi-card\">\n  <div class=\"kpi-top\">\n    <span class=\"kpi-label\" data-k=\"label\"></span>\n    <span class=\"kpi-ico\" data-k=\"ico\"></span>\n  </div>\n  <div class=\"kpi-value\" data-k=\"value\"></div>\n  <div class=\"kpi-foot\">\n    <span class=\"kpi-trend\" data-el=\"trend\"></span>\n    <span class=\"text-muted\" data-k=\"foot\"></span>\n  </div>\n  <div class=\"kpi-spark\" data-el=\"spark\"><canvas data-el=\"canvas\"></canvas></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  DASHBOARD ROW — the four same-height cards that head both Payroll Overview\n  and Salary Manage. ONE shell, filled with different numbers by each caller:\n\n    1  identity panel  company · hero figure · 3 clickable drill facts ·\n                       the last payroll event (direction · amount · reference ·\n                       opening → closing of what we owe staff)\n    2  flow card       a mirrored 2-colour sparkline + its two totals\n    3  reconciliation  a 2×2 of control figures + a variance badge + \"why?\"\n    4  mini stack      two small click-through cards\n--------------------------------------------------------------------------- -->\n<div data-shell=\"dash\" class=\"bank-cards-row pay-cards-row\">\n\n  <div class=\"bank-summary pay-summary\" data-el=\"panel\">\n    <div class=\"bank-summary-in\">\n      <div class=\"bank-summary-body\">\n        <div class=\"bank-summary-left\">\n          <div class=\"bank-summary-head\">\n            <div class=\"bank-summary-ico\" data-k=\"ico\"></div>\n            <div class=\"bank-summary-id\">\n              <div class=\"bank-summary-co\" data-k=\"co\"></div>\n              <div class=\"bank-summary-sub\" data-k=\"co-sub\"></div>\n            </div>\n          </div>\n          <div class=\"bank-summary-hero clik\" data-act=\"hero\">\n            <div class=\"bank-summary-bal\" data-k=\"hero\"></div>\n            <div class=\"bank-summary-ballabel\" data-k=\"hero-label\"></div>\n          </div>\n        </div>\n        <div class=\"bank-summary-last\" data-el=\"last\">\n          <div class=\"bank-summary-last-top\">\n            <span class=\"bank-summary-last-lbl\" data-k=\"last-label\"></span>\n            <span class=\"bank-summary-dir\" data-k=\"dir\"></span>\n          </div>\n          <div class=\"bank-summary-last-row\">\n            <span class=\"bank-summary-last-amt\" data-k=\"amt\"></span>\n            <span class=\"bank-summary-last-date\" data-k=\"when\"></span>\n          </div>\n          <div class=\"bank-summary-last-ref\" data-k=\"ref\"></div>\n          <div class=\"bank-summary-last-oc\">\n            <div class=\"oc-open\" data-k=\"oc-open\"></div>\n            <div class=\"oc-close\" data-k=\"oc-close\"></div>\n          </div>\n        </div>\n      </div>\n      <div class=\"bank-summary-facts\">\n        <div class=\"bank-summary-fact clik\" data-act=\"f1\"><div class=\"k\" data-k=\"f1k\"></div><div class=\"v\" data-k=\"f1v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f2\"><div class=\"k\" data-k=\"f2k\"></div><div class=\"v\" data-k=\"f2v\"></div></div>\n        <div class=\"bank-summary-fact clik\" data-act=\"f3\"><div class=\"k\" data-k=\"f3k\"></div><div class=\"v\" data-k=\"f3v\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-flow pay-flow\" data-el=\"flow\">\n    <div class=\"bank-flow-head\">\n      <div>\n        <div class=\"bank-flow-title\" data-k=\"flow-title\"></div>\n        <div class=\"bank-flow-sub\" data-k=\"flow-sub\"></div>\n      </div>\n      <span class=\"bank-flow-net\" data-k=\"flow-net\"></span>\n    </div>\n    <div class=\"bank-flow-spark\" data-fill=\"spark\"></div>\n    <div class=\"bank-flow-foot\">\n      <span><span class=\"bank-flow-dot in\"></span><span data-k=\"flow-in\"></span></span>\n      <span><span class=\"bank-flow-dot out\"></span><span data-k=\"flow-out\"></span></span>\n    </div>\n  </div>\n\n  <div class=\"card bank-recon bank-recon-clik pay-recon\" data-el=\"recon\">\n    <!-- no head badge: inside .bank-cards-row components.css hides it, because\n         the verdict already reads in the 4th stat (coloured + its \"why?\"). -->\n    <div class=\"card-head\">\n      <h3 data-k=\"recon-title\"></h3>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"bank-recon-2x2\">\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r1k\"></div><div class=\"stat-value num\" data-k=\"r1v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r2k\"></div><div class=\"stat-value num\" data-k=\"r2v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r3k\"></div><div class=\"stat-value num\" data-k=\"r3v\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\" data-k=\"r4k\"></div><div class=\"stat-value num\" data-k=\"r4v\"></div>\n          <button class=\"float-why\" type=\"button\" data-el=\"why\" hidden></button>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"bank-ministack pay-ministack\">\n    <div class=\"card bank-mini\" data-el=\"m1\">\n      <div class=\"fw-600 sm\" data-k=\"m1t\"></div>\n      <div class=\"strong num\" data-k=\"m1v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m1s\"></div>\n    </div>\n    <div class=\"card bank-mini\" data-el=\"m2\">\n      <div class=\"fw-600 sm\" data-k=\"m2t\"></div>\n      <div class=\"strong num\" data-k=\"m2v\"></div>\n      <div class=\"text-mute xs\" data-k=\"m2s\"></div>\n    </div>\n  </div>\n\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL OVERVIEW — the payroll command centre (new tab, owner 2026-07-28).\n  Reads only what the payroll engine and the general ledger already hold; it\n  never posts by itself. Every automation is a PROPOSAL with a button (owner:\n  automation lives on the overview/summary and asks before it moves money).\n--------------------------------------------------------------------------- -->\n<section data-screen=\"overview\">\n\n  <!-- 1 · the four-card dashboard row (cloned from [data-shell=\"dash\"]) -->\n  <div data-fill=\"dash\"></div>\n\n  <!-- 2 · the brief row (owner 2026-07-30): Autopilot (what should happen next),\n       Radar (what looks wrong) and the narrated Digest (the month in words), as\n       THREE cards in ONE row of a fixed height. Each card scrolls inside itself,\n       so a long autopilot can never push the register down the page. -->\n  <div class=\"pay-brief-row\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"auto-title\"></h3>\n        <span class=\"card-sub\" data-k=\"auto-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"auto\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"radar-title\"></h3>\n        <span class=\"card-sub\" data-k=\"radar-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"radar\">\n        <div class=\"brief-exc\" hidden data-proto=\"row\">\n          <div class=\"brief-exc-ico\" data-k=\"ico\"></div>\n          <div class=\"brief-exc-body\">\n            <strong data-k=\"title\"></strong>\n            <span data-k=\"why\"></span>\n          </div>\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-el=\"go\" hidden></button>\n        </div>\n        <div class=\"brief-good\" hidden data-el=\"clear\"></div>\n      </div>\n    </div>\n\n    <!-- the digest, every figure computed live from the books -->\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"digest-title\"></h3>\n        <span class=\"card-sub\" data-k=\"digest-sub\"></span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"pay-digest-scope\" data-k=\"digest-scope\"></div>\n        <div class=\"pay-digest-text\" data-k=\"digest-text\"></div>\n      </div>\n    </div>\n\n  </div>\n\n  <!-- 3 · the last 12 payroll months, and where the money goes by department -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"trend-title\"></h3>\n      <span class=\"card-sub\" data-k=\"trend-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"trend\"></div>\n  </div>\n\n  <!-- Where the money goes: the doughnut carries the PROPORTION, the table the\n       precise figures. No chart legend — the table beside it already names every\n       department and its share, so a legend would print each label twice. -->\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3 data-k=\"dept-title\"></h3>\n      <span class=\"card-sub\" data-k=\"dept-sub\"></span>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"pay-dept-split\">\n        <div class=\"pay-dept-ring\" data-el=\"ring\"><canvas data-el=\"deptcanvas\"></canvas></div>\n        <div class=\"pay-dept-tbl\" data-fill=\"dept\"></div>\n      </div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  PAYROLL HISTORY — sits directly under the Salary Sheet on Salary Manage (owner\n  2026-07-28). One row per payroll month, newest first; the row opens a modal\n  listing EVERY payroll transaction that month, and a transaction opens its own\n  printable detail. The month list is built from pay_runs UNION the distinct ym\n  values in pay_slips, so a month with payslips but no run row still appears.\n--------------------------------------------------------------------------- -->\n<div data-shell=\"history\" class=\"card mt-3\">\n  <div class=\"card-head\">\n    <h3 data-k=\"title\"></h3>\n    <span class=\"card-sub\" data-k=\"sub\"></span>\n  </div>\n  <div class=\"card-body tbl-dense\" data-fill=\"body\"></div>\n</div>\n\n<!-- ---------------------------------------------------------------------------\n  ONE MONTH, IN FULL — the drill behind a row of the Monthly Register (owner\n  2026-07-28: \"if I click on January, it should show me how many transactions\n  happened … all their accounts summary of January in a table — gross, net,\n  deductions, additions, overtime, late, bonus\"). Everything that touched\n  payroll in that month, on one screen:\n    · the month's dashboard row (same four cards, month-scoped)\n    · the SALARY REGISTER — every employee, every component, additions and\n      deductions broken out and subtotalled, exportable and printable\n    · the month's EMPLOYEE MONEY MOVEMENTS (advance · loan · repayment · bonus ·\n      encashment payout) and every LEDGER POSTING payroll wrote that month\n--------------------------------------------------------------------------- -->\n<section data-screen=\"month\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"flex justify-between items-center flex-wrap gap-2\">\n        <div class=\"flex items-center gap-2 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"back\"></button>\n          <select class=\"input tw-max-w-[230px]\" data-el=\"mpick\"></select>\n          <span class=\"badge\" data-k=\"status\"></span>\n        </div>\n        <div class=\"flex gap-1 flex-wrap\">\n          <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"print\"></button>\n          <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"open-run\"></button>\n        </div>\n      </div>\n      <div class=\"text-mute sm mt-2\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n  <div data-fill=\"dash\"></div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"reg-title\"></h3>\n      <span class=\"card-sub\" data-k=\"reg-sub\"></span>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"reg\"></div>\n  </div>\n\n  <div class=\"two-col\">\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"txn-title\"></h3>\n        <span class=\"card-sub\" data-k=\"txn-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"txns\"></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3 data-k=\"post-title\"></h3>\n        <span class=\"card-sub\" data-k=\"post-sub\"></span>\n      </div>\n      <div class=\"card-body\" data-fill=\"posts\"></div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ---------------------------------------------------------------------------\n  SALARY TEMPLATE — the tab, in two halves (owner 2026-07-29):\n\n  1 · SALARY TEMPLATES LIST — the saved package per employee: the five components\n      as fixed taka, the standing bonus, the total, whether overtime is allowed\n      and any standing fine. Add · edit · punish · delete. It is the top half\n      because it is the half people work in daily.\n  2 · STRUCTURE + LIVE PREVIEW — the company's STATUTORY rules (percentages, tax,\n      PF, leave, working days, the pay-by and correction days). Unchanged: they\n      still compute everyone who is NOT on a package, and they still govern tax,\n      PF, absence and encashment for everyone who is. Built by JS below this block.\n\n  The [data-fill=\"list\"] table is EPAL.table (a data grid — the law's live-data\n  carve-out); everything around it is markup.\n--------------------------------------------------------------------------- -->\n<!-- ---------------------------------------------------------------------------\n  ADVANCE REQUESTS — the decision queue on the Advance Salary tab (owner\n  2026-07-29: \"employees' advance salary request option will appear, boss will\n  allow or disallow, also can customize the amount. For which month advanced,\n  that should indicate.\").\n\n  One card, two parts: the asks still waiting on a decision, then everything\n  already decided. The pending card is REMOVED when the queue is empty — an empty\n  decision queue is not a screen anyone needs to look at, and leaving it there\n  makes the tab look like it is asking for something when it is not.\n\n  Each waiting row states who, how much, WHICH MONTH the advance is against, and\n  why — then Approve (which opens a form where the amount can be changed) and\n  Decline (which insists on a reason).\n--------------------------------------------------------------------------- -->\n<div data-shell=\"advreq\" class=\"card mb-3\">\n  <div class=\"card-head\">\n    <h3 data-k=\"title\"></h3>\n    <span class=\"card-sub\" data-k=\"sub\"></span>\n  </div>\n  <div class=\"card-body\" data-fill=\"rows\">\n    <div class=\"adv-req\" hidden data-proto=\"row\">\n      <div class=\"adv-req-who\">\n        <div class=\"fw-700\" data-k=\"name\"></div>\n        <div class=\"text-mute xs\" data-k=\"when\"></div>\n      </div>\n      <div class=\"adv-req-ask\">\n        <div class=\"strong num\" data-k=\"amount\"></div>\n        <span class=\"badge badge-info\" data-k=\"forym\"></span>\n      </div>\n      <div class=\"adv-req-why text-mute sm\" data-k=\"reason\"></div>\n      <div class=\"adv-req-do\">\n        <button class=\"btn btn-sm btn-primary\" type=\"button\" data-act=\"approve\"></button>\n        <button class=\"btn btn-sm btn-outline\" type=\"button\" data-act=\"reject\"></button>\n      </div>\n    </div>\n  </div>\n</div>\n\n<section data-screen=\"salary-templates\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"title\"></h3>\n      <!-- ⚠ the button is REMOVED by the logic when the user cannot create, never\n           hidden: [hidden] and .btn{display:inline-flex} have the same specificity\n           and the class wins (the trap documented in payroll.js). -->\n      <div class=\"flex items-center gap-2\">\n        <span class=\"card-sub\" data-k=\"sub\"></span>\n        <button class=\"btn btn-primary btn-sm\" type=\"button\" data-act=\"new\"></button>\n      </div>\n    </div>\n    <div class=\"card-body tbl-dense\" data-fill=\"list\"></div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-body\">\n      <div class=\"text-mute sm\" data-k=\"note\"></div>\n    </div>\n  </div>\n\n</section>\n\n<!-- ===========================================================================\n  EMPLOYEE FILE — the whole person, UNDER the table (owner 2026-07-29:\n  \"clicking a staff's name opens a modal card … I want it to open another\n  structure, in the below of the page, not on a pop up card\").\n\n  Two sections, mounted in two different places, on purpose:\n\n  · [data-screen=\"emp-file\"]      the page chrome — the identity band and the six\n                                  money tiles — plus [data-fill=\"file\"], where the\n                                  SHARED kit (platform/kit/emp-profile.js) renders\n                                  the tab bar and the five tab bodies it already\n                                  owns (Overview · Accounts · Payslips ·\n                                  Attendance · All Details). The kit is called\n                                  with {host, head:false}: same file, no modal,\n                                  and its own header card suppressed because the\n                                  band below IS the header.\n\n  · [data-screen=\"emp-analytics\"] the reference stack from the owner's screenshots\n                                  — profile details, task tiles, the two task\n                                  charts, attendance, leave, salary & loan. It is\n                                  handed to the kit as `overviewExtra`, so it is\n                                  appended INSIDE the Overview tab: it must come\n                                  and go with that tab, not sit under all five.\n\n  Every figure here is read from data the app already holds — tasks\n  (db.tasksFor), attendance (att_monthly), leave (tv_leaves), payslips / loans /\n  advances (EPAL.payroll). Nothing is invented; where the reference app showed a\n  number we cannot honestly derive (clock-in/out \"Working Hour\", \"Late Time\"),\n  the card shows the days we DO record and says so.\n============================================================================ -->\n<section data-screen=\"emp-file\">\n\n  <div class=\"card emp-file mb-3\">\n    <!-- The identity band. Dark by design — the reference header is a solid band,\n         and it is what makes a file read as a FILE rather than as one more card.\n         It takes the COMPANY accent gradient, so Woodart's file is green and\n         Travels' is blue: the same per-company identity rule as everywhere else. -->\n    <div class=\"emp-band\">\n      <span class=\"emp-band-av\" data-k=\"avatar\"></span>\n      <div class=\"emp-band-who\">\n        <div class=\"emp-band-name\" data-k=\"name\"></div>\n        <div class=\"emp-band-meta\" data-k=\"meta\"></div>\n      </div>\n      <div class=\"emp-band-chips\" data-k=\"chips\"></div>\n      <div class=\"emp-band-do\">\n        <button class=\"btn btn-sm emp-band-btn\" type=\"button\" data-act=\"payslip\"></button>\n        <button class=\"btn btn-sm emp-band-btn\" type=\"button\" data-act=\"close\"></button>\n      </div>\n    </div>\n\n    <!-- the six money facts, in the order they get asked about -->\n    <div class=\"stat-row stat-compact\">\n      <div class=\"stat\"><div class=\"stat-label\">Salary</div><div class=\"stat-value num\" data-k=\"t-salary\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\" data-k=\"t-owes-l\"></div><div class=\"stat-value num\" data-k=\"t-owes\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Salary due</div><div class=\"stat-value num\" data-k=\"t-due\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Advance out</div><div class=\"stat-value num\" data-k=\"t-adv\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Loan out</div><div class=\"stat-value num\" data-k=\"t-loan\"></div></div>\n      <div class=\"stat\"><div class=\"stat-label\">Leave encash</div><div class=\"stat-value num\" data-k=\"t-encash\"></div></div>\n    </div>\n  </div>\n\n  <div data-fill=\"file\"></div>\n\n</section>\n\n\n<section data-screen=\"emp-analytics\">\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\">\n      <h3 data-k=\"pd-title\"></h3>\n      <span class=\"card-sub\" data-k=\"pd-sub\"></span>\n    </div>\n    <div class=\"card-body\">\n      <div class=\"emp-facts\">\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Email</div><div class=\"emp-fact-v\" data-k=\"p-email\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Phone</div><div class=\"emp-fact-v\" data-k=\"p-phone\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Company</div><div class=\"emp-fact-v\" data-k=\"p-company\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Department</div><div class=\"emp-fact-v\" data-k=\"p-dept\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Designation</div><div class=\"emp-fact-v\" data-k=\"p-desig\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Employment type</div><div class=\"emp-fact-v\" data-k=\"p-type\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Employee ID</div><div class=\"emp-fact-v\" data-k=\"p-id\"></div></div>\n        <div class=\"emp-fact\"><div class=\"emp-fact-l\">Join date</div><div class=\"emp-fact-v\" data-k=\"p-join\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <!-- TASKS — the board totals for this person (db.tasksFor). \"Pending\" counts\n       everything not done and not cancelled: a cancelled task is closed, and\n       counting it as outstanding work would overstate the queue. -->\n  <div class=\"stat-row stat-compact mb-3\">\n    <div class=\"stat\"><div class=\"stat-label\">Task total</div><div class=\"stat-value\" data-k=\"k-tasks\"></div><div class=\"text-mute xs\" data-k=\"k-tasks-f\"></div></div>\n    <div class=\"stat\"><div class=\"stat-label\">Completed</div><div class=\"stat-value text-good\" data-k=\"k-done\"></div><div class=\"text-mute xs\" data-k=\"k-done-f\"></div></div>\n    <div class=\"stat\"><div class=\"stat-label\">Pending</div><div class=\"stat-value text-warn\" data-k=\"k-pending\"></div><div class=\"text-mute xs\" data-k=\"k-pending-f\"></div></div>\n  </div>\n\n  <div class=\"two-col mb-3\">\n    <div class=\"card\">\n      <div class=\"card-head\"><h3 data-k=\"wk-title\"></h3><span class=\"card-sub\" data-k=\"wk-sub\"></span></div>\n      <div class=\"card-body\"><div class=\"emp-chart\"><canvas data-el=\"wk\"></canvas></div></div>\n    </div>\n    <div class=\"card\">\n      <div class=\"card-head\"><h3 data-k=\"mn-title\"></h3><span class=\"card-sub\" data-k=\"mn-sub\"></span></div>\n      <div class=\"card-body\"><div class=\"emp-chart\"><canvas data-el=\"mn\"></canvas></div></div>\n    </div>\n  </div>\n\n  <!-- ATTENDANCE — what att_monthly actually records: DAYS. The reference app\n       printed \"Working Hour 174.03 hr\" and \"Late Time 862.52 min\"; there is no\n       clock-in / clock-out anywhere in this system, so neither can be derived and\n       neither is shown as if it could be. The note under the chart says so. -->\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"att-title\"></h3><span class=\"card-sub\" data-k=\"att-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"stat-row stat-compact mb-3\">\n        <div class=\"stat\"><div class=\"stat-label\">Present days</div><div class=\"stat-value text-good\" data-k=\"a-present\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Absent days</div><div class=\"stat-value\" data-k=\"a-absent\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Late</div><div class=\"stat-value\" data-k=\"a-late\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Early leave</div><div class=\"stat-value\" data-k=\"a-early\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">On leave</div><div class=\"stat-value\" data-k=\"a-leave\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Overtime</div><div class=\"stat-value\" data-k=\"a-ot\"></div></div>\n      </div>\n      <div class=\"emp-chart\"><canvas data-el=\"att\"></canvas></div>\n      <div class=\"text-mute sm mt-2\" data-k=\"att-note\"></div>\n    </div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"lv-title\"></h3><span class=\"card-sub\" data-k=\"lv-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"stat-row stat-compact\">\n        <div class=\"stat\"><div class=\"stat-label\">Approved</div><div class=\"stat-value text-good\" data-k=\"l-approved\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Pending</div><div class=\"stat-value text-warn\" data-k=\"l-pending\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Rejected</div><div class=\"stat-value text-bad\" data-k=\"l-rejected\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Used leave days</div><div class=\"stat-value\" data-k=\"l-used\"></div></div>\n        <div class=\"stat\"><div class=\"stat-label\">Still to take</div><div class=\"stat-value\" data-k=\"l-left\"></div></div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"card mb-3\">\n    <div class=\"card-head\"><h3 data-k=\"sl-title\"></h3><span class=\"card-sub\" data-k=\"sl-sub\"></span></div>\n    <div class=\"card-body\">\n      <div class=\"two-col\">\n        <div>\n          <div class=\"section-label\">Salary</div>\n          <div class=\"data-list\">\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Paid records</div><div class=\"strong\" data-k=\"s-paid\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Pending records</div><div class=\"strong\" data-k=\"s-pending\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\" data-k=\"s-total-l\"></div><div class=\"strong num\" data-k=\"s-total\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\" data-k=\"s-latest-l\"></div><div class=\"strong num\" data-k=\"s-latest\"></div></div>\n          </div>\n        </div>\n        <div>\n          <div class=\"section-label\">Loan &amp; advance</div>\n          <div class=\"data-list\">\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Running loans</div><div class=\"strong\" data-k=\"ln-running\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Completed loans</div><div class=\"strong\" data-k=\"ln-done\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Loan remaining</div><div class=\"strong num\" data-k=\"ln-remaining\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Advance pending decision</div><div class=\"strong num\" data-k=\"ln-advpending\"></div></div>\n            <div class=\"data-row\"><div class=\"text-mute sm flex-1\">Advance to recover</div><div class=\"strong num\" data-k=\"ln-advout\"></div></div>\n          </div>\n          <!-- every loan, one row each: taken + taken on / paid / still due -->\n          <div class=\"data-list mt-2\" data-el=\"ln-loans\"></div>\n        </div>\n      </div>\n    </div>\n  </div>\n\n</section>\n";
-  var MODULE_CSS = "/* ============================================================================\n * TRAVELS · PAYROLL · MODULE STYLESHEET\n * ----------------------------------------------------------------------------\n * The few rules the shared design system does not already express. Picked up\n * automatically by tools/build/build-module.mjs (it compiles frontend/<id>.css\n * into view.js as MODULE_CSS and injects it once into <head> as\n * <style data-module-style=\"travels/payroll\">), so nothing in\n * platform/design-system/ has to fork for one screen.\n *\n * Everything else on this desk uses the house vocabulary — .kpi-card, .meter,\n * .card, .bank-* for the dashboard row — on purpose: reusing them means Payroll\n * stays pixel-consistent with Manage Banks and the group dashboard for free.\n * Only add here what genuinely has no house equivalent.\n * ========================================================================== */\n\n/* ============ THE BRIEF ROW — autopilot · radar · digest (owner 2026-07-30) ==\n   \"The anomaly and autopilot section can take up to that much space… if the list\n   is long, just give a scroll bar… make total 3 card there, one for autopilot,\n   then anomaly, then digest.\" So the three answers the overview owes — what to\n   do next, what looks wrong, and the month in words — sit side by side in ONE\n   row of a FIXED height, and the LIST is what scrolls, never the page. A twelve\n   row autopilot used to push the Monthly Register a screen and a half down.\n\n   The digest moved in here out of the full-width navy .brief-hero it used to\n   own; it is the same live narrative, now the third card of the row.\n\n   No house equivalent: .two-col is a 1.6fr/1fr split and .three-col three equal\n   thirds, and neither CAPS its cards. The proportions are the owner's marked\n   boxes — the autopilot carries a sentence per row, the radar a name. */\n.pay-brief-row {\n  display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 18px; margin-bottom: 18px;\n  align-items: stretch;                 /* three cards, one height, one baseline */\n}\n/* THE CAP. The card becomes a column so the head stays put and only the body\n   travels; min-height:0 is what actually lets a grid child scroll — without it a\n   grid/flex item refuses to shrink below its content and grows instead. */\n.pay-brief-row > .card { max-height: 264px; display: flex; flex-direction: column; min-height: 0; }\n.pay-brief-row .card-head { flex: none; }\n.pay-brief-row .card-body { overflow-y: auto; min-height: 0; }\n/* the last row of a scrolled list keeps a margin the eye reads as a gap under\n   the card, and the reader cannot tell whether more follows — drop it, so the\n   list ends exactly where the scroll ends */\n.pay-brief-row .card-body > .brief-exc:last-child { margin-bottom: 0; }\n\n/* THE DIGEST CARD. On the navy hero the figures were gold on dark; on a white\n   card that is unreadable, so the emphasis is the accent at body weight — the\n   same treatment every other number on this desk gets. */\n.pay-digest-scope { font-weight: 700; font-size: var(--fs-small); margin-bottom: 6px; }\n.pay-digest-text { font-size: var(--fs-small); line-height: 1.75; color: var(--text-dim); }\n.pay-digest-text strong { color: var(--accent); font-weight: 700; }\n\n@media (max-width: 1100px) {\n  /* stacked, and the cap comes off — a phone scrolls the page, not three boxes */\n  .pay-brief-row { grid-template-columns: 1fr; }\n  .pay-brief-row > .card { max-height: none; }\n  .pay-brief-row .card-body { overflow-y: visible; }\n}\n\n/* WHERE THE MONEY GOES — the department doughnut beside its table.\n   The ring carries the PROPORTION, the table the precise figures; the chart runs\n   with its legend switched off because the table beside it already names every\n   department and its share, and a legend would print each label a second time.\n   min-width:0 on the table column matters: a flex child defaults to\n   min-width:auto, and a wide table would otherwise refuse to shrink and push the\n   ring off the card. */\n.pay-dept-split { display: flex; gap: 18px; align-items: center; }\n.pay-dept-ring { flex: none; width: 190px; height: 190px; position: relative; }\n.pay-dept-tbl { flex: 1; min-width: 0; }\n@media (max-width: 720px) {\n  .pay-dept-split { flex-direction: column; align-items: stretch; }\n  .pay-dept-ring { width: 100%; height: 170px; }\n}\n\n/* ============ THE ALL-COMPANIES NOTE, COLLAPSED (owner 2026-07-30) ==========\n   \"Make the marked icon placed here while in all companies, clicking it will\n   expand its card.\" So the note ships SHUT: no card, no chrome, nothing but the\n   (i) button — placed where the open card's icon sits, which is why opening it\n   makes the card appear around the icon instead of shifting the icon anywhere.\n   Only the shut state is new; the open card is the same .card + .brief-exc it\n   always was, so the expanded look is unchanged. */\n.scopenote-ico {\n  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim);\n  transition: color var(--t), border-color var(--t), background var(--t);\n}\n.scopenote-ico:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }\n.scopenote.is-shut {\n  /* the card's own skin is dropped rather than the card removed: the element has\n     to stay in the flow to keep the note's place on the page */\n  background: none; border: none; box-shadow: none; border-radius: 0;\n  width: max-content; max-width: 100%; margin-bottom: 10px;\n}\n.scopenote.is-shut .card-body { padding: 0; }\n.scopenote.is-shut .brief-exc { border: none; background: none; padding: 0; margin: 0; }\n/* removed, not [hidden]: a house class carrying `display` would out-specify the\n   UA rule (see the TRAP note in payroll.js) — an explicit rule cannot be beaten */\n.scopenote.is-shut .brief-exc-body { display: none; }\n\n/* ADVANCE REQUESTS — one waiting row. Four columns on a desk (who · how much and\n   for which month · why · the two buttons), stacking to a readable block on a\n   phone. The left rail is the house \"needs a decision\" cue, the same idea as the\n   severity stripe on an Autopilot row. */\n.adv-req {\n  display: grid; grid-template-columns: minmax(150px, 1.1fr) auto minmax(0, 1.6fr) auto;\n  gap: 14px; align-items: center;\n  padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--r-md);\n  border-left: 3px solid var(--warn); background: var(--surface-2); margin-bottom: 9px;\n}\n.adv-req:last-child { margin-bottom: 0; }\n.adv-req-ask { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }\n.adv-req-why { min-width: 0; overflow-wrap: anywhere; }\n.adv-req-do { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }\n@media (max-width: 860px) {\n  .adv-req { grid-template-columns: 1fr auto; }\n  .adv-req-why { grid-column: 1 / -1; }\n  .adv-req-do { grid-column: 1 / -1; justify-content: flex-start; }\n}\n\n/* PAYMENT PROGRESS — appended under the Salary Manage run card's status line.\n   The card already prints the net and the outstanding as two separate figures;\n   this makes the relationship between them readable without doing the division\n   in your head. Uses the house .meter; only the label row above it is new. */\n.pay-progress { margin-top: 10px; }\n.pay-progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 5px; }\n\n/* ============== HOW THIS MONTH IS MADE UP (owner 2026-07-29) ================\n   The month's arithmetic, compact. Three ANCHORS — gross, net payable, cash to\n   hand out — run full width as rules across the card; between them the movement\n   sits in two columns, additions beside deductions, each with its subtotal in its\n   own heading. The house .data-list was the previous shape and cost ~41px a row\n   for up to fourteen rows; this halves the card and puts each label next to its\n   figure instead of a card-width away from it.\n\n   No house equivalent exists: .detail-cols is label→value facts with no subtotal\n   heading, tinted body or signed money, and .two-col is a 1.6fr/1fr page split. */\n.makeup { display: flex; flex-direction: column; }\n\n/* an anchor — the figures the columns have to add up TO. Heavier than a line and\n   ruled off, so the eye can stop on it while scanning the detail. */\n.makeup-anchor {\n  display: flex; align-items: baseline; gap: 12px;\n  padding: 9px 2px; border-bottom: 1px solid var(--border); font-weight: 700;\n}\n.makeup-anchor .makeup-v { font-size: var(--fs-body); }\n/* the last figure on the card is the one the owner acts on — it keeps the accent\n   and loses the rule, because nothing follows it to be separated from */\n.makeup-anchor.is-cash { border-bottom: none; color: var(--accent); padding-bottom: 2px; }\n\n/* THE PAIR. Equal halves with a hairline between them, so neither side reads as\n   the main column. One column on a phone, where two would set ~9 chars a line. */\n.makeup-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }\n.makeup-col { min-width: 0; padding: 9px 0 10px; }\n.makeup-col.is-add { padding-right: 16px; border-right: 1px solid var(--border); }\n.makeup-col.is-ded { padding-left: 16px; }\n.makeup-colhead {\n  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 5px;\n}\n.makeup-coltitle {\n  font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .06em;\n  font-weight: 700; color: var(--text-mute);\n}\n.makeup-coltotal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--fs-small); }\n.is-add .makeup-coltotal { color: var(--good); }\n.is-ded .makeup-coltotal { color: var(--bad); }\n.makeup-none { font-size: var(--fs-micro); color: var(--text-mute); padding: 3px 0; }\n\n/* a detail line. Dense on purpose — these are read as a list of names against a\n   column of figures, not as rows to be clicked. */\n.makeup-lines { display: flex; flex-direction: column; }\n.makeup-line { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; }\n.makeup-k { flex: 1; min-width: 0; font-size: var(--fs-small); color: var(--text-dim); overflow-wrap: anywhere; }\n.makeup-v { margin-left: auto; white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-small); }\n.makeup-anchor .makeup-k { color: var(--text); font-size: var(--fs-body); font-weight: 700; }\n\n/* the recoveries — money that comes back out of the salary, so they belong under\n   the net rather than in either column. Indented to read as a sub-step of it. */\n.makeup-recov { padding: 7px 0 8px 14px; border-bottom: 1px solid var(--border); }\n\n@media (max-width: 720px) {\n  .makeup-cols { grid-template-columns: 1fr; }\n  .makeup-col.is-add { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border); }\n  .makeup-col.is-ded { padding-left: 0; }\n}\n\n/* ============================== THE EMPLOYEE FILE (owner 2026-07-29) ========\n   The person's whole file, opened UNDER the Staff Accounts table instead of in\n   a pop-up card. Only three things here have no house equivalent: the identity\n   BAND, the facts GRID and a chart BOX of a fixed height. Everything else on the\n   file is house vocabulary (.card, .stat-row, .data-list, .badge, .two-col) on\n   purpose — the file has to look like the rest of the desk, not like a guest. */\n\n/* the file sits away from the table it belongs to, so the two never read as one\n   long sheet; the top rule is the seam between \"the list\" and \"this person\" */\n.emp-file-host { margin-top: 18px; }\n.emp-file-host:empty { margin-top: 0; }\n\n/* THE BAND. Dark, full-bleed across the card head, carrying the COMPANY accent\n   gradient — Woodart's file is green, Travels' is blue, the same per-company\n   identity the rest of the app uses. It is the one place on the desk where text\n   sits on the accent, so everything inside is locked to white rather than to the\n   theme's --text (which would vanish on the gradient in light mode). */\n.emp-band {\n  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;\n  padding: 16px 20px; color: #fff;\n  /* mixed from the LIVE company accent, not from --epal-deep: that token is the\n     group's dark blue everywhere, so a Woodart file came out blue while its own\n     tabs, buttons and chips were green. Darkening the accent towards the brand\n     ink keeps the band deep enough for white text in either theme. */\n  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 72%, #00072D), var(--accent));\n  border-radius: var(--r-lg) var(--r-lg) 0 0;\n}\n.emp-band-av.avatar { width: 52px; height: 52px; font-size: 18px; flex: none; background-size: cover; background-position: center; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }\n.emp-band-who { min-width: 180px; flex: 1; }\n.emp-band-name { font-family: var(--font-display); font-size: var(--fs-h3); font-weight: 700; line-height: 1.2; }\n.emp-band-meta { font-size: var(--fs-small); color: rgba(255,255,255,.78); margin-top: 2px; }\n.emp-band-chips { display: flex; gap: 6px; flex-wrap: wrap; }\n/* the chips are on the accent, so they cannot use the tinted --*-soft palettes */\n.emp-band-chips .badge { background: rgba(255,255,255,.16); color: #fff; }\n.emp-band-do { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }\n.emp-band-btn { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.28); }\n.emp-band-btn:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.45); }\n/* the six money tiles butt straight onto the band — one block, no seam */\n.emp-file .stat-row { border-radius: 0 0 var(--r-lg) var(--r-lg); }\n/* the sixth tile carries two facts (\"13.4d · ৳32,208\") and .num is nowrap, so it\n   ran out over the card edge. The tile wraps; the figures inside stay atomic. */\n.emp-file .stat { min-width: 0; }\n.emp-file .stat-value.num { white-space: normal; overflow-wrap: normal; }\n\n/* PROFILE DETAILS — label over value, three across, wrapping to two and then to\n   one. A .data-list would have been the house default, but these are eight short\n   facts that read far faster side by side than as eight full-width rows. */\n.emp-facts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }\n.emp-fact { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 9px 12px; background: var(--surface-2); min-width: 0; }\n.emp-fact-l { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .05em; color: var(--text-mute); }\n.emp-fact-v { font-size: var(--fs-small); font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }\n\n/* A chart needs a height its canvas can be measured against — Chart.js reads the\n   parent box, and an unsized parent collapses to nothing on first paint. */\n.emp-chart { position: relative; height: 230px; }\n.emp-chart canvas { width: 100% !important; height: 100% !important; }\n@media (max-width: 720px) { .emp-chart { height: 190px; } }\n\n/* ============================================================================\n * MANAGE SALARY — the extended panels (owner 2026-07-29)\n * ----------------------------------------------------------------------------\n * The modal that opens from the money-bag icon on Salary Manage keeps everything\n * it had (identity, the four stats, the button row) and gains, beneath it, the\n * salary RECORD read out in full plus the ALLOCATOR that pays several months in\n * one posting. Nothing here restyles the part that was already there.\n *\n * The fact tiles reuse .emp-facts / .emp-fact from the profile above — same grid,\n * same border, same label-over-value rhythm — so the modal reads as one system.\n * These rules only add the tone (a deduction is red, an addition green) and the\n * small hint line under a value (\"Auto: Overtime + Bonus + Adjustment\").\n * ==========================================================================*/\n.sal-facts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }\n.sal-fact-h { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 3px; overflow-wrap: anywhere; }\n.emp-fact.is-ded .emp-fact-v { color: var(--bad); }\n.emp-fact.is-add .emp-fact-v { color: var(--good); }\n.emp-fact.is-key { background: var(--surface-3); border-color: var(--accent); }\n.emp-fact.is-key .emp-fact-v { font-size: var(--fs-body); color: var(--accent); }\n/* a tile whose figure is nil is still printed — a missing tile reads as \"we do\n   not track this\", which is a different statement from \"none this month\" */\n.emp-fact.is-nil .emp-fact-v { color: var(--text-mute); font-weight: 600; }\n\n/* THE ALLOCATOR — one row per month the employee is still owed for, each with\n   its own box. The grid is month · owed · pay · left, collapsing to two columns\n   on a phone so the input never shrinks below a thumb. */\n.alloc { display: flex; flex-direction: column; }\n.alloc-row {\n  display: grid; grid-template-columns: 1fr auto 120px auto; gap: 10px;\n  align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border);\n}\n.alloc-row:last-of-type { border-bottom: none; }\n.alloc-m { min-width: 0; }\n.alloc-mn { font-size: var(--fs-small); font-weight: 700; overflow-wrap: anywhere; }\n.alloc-ms { font-size: var(--fs-micro); color: var(--text-mute); }\n.alloc-owed, .alloc-left {\n  font-family: var(--font-mono); font-variant-numeric: tabular-nums;\n  font-size: var(--fs-small); white-space: nowrap; text-align: right;\n}\n.alloc-left { min-width: 92px; color: var(--text-mute); }\n.alloc-left.is-clear { color: var(--good); }\n.alloc-left.is-owing { color: var(--warn); }\n.alloc-in { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }\n.alloc-foot {\n  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;\n  flex-wrap: wrap; margin-top: 8px; padding-top: 9px; border-top: 2px solid var(--border);\n}\n.alloc-foot-v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; }\n.alloc-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }\n@media (max-width: 640px) {\n  .alloc-row { grid-template-columns: 1fr 110px; row-gap: 4px; }\n  .alloc-owed { text-align: left; grid-column: 1; }\n  .alloc-left { text-align: right; }\n}\n";
+  var MODULE_CSS = "/* ============================================================================\n * TRAVELS · PAYROLL · MODULE STYLESHEET\n * ----------------------------------------------------------------------------\n * The few rules the shared design system does not already express. Picked up\n * automatically by tools/build/build-module.mjs (it compiles frontend/<id>.css\n * into view.js as MODULE_CSS and injects it once into <head> as\n * <style data-module-style=\"travels/payroll\">), so nothing in\n * platform/design-system/ has to fork for one screen.\n *\n * Everything else on this desk uses the house vocabulary — .kpi-card, .meter,\n * .card, .bank-* for the dashboard row — on purpose: reusing them means Payroll\n * stays pixel-consistent with Manage Banks and the group dashboard for free.\n * Only add here what genuinely has no house equivalent.\n * ========================================================================== */\n\n/* ============ THE BRIEF ROW — autopilot · radar · digest (owner 2026-07-30) ==\n   \"The anomaly and autopilot section can take up to that much space… if the list\n   is long, just give a scroll bar… make total 3 card there, one for autopilot,\n   then anomaly, then digest.\" So the three answers the overview owes — what to\n   do next, what looks wrong, and the month in words — sit side by side in ONE\n   row of a FIXED height, and the LIST is what scrolls, never the page. A twelve\n   row autopilot used to push the Monthly Register a screen and a half down.\n\n   The digest moved in here out of the full-width navy .brief-hero it used to\n   own; it is the same live narrative, now the third card of the row.\n\n   No house equivalent: .two-col is a 1.6fr/1fr split and .three-col three equal\n   thirds, and neither CAPS its cards. The proportions are the owner's marked\n   boxes — the autopilot carries a sentence per row, the radar a name. */\n.pay-brief-row {\n  display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 18px; margin-bottom: 18px;\n  align-items: stretch;                 /* three cards, one height, one baseline */\n}\n/* THE CAP. The card becomes a column so the head stays put and only the body\n   travels; min-height:0 is what actually lets a grid child scroll — without it a\n   grid/flex item refuses to shrink below its content and grows instead. */\n.pay-brief-row > .card { max-height: 264px; display: flex; flex-direction: column; min-height: 0; }\n.pay-brief-row .card-head { flex: none; }\n.pay-brief-row .card-body { overflow-y: auto; min-height: 0; }\n/* the last row of a scrolled list keeps a margin the eye reads as a gap under\n   the card, and the reader cannot tell whether more follows — drop it, so the\n   list ends exactly where the scroll ends */\n.pay-brief-row .card-body > .brief-exc:last-child { margin-bottom: 0; }\n\n/* THE DIGEST CARD. On the navy hero the figures were gold on dark; on a white\n   card that is unreadable, so the emphasis is the accent at body weight — the\n   same treatment every other number on this desk gets. */\n.pay-digest-scope { font-weight: 700; font-size: var(--fs-small); margin-bottom: 6px; }\n.pay-digest-text { font-size: var(--fs-small); line-height: 1.75; color: var(--text-dim); }\n.pay-digest-text strong { color: var(--accent); font-weight: 700; }\n\n@media (max-width: 1100px) {\n  /* stacked, and the cap comes off — a phone scrolls the page, not three boxes */\n  .pay-brief-row { grid-template-columns: 1fr; }\n  .pay-brief-row > .card { max-height: none; }\n  .pay-brief-row .card-body { overflow-y: visible; }\n}\n\n/* WHERE THE MONEY GOES — the department doughnut beside its table.\n   The ring carries the PROPORTION, the table the precise figures; the chart runs\n   with its legend switched off because the table beside it already names every\n   department and its share, and a legend would print each label a second time.\n   min-width:0 on the table column matters: a flex child defaults to\n   min-width:auto, and a wide table would otherwise refuse to shrink and push the\n   ring off the card. */\n.pay-dept-split { display: flex; gap: 18px; align-items: center; }\n.pay-dept-ring { flex: none; width: 190px; height: 190px; position: relative; }\n.pay-dept-tbl { flex: 1; min-width: 0; }\n@media (max-width: 720px) {\n  .pay-dept-split { flex-direction: column; align-items: stretch; }\n  .pay-dept-ring { width: 100%; height: 170px; }\n}\n\n/* ============ THE ALL-COMPANIES NOTE, COLLAPSED (owner 2026-07-30) ==========\n   \"Make the marked icon placed here while in all companies, clicking it will\n   expand its card.\" So the note ships SHUT: no card, no chrome, nothing but the\n   (i) button — placed where the open card's icon sits, which is why opening it\n   makes the card appear around the icon instead of shifting the icon anywhere.\n   Only the shut state is new; the open card is the same .card + .brief-exc it\n   always was, so the expanded look is unchanged. */\n.scopenote-ico {\n  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim);\n  transition: color var(--t), border-color var(--t), background var(--t);\n}\n.scopenote-ico:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }\n.scopenote.is-shut {\n  /* the card's own skin is dropped rather than the card removed: the element has\n     to stay in the flow to keep the note's place on the page */\n  background: none; border: none; box-shadow: none; border-radius: 0;\n  width: max-content; max-width: 100%; margin-bottom: 10px;\n}\n.scopenote.is-shut .card-body { padding: 0; }\n.scopenote.is-shut .brief-exc { border: none; background: none; padding: 0; margin: 0; }\n/* removed, not [hidden]: a house class carrying `display` would out-specify the\n   UA rule (see the TRAP note in payroll.js) — an explicit rule cannot be beaten */\n.scopenote.is-shut .brief-exc-body { display: none; }\n\n/* ADVANCE REQUESTS — one waiting row. Four columns on a desk (who · how much and\n   for which month · why · the two buttons), stacking to a readable block on a\n   phone. The left rail is the house \"needs a decision\" cue, the same idea as the\n   severity stripe on an Autopilot row. */\n.adv-req {\n  display: grid; grid-template-columns: minmax(150px, 1.1fr) auto minmax(0, 1.6fr) auto;\n  gap: 14px; align-items: center;\n  padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--r-md);\n  border-left: 3px solid var(--warn); background: var(--surface-2); margin-bottom: 9px;\n}\n.adv-req:last-child { margin-bottom: 0; }\n.adv-req-ask { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }\n.adv-req-why { min-width: 0; overflow-wrap: anywhere; }\n.adv-req-do { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }\n@media (max-width: 860px) {\n  .adv-req { grid-template-columns: 1fr auto; }\n  .adv-req-why { grid-column: 1 / -1; }\n  .adv-req-do { grid-column: 1 / -1; justify-content: flex-start; }\n}\n\n/* PAYMENT PROGRESS — appended under the Salary Manage run card's status line.\n   The card already prints the net and the outstanding as two separate figures;\n   this makes the relationship between them readable without doing the division\n   in your head. Uses the house .meter; only the label row above it is new. */\n.pay-progress { margin-top: 10px; }\n.pay-progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 5px; }\n\n/* ============== HOW THIS MONTH IS MADE UP (owner 2026-07-29) ================\n   The month's arithmetic, compact. Three ANCHORS — gross, net payable, cash to\n   hand out — run full width as rules across the card; between them the movement\n   sits in two columns, additions beside deductions, each with its subtotal in its\n   own heading. The house .data-list was the previous shape and cost ~41px a row\n   for up to fourteen rows; this halves the card and puts each label next to its\n   figure instead of a card-width away from it.\n\n   No house equivalent exists: .detail-cols is label→value facts with no subtotal\n   heading, tinted body or signed money, and .two-col is a 1.6fr/1fr page split. */\n.makeup { display: flex; flex-direction: column; }\n\n/* an anchor — the figures the columns have to add up TO. Heavier than a line and\n   ruled off, so the eye can stop on it while scanning the detail. */\n.makeup-anchor {\n  display: flex; align-items: baseline; gap: 12px;\n  padding: 9px 2px; border-bottom: 1px solid var(--border); font-weight: 700;\n}\n.makeup-anchor .makeup-v { font-size: var(--fs-body); }\n/* the last figure on the card is the one the owner acts on — it keeps the accent\n   and loses the rule, because nothing follows it to be separated from */\n.makeup-anchor.is-cash { border-bottom: none; color: var(--accent); padding-bottom: 2px; }\n\n/* THE PAIR. Equal halves with a hairline between them, so neither side reads as\n   the main column. One column on a phone, where two would set ~9 chars a line. */\n.makeup-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }\n.makeup-col { min-width: 0; padding: 9px 0 10px; }\n.makeup-col.is-add { padding-right: 16px; border-right: 1px solid var(--border); }\n.makeup-col.is-ded { padding-left: 16px; }\n.makeup-colhead {\n  display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 5px;\n}\n.makeup-coltitle {\n  font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .06em;\n  font-weight: 700; color: var(--text-mute);\n}\n.makeup-coltotal { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--fs-small); }\n.is-add .makeup-coltotal { color: var(--good); }\n.is-ded .makeup-coltotal { color: var(--bad); }\n.makeup-none { font-size: var(--fs-micro); color: var(--text-mute); padding: 3px 0; }\n\n/* a detail line. Dense on purpose — these are read as a list of names against a\n   column of figures, not as rows to be clicked. */\n.makeup-lines { display: flex; flex-direction: column; }\n.makeup-line { display: flex; align-items: baseline; gap: 10px; padding: 3px 0; }\n.makeup-k { flex: 1; min-width: 0; font-size: var(--fs-small); color: var(--text-dim); overflow-wrap: anywhere; }\n.makeup-v { margin-left: auto; white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-small); }\n.makeup-anchor .makeup-k { color: var(--text); font-size: var(--fs-body); font-weight: 700; }\n\n/* the recoveries — money that comes back out of the salary, so they belong under\n   the net rather than in either column. Indented to read as a sub-step of it. */\n.makeup-recov { padding: 7px 0 8px 14px; border-bottom: 1px solid var(--border); }\n\n@media (max-width: 720px) {\n  .makeup-cols { grid-template-columns: 1fr; }\n  .makeup-col.is-add { padding-right: 0; border-right: none; border-bottom: 1px solid var(--border); }\n  .makeup-col.is-ded { padding-left: 0; }\n}\n\n/* ============================== THE EMPLOYEE FILE (owner 2026-07-29) ========\n   The person's whole file, opened UNDER the Staff Accounts table instead of in\n   a pop-up card. Only three things here have no house equivalent: the identity\n   BAND, the facts GRID and a chart BOX of a fixed height. Everything else on the\n   file is house vocabulary (.card, .stat-row, .data-list, .badge, .two-col) on\n   purpose — the file has to look like the rest of the desk, not like a guest. */\n\n/* the file sits away from the table it belongs to, so the two never read as one\n   long sheet; the top rule is the seam between \"the list\" and \"this person\" */\n.emp-file-host { margin-top: 18px; }\n.emp-file-host:empty { margin-top: 0; }\n\n/* THE BAND. Dark, full-bleed across the card head, carrying the COMPANY accent\n   gradient — Woodart's file is green, Travels' is blue, the same per-company\n   identity the rest of the app uses. It is the one place on the desk where text\n   sits on the accent, so everything inside is locked to white rather than to the\n   theme's --text (which would vanish on the gradient in light mode). */\n.emp-band {\n  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;\n  padding: 16px 20px; color: #fff;\n  /* mixed from the LIVE company accent, not from --epal-deep: that token is the\n     group's dark blue everywhere, so a Woodart file came out blue while its own\n     tabs, buttons and chips were green. Darkening the accent towards the brand\n     ink keeps the band deep enough for white text in either theme. */\n  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 72%, #00072D), var(--accent));\n  border-radius: var(--r-lg) var(--r-lg) 0 0;\n}\n.emp-band-av.avatar { width: 52px; height: 52px; font-size: 18px; flex: none; background-size: cover; background-position: center; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }\n.emp-band-who { min-width: 180px; flex: 1; }\n.emp-band-name { font-family: var(--font-display); font-size: var(--fs-h3); font-weight: 700; line-height: 1.2; }\n.emp-band-meta { font-size: var(--fs-small); color: rgba(255,255,255,.78); margin-top: 2px; }\n.emp-band-chips { display: flex; gap: 6px; flex-wrap: wrap; }\n/* the chips are on the accent, so they cannot use the tinted --*-soft palettes */\n.emp-band-chips .badge { background: rgba(255,255,255,.16); color: #fff; }\n.emp-band-do { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }\n.emp-band-btn { background: rgba(255,255,255,.14); color: #fff; border-color: rgba(255,255,255,.28); }\n.emp-band-btn:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.45); }\n/* the six money tiles butt straight onto the band — one block, no seam */\n.emp-file .stat-row { border-radius: 0 0 var(--r-lg) var(--r-lg); }\n/* the sixth tile carries two facts (\"13.4d · ৳32,208\") and .num is nowrap, so it\n   ran out over the card edge. The tile wraps; the figures inside stay atomic. */\n.emp-file .stat { min-width: 0; }\n.emp-file .stat-value.num { white-space: normal; overflow-wrap: normal; }\n\n/* PROFILE DETAILS — label over value, three across, wrapping to two and then to\n   one. A .data-list would have been the house default, but these are eight short\n   facts that read far faster side by side than as eight full-width rows. */\n.emp-facts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }\n.emp-fact { border: 1px solid var(--border); border-radius: var(--r-sm); padding: 9px 12px; background: var(--surface-2); min-width: 0; }\n.emp-fact-l { font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .05em; color: var(--text-mute); }\n.emp-fact-v { font-size: var(--fs-small); font-weight: 600; margin-top: 2px; overflow-wrap: anywhere; }\n\n/* A chart needs a height its canvas can be measured against — Chart.js reads the\n   parent box, and an unsized parent collapses to nothing on first paint. */\n.emp-chart { position: relative; height: 230px; }\n.emp-chart canvas { width: 100% !important; height: 100% !important; }\n@media (max-width: 720px) { .emp-chart { height: 190px; } }\n\n/* ============================================================================\n * MANAGE SALARY — the extended panels (owner 2026-07-29)\n * ----------------------------------------------------------------------------\n * The modal that opens from the money-bag icon on Salary Manage keeps everything\n * it had (identity, the four stats, the button row) and gains, beneath it, the\n * salary RECORD read out in full plus the ALLOCATOR that pays several months in\n * one posting. Nothing here restyles the part that was already there.\n *\n * The fact tiles reuse .emp-facts / .emp-fact from the profile above — same grid,\n * same border, same label-over-value rhythm — so the modal reads as one system.\n * These rules only add the tone (a deduction is red, an addition green) and the\n * small hint line under a value (\"Auto: Overtime + Bonus + Adjustment\").\n * ==========================================================================*/\n.sal-facts { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }\n.sal-fact-h { font-size: var(--fs-micro); color: var(--text-mute); margin-top: 3px; overflow-wrap: anywhere; }\n.emp-fact.is-ded .emp-fact-v { color: var(--bad); }\n.emp-fact.is-add .emp-fact-v { color: var(--good); }\n.emp-fact.is-key { background: var(--surface-3); border-color: var(--accent); }\n.emp-fact.is-key .emp-fact-v { font-size: var(--fs-body); color: var(--accent); }\n/* a tile whose figure is nil is still printed — a missing tile reads as \"we do\n   not track this\", which is a different statement from \"none this month\" */\n.emp-fact.is-nil .emp-fact-v { color: var(--text-mute); font-weight: 600; }\n\n/* THE ALLOCATOR — one row per month the employee is still owed for, each with\n   its own box. The grid is month · owed · pay · left, collapsing to two columns\n   on a phone so the input never shrinks below a thumb. */\n.alloc { display: flex; flex-direction: column; }\n.alloc-row {\n  display: grid; grid-template-columns: 1fr auto 120px auto; gap: 10px;\n  align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border);\n}\n.alloc-row:last-of-type { border-bottom: none; }\n.alloc-m { min-width: 0; }\n.alloc-mn { font-size: var(--fs-small); font-weight: 700; overflow-wrap: anywhere; }\n.alloc-ms { font-size: var(--fs-micro); color: var(--text-mute); }\n.alloc-owed, .alloc-left {\n  font-family: var(--font-mono); font-variant-numeric: tabular-nums;\n  font-size: var(--fs-small); white-space: nowrap; text-align: right;\n}\n.alloc-left { min-width: 92px; color: var(--text-mute); }\n.alloc-left.is-clear { color: var(--good); }\n.alloc-left.is-owing { color: var(--warn); }\n.alloc-in { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }\n.alloc-foot {\n  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;\n  flex-wrap: wrap; margin-top: 8px; padding-top: 9px; border-top: 2px solid var(--border);\n}\n.alloc-foot-v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; }\n.alloc-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }\n@media (max-width: 640px) {\n  .alloc-row { grid-template-columns: 1fr 110px; row-gap: 4px; }\n  .alloc-owed { text-align: left; grid-column: 1; }\n  .alloc-left { text-align: right; }\n}\n\n/* ============================================================================\n * THE PRINT CENTRE (owner 2026-07-30) — the four steps before anything prints\n * ----------------------------------------------------------------------------\n * A tick list, not a form: months and people are chosen by eye, so each row is a\n * whole-row <label> (the checkbox is the smallest part of the target) and the\n * lists scroll inside the modal rather than pushing the buttons off it. Numbers\n * hug the right edge of every row so the reader can add them up down a column —\n * which is precisely what the live counter under the list has already done.\n * No house equivalent: .data-list is label→value facts with no control, and the\n * house forms build a field per row, which for 21 people is 21 fields.\n * ==========================================================================*/\n.pay-print-step { margin-bottom: 16px; }\n.pay-print-step:last-child { margin-bottom: 0; }\n.pay-print-h {\n  font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .07em;\n  font-weight: 700; color: var(--text-mute); margin-bottom: 7px;\n}\n.pay-print-scope {\n  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;\n  border: 1px solid var(--border); border-left: 3px solid var(--accent);\n  border-radius: var(--r-md); background: var(--surface-2); padding: 10px 13px;\n}\n.pay-print-bulk { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }\n.pay-print-bulk .input { flex: 1 1 190px; min-width: 0; }\n.pay-print-months, .pay-print-rows {\n  border: 1px solid var(--border); border-radius: var(--r-md); max-height: 208px; overflow-y: auto;\n}\n.pay-print-mo, .pay-print-row {\n  display: flex; align-items: center; gap: 10px; padding: 7px 11px; cursor: pointer;\n  border-bottom: 1px solid var(--border); font-size: var(--fs-small);\n}\n.pay-print-mo:last-child, .pay-print-row:last-child { border-bottom: none; }\n.pay-print-mo:hover, .pay-print-row:hover { background: var(--surface-2); }\n.pay-print-mo-n, .pay-print-row-n { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }\n.pay-print-mo-n { flex: 1; }\n.pay-print-row-n { flex: 1; }\n.pay-print-row-v {\n  margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums;\n  white-space: nowrap; font-weight: 600;\n}\n.pay-print-mo .text-mute { margin-left: auto; white-space: nowrap; }\n/* the live count IS the control: it says what the printed totals row will say */\n.pay-print-count {\n  margin-top: 7px; font-size: var(--fs-small); font-weight: 600; color: var(--accent);\n  font-variant-numeric: tabular-nums;\n}\n.pay-print-lvl {\n  display: flex; gap: 10px; align-items: flex-start; padding: 9px 11px; cursor: pointer;\n  border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: 6px;\n}\n.pay-print-lvl:hover { background: var(--surface-2); }\n.pay-print-lvl input { margin-top: 3px; }\n";
   if (MODULE_CSS && !document.querySelector('style[data-module-style="travels/payroll"]')) {
     var st = document.createElement('style');
     st.setAttribute('data-module-style', 'travels/payroll');
@@ -1555,6 +1555,31 @@ function registerTable(series) {
     ],
     rows: rows, pageSize: 12, totalKey: 'net', exportName: 'payroll-monthly-register.csv',
     pdfTitle: scopeFull() + ' — Payroll Monthly Register',
+    /* PRINT rides in the table's own toolbar, beside Export and PDF — it is an
+     * output of this table, and the reader looks for it where the other two are.
+     * It opens the print centre (months · detail level · people), never the
+     * printer. */
+    toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+      title: 'Print the payroll register — choose months and detail level',
+      onclick: function () { printCentre({ from: 'register' }); } }),
+    /* THE FOOT. Sums where a sum is the answer, the CLOSING BALANCE for the
+     * encashment accrual (it is a liability balance, not a monthly movement) and
+     * a DISTINCT headcount — seven months of 21 staff is 21 people. Same rules,
+     * same figures, as the printed register: see paySummaryReport(). */
+    totals: function (ms) {
+      if (!ms.length) return null;
+      var asc = ms.slice().sort(function (a, b) { return a.ym < b.ym ? -1 : 1; });
+      var cum = encashRunning(), last = asc[asc.length - 1];
+      var t = { gross: 0, adds: 0, deds: 0, net: 0, paid: 0, due: 0 };
+      asc.forEach(function (m) { t.gross += m.gross || 0; t.adds += m.adds || 0; t.deds += m.deds || 0;
+        t.net += m.net || 0; t.paid += m.paid || 0; t.due += m.due || 0; });
+      return { label: asc.length + ' run' + (asc.length === 1 ? '' : 's'), values: {
+        heads: String(distinctHeads(asc.map(function (m) { return m.ym; }))),
+        gross: ui.money(t.gross), adds: ui.money(t.adds), deds: ui.money(t.deds),
+        encash: ui.money(cum[last.ym] || 0) + ' <span class="xs text-mute">cl. bal.</span>',
+        net: ui.money(t.net), paid: ui.money(t.paid), due: ui.money(t.due)
+      } };
+    },
     onRow: function (m) { ovMonth = m.ym; repaint(); },
     actions: [{ icon: 'box-arrow-up-right', title: 'Open this month in full', onClick: function (m) { ovMonth = m.ym; repaint(); } }],
     empty: { icon: 'calendar3', title: 'No payroll months yet', hint: 'Salary Manage generates the current month.' }
@@ -1616,7 +1641,11 @@ function monthView(page) {
 
   /* ---- the control bar -------------------------------------------------- */
   act(s, 'back', function () { ovMonth = null; repaint(); }).innerHTML = ui.icon('arrow-left') + ' Monthly Register';
-  act(s, 'print', function () { printSheetForm(slips, ym); }).innerHTML = ui.icon('printer') + ' Print register';
+  /* Print opens the PRINT CENTRE with THIS month ticked and employee-level
+   * detail chosen — the reader is looking at one month's people, so that is what
+   * "print" means from here (owner spec). The legacy tick-the-columns sheet is
+   * untouched and still lives on Salary Manage › Print Sheet. */
+  act(s, 'print', function () { printCentre({ from: 'sheet', ym: ym }); }).innerHTML = ui.icon('printer') + ' Print register';
   act(s, 'open-run', function () { payYm = ym; goTab('manage'); })
     .innerHTML = ui.icon('sliders') + (isAll() ? ' Open this month' : ' Manage this run');
   var pick = part(s, 'mpick');
@@ -1707,6 +1736,32 @@ function monthView(page) {
     rows: slips, searchKeys: ['empName', 'empId', 'dept'], quickFilter: 'status', filterPanel: true,
     filters: [{ key: 'dept', label: 'Dept' }, { key: 'status', label: 'Status' }].concat(coFilter()),
     totalKey: 'net', pageSize: 25,
+    /* THE FOOT — every money column of the register, summed over whatever is
+     * FILTERED (so filtering to one department foots that department). Encash
+     * Accrued is the exception the printed report also makes: it is a balance
+     * carried, so it is summed here only because one month's accrual for the
+     * filtered people IS this month's movement. Status has no total.
+     * No Print button in this toolbar: the screen's own "Print register" above
+     * already opens the print centre for this month, and two identical buttons
+     * on one screen is a question, not a convenience. */
+    totals: function (xs) {
+      if (!xs.length) return null;
+      function S2(f) { return ui.money(sum(xs, f)); }
+      return { label: xs.length + (xs.length === 1 ? ' employee' : ' employees'), values: {
+        gross: S2(function (x) { return x.gross || 0; }),
+        absentDeduction: S2(function (x) { return x.absentDeduction || 0; }),
+        earnedGross: S2(function (x) { return x.earnedGross || 0; }),
+        overtime: S2(function (x) { return x.overtime || 0; }), bonus: S2(bonusOf),
+        adjustment: S2(function (x) { return x.adjustment || 0; }), adds: S2(addOf),
+        lateDeduction: S2(function (x) { return x.lateDeduction || 0; }),
+        earlyDeduction: S2(function (x) { return x.earlyDeduction || 0; }),
+        tax: S2(function (x) { return x.tax || 0; }), pf: S2(function (x) { return x.pf || 0; }),
+        otherDeduction: S2(function (x) { return x.otherDeduction || 0; }), fine: S2(function (x) { return x.fine || 0; }),
+        deds: S2(dedOf), net: S2(function (x) { return PR().slipPayable(x); }),
+        encashAmt: S2(function (x) { return x.encashAmt || 0; }), adv: S2(advOf), emi: S2(emiOf),
+        cash: S2(cashOf), paid: S2(function (x) { return x.paid || 0; }), due: S2(dueOf)
+      } };
+    },
     exportName: 'salary-register-' + ym + '.csv', pdfTitle: scopeFull() + ' — Salary Register ' + PR().mLabel(ym),
     onRow: function (x) { var e = empById(x.empId); if (e) statement(e, ym); },
     actions: [{ icon: 'person-lines-fill', title: 'Open the employee\'s full file', onClick: function (x) { showEmp(x.empId); } }]
@@ -4285,6 +4340,636 @@ function payEncashFlow(e) {
   }
   ui.confirm({ title: 'Pay leave encashment — ' + e.name + '?', text: 'Pays ' + ls.encashableDays.toFixed(2) + ' accrued days = ' + ui.money(ls.value) + ' (DR Leave-Encash Payable / CR Bank) and resets the accrual.', confirmLabel: 'Pay Encashment' })
     .then(function (ok) { if (!ok) return; try { PR().payEncashment(e.id); ui.toast('Encashment paid', 'success'); EPAL.router.render(); } catch (x) { ui.toast(x.message || 'Failed', 'error'); } });
+}
+
+/* ============================================================================
+ * THE PRINTED PAYROLL  (owner 2026-07-30 — written spec + a marked-up mock-up)
+ * ----------------------------------------------------------------------------
+ * "Print" no longer prints. It opens the PRINT CENTRE: confirm the scope, tick
+ * the months, choose summary or employee-level, tick the people — then preview
+ * the REAL document and send it to the printer. Everything below is the same
+ * read the screens make, formatted for paper; nothing here invents a figure.
+ *
+ * WHAT A PAYROLL DOCUMENT MUST DO THAT A SCREEN NEED NOT
+ *  · Every numeric column FOOTS — and the foot is not always a sum. A percentage
+ *    is RE-COMPUTED from the totals (an average of row percentages is a
+ *    different, wrong number); a cumulative accrual shows its CLOSING BALANCE;
+ *    headcount is a DISTINCT count, because seven months of 21 staff is 21
+ *    people and not 147.
+ *  · A partial selection SAYS SO on the page. A payroll report that looks
+ *    complete but is not is a control failure, not a formatting one.
+ *  · Leave encashment is a LIABILITY ACCRUAL, never pay: it stays out of Net
+ *    Payable, accrues monthly and settles once in December — printed in words so
+ *    no reader mistakes it for unpaid salary.
+ *  · Only APPROVED runs print. Drafts are excluded and every page says so.
+ *  · The figures are the SHEET's. The desk's Payroll ↔ Ledger card is where the
+ *    sheet is reconciled against the books; a report that quietly mixed the two
+ *    would foot to neither.
+ *
+ * The layout itself lives in platform/kit/report-print.js (EPAL.report) — A4
+ * landscape, JS-paginated, black figures, brackets for negatives. This file
+ * decides WHAT is printed; that one decides how a page is built.
+ * ==========================================================================*/
+
+function payUser() { var u = (EPAL.auth && EPAL.auth.current && EPAL.auth.current()) || null; return (u && u.name) || 'Signed in'; }
+function payMoney(n) { return EPAL.report.money(n); }
+function payBrk(n) { return EPAL.report.brackets(n); }
+function payPct(n) { return EPAL.report.pct(n); }
+function coCode(cid) { return String(coShort(cid) || cid).toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+/* THE MASTHEAD — read from the company master record (EPAL.config), never from
+ * this file, so one edit changes every document the group prints. A single
+ * concern prints its OWN name over its own contact block where it has one, and
+ * over the group's where it does not: they trade from the group's address, and
+ * printing nothing there would be less true than printing that. */
+function payLetterhead() {
+  var g = (EPAL.config && EPAL.config.group) || {}, lh = g.letterhead || {};
+  var c = isAll() ? null : (EPAL.config.company ? EPAL.config.company(CID) : null);
+  var own = (c && c.letterhead) || {};
+  var l1 = [g.legalName || '', own.address || lh.address || ''].filter(Boolean).join(' · ');
+  var l2 = [own.web || lh.web, own.email || lh.email, own.phone || lh.phone, own.licences || lh.licences]
+    .filter(Boolean).join(' · ');
+  return { name: c ? c.name : (g.name || 'Epal Group'), division: 'Human Resources & Payroll',
+    lines: [l1, l2].filter(Boolean) };
+}
+
+/* THE REPORT ID. MR = Monthly Register, SR = Salary Register — two different
+ * documents that must never be confused for one another, and a consolidated
+ * report must never be confused for one concern's: the company code sits in the
+ * id exactly when the report is scoped to a company. */
+function payReportId(kind, ym) { return 'PR-' + kind + (isAll() ? '' : '-' + coCode(CID)) + '-' + ym; }
+/* REV — how many times THIS document has been raised. Read here, committed only
+ * when the print dialog is actually opened (see onPrint), so flipping through
+ * previews does not burn revision numbers. It is also the audit trail: who
+ * raised a confidential payroll document, and when.
+ * ⚠ Browser-local until the Laravel backend owns it (same gap as pay_txns). */
+function payRev(id) { var r = S.list('pay_prints').filter(function (x) { return x.id === id; })[0]; return ((r && r.n) || 0) + 1; }
+function payRevCommit(id, rev) { S.upsert('pay_prints', { id: id, n: rev, at: Date.now(), by: payUser() }); }
+function payMetaLines(id, rev) {
+  return ['Report  ' + id + '  ·  Rev ' + (rev < 10 ? '0' + rev : rev),
+    'Generated ' + ui.date(new Date(), 'full') + ' by ' + payUser(),
+    'Currency: Bangladeshi Taka (Tk)'];
+}
+function paySignoff() {
+  return [{ role: 'Prepared by', name: payUser() }, { role: 'Checked by', name: 'Accounts' },
+    { role: 'Recommended by', name: 'Head of HR & Admin' }, { role: 'Approved by', name: 'Managing Director' }];
+}
+// the filename Chrome pre-fills in Save-as-PDF (it takes the document title)
+function payFileName(kind, first, last) {
+  var d = new Date(), p = function (n) { return n < 10 ? '0' + n : String(n); };
+  var mo = function (ym) { return PR().mLabel(ym).slice(0, 3); };      // "Jul"
+  var period = (first === last ? mo(last) : mo(first) + '-' + mo(last)) + last.slice(0, 4);
+  return ['Epal-Payroll', kind, isAll() ? 'AllCompanies' : coShort(CID).replace(/[^A-Za-z0-9]/g, ''),
+    period, d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())].filter(Boolean).join('-');
+}
+
+/* Only APPROVED (finalized and beyond) runs may be printed — a draft month is a
+ * working figure, not a document. Ascending, because a register reads forwards. */
+function approvedMonths() { return monthSeries().filter(function (m) { return m.status && m.status !== 'draft'; }); }
+function draftMonthCount() { return monthSeries().length - approvedMonths().length; }
+/* The encashment BALANCE at the end of each month — a running total over every
+ * month in the book, not over the printed selection: a balance is what the
+ * account actually holds, and unticking March does not un-accrue March. */
+function encashRunning() {
+  var run = 0, map = {};
+  monthSeries().forEach(function (m) { run += m.encash || 0; map[m.ym] = run; });
+  return map;
+}
+function distinctHeads(yms) {
+  var want = {}, ids = {};
+  yms.forEach(function (y) { want[y] = 1; });
+  scoped('pay_slips').forEach(function (s) { if (want[s.ym]) ids[s.empId] = 1; });
+  return Object.keys(ids).length;
+}
+// column widths as weights, normalised — table-layout is fixed, so they must add up
+function payWidths(ws) {
+  var t = ws.reduce(function (a, b) { return a + b; }, 0);
+  return ws.map(function (w) { return (w / t * 100).toFixed(2) + '%'; });
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 1 — the MONTHLY REGISTER (one row per month), summary level
+ * ------------------------------------------------------------------------- */
+function paySummaryReport(months) {
+  var cum = encashRunning(), first = months[0], last = months[months.length - 1];
+  var T = { gross: 0, adds: 0, deds: 0, net: 0, encash: 0, paid: 0, due: 0 };
+  months.forEach(function (m) {
+    T.gross += m.gross || 0; T.adds += m.adds || 0; T.deds += m.deds || 0; T.net += m.net || 0;
+    T.encash += m.encash || 0; T.paid += m.paid || 0; T.due += m.due || 0;
+  });
+  var heads = distinctHeads(months.map(function (m) { return m.ym; }));
+  var encBal = cum[last.ym] || 0;                       // liability carried
+  var cost = T.gross + T.adds + T.encash;               // the budgeting figure
+  var perHead = heads ? cost / heads / months.length : 0;
+  var monthly = last.encash || 0;                       // this month's flat accrual
+  var monthNo = +last.ym.slice(5, 7), left = Math.max(0, 12 - monthNo);
+  var id = payReportId('MR', last.ym), rev = payRev(id);
+  var everyMonth = approvedMonths().length === months.length;
+
+  /* Widths, as weights over 273mm of printable page. The month column carries
+   * "September 2026" and the totals row's "Total — 7 runs" on ONE line — a
+   * wrapped label in the first column makes every row of a register look like
+   * two. The figures need ~15mm for an eight-character taka amount at 8.5pt. */
+  var w = payWidths([12, 5, 5.5, 7.5, 7, 7.5, 8, 7.5, 7.5, 7, 5.5, 5.5, 6]);
+  var rows = months.map(function (m, i) {
+    var prev = i > 0 ? months[i - 1] : null;
+    var mom = (prev && prev.net) ? (m.net - prev.net) / prev.net * 100 : null;
+    return [
+      { v: esc(PR().mLabel(m.ym)), strong: true, sub: esc(m.ym) },
+      { v: esc(cap(m.status || 'draft')) },
+      { v: String(m.heads || 0), num: true },
+      { v: payMoney(m.gross), num: true },
+      { v: payMoney(m.adds), num: true },
+      { v: payBrk(m.deds), num: true },
+      { v: payMoney(m.net), num: true, strong: true },
+      { v: payMoney(cum[m.ym]), num: true },
+      { v: payMoney(m.paid), num: true },
+      { v: payMoney(m.due), num: true },
+      { v: m.net ? payPct(m.paid / m.net * 100) : '–', num: true },
+      // month-on-month wears the document's own sign convention: a fall is in
+      // brackets like every other negative on the page, never a minus sign
+      { v: i === 0 ? 'base' : (mom == null ? '–' : mom < 0 ? '(' + payPct(-mom) + ')' : '+' + payPct(mom)), num: true },
+      { v: m.gross ? payPct(m.deds / m.gross * 100) : '–', num: true }
+    ];
+  });
+
+  return {
+    docTitle: payFileName('', first.ym, last.ym),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Payroll Monthly Register' + (isAll() ? '' : ' — ' + coFull(CID)),
+    scope: [
+      'Period ' + PR().mLabel(first.ym) + ' – ' + PR().mLabel(last.ym) + ' · ' + months.length +
+        ' approved run' + (months.length === 1 ? '' : 's') + ' · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)),
+      'YTD = year to date, ' + PR().mLabel(first.ym) + ' to ' + PR().mLabel(last.ym) + '. Leave encashment is a ' +
+        'liability accrued monthly and settled once in December — it is NOT part of Net Payable and is not ' +
+        'disbursed with salary.'
+    ],
+    notice: everyMonth ? null : 'Partial selection — ' + months.length + ' of ' + approvedMonths().length +
+      ' approved months. Totals below reflect the selected months only.',
+    kpis: [
+      { label: 'Total payroll cost, YTD', value: payMoney(cost), sub: 'gross + additions + encashment accrued' },
+      { label: 'Cash disbursed, YTD', value: payMoney(T.paid), sub: 'paid out of bank and cash' },
+      { label: 'True cost per employee', value: payMoney(perHead), sub: 'per person, per month' },
+      { label: 'Deduction rate, YTD', value: T.gross ? payPct(T.deds / T.gross * 100) : '–', sub: 'deductions ÷ gross' },
+      { label: 'Payroll liability carried', value: payMoney(T.due + T.deds + encBal), sub: 'unpaid pay + withheld + encashment' }
+    ],
+    table: {
+      groups: [{ span: 3 }, { label: 'Earnings and deductions', span: 4 }, { label: 'Liability accrual', span: 1 },
+        { label: 'Settlement', span: 3 }, { label: 'Trend', span: 2 }],
+      head: [
+        { label: 'Month', width: w[0] }, { label: 'Run', width: w[1] }, { label: 'Employees', num: true, width: w[2] },
+        { label: 'Gross', num: true, width: w[3] }, { label: 'Additions', num: true, width: w[4] },
+        { label: 'Deductions', num: true, width: w[5] }, { label: 'Net payable', num: true, width: w[6] },
+        // the SCREEN's Encash column is that month's movement; the printed one is
+        // the balance it had built to, so the header says which
+        { label: 'Encashment accrued', sub: 'cumulative', num: true, width: w[7] },
+        { label: 'Paid', num: true, width: w[8] }, { label: 'Due', num: true, width: w[9] },
+        { label: 'Settled %', num: true, width: w[10] }, { label: 'MoM net', num: true, width: w[11] },
+        { label: 'Ded % of gross', num: true, width: w[12] }
+      ],
+      rows: rows,
+      /* THE FOOT. Sums where a sum is the answer; the CLOSING BALANCE for the
+       * accrual; a DISTINCT headcount; percentages re-computed from the totals;
+       * and a dash for month-on-month, which has no meaning across a period. */
+      totals: [
+        { v: 'Total — ' + months.length + ' run' + (months.length === 1 ? '' : 's') },
+        { v: '' },
+        { v: String(heads), num: true },
+        { v: payMoney(T.gross), num: true },
+        { v: payMoney(T.adds), num: true },
+        { v: payBrk(T.deds), num: true },
+        { v: payMoney(T.net), num: true },
+        { v: payMoney(encBal), num: true, sub: 'cl. bal.' },
+        { v: payMoney(T.paid), num: true },
+        { v: payMoney(T.due), num: true },
+        { v: T.net ? payPct(T.paid / T.net * 100) : '–', num: true },
+        { v: '–', num: true },
+        { v: T.gross ? payPct(T.deds / T.gross * 100) : '–', num: true }
+      ]
+    },
+    panelPairs: [
+      [
+        { title: 'Reconciliation — year-to-date control', lines: [
+          { k: 'Gross earnings', v: payMoney(T.gross) },
+          { k: 'Add: allowances, arrears, bonus', v: payMoney(T.adds) },
+          { k: 'Add: leave encashment accrued', v: payMoney(T.encash) },
+          { k: 'Total payroll charge to profit & loss', v: payMoney(cost), rule: true },
+          { k: 'Less: encashment deferred to December', v: payBrk(T.encash) },
+          { k: 'Less: employee deductions withheld', v: payBrk(T.deds) },
+          { k: 'Net payable to staff', v: payMoney(T.net), close: true }
+        ] },
+        { title: 'Liability position at ' + PR().mLabel(last.ym), lines: [
+          { k: 'Salary payable — ' + PR().mLabel(last.ym) + ' run', v: payMoney(last.due) },
+          { k: 'Deductions withheld, not yet remitted', v: payMoney(T.deds) },
+          { k: 'Leave encashment payable, ' + months.length + ' month' + (months.length === 1 ? '' : 's'), v: payMoney(encBal) },
+          { k: 'Total payroll liability carried', v: payMoney(last.due + T.deds + encBal), rule: true },
+          { k: 'Encashment monthly accrual, flat', v: payMoney(monthly) },
+          { k: 'Still to accrue, ' + left + ' month' + (left === 1 ? '' : 's') + ' to December', v: payMoney(monthly * left) }
+        ] }
+      ],
+      [
+        { title: 'Cash settlement', lines: [
+          { k: 'Net payable to staff', v: payMoney(T.net) },
+          { k: 'Less: disbursed by bank and cash', v: payBrk(T.paid) },
+          { k: 'Still owed to staff', v: payMoney(T.due), close: true }
+        ] },
+        { title: 'Encashment obligation', lines: [
+          { k: 'Full-year obligation, settles December', v: payMoney(monthly * 12) },
+          { k: 'Encashment per employee, full year', v: heads ? payMoney(monthly * 12 / heads) : '–' },
+          { k: 'Accrued to date', v: payMoney(encBal) },
+          { k: 'Charged to expense monthly, not disbursed', v: payMoney(monthly) }
+        ] }
+      ]
+    ],
+    notesTitle: 'Exceptions requiring attention',
+    notes: paySummaryNotes(months, T, everyMonth),
+    signoff: paySignoff(),
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · approved runs only',
+    previewTitle: 'Payroll Monthly Register — print preview'
+  };
+}
+
+/* The exceptions list. HIGH first, then WATCH, then NOTE — and every one of them
+ * is a fact already on the desk (the anomaly radar, the run statuses, the
+ * selection), never a judgement invented for the page. */
+function paySummaryNotes(months, T, everyMonth) {
+  var out = [], P = position();
+  months.forEach(function (m) {
+    if (m.due > 0) out.push({ tag: 'HIGH', text: PR().mLabel(m.ym) + ' is still owed ' + payMoney(m.due) +
+      ' of ' + payMoney(m.net) + ' net payable — ' + (m.heads - m.paidHeads) + ' of ' + m.heads + ' staff unpaid.' });
+  });
+  radar(P).filter(function (r) { return r.sev === 'high'; }).slice(0, 3).forEach(function (r) {
+    out.push({ tag: 'HIGH', text: r.title + ' — ' + String(r.why || '').replace(/<[^>]+>/g, '') });
+  });
+  months.forEach(function (m) {
+    if (m.status === 'mixed') out.push({ tag: 'WATCH', text: PR().mLabel(m.ym) +
+      ' is not at the same stage in every concern — the run is closed in some and open in others.' });
+  });
+  if (draftMonthCount()) out.push({ tag: 'WATCH', text: draftMonthCount() + ' month' +
+    (draftMonthCount() === 1 ? ' is' : 's are') + ' still in draft and therefore excluded from this report.' });
+  if (!everyMonth) out.push({ tag: 'NOTE', text: 'This is a partial selection of the approved months. ' +
+    'Every figure above, including the totals row, covers the selected months only.' });
+  out.push({ tag: 'NOTE', text: 'Leave encashment is charged to expense each month and credited to Leave ' +
+    'Encashment Payable. It is subject to the 12-month service condition, is not part of Net Payable, and the ' +
+    'accrued balance settles once, in December.' });
+  out.push({ tag: 'NOTE', text: 'Deductions withheld remain a liability of the group until they are remitted to ' +
+    'the relevant authority; they are not a reduction in payroll cost. True cost = gross + additions + encashment accrual.' });
+  return out;
+}
+
+/* ---------------------------------------------------------------------------
+ * REPORT 2 — the SALARY REGISTER (one row per employee), a single month
+ * ------------------------------------------------------------------------- */
+function payDetailReport(ym, slips, allInMonth) {
+  var co = isAll();
+  var T = { gross: 0, absent: 0, earned: 0, ot: 0, bonus: 0, adj: 0, adds: 0, late: 0, early: 0,
+    tax: 0, pf: 0, other: 0, deds: 0, net: 0, paid: 0, due: 0, encash: 0 };
+  slips.forEach(function (s) {
+    T.gross += s.gross || 0; T.absent += s.absentDeduction || 0; T.earned += s.earnedGross || 0;
+    T.ot += s.overtime || 0; T.bonus += bonusOf(s); T.adj += s.adjustment || 0; T.adds += addOf(s);
+    T.late += s.lateDeduction || 0; T.early += s.earlyDeduction || 0; T.tax += s.tax || 0; T.pf += s.pf || 0;
+    T.other += (s.otherDeduction || 0) + (s.fine || 0); T.deds += dedOf(s); T.net += PR().slipPayable(s);
+    T.paid += s.paid || 0; T.due += dueOf(s); T.encash += s.encashAmt || 0;
+  });
+  var partial = slips.length !== allInMonth.length;
+  var id = payReportId('SR', ym), rev = payRev(id);
+  /* THE COLUMN COUNT IS A BUDGET, and 273mm of printable width is all there is.
+   * An eight-figure taka amount needs ~15mm at 8.5pt, and the spec is explicit
+   * that type does not shrink to buy a column — a column goes instead. So:
+   *   · the employee ID rides UNDER the name rather than in a column of its own
+   *     (it is still printed, on every row, and the name gets the width it needs
+   *     to stay on one line);
+   *   · the ADDITIONS subtotal is dropped, because its three components —
+   *     overtime, bonus and adjustment — are each printed beside it and the
+   *     total appears twice more: in the KPI band and in "How the month adds up".
+   * Nothing else in the spec's column list is left out. */
+  /* Measured, not guessed: an eight-character taka figure at 8.5pt Consolas is
+   * 13.2mm and needs ~14.8mm of column, so the fourteen money columns are the
+   * fixed cost and the three text columns share what is left — "Nasir Uddin
+   * Ahmed" in 28mm, "IT Solutions" and "Construction" in 19mm, both on one line. */
+  var w = payWidths(co ? [10.5, 7, 6.6, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.4, 5.8, 5.4, 5.4]
+    : [12, 8, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.9, 5.5, 5.5]);
+  var head = [{ label: 'Employee', sub: 'ID', width: w[0] }]
+    .concat(co ? [{ label: 'Company', width: w[1] }] : [])
+    .concat([{ label: 'Department' }, { label: 'Gross', num: true }, { label: 'Absent', num: true },
+      { label: 'Earned gross', num: true }, { label: 'Overtime', num: true }, { label: 'Bonus', num: true },
+      { label: 'Adjustment', num: true }, { label: 'Late', num: true },
+      { label: 'Early', num: true }, { label: 'Tax', num: true }, { label: 'PF', num: true },
+      { label: 'Other ded.', num: true }, { label: 'Net payable', num: true }, { label: 'Paid', num: true },
+      { label: 'Due', num: true }].map(function (h, i) { h.width = w[i + (co ? 2 : 1)]; return h; }));
+
+  var rows = slips.map(function (s) {
+    return [{ v: esc(s.empName), strong: true, sub: esc(s.empId) }]
+      .concat(co ? [{ v: esc(coShort(s.companyId)) }] : [])
+      .concat([
+        { v: esc(s.dept || '—') },
+        { v: payMoney(s.gross), num: true },
+        { v: payBrk(s.absentDeduction), num: true },
+        { v: payMoney(s.earnedGross), num: true },
+        { v: payMoney(s.overtime), num: true },
+        { v: payMoney(bonusOf(s)), num: true },
+        { v: payMoney(s.adjustment), num: true },
+        { v: payBrk(s.lateDeduction), num: true },
+        { v: payBrk(s.earlyDeduction), num: true },
+        { v: payBrk(s.tax), num: true },
+        { v: payBrk(s.pf), num: true },
+        { v: payBrk((s.otherDeduction || 0) + (s.fine || 0)), num: true },
+        { v: payMoney(PR().slipPayable(s)), num: true, strong: true },
+        { v: payMoney(s.paid), num: true },
+        { v: payMoney(dueOf(s)), num: true }
+      ]);
+  });
+  var totals = [{ v: 'Total — ' + slips.length + ' employee' + (slips.length === 1 ? '' : 's') }]
+    .concat(co ? [{ v: '' }] : [])
+    .concat([{ v: '' },
+      { v: payMoney(T.gross), num: true }, { v: payBrk(T.absent), num: true }, { v: payMoney(T.earned), num: true },
+      { v: payMoney(T.ot), num: true }, { v: payMoney(T.bonus), num: true }, { v: payMoney(T.adj), num: true },
+      { v: payBrk(T.late), num: true }, { v: payBrk(T.early), num: true },
+      { v: payBrk(T.tax), num: true }, { v: payBrk(T.pf), num: true }, { v: payBrk(T.other), num: true },
+      { v: payMoney(T.net), num: true }, { v: payMoney(T.paid), num: true }, { v: payMoney(T.due), num: true }]);
+
+  /* THE DEPARTMENTAL SUMMARY — the same rows, grouped, so the register can be
+   * read by cost centre without adding it up by hand. It foots to the register
+   * above by construction: it is built from the very same slips. */
+  var byDept = {};
+  slips.forEach(function (s) {
+    var d = byDept[s.dept || '—'] || (byDept[s.dept || '—'] = { heads: 0, gross: 0, deds: 0, net: 0 });
+    d.heads++; d.gross += s.earnedGross || 0; d.deds += dedOf(s); d.net += PR().slipPayable(s);
+  });
+  var dw = payWidths([34, 12, 18, 18, 18]);
+  var deptRows = Object.keys(byDept).sort(function (a, b) { return byDept[b].net - byDept[a].net; })
+    .map(function (k) {
+      var d = byDept[k];
+      return [{ v: esc(k) }, { v: String(d.heads), num: true }, { v: payMoney(d.gross), num: true },
+        { v: payBrk(d.deds), num: true }, { v: payMoney(d.net), num: true }];
+    });
+
+  return {
+    docTitle: payFileName('SalaryRegister', ym, ym),
+    brand: payLetterhead(),
+    meta: payMetaLines(id, rev),
+    onPrint: function () { payRevCommit(id, rev); },
+    title: 'Salary Register — ' + PR().mLabel(ym) + (isAll() ? '' : ' · ' + coFull(CID)),
+    scope: [
+      PR().mLabel(ym) + ' · ' + slips.length + ' employee' + (slips.length === 1 ? '' : 's') + ' · ' +
+        (isAll() ? 'All Companies (consolidated) — ' + scopeNames() : coFull(CID)) +
+        ' · run ' + cap(runInfo(ym).status),
+      'Gross is the contract gross; earned gross is gross less absence, and the net is built from it. Leave ' +
+        'encashment accrued this month (' + payMoney(T.encash) + ') is a liability and is NOT part of Net Payable.'
+    ],
+    notice: partial ? 'Partial selection — ' + slips.length + ' of ' + allInMonth.length +
+      ' employees. Totals below reflect the selected rows only.' : null,
+    kpis: [
+      { label: 'Employees printed', value: String(slips.length), sub: partial ? 'of ' + allInMonth.length + ' in the run' : 'the whole run' },
+      { label: 'Gross', value: payMoney(T.earned), sub: 'earned gross, after absence' },
+      { label: 'Total deductions', value: payMoney(T.deds), sub: T.earned ? payPct(T.deds / T.earned * 100) + ' of earned gross' : '' },
+      { label: 'Net payable', value: payMoney(T.net), sub: payMoney(T.paid) + ' paid · ' + payMoney(T.due) + ' due' }
+    ],
+    table: { wide: true,          // 17 columns — the gutters give way, not the type
+      groups: [{ span: co ? 3 : 2 }, { label: 'Earnings and additions', span: 6 },
+        { label: 'Deductions', span: 5 }, { label: 'Settlement', span: 3 }],
+      head: head, rows: rows, totals: totals },
+    panelPairs: [[
+      { title: 'Departmental summary', table: { head: [{ label: 'Department', width: dw[0] },
+        { label: 'Staff', num: true, width: dw[1] }, { label: 'Gross', num: true, width: dw[2] },
+        { label: 'Deductions', num: true, width: dw[3] }, { label: 'Net payable', num: true, width: dw[4] }],
+        rows: deptRows,
+        totals: [{ v: 'Total' }, { v: String(slips.length), num: true }, { v: payMoney(T.earned), num: true },
+          { v: payBrk(T.deds), num: true }, { v: payMoney(T.net), num: true }] } },
+      { title: 'How the month adds up', lines: [
+        { k: 'Contract gross', v: payMoney(T.gross) },
+        { k: 'Less: absence', v: payBrk(T.absent) },
+        { k: 'Earned gross', v: payMoney(T.earned), rule: true },
+        { k: 'Add: overtime, bonus and adjustments', v: payMoney(T.adds) },
+        { k: 'Less: deductions withheld', v: payBrk(T.deds) },
+        { k: 'Net payable', v: payMoney(T.net), rule: true },
+        { k: 'Less: paid', v: payBrk(T.paid) },
+        { k: 'Still owed', v: payMoney(T.due), close: true }
+      ] }
+    ]],
+    notesTitle: 'Exceptions requiring attention',
+    notes: payDetailNotes(ym, slips, partial, allInMonth),
+    signoff: paySignoff(),
+    confidential: 'CONFIDENTIAL — PAYROLL',
+    footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · approved run only',
+    previewTitle: 'Salary Register — print preview'
+  };
+}
+
+function payDetailNotes(ym, slips, partial, allInMonth) {
+  var out = [];
+  slips.forEach(function (s) {
+    var payable = PR().slipPayable(s);
+    if ((s.paid || 0) > payable + 1) out.push({ tag: 'HIGH', text: s.empName + ' was paid ' + payMoney(s.paid) +
+      ' against a payslip of ' + payMoney(payable) + ' — ' + payMoney(s.paid - payable) + ' more than the sheet allows.' });
+  });
+  var unpaid = slips.filter(function (s) { return dueOf(s) > 0; });
+  if (unpaid.length) out.push({ tag: 'HIGH', text: unpaid.length + ' of ' + slips.length +
+    ' employees are still owed ' + payMoney(sum(unpaid, dueOf)) + ' for ' + PR().mLabel(ym) + '.' });
+  slips.forEach(function (s) {
+    if ((s.leaveDeductDays || 0) >= 5) out.push({ tag: 'WATCH', text: s.empName + ' was absent ' +
+      s.leaveDeductDays + ' days — ' + payMoney(s.absentDeduction) + ' deducted.' });
+  });
+  if (partial) out.push({ tag: 'NOTE', text: 'Partial selection: ' + slips.length + ' of ' + allInMonth.length +
+    ' employees in this run. The totals row covers the printed rows only.' });
+  out.push({ tag: 'NOTE', text: 'Leave encashment accrues monthly against a 12-month service condition, is ' +
+    'charged to expense and credited to Leave Encashment Payable, and settles once in December. It is not ' +
+    'part of Net Payable and is not disbursed with this month\'s salary.' });
+  return out.slice(0, 8);
+}
+
+/* ---------------------------------------------------------------------------
+ * THE PRINT CENTRE — scope → months → detail level → rows → preview
+ * ---------------------------------------------------------------------------
+ * Print never prints straight away (owner): a payroll document goes out under
+ * somebody's name, so the scope is confirmed, the months are chosen and, at
+ * employee level, the people are chosen — with the net payable of the CURRENT
+ * ticks shown live, so what the printed totals row will say is known before the
+ * paper exists.
+ * ------------------------------------------------------------------------- */
+function printCentre(opts) {
+  opts = opts || {};
+  var all = approvedMonths();
+  if (!all.length) { ui.toast('No approved payroll run to print — finalize a month first', 'warn'); return; }
+
+  /* Launched from the Salary Register (one month on screen) → that month only,
+   * at employee level. Launched from the Monthly Register → every month, as the
+   * summary. Either way the reader can change it below. */
+  var fromSheet = opts.from === 'sheet' && opts.ym;
+  var pick = {}, level = fromSheet ? 'detail' : 'summary', q = '', rowPick = null;
+  all.forEach(function (m) { pick[m.ym] = fromSheet ? (m.ym === opts.ym) : true; });
+  if (fromSheet && !pick[opts.ym]) { ui.toast('That month is not an approved run yet', 'warn'); return; }
+
+  var body = el('div.pay-print');
+  var mCount = el('div.pay-print-count'), rCount = el('div.pay-print-count');
+  var secLevel = el('div.pay-print-step'), secRows = el('div.pay-print-step'), rowHost = el('div.pay-print-rows');
+  var searchIn = el('input.input', { placeholder: 'Search name, ID or department…',
+    oninput: ui.debounce(function () { q = searchIn.value.toLowerCase(); drawRows(); }, 120) });
+  var goBtn = null;
+
+  function picked() { return all.filter(function (m) { return pick[m.ym]; }); }
+  function oneYm() { var p = picked(); return p.length === 1 ? p[0].ym : null; }
+  function monthSlips() {
+    var ym = oneYm(); if (!ym) return [];
+    return slipsIn(ym).slice().sort(function (a, b) { return (a.empName || '') < (b.empName || '') ? -1 : 1; });
+  }
+  function ensureRowPick() {
+    var list = monthSlips();
+    if (!rowPick) { rowPick = {}; list.forEach(function (s) { rowPick[s.empId] = true; }); }   // ALL ticked by default
+    return list;
+  }
+  function pickedSlips() { var list = ensureRowPick(); return list.filter(function (s) { return rowPick[s.empId]; }); }
+
+  /* ---- step 1 · scope (read-only — you cannot print the wrong entity by
+   * accident, and changing it is a deliberate act on the switcher) ---------- */
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '1 · Scope' }),
+    el('div.pay-print-scope', null, [
+      el('div', null, [ el('strong', { text: scopeFull() }),
+        el('div.text-mute.sm', { text: isAll() ? scopeCids().length + ' concerns consolidated — ' + scopeNames()
+          : 'this concern only · report id ' + payReportId('MR', all[all.length - 1].ym) }) ]),
+      el('button.btn.btn-sm.btn-ghost', { html: ui.icon('arrow-left-right') + ' Change company',
+        onclick: function () { m.close(); ui.toast('Pick the company from the switcher above, then print again', 'info'); } })
+    ])
+  ]));
+
+  /* ---- step 2 · months --------------------------------------------------- */
+  var monthHost = el('div.pay-print-months');
+  all.slice().reverse().forEach(function (mo) {                      // newest first
+    var cb = el('input', { type: 'checkbox', checked: pick[mo.ym] ? 'checked' : null,
+      onchange: function () { pick[mo.ym] = cb.checked; rowPick = null; sync(); } });
+    mo._cb = cb;
+    monthHost.appendChild(el('label.pay-print-mo', null, [ cb,
+      el('span.pay-print-mo-n', { text: PR().mLabel(mo.ym) }),
+      el('span.badge', { text: cap(mo.status) }),
+      el('span.text-mute.xs', { text: mo.heads + ' staff · ' + ui.money(mo.net) }) ]));
+  });
+  function setAll(fn) { all.forEach(function (mo) { pick[mo.ym] = fn(mo); if (mo._cb) mo._cb.checked = pick[mo.ym]; }); rowPick = null; sync(); }
+  function lastN(n) { var keep = {}; all.slice(-n).forEach(function (mo) { keep[mo.ym] = 1; }); setAll(function (mo) { return !!keep[mo.ym]; }); }
+  body.appendChild(el('div.pay-print-step', null, [
+    el('div.pay-print-h', { text: '2 · Months' }),
+    el('div.pay-print-bulk', null, [
+      el('button.btn.btn-sm.btn-ghost', { text: 'Select all', onclick: function () { setAll(function () { return true; }); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () { setAll(function () { return false; }); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Last 3', onclick: function () { lastN(3); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'Last 6', onclick: function () { lastN(6); } }),
+      el('button.btn.btn-sm.btn-ghost', { text: 'This year', onclick: function () {
+        var y = all[all.length - 1].ym.slice(0, 4); setAll(function (mo) { return mo.ym.slice(0, 4) === y; }); } })
+    ]),
+    monthHost, mCount
+  ]));
+
+  /* ---- step 3 · detail level (only when the selection is ONE month, because
+   * an employee-level register of six months is six registers) -------------- */
+  var radios = [['summary', 'Summary row only', 'the register line for that month, its totals and the control panels'],
+    ['detail', 'Employee-level detail', 'the full Salary Register — one row per employee']];
+  secLevel.appendChild(el('div.pay-print-h', { text: '3 · Detail level' }));
+  radios.forEach(function (r) {
+    var rb = el('input', { type: 'radio', name: 'paylvl', checked: level === r[0] ? 'checked' : null,
+      onchange: function () { if (rb.checked) { level = r[0]; sync(); } } });
+    secLevel.appendChild(el('label.pay-print-lvl', null, [ rb,
+      el('span', null, [ el('strong', { text: r[1] }), el('div.text-mute.sm', { text: r[2] }) ]) ]));
+  });
+  body.appendChild(secLevel);
+
+  /* ---- step 4 · rows ----------------------------------------------------- */
+  function drawRows() {
+    var list = ensureRowPick();
+    rowHost.innerHTML = '';
+    var shown = list.filter(function (s) {
+      if (!q) return true;
+      return (s.empName + ' ' + s.empId + ' ' + (s.dept || '')).toLowerCase().indexOf(q) >= 0;
+    });
+    shown.forEach(function (s) {
+      /* ticking a person updates the COUNTER, never the list: redrawing 21 rows
+       * under the cursor loses the scroll position and steals the next click */
+      var cb = el('input', { type: 'checkbox', checked: rowPick[s.empId] ? 'checked' : null,
+        onchange: function () { rowPick[s.empId] = cb.checked; syncCounts(); } });
+      rowHost.appendChild(el('label.pay-print-row', null, [ cb,
+        el('span.pay-print-row-n', { text: s.empName }),
+        el('span.text-mute.xs', { text: s.empId }),
+        isAll() ? el('span.badge', { text: coShort(s.companyId) }) : null,
+        el('span.text-mute.xs', { text: s.dept || '—' }),
+        el('span.pay-print-row-v', { text: ui.money(PR().slipPayable(s)) }) ].filter(Boolean)));
+    });
+    if (!shown.length) rowHost.appendChild(el('div.text-mute.sm', { text: 'No employee matches “' + q + '”.' }));
+  }
+  function bulkRows(fn) { ensureRowPick().forEach(function (s) { if (fn(s)) rowPick[s.empId] = true; }); drawRows(); sync(); }
+  var byCoSel = el('select.select', { onchange: function () {
+    var v = byCoSel.value; if (v !== '__') bulkRows(function (s) { return s.companyId === v; }); byCoSel.value = '__'; } });
+  var byDeptSel = el('select.select', { onchange: function () {
+    var v = byDeptSel.value; if (v !== '__') bulkRows(function (s) { return (s.dept || '—') === v; }); byDeptSel.value = '__'; } });
+  function fillBulkSelects() {
+    var list = ensureRowPick(), cos = {}, depts = {};
+    list.forEach(function (s) { cos[s.companyId] = 1; depts[s.dept || '—'] = 1; });
+    byCoSel.innerHTML = ''; byCoSel.appendChild(el('option', { value: '__', text: 'Select by company…' }));
+    Object.keys(cos).sort().forEach(function (c) { byCoSel.appendChild(el('option', { value: c, text: coShort(c) })); });
+    byDeptSel.innerHTML = ''; byDeptSel.appendChild(el('option', { value: '__', text: 'Select by department…' }));
+    Object.keys(depts).sort().forEach(function (d) { byDeptSel.appendChild(el('option', { value: d, text: d })); });
+    byCoSel.style.display = isAll() ? '' : 'none';
+  }
+  secRows.appendChild(el('div.pay-print-h', { text: '4 · Employees' }));
+  secRows.appendChild(el('div.pay-print-bulk', null, [ searchIn,
+    el('button.btn.btn-sm.btn-ghost', { text: 'Select all', onclick: function () { bulkRows(function () { return true; }); } }),
+    el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () {
+      ensureRowPick(); Object.keys(rowPick).forEach(function (k) { rowPick[k] = false; }); drawRows(); sync(); } }),
+    byCoSel, byDeptSel ]));
+  secRows.appendChild(rowHost);
+  secRows.appendChild(rCount);
+  body.appendChild(secRows);
+
+  /* ---- what the reader is told, live -------------------------------------
+   * syncCounts() is the cheap half — the two live counters and whether Preview
+   * can be pressed. It is what a tick calls. sync() adds the structural half:
+   * which steps exist at all, and rebuilding the employee list under them. */
+  function syncCounts() {
+    var p = picked(), one = oneYm(), wantRows = !!one && level === 'detail';
+    mCount.textContent = p.length + ' of ' + all.length + ' month' + (all.length === 1 ? '' : 's') + ' selected' +
+      (p.length ? ' · net payable ' + ui.money(sum(p, function (m) { return m.net; })) : '');
+    if (wantRows) {
+      var sel = pickedSlips();
+      rCount.textContent = sel.length + ' of ' + ensureRowPick().length + ' employees selected · net payable ' +
+        ui.money(sum(sel, function (s) { return PR().slipPayable(s); }));
+      if (goBtn) goBtn.disabled = !sel.length;
+    } else if (goBtn) goBtn.disabled = !p.length;
+    if (goBtn) goBtn.style.opacity = goBtn.disabled ? .5 : 1;
+  }
+  function sync() {
+    var one = oneYm();
+    // step 3 only exists for a single month; two or more always print the summary
+    secLevel.style.display = one ? '' : 'none';
+    if (!one) level = 'summary';
+    var wantRows = !!one && level === 'detail';
+    secRows.style.display = wantRows ? '' : 'none';
+    if (wantRows) { fillBulkSelects(); drawRows(); }
+    syncCounts();
+  }
+
+  var m = ui.modal({
+    title: 'Print payroll — ' + scopeShort(), icon: 'printer', size: 'lg', body: body,
+    actions: [
+      { label: 'Cancel', onClick: function () {} },
+      { label: 'Preview', icon: 'eye', variant: 'primary', onClick: function () {
+          var p = picked();
+          if (!p.length) { ui.toast('Tick at least one month', 'error'); return false; }
+          var one = oneYm();
+          if (one && level === 'detail') {
+            var sel = pickedSlips();
+            if (!sel.length) { ui.toast('Tick at least one employee', 'error'); return false; }
+            EPAL.report.open(payDetailReport(one, sel, ensureRowPick()));
+          } else {
+            EPAL.report.open(paySummaryReport(p));
+          }
+        } }
+    ]
+  });
+  goBtn = m.box.querySelector('.modal-foot .btn-primary');
+  sync();
+  return m;
 }
 
 /* ---- small helpers ----------------------------------------------------*/

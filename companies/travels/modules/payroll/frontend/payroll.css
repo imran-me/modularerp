@@ -293,3 +293,56 @@
   .alloc-owed { text-align: left; grid-column: 1; }
   .alloc-left { text-align: right; }
 }
+
+/* ============================================================================
+ * THE PRINT CENTRE (owner 2026-07-30) — the four steps before anything prints
+ * ----------------------------------------------------------------------------
+ * A tick list, not a form: months and people are chosen by eye, so each row is a
+ * whole-row <label> (the checkbox is the smallest part of the target) and the
+ * lists scroll inside the modal rather than pushing the buttons off it. Numbers
+ * hug the right edge of every row so the reader can add them up down a column —
+ * which is precisely what the live counter under the list has already done.
+ * No house equivalent: .data-list is label→value facts with no control, and the
+ * house forms build a field per row, which for 21 people is 21 fields.
+ * ==========================================================================*/
+.pay-print-step { margin-bottom: 16px; }
+.pay-print-step:last-child { margin-bottom: 0; }
+.pay-print-h {
+  font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: .07em;
+  font-weight: 700; color: var(--text-mute); margin-bottom: 7px;
+}
+.pay-print-scope {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--r-md); background: var(--surface-2); padding: 10px 13px;
+}
+.pay-print-bulk { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.pay-print-bulk .input { flex: 1 1 190px; min-width: 0; }
+.pay-print-months, .pay-print-rows {
+  border: 1px solid var(--border); border-radius: var(--r-md); max-height: 208px; overflow-y: auto;
+}
+.pay-print-mo, .pay-print-row {
+  display: flex; align-items: center; gap: 10px; padding: 7px 11px; cursor: pointer;
+  border-bottom: 1px solid var(--border); font-size: var(--fs-small);
+}
+.pay-print-mo:last-child, .pay-print-row:last-child { border-bottom: none; }
+.pay-print-mo:hover, .pay-print-row:hover { background: var(--surface-2); }
+.pay-print-mo-n, .pay-print-row-n { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.pay-print-mo-n { flex: 1; }
+.pay-print-row-n { flex: 1; }
+.pay-print-row-v {
+  margin-left: auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  white-space: nowrap; font-weight: 600;
+}
+.pay-print-mo .text-mute { margin-left: auto; white-space: nowrap; }
+/* the live count IS the control: it says what the printed totals row will say */
+.pay-print-count {
+  margin-top: 7px; font-size: var(--fs-small); font-weight: 600; color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.pay-print-lvl {
+  display: flex; gap: 10px; align-items: flex-start; padding: 9px 11px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: 6px;
+}
+.pay-print-lvl:hover { background: var(--surface-2); }
+.pay-print-lvl input { margin-top: 3px; }

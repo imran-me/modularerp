@@ -306,6 +306,23 @@
     group: {
       name: 'Epal Group',
       legalName: 'Epal Group of Companies',
+      /* THE LETTERHEAD (owner 2026-07-30, with the payroll print spec) — the
+       * contact block every FORMAL printed report puts under the brand. It lives
+       * on the company master record rather than inside a report so one edit
+       * changes every document, and so a Laravel `companies` table can carry the
+       * same columns later.
+       *
+       * A SISTER CONCERN may override any line by giving its own
+       * `letterhead: { … }` on its COMPANIES entry above — a concern with its own
+       * licence numbers or its own office prints those instead. Until the owner
+       * supplies them, a single-company report prints the concern's NAME over the
+       * group's block, which is true: they trade from the group's address. */
+      letterhead: {
+        address: 'Dhaka, Bangladesh',
+        web: 'www.epalgroup.com',
+        email: 'info@epalgroup.com',
+        licences: 'IATA 42342801 · ATAB & TOAB member'
+      },
       tagline: 'One Group. One Operating System.',
       currency: 'BDT',
       currencySymbol: '৳',
