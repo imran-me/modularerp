@@ -1722,9 +1722,17 @@ function monthView(page) {
      * Accrued is the exception the printed report also makes: it is a balance
      * carried, so it is summed here only because one month's accrual for the
      * filtered people IS this month's movement. Status has no total.
-     * No Print button in this toolbar: the screen's own "Print register" above
-     * already opens the print centre for this month, and two identical buttons
-     * on one screen is a question, not a convenience. */
+     *
+     * PRINT SITS BESIDE EXPORT AND PDF (owner 2026-07-30: "where is, after
+     * clicking a single month, then print option, with that month's these
+     * infos?"). It was only at the top of the screen, above the dashboard row —
+     * out of sight by the time you are reading the register — and a reader looks
+     * for Print where the other two outputs of THIS table already are. Both
+     * buttons open the same print centre for this month; a second door into one
+     * room is not a duplicate feature. */
+    toolbarEl: el('button.btn.btn-sm.btn-ghost', { html: ui.icon('printer') + ' Print',
+      title: 'Print this month — choose all, just the due, just the paid, or specific employees',
+      onclick: function () { printCentre({ from: 'sheet', ym: ym }); } }),
     totals: function (xs) {
       if (!xs.length) return null;
       function S2(f) { return ui.money(sum(xs, f)); }
@@ -4605,7 +4613,7 @@ function paySummaryNotes(months, T, everyMonth) {
 /* ---------------------------------------------------------------------------
  * REPORT 2 — the SALARY REGISTER (one row per employee), a single month
  * ------------------------------------------------------------------------- */
-function payDetailReport(ym, slips, allInMonth) {
+function payDetailReport(ym, slips, allInMonth, pickLabel) {
   var co = isAll();
   var T = { gross: 0, absent: 0, earned: 0, ot: 0, bonus: 0, adj: 0, adds: 0, late: 0, early: 0,
     tax: 0, pf: 0, other: 0, deds: 0, net: 0, paid: 0, due: 0, encash: 0 };
@@ -4702,8 +4710,12 @@ function payDetailReport(ym, slips, allInMonth) {
       'Gross is the contract gross; earned gross is gross less absence, and the net is built from it. Leave ' +
         'encashment accrued this month (' + payMoney(T.encash) + ') is a liability and is NOT part of Net Payable.'
     ],
+    /* A partial register SAYS SO, and says WHICH part: "15 of 21 employees,
+     * unpaid only" is a document somebody can act on; "15 of 21" leaves the
+     * reader to guess which fifteen, and a payroll report that looks complete
+     * but is not is a control failure. */
     notice: partial ? 'Partial selection — ' + slips.length + ' of ' + allInMonth.length +
-      ' employees. Totals below reflect the selected rows only.' : null,
+      ' employees' + (pickLabel ? ', ' + pickLabel : '') + '. Totals below reflect the selected rows only.' : null,
     kpis: [
       { label: 'Employees printed', value: String(slips.length), sub: partial ? 'of ' + allInMonth.length + ' in the run' : 'the whole run' },
       { label: 'Gross', value: payMoney(T.earned), sub: 'earned gross, after absence' },
@@ -4733,7 +4745,7 @@ function payDetailReport(ym, slips, allInMonth) {
       ] }
     ]],
     notesTitle: 'Exceptions requiring attention',
-    notes: payDetailNotes(ym, slips, partial, allInMonth),
+    notes: payDetailNotes(ym, slips, partial, allInMonth, pickLabel),
     signoff: paySignoff(),
     confidential: 'CONFIDENTIAL — PAYROLL',
     footId: id + ' · Rev ' + (rev < 10 ? '0' + rev : rev) + ' · approved run only',
@@ -4741,7 +4753,7 @@ function payDetailReport(ym, slips, allInMonth) {
   };
 }
 
-function payDetailNotes(ym, slips, partial, allInMonth) {
+function payDetailNotes(ym, slips, partial, allInMonth, pickLabel) {
   var out = [];
   slips.forEach(function (s) {
     var payable = PR().slipPayable(s);
@@ -4756,7 +4768,7 @@ function payDetailNotes(ym, slips, partial, allInMonth) {
       s.leaveDeductDays + ' days — ' + payMoney(s.absentDeduction) + ' deducted.' });
   });
   if (partial) out.push({ tag: 'NOTE', text: 'Partial selection: ' + slips.length + ' of ' + allInMonth.length +
-    ' employees in this run. The totals row covers the printed rows only.' });
+    ' employees in this run' + (pickLabel ? ' (' + pickLabel + ')' : '') + '. The totals row covers the printed rows only.' });
   out.push({ tag: 'NOTE', text: 'Leave encashment accrues monthly against a 12-month service condition, is ' +
     'charged to expense and credited to Leave Encashment Payable, and settles once in December. It is not ' +
     'part of Net Payable and is not disbursed with this month\'s salary.' });
@@ -4869,17 +4881,33 @@ function printCentre(opts) {
       /* ticking a person updates the COUNTER, never the list: redrawing 21 rows
        * under the cursor loses the scroll position and steals the next click */
       var cb = el('input', { type: 'checkbox', checked: rowPick[s.empId] ? 'checked' : null,
-        onchange: function () { rowPick[s.empId] = cb.checked; syncCounts(); } });
+        onchange: function () { rowPick[s.empId] = cb.checked; pickWas = null; syncCounts(); } });
+      var due = dueOf(s);
       rowHost.appendChild(el('label.pay-print-row', null, [ cb,
         el('span.pay-print-row-n', { text: s.empName }),
         el('span.text-mute.xs', { text: s.empId }),
         isAll() ? el('span.badge', { text: coShort(s.companyId) }) : null,
         el('span.text-mute.xs', { text: s.dept || '—' }),
+        // the state the reader is choosing BY, on the row they are choosing
+        el('span.badge' + (due > 0 ? '.badge-bad' : '.badge-good'), { text: due > 0 ? 'Due' : 'Paid' }),
         el('span.pay-print-row-v', { text: ui.money(PR().slipPayable(s)) }) ].filter(Boolean)));
     });
     if (!shown.length) rowHost.appendChild(el('div.text-mute.sm', { text: 'No employee matches “' + q + '”.' }));
   }
-  function bulkRows(fn) { ensureRowPick().forEach(function (s) { if (fn(s)) rowPick[s.empId] = true; }); drawRows(); sync(); }
+  /* TWO KINDS OF PICKER, and the difference is deliberate.
+   *   onlyRows(fn) REPLACES the selection — "just the due ones" means those and
+   *     nothing else, which is what a reader asking for it wants to print.
+   *   bulkRows(fn) ADDS to it — so two companies, or three departments, can be
+   *     built up one dropdown pick at a time.
+   * `pickWas` remembers which named set was chosen, so the printed page can say
+   * "unpaid only" rather than the anonymous "15 of 21"; any hand-tick clears it,
+   * because the set is no longer the one that was named. */
+  var pickWas = null;
+  function bulkRows(fn) { ensureRowPick().forEach(function (s) { if (fn(s)) rowPick[s.empId] = true; }); pickWas = null; drawRows(); sync(); }
+  function onlyRows(fn, label) {
+    ensureRowPick().forEach(function (s) { rowPick[s.empId] = !!fn(s); });
+    pickWas = label || null; drawRows(); sync();
+  }
   var byCoSel = el('select.select', { onchange: function () {
     var v = byCoSel.value; if (v !== '__') bulkRows(function (s) { return s.companyId === v; }); byCoSel.value = '__'; } });
   var byDeptSel = el('select.select', { onchange: function () {
@@ -4887,18 +4915,27 @@ function printCentre(opts) {
   function fillBulkSelects() {
     var list = ensureRowPick(), cos = {}, depts = {};
     list.forEach(function (s) { cos[s.companyId] = 1; depts[s.dept || '—'] = 1; });
-    byCoSel.innerHTML = ''; byCoSel.appendChild(el('option', { value: '__', text: 'Select by company…' }));
+    byCoSel.innerHTML = ''; byCoSel.appendChild(el('option', { value: '__', text: 'Add by company…' }));
     Object.keys(cos).sort().forEach(function (c) { byCoSel.appendChild(el('option', { value: c, text: coShort(c) })); });
-    byDeptSel.innerHTML = ''; byDeptSel.appendChild(el('option', { value: '__', text: 'Select by department…' }));
+    byDeptSel.innerHTML = ''; byDeptSel.appendChild(el('option', { value: '__', text: 'Add by department…' }));
     Object.keys(depts).sort().forEach(function (d) { byDeptSel.appendChild(el('option', { value: d, text: d })); });
     byCoSel.style.display = isAll() ? '' : 'none';
+    // a set nobody is in is not offered: no unpaid staff, no "Only unpaid" button
+    var anyDue = list.filter(function (s) { return dueOf(s) > 0; }).length;
+    dueBtn.style.display = anyDue ? '' : 'none';
+    paidBtn.style.display = (anyDue < list.length) ? '' : 'none';
   }
+  var dueBtn = el('button.btn.btn-sm.btn-ghost', { html: ui.icon('exclamation-circle') + ' Only unpaid',
+    title: 'Print only the employees still owed money for this month',
+    onclick: function () { onlyRows(function (s) { return dueOf(s) > 0; }, 'unpaid only'); } });
+  var paidBtn = el('button.btn.btn-sm.btn-ghost', { html: ui.icon('check2-circle') + ' Only paid',
+    title: 'Print only the employees whose month is fully settled',
+    onclick: function () { onlyRows(function (s) { return dueOf(s) <= 0; }, 'fully paid only'); } });
   secRows.appendChild(el('div.pay-print-h', { text: '4 · Employees' }));
   secRows.appendChild(el('div.pay-print-bulk', null, [ searchIn,
-    el('button.btn.btn-sm.btn-ghost', { text: 'Select all', onclick: function () { bulkRows(function () { return true; }); } }),
-    el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () {
-      ensureRowPick(); Object.keys(rowPick).forEach(function (k) { rowPick[k] = false; }); drawRows(); sync(); } }),
-    byCoSel, byDeptSel ]));
+    el('button.btn.btn-sm.btn-ghost', { text: 'Select all', onclick: function () { onlyRows(function () { return true; }, null); } }),
+    el('button.btn.btn-sm.btn-ghost', { text: 'Clear all', onclick: function () { onlyRows(function () { return false; }, null); } }),
+    dueBtn, paidBtn, byCoSel, byDeptSel ]));
   secRows.appendChild(rowHost);
   secRows.appendChild(rCount);
   body.appendChild(secRows);
@@ -4913,7 +4950,8 @@ function printCentre(opts) {
       (p.length ? ' · net payable ' + ui.money(sum(p, function (m) { return m.net; })) : '');
     if (wantRows) {
       var sel = pickedSlips();
-      rCount.textContent = sel.length + ' of ' + ensureRowPick().length + ' employees selected · net payable ' +
+      rCount.textContent = sel.length + ' of ' + ensureRowPick().length + ' employees selected' +
+        (pickWas ? ' · ' + pickWas : '') + ' · net payable ' +
         ui.money(sum(sel, function (s) { return PR().slipPayable(s); }));
       if (goBtn) goBtn.disabled = !sel.length;
     } else if (goBtn) goBtn.disabled = !p.length;
@@ -4941,7 +4979,7 @@ function printCentre(opts) {
           if (one && level === 'detail') {
             var sel = pickedSlips();
             if (!sel.length) { ui.toast('Tick at least one employee', 'error'); return false; }
-            EPAL.report.open(payDetailReport(one, sel, ensureRowPick()));
+            EPAL.report.open(payDetailReport(one, sel, ensureRowPick(), pickWas));
           } else {
             EPAL.report.open(paySummaryReport(p));
           }

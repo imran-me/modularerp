@@ -547,6 +547,20 @@ document the group prints; and `pay_prints`, the revision counter and audit trai
 of who raised a confidential payroll document — written when the print dialog
 opens, not when a preview is flipped through.
 
+**SAME-DAY FOLLOW-UP** (owner: *"where is, after clicking a single month, then
+print option, with that month's these infos?? also, option to mark specific
+employee, or all, or just due, or just paid"*) — two real gaps, both closed:
+Print was only in the month screen's control bar, ABOVE the dashboard row, so by
+the time you are reading the register it is off the top of the screen; it now
+also rides in the register's own toolbar beside Export and PDF, where a reader
+looks for the outputs of the table in front of them. And step 4 gained **Only
+unpaid** / **Only paid**, which REPLACE the selection (one click = one intended
+set) rather than adding to it like the by-company / by-department pickers; every
+row carries a Due/Paid badge, and the printed page names the subset — *"Partial
+selection — 11 of 17 employees, unpaid only"* — because "11 of 17" leaves the
+reader to guess WHICH eleven. Driver-checked against the store: Only unpaid = 11
+of 17 · ৳5,43,494, Only paid = 6, and 11 + 6 = 17.
+
 **Deviations, both forced by 273mm of paper** (the spec's own rule: drop a column
 rather than shrink the type): the employee ID prints UNDER the name instead of in
 its own column, and the ADDITIONS subtotal is dropped from the salary register —

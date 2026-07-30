@@ -49,6 +49,16 @@ average raw."*
   nil, Bangladeshi digit grouping, no Monthly-average row.
 - Also: `EPAL.config.group.letterhead` (+ per-company override) and `pay_prints`
   (revision + who printed what).
+- **Follow-up, same day** (owner: *"where is, after clicking a single month, then
+  print option, with that month's these infos?? also, option to mark specific
+  employee, or all, or just due, or just paid"*): Print now also sits in the
+  Salary Register's OWN toolbar beside Export and PDF — it was only at the top of
+  the month screen, out of sight by the time you are reading the register — and
+  step 4 gained **Only unpaid** / **Only paid** (which REPLACE the selection, so
+  one click is one intended set) beside Select all / Clear all and the additive
+  Add-by-company / Add-by-department pickers. Every row now shows a Due/Paid
+  badge, and the printed page names the subset: *"Partial selection — 11 of 17
+  employees, unpaid only."*
 - ⏭ **Owner input still wanted:** each concern's OWN address / licence numbers
   for its letterhead (they currently print the group's), and whether the sign-off
   roles should carry real names instead of "Accounts / Head of HR & Admin /
