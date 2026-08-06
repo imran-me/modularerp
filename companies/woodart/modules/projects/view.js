@@ -263,6 +263,10 @@
     page.appendChild(el('div.section-label', { text:'MATERIALS — QUOTED vs USED' }));
     page.appendChild(materialTable(reqs, id));
 
+    /* ---- the ledger — every delivery and every issue, dated ------------- */
+    page.appendChild(el('div.section-label', { text:'MATERIAL LEDGER — EVERY DELIVERY AND EVERY ISSUE' }));
+    page.appendChild(ledgerTable(id));
+
     /* ---- where the detail lives ---------------------------------------- */
     page.appendChild(el('div.section-label', { text:'THE DESKS THAT FEED THIS PAGE' }));
     page.appendChild(deskLinks(id, spaces.length, phases.length));
@@ -440,10 +444,154 @@
       ],
       rows: rows,
       searchKeys: ['item'],
+      onRow: function (r) { materialHistory(r.item, projectId); },
       exportName: 'woodart-project-materials.csv',
       pageSize: 20,
       empty: { icon:'boxes', title:'No material planned', hint:'Add material lines to the phases in Spaces & Phases.' }
     }).el ]) ]);
+  }
+
+  /**
+   * EVERY MATERIAL EVENT ON THIS JOB, newest first — the same thing the cash
+   * book does for money (owner, 2026-08-06: *"like for money we have clear
+   * ledger etc history to see each transaction, I need same for project,
+   * materials bought, moved etc"*).
+   *
+   * A receipt belongs to the job through the ORDER that bought it; an issue and
+   * a wastage name the project directly. Both are collected here, so one table
+   * answers "what came in, what went out, when, to which room, and who moved it".
+   */
+  function projectMovements(id) {
+    var orders = db.col('wa_purchases').filter(function (o) { return o.project === id; })
+      .map(function (o) { return o.id; });
+    return db.col('wa_movements').filter(function (m) {
+      return m.ref === id || (m.order && orders.indexOf(m.order) >= 0);
+    }).slice().sort(function (a, b) {
+      var x = String(a.date || ''), y = String(b.date || '');
+      if (x === y) return String(b.id).localeCompare(String(a.id));
+      return x < y ? 1 : -1;
+    });
+  }
+
+  var MOVE_TONE = { Receipt:'good', Issue:'', Adjustment:'warn', Wastage:'bad' };
+
+  function materialName(matId) {
+    var m = db.col('wa_materials').filter(function (x) { return x.id === matId; })[0];
+    return m ? m.name : matId;
+  }
+  function spaceName(spaceId) {
+    var s = db.col('wa_spaces').filter(function (x) { return x.id === spaceId; })[0];
+    return s ? s.name : '';
+  }
+
+  function ledgerTable(id) {
+    var rows = projectMovements(id).map(function (m) {
+      return { id:m.id, date:m.date, kind:m.kind, material:materialName(m.material),
+        qty:+m.qty || 0, room:spaceName(m.space), against:m.order || m.ref || '',
+        by:m.by || '', note:m.note || '' };
+    });
+    return el('div.card', null, [ el('div.card-body', null, [ EPAL.table({
+      columns: [
+        { key:'date', label:'Date', date:true },
+        { key:'kind', label:'Kind', badge: MOVE_TONE },
+        { key:'material', label:'Material' },
+        { key:'qty', label:'Qty', num:true,
+          render: function (r) {
+            return '<span class="num ' + (r.qty >= 0 ? 'text-good' : 'text-bad') + '">' +
+              (r.qty >= 0 ? '+' : '') + ui.num(r.qty) + '</span>';
+          } },
+        { key:'room', label:'Room', render: function (r) { return r.room ? '<span class="badge">' + ui.escapeHtml(r.room) + '</span>' : '<span class="text-mute">—</span>'; } },
+        { key:'against', label:'Against' },
+        { key:'by', label:'By' },
+        { key:'note', label:'Note' }
+      ],
+      rows: rows,
+      searchKeys: ['material', 'room', 'against', 'by', 'note'],
+      filters: [{ key:'kind', label:'Kind' }, { key:'material', label:'Material' }],
+      exportName: 'woodart-project-ledger.csv',
+      pageSize: 15,
+      empty: { icon:'arrow-left-right', title:'Nothing has moved yet',
+        hint:'Deliveries and issues recorded in Materials appear here.' }
+    }).el ]) ]);
+  }
+
+  /**
+   * ONE MATERIAL'S STORY on this job: what was needed, what was ordered, what has
+   * arrived so far and what has gone to which room — the instalment view.
+   * Opened by clicking a row in the materials table.
+   */
+  function materialHistory(item, projectId) {
+    var needed = 0, byRoom = {};
+    db.col('wa_requirements').forEach(function (r) {
+      if (r.project !== projectId || r.item !== item) return;
+      needed += (+r.qty || 0);
+      byRoom[r.space] = byRoom[r.space] || { needed:0, used:0 };
+      byRoom[r.space].needed += (+r.qty || 0);
+    });
+
+    var mat = db.col('wa_materials').filter(function (m) { return m.name === item; })[0];
+    var ordered = 0;
+    db.col('wa_purchase_lines').forEach(function (l) {
+      if (l.project === projectId && l.item === item) ordered += (+l.qty || 0);
+    });
+
+    var received = 0, used = 0, rows = [];
+    projectMovements(projectId).forEach(function (m) {
+      if (!mat || m.material !== mat.id) return;
+      var q = +m.qty || 0;
+      if (q > 0) received += q; else used += -q;
+      if (m.space) { byRoom[m.space] = byRoom[m.space] || { needed:0, used:0 }; byRoom[m.space].used += -q; }
+      rows.push(m);
+    });
+
+    var body = el('div');
+    body.appendChild(el('div.stat-row.stat-compact.mb-2', null, [
+      st('Needed', ui.num(needed) + ' ' + (mat ? mat.unit : '')),
+      st('Ordered', ordered ? ui.num(ordered) : '—'),
+      st('Received', ui.num(received)),
+      st('Used', ui.num(used)),
+      st('Still to buy', ui.num(Math.max(0, needed - received)))
+    ]));
+
+    var roomIds = Object.keys(byRoom).filter(function (k) { return k; });
+    if (roomIds.length) {
+      body.appendChild(el('div.section-label.mt-0', { text:'BY ROOM' }));
+      var rl = el('div.data-list');
+      roomIds.forEach(function (k) {
+        var r = byRoom[k];
+        rl.appendChild(el('div.data-row', null, [
+          el('span.flex-1', { text: spaceName(k) || k }),
+          el('span.text-mute.xs', { text: 'needed ' + ui.num(r.needed) }),
+          el('span.num', { text: 'used ' + ui.num(r.used) })
+        ]));
+      });
+      body.appendChild(rl);
+    }
+
+    body.appendChild(el('div.section-label', { text:'EVERY MOVEMENT, NEWEST FIRST' }));
+    if (!rows.length) {
+      body.appendChild(el('p.text-mute.sm', { text:'Nothing has moved yet — this material is planned but not yet bought.' }));
+    } else {
+      var list = el('div.data-list');
+      rows.forEach(function (m) {
+        var q = +m.qty || 0;
+        list.appendChild(el('div.data-row', null, [
+          el('span.badge' + (MOVE_TONE[m.kind] ? '.badge-' + MOVE_TONE[m.kind] : ''), { text:m.kind }),
+          el('div.flex-1', null, [
+            el('div.fw-600', { text: (q >= 0 ? '+' : '') + ui.num(q) + (m.space ? ' · ' + spaceName(m.space) : '') }),
+            el('div.text-mute.xs', { text: (m.order || m.ref || '') + (m.note ? ' · ' + m.note : '') + (m.by ? ' — ' + m.by : '') })
+          ]),
+          el('span.text-mute.xs', { text: m.date ? ui.date(m.date) : '' })
+        ]));
+      });
+      body.appendChild(list);
+    }
+
+    ui.modal({ title: item, icon:'clock-history', size:'lg', body: body, footer:false });
+  }
+
+  function st(k, v) {
+    return el('div.stat', null, [ el('div.stat-label', { text:k }), el('div.stat-value', { text:String(v) }) ]);
   }
 
   /** Every desk that feeds this page, with what it holds for this project. */

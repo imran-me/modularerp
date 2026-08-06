@@ -1099,8 +1099,94 @@
         { id:'LOC-003', name:'Site Store',     kind:'Site',     area:'Munshiganj',   primary:false, created:dt(3) }
       ]);
     }
+    /* ========================================================================
+     * PURCHASE ORDER LINES — what an order actually orders (owner, 2026-08-06:
+     * *"a room needs 500 brick, so can buy 100, then 50 like that"*).
+     * ------------------------------------------------------------------------
+     * A purchase order used to record a supplier, a total and an item COUNT, so
+     * "ordered 500 bricks" was not a fact this system held — and neither was a
+     * part-delivery against it. A line carries the material and the quantity;
+     * the deliveries against it are receipts in the movement ledger, each with
+     * its own date. Ordered, received and still-to-come are then all readable
+     * from records rather than assumed.
+     * ====================================================================== */
+    if (localStorage.getItem(S.namespace + 'wa_purchase_lines') === null) {
+      var poLines = [], pl = 0;
+      /* [order, material name, qty, unit, rate] — quantities are the order's own
+       * amount divided by the rate, so a line and its order can never disagree. */
+      var PO_LINES = [
+        ['WPO-101', 'Rod — BSRM 60 grade', 10075, 'kg',  85],
+        ['WPO-102', 'Cement — 50 kg bag',    502, 'bag', 545],
+        ['WPO-103', 'Bricks (1st class)',  34500, 'pcs',  12],
+        ['WPO-104', 'Sand & bali',          3768, 'cft',  65],
+        ['WPO-105', 'Civil hardware & fixings', 1, 'lot', 24160],
+        ['WPO-106', 'Electrical points & wiring', 8, 'point', 2850],
+        ['WPO-107', 'Sanitary & plumbing set',    1, 'set',  7530]
+      ];
+      var matIdByName = {};
+      S.list('wa_materials').forEach(function (m) { matIdByName[m.name] = m.id; });
+
+      PO_LINES.forEach(function (l) {
+        poLines.push({ id: seq('POL', pl++, 4), companyId: 'woodart', order: l[0],
+          project: 'WAP-101', material: matIdByName[l[1]] || null, item: l[1],
+          qty: l[2], unit: l[3], unitCost: l[4] });
+      });
+      S.set('wa_purchase_lines', poLines);
+    }
+
+    /* ========================================================================
+     * THE MOVEMENT LEDGER — every delivery and every issue, dated.
+     * ------------------------------------------------------------------------
+     * Money has a ledger where each transaction is a row you can point at; the
+     * owner asked for the same for material (2026-08-06). So stock does not
+     * arrive in one lump and leave in another: it arrives in DELIVERIES against
+     * a purchase order, and leaves ROOM BY ROOM.
+     *
+     *   receipt   dated · against an order · into a location
+     *   issue     dated · to a ROOM (phase) · by a named person
+     *   wastage   dated · cutting waste and breakage
+     *
+     * THE INVARIANT IS UNCHANGED and still proven by Materials.reconcile(): for
+     * every material, the sum of its movements equals its stored stock. Splitting
+     * one receipt into three deliveries and one issue into eleven rooms changes
+     * the number of rows, never the total.
+     *
+     * Rooms get their share by AREA — the same split the requirements use — so
+     * "this room needed 6,250 bricks and used 5,800" reconciles both ways.
+     * ====================================================================== */
     if (localStorage.getItem(S.namespace + 'wa_movements') === null) {
       var moves = [], mv = 0;
+
+      /* Deliveries against each order — the instalments, in the order they came. */
+      var DELIVERIES = {
+        'Rod — BSRM 60 grade': [['WPO-101', 4000, '2026-03-14'], ['WPO-101', 3500, '2026-03-19'], ['WPO-101', 2575, '2026-03-24']],
+        'Cement — 50 kg bag':  [['WPO-102', 300,  '2026-03-22'], ['WPO-102', 202,  '2026-04-01']],
+        'Bricks (1st class)':  [['WPO-103', 15000,'2026-03-08'], ['WPO-103', 12000,'2026-03-13'], ['WPO-103', 7500, '2026-03-17']],
+        'Sand & bali':         [['WPO-104', 2000, '2026-03-05'], ['WPO-104', 1768, '2026-03-11']]
+      };
+
+      /* What left the store, and for which room. The dates run after the
+       * deliveries that supplied them — a room cannot use brick that has not
+       * arrived, and a ledger that says otherwise is not worth reading. */
+      var ISSUE_DATE = { 'Rod — BSRM 60 grade': '2026-03-26', 'Cement — 50 kg bag': '2026-04-04',
+                         'Bricks (1st class)': '2026-03-18', 'Sand & bali': '2026-03-12' };
+
+      /* the civil phases, by room, in area order — what an issue is issued TO */
+      var civilPhases = S.list('wa_phases').filter(function (p) { return p.name === 'Civil & Breaking'; });
+      var areaOfSpace = {};
+      S.list('wa_spaces').forEach(function (s) { areaOfSpace[s.id] = s.area; });
+
+      function splitAcrossRooms(total) {
+        var weights = civilPhases.map(function (p) { return areaOfSpace[p.space] || 1; });
+        var sum = weights.reduce(function (t, w) { return t + w; }, 0) || weights.length;
+        var raw = weights.map(function (w) { return total * w / sum; });
+        var out = raw.map(function (v) { return Math.floor(v); });
+        var used = out.reduce(function (t, n) { return t + n; }, 0);
+        var order = raw.map(function (v, i) { return [v - Math.floor(v), i]; })
+                       .sort(function (a, b) { return b[0] - a[0]; });
+        for (var k = 0; used < total; k++, used++) out[order[k % order.length][1]]++;
+        return out;
+      }
       /* WHAT THE VILLA HAS ACTUALLY CONSUMED, by material name. Only the four
        * civil bulk materials appear: the joinery phases have not started, so
        * not one sheet of plywood has left the workshop for this job — which is
@@ -1125,24 +1211,47 @@
         var used = CONSUMED[m.name] || [];
         var out = used.reduce(function (s, u) { return s + u[1]; }, 0);
         var wastage = out ? Math.max(1, Math.round(out * 0.02)) : 0;
-        /* opening receipt = whatever is left, plus everything that left again,
-           so the ledger nets EXACTLY to the stock already on the record */
         var opening = (+m.stock || 0) + out + wastage;
-        moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Receipt',
-          qty: opening, location: loc, ref: 'OPENING',
-          note: 'Opening stock on hand', by: 'System', date: dt(5), created: dt(5) });
+        var deliveries = DELIVERIES[m.name];
+
+        if (deliveries) {
+          /* Received in instalments, against the order that bought them. The
+           * instalments sum to the same opening quantity, so the invariant
+           * holds — it is the same stock, told as its history. */
+          var got = deliveries.reduce(function (t, d) { return t + d[1]; }, 0);
+          deliveries.forEach(function (d, i) {
+            var qty = d[1] + (i === deliveries.length - 1 ? (opening - got) : 0);
+            moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Receipt',
+              qty: qty, location: loc, ref: d[0], order: d[0],
+              note: 'Delivery ' + (i + 1) + ' of ' + deliveries.length + ' against ' + d[0],
+              by: 'Jahangir Alam', date: d[2], created: d[2] });
+          });
+        } else {
+          moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Receipt',
+            qty: opening, location: loc, ref: 'OPENING',
+            note: 'Opening stock on hand', by: 'System', date: dt(5), created: dt(5) });
+        }
+
         used.forEach(function (u) {
-          moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Issue',
-            qty: -u[1], location: loc, ref: u[0],
-            note: 'Issued to ' + u[0], by: 'Jahangir Alam', date: u[2], created: u[2] });
+          /* Issued ROOM BY ROOM, split by area exactly as the requirements were,
+           * so "this room needed 6,250 and used 5,800" reconciles both ways. */
+          var parts = splitAcrossRooms(u[1]);
+          civilPhases.forEach(function (p, i) {
+            if (!parts[i]) return;
+            moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Issue',
+              qty: -parts[i], location: loc, ref: u[0], phase: p.id, space: p.space,
+              note: 'Issued to ' + (S.list('wa_spaces').filter(function (x) { return x.id === p.space; })[0] || {}).name,
+              by: 'Jahangir Alam', date: ISSUE_DATE[m.name] || u[2], created: ISSUE_DATE[m.name] || u[2] });
+          });
         });
+
         if (wastage) {
           moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Wastage',
-            qty: -wastage, location: loc, ref: '',
+            qty: -wastage, location: loc, ref: 'WAP-101',
             note: 'Cutting waste and breakage', by: 'Jahangir Alam', date: dt(1), created: dt(1) });
         }
       });
-      S.set('wa_movements', moves);
+            S.set('wa_movements', moves);
     }
 
     /* ============================ IT SOLUTIONS ==============================*/
