@@ -35,6 +35,9 @@
   var CID = 'woodart';
 
   var STAGES = ['Design', 'Production', 'Installation', 'Handover', 'Completed'];
+  /* The four SECTIONS of this module. Anything else in the sub slot is a
+   * PROJECT ID — that is how #/woodart/projects/WAP-101 opens the profile. */
+  var SECTIONS = ['active', 'design', 'milestones', 'gallery'];
   var STAGE_COLOR = {
     Design:'#7b5cff', Production:'#2f6bff', Installation:'#f4b740',
     Handover:'#1A43BF', Completed:'#23c17e'
@@ -106,6 +109,34 @@
     render: function (ctx) {
       var sub = ctx.subId || 'active';
       var page = el('div.page');
+
+      /* THE PROFILE. Clicking a project in the register lands here — the whole
+       * job on one page. Read-only: every number is derived from the desk that
+       * owns it, and those desks are linked at the bottom of the page. An id
+       * that no longer resolves falls through to the register rather than
+       * rendering an empty screen. */
+      var open = SECTIONS.indexOf(sub) < 0 ? project(sub) : null;
+      if (open) {
+        page.appendChild(EPAL.pageHead({
+          eyebrow:'Woodart › Projects', icon:'easel2-fill',
+          /* The SHORT name in the head bar: a full project name plus three
+           * action buttons overflows the one-line head and clips. The whole
+           * name sits on the band immediately below, where it has the room. */
+          title: String(open.name).split(' — ')[0],
+          sub:'The whole job on one page — progress, quoted against spent, room by room and material by material.',
+          actions: [
+            el('a.btn.btn-ghost', { href:'#/woodart/projects/active', html: ui.icon('arrow-left') + ' All Projects' }),
+            el('button.btn.btn-ghost', { html: ui.icon('layout-sidebar-inset-reverse') + ' Details & Billing',
+              onclick: function () { projectDrawer(open.id); } }),
+            el('button.btn.btn-primary', { html: ui.icon('pencil') + ' Edit Project',
+              onclick: function () { editProject(open); } })
+          ]
+        }));
+        projectProfile(page, open);
+        ctx.mount.appendChild(page);
+        return;
+      }
+
       var map = { active:'Active Projects', design:'Design Studio', milestones:'Milestones & Billing', gallery:'Gallery' };
       page.appendChild(EPAL.pageHead({
         eyebrow:'Woodart › Projects', icon:'easel2-fill',
@@ -130,6 +161,318 @@
       design:'Design-build pipeline board — drag a project card to advance its stage.',
       milestones:'Production and installation milestones, snag status and client billing ledger.',
       gallery:'Visual portfolio wall — every Woodart interior at a glance.' }[sub]) || '';
+  }
+
+
+  /* ==========================================================================
+   * THE PROJECT PROFILE  ·  #/woodart/projects/WAP-101
+   * --------------------------------------------------------------------------
+   * Click a project in the register and this is what opens: the WHOLE job on one
+   * page — progress, what was quoted, what has been spent, what is left, room by
+   * room and head by head, down to how much of each material has been used.
+   *
+   * IT IS READ-ONLY, ON PURPOSE (owner, 2026-08-06: *"all other things, such as
+   * budgeting, project phase building, materials all happen in the dedicated
+   * sections"*). Nothing is entered here. Every figure is derived from the desks
+   * that own it — Spaces & Phases, Estimates & BOQ, Materials, Accounts — so the
+   * page cannot drift from them and there is never a second place to edit a
+   * number. Where the detail lives, it links.
+   *
+   * WHERE EVERY NUMBER COMES FROM
+   *   quoted        wa_estimates.lines of the approved BOQ (qty × unitCost)
+   *   spent         acc_entries, kind Expense, ref = this project
+   *   billed        acc_entries, kind Income,  ref = this project
+   *   per head      both of the above grouped by cost code
+   *   rooms         wa_spaces + wa_phases, progress weighted by planned cost
+   *   materials     wa_requirements (quoted qty) vs wa_movements (issued qty)
+   *
+   * ⚠️ ORDERED / RECEIVED PER MATERIAL IS NOT SHOWN, and that is deliberate: a
+   * purchase order records a supplier, a total and an item COUNT — no quantity
+   * per material. Showing an empty column would read as "nothing ordered" rather
+   * than "not recorded". It arrives when purchase orders get real lines.
+   *
+   * STYLE NOTE: this file is the legacy hand-written screen (ROOT-MAP §6 puts its
+   * rebuild at #9), so this block is written in the same el() idiom as the rest
+   * of it rather than in the template.html standard. It converts with the module.
+   * ======================================================================== */
+  function projectProfile(page, p) {
+    var id = p.id;
+    var boq = estimates().filter(function (e) {
+      return e.project === id && (e.status === 'Approved' || e.status === 'Sent');
+    });
+    var lines = [];
+    boq.forEach(function (e) { (e.lines || []).forEach(function (l) { lines.push(l); }); });
+
+    var entries = db.col('acc_entries').filter(function (e) { return e.ref === id; });
+    var spent = 0, billed = 0;
+    entries.forEach(function (e) {
+      if (e.kind === 'Income') billed += (+e.amount || 0); else spent += (+e.amount || 0);
+    });
+
+    var quoted = 0, quotedSale = 0;
+    lines.forEach(function (l) {
+      quoted += (+l.qty || 0) * (+l.unitCost || 0);
+      quotedSale += (+l.qty || 0) * (+l.unitSale || 0);
+    });
+
+    var spaces = db.col('wa_spaces').filter(function (s) { return s.project === id; })
+      .sort(function (a, b) { return (+a.sort || 0) - (+b.sort || 0); });
+    var phases = db.col('wa_phases').filter(function (f) { return f.project === id; });
+    var reqs = db.col('wa_requirements').filter(function (r) { return r.project === id; });
+
+    /* ---- the header band, on every screenful ---------------------------- */
+    var prog = Math.max(0, Math.min(100, +p.progress || 0));
+    var dl = daysLeft(p.deadline);
+    var head = el('div.card.mb-3', null, [
+      el('div.card-pad', null, [
+        el('div.flex.items-center.gap-2', null, [
+          el('div.flex-1', null, [
+            el('h2', { text: p.name }),
+            el('div.text-mute.sm', { text: (p.client || '—') + ' · ' + id + ' · ' + (p.designer || 'no lead designer') })
+          ]),
+          el('span.badge.badge-accent', { text: p.stage || '—' }),
+          el('span.badge' + (isNaN(dl) ? '' : dl < 0 ? '.badge-bad' : dl < 30 ? '.badge-warn' : ''),
+            { text: isNaN(dl) ? 'no deadline' : (dl < 0 ? Math.abs(dl) + 'd overdue' : dl + 'd left') })
+        ]),
+        el('div.progress.mt-2', null, [ el('div.progress-bar', { style:{ width: prog + '%' } }) ]),
+        el('div.text-mute.xs.mt-1', { text: prog + '% complete · ' + ui.date(p.start) + ' → ' + ui.date(p.deadline) })
+      ])
+    ]);
+    page.appendChild(head);
+
+    page.appendChild(el('div.kpi-grid.kpi-compact.stagger', null, [
+      kpi('Contract', ui.money(+p.value || 0, { compact:true }), 'file-earmark-text'),
+      kpi('Quoted Cost', ui.money(quoted, { compact:true }), 'calculator'),
+      kpi('Spent So Far', ui.money(spent, { compact:true }), 'cash-stack'),
+      kpi('Billed', ui.money(billed, { compact:true }), 'receipt'),
+      kpi('Left To Spend', ui.money(Math.max(0, quoted - spent), { compact:true }), 'wallet2')
+    ]));
+
+    /* ---- one plain sentence: what needs you today ----------------------- */
+    page.appendChild(attentionLine(p, phases, lines, entries));
+
+    /* ---- QUOTED vs SPENT, per head — the control view ------------------- */
+    page.appendChild(el('div.section-label', { text:'QUOTED vs SPENT — BY HEAD' }));
+    page.appendChild(headTable(lines, entries));
+
+    /* ---- the rooms ------------------------------------------------------ */
+    page.appendChild(el('div.section-label', { text:'ROOMS — ' + spaces.length + ' SPACES' }));
+    page.appendChild(roomTable(spaces, phases, reqs));
+
+    /* ---- material trajectory ------------------------------------------- */
+    page.appendChild(el('div.section-label', { text:'MATERIALS — QUOTED vs USED' }));
+    page.appendChild(materialTable(reqs, id));
+
+    /* ---- where the detail lives ---------------------------------------- */
+    page.appendChild(el('div.section-label', { text:'THE DESKS THAT FEED THIS PAGE' }));
+    page.appendChild(deskLinks(id, spaces.length, phases.length));
+  }
+
+  /** THE SENTENCE. Same rules the screens use, said in one line: over-spent
+   *  heads, late phases, work with nobody on it. Silence is a healthy job. */
+  function attentionLine(p, phases, lines, entries) {
+    var TODAY = '2026-07-05';
+    var msgs = [];
+
+    var byHead = groupHeads(lines, entries);
+    var over = byHead.filter(function (h) { return h.spent > h.quoted && h.quoted > 0; });
+    over.forEach(function (h) { msgs.push(h.code + ' is ' + h.pct + '% spent'); });
+
+    var late = phases.filter(function (f) {
+      return f.status !== 'Complete' && f.finish && String(f.finish) < TODAY;
+    }).length;
+    if (late) msgs.push(late + ' phase' + (late === 1 ? '' : 's') + ' past their finish date');
+
+    var unassigned = phases.filter(function (f) {
+      return f.status !== 'Complete' && !f.ownerId;
+    }).length;
+    if (unassigned) msgs.push(unassigned + ' phase' + (unassigned === 1 ? '' : 's') + ' with nobody responsible');
+
+    if (!msgs.length) {
+      return el('div.build-banner', null, [ ui.frag(ui.icon('check2-circle')),
+        el('div', { html: '<strong>Nothing needs attention.</strong> No head is over its quote, ' +
+          'nothing is past its date, and every open phase has a name against it.' }) ]);
+    }
+    return el('div.build-banner', null, [ ui.frag(ui.icon('exclamation-diamond')),
+      el('div', { html: msgs.join(' · ') }) ]);
+  }
+
+  /** Quoted and spent per cost code, from the two sources that own them. */
+  function groupHeads(lines, entries) {
+    var bag = {};
+    lines.forEach(function (l) {
+      var c = l.code || 'Other Expense';
+      bag[c] = bag[c] || { code: c, quoted: 0, spent: 0 };
+      bag[c].quoted += (+l.qty || 0) * (+l.unitCost || 0);
+    });
+    entries.forEach(function (e) {
+      if (e.kind === 'Income') return;
+      var c = e.category || 'Other Expense';
+      bag[c] = bag[c] || { code: c, quoted: 0, spent: 0 };
+      bag[c].spent += (+e.amount || 0);
+    });
+    return Object.keys(bag).map(function (k) {
+      var h = bag[k];
+      h.left = h.quoted - h.spent;
+      h.pct = h.quoted > 0 ? Math.round(h.spent / h.quoted * 100) : (h.spent ? 100 : 0);
+      return h;
+    }).sort(function (a, b) { return b.quoted - a.quoted; });
+  }
+
+  function headTable(lines, entries) {
+    var rows = groupHeads(lines, entries);
+    return el('div.card', null, [ el('div.card-body', null, [ EPAL.table({
+      columns: [
+        { key:'code', label:'Head', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.code) + '</span>'; } },
+        { key:'quoted', label:'Quoted', num:true, money:true },
+        { key:'spent', label:'Spent', num:true, money:true },
+        { key:'left', label:'Left', num:true,
+          render: function (r) {
+            if (!r.quoted) return '<span class="text-mute">not quoted</span>';
+            return '<span class="num ' + (r.left < 0 ? 'text-bad' : '') + '">' + ui.money(r.left) + '</span>';
+          } },
+        { key:'pct', label:'Used', num:true,
+          render: function (r) {
+            if (!r.quoted) return '<span class="text-mute">—</span>';
+            if (!r.spent) return '<span class="text-mute">not started</span>';
+            var tone = r.pct > 100 ? 'text-bad' : r.pct > 90 ? 'text-warn' : '';
+            return '<span class="num strong ' + tone + '">' + r.pct + '%</span>' + (r.pct > 100 ? ' ▲' : '');
+          } }
+      ],
+      rows: rows,
+      searchKeys: ['code'],
+      exportName: 'woodart-project-heads.csv',
+      pageSize: 25,
+      empty: { icon:'calculator', title:'Nothing quoted yet', hint:'Approve a BOQ in Estimates & BOQ.' }
+    }).el ]) ]);
+  }
+
+  /** Room by room: how far it has got, and what it was planned to cost. */
+  function roomTable(spaces, phases, reqs) {
+    var rows = spaces.map(function (s) {
+      var mine = phases.filter(function (f) { return f.space === s.id; });
+      var done = mine.filter(function (f) { return f.status === 'Complete'; }).length;
+      var planned = 0;
+      reqs.forEach(function (r) { if (r.space === s.id) planned += (+r.qty || 0) * (+r.unitCost || 0); });
+      /* weighted by what each phase is worth — a ৳4L wood-work phase must not
+         count the same as a ৳15,000 handover (the same rule the board uses) */
+      var wAll = 0, wDone = 0;
+      mine.forEach(function (f) {
+        var w = 0;
+        reqs.forEach(function (r) { if (r.phase === f.id) w += (+r.qty || 0) * (+r.unitCost || 0); });
+        w = w || 1;
+        wAll += w;
+        if (f.status === 'Complete') wDone += w;
+      });
+      return { id:s.id, name:s.name, kind:s.kind, area:+s.area || 0,
+        phases: mine.length, done: done, planned: planned,
+        pct: wAll ? Math.round(wDone / wAll * 100) : 0,
+        active: mine.filter(function (f) { return f.status === 'Active'; }).length };
+    });
+
+    return el('div.card', null, [ el('div.card-body', null, [ EPAL.table({
+      columns: [
+        { key:'name', label:'Room', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.name) + '</span>'; } },
+        { key:'kind', label:'Kind', render: function (r) { return '<span class="badge">' + ui.escapeHtml(r.kind || '—') + '</span>'; } },
+        { key:'area', label:'Area', num:true, render: function (r) { return r.area ? ui.num(r.area) + ' <span class="text-mute xs">sft</span>' : '—'; } },
+        { key:'done', label:'Phases', num:true,
+          render: function (r) { return '<span class="num">' + r.done + ' of ' + r.phases + '</span>' +
+            (r.active ? ' <span class="badge badge-accent">' + r.active + ' active</span>' : ''); } },
+        { key:'pct', label:'Complete', num:true,
+          render: function (r) { return '<span class="num strong">' + r.pct + '%</span>'; } },
+        { key:'planned', label:'Planned Cost', num:true, money:true }
+      ],
+      rows: rows,
+      searchKeys: ['name', 'kind'],
+      onRow: function (r) { EPAL.router.navigate('woodart/scope/phases', { p: projectOfSpace(r.id) }); },
+      exportName: 'woodart-project-rooms.csv',
+      pageSize: 20,
+      empty: { icon:'door-closed', title:'No rooms yet', hint:'Break the project into spaces in Spaces & Phases.' }
+    }).el ]) ]);
+  }
+
+  function projectOfSpace(spaceId) {
+    var s = db.col('wa_spaces').filter(function (x) { return x.id === spaceId; })[0];
+    return s ? s.project : null;
+  }
+
+  /** Quoted quantity against what has actually left the store for this job. */
+  function materialTable(reqs, projectId) {
+    var issued = {};
+    db.col('wa_movements').forEach(function (m) {
+      if (m.kind !== 'Issue' || m.ref !== projectId) return;
+      var mat = db.col('wa_materials').filter(function (x) { return x.id === m.material; })[0];
+      if (!mat) return;
+      issued[mat.name] = (issued[mat.name] || 0) + Math.abs(+m.qty || 0);
+    });
+
+    var bag = {};
+    reqs.forEach(function (r) {
+      if (r.kind !== 'material') return;
+      bag[r.item] = bag[r.item] || { item:r.item, unit:r.unit || '', qty:0, cost:0, rooms:{} };
+      bag[r.item].qty += (+r.qty || 0);
+      bag[r.item].cost += (+r.qty || 0) * (+r.unitCost || 0);
+      bag[r.item].rooms[r.space] = 1;
+    });
+
+    var rows = Object.keys(bag).map(function (k) {
+      var b = bag[k];
+      b.used = issued[b.item] || 0;
+      b.left = b.qty - b.used;
+      b.rooms = Object.keys(b.rooms).length;
+      return b;
+    }).sort(function (a, b) { return b.cost - a.cost; });
+
+    return el('div.card', null, [ el('div.card-body', null, [ EPAL.table({
+      columns: [
+        { key:'item', label:'Material', render: function (r) { return '<span class="strong">' + ui.escapeHtml(r.item) + '</span>'; } },
+        { key:'qty', label:'Quoted', num:true,
+          render: function (r) { return '<span class="num">' + ui.num(r.qty) + '</span> <span class="text-mute xs">' + ui.escapeHtml(r.unit) + '</span>'; } },
+        { key:'used', label:'Used So Far', num:true,
+          render: function (r) { return r.used ? '<span class="num">' + ui.num(r.used) + '</span>' : '<span class="text-mute">none yet</span>'; } },
+        { key:'left', label:'Left of Quote', num:true,
+          render: function (r) {
+            var tone = r.left < 0 ? 'text-bad' : '';
+            return '<span class="num ' + tone + '">' + ui.num(r.left) + '</span>' + (r.left < 0 ? ' ▲ over' : '');
+          } },
+        { key:'cost', label:'Quoted Cost', num:true, money:true },
+        { key:'rooms', label:'Rooms', num:true }
+      ],
+      rows: rows,
+      searchKeys: ['item'],
+      exportName: 'woodart-project-materials.csv',
+      pageSize: 20,
+      empty: { icon:'boxes', title:'No material planned', hint:'Add material lines to the phases in Spaces & Phases.' }
+    }).el ]) ]);
+  }
+
+  /** Every desk that feeds this page, with what it holds for this project. */
+  function deskLinks(id, spaceCount, phaseCount) {
+    var links = [
+      ['Spaces & Phases', 'diagram-3', 'woodart/scope/spaces', spaceCount + ' rooms · ' + phaseCount + ' phases'],
+      ['Estimates & BOQ', 'calculator', 'woodart/estimates/boq', 'the quotation and its lines'],
+      ['Design & 3D', 'vector-pen', 'woodart/design/register', db.col('wa_drawings').filter(function (d) { return d.project === id; }).length + ' drawings'],
+      ['Procurement', 'cart-fill', 'woodart/procurement/orders', db.col('wa_purchases').filter(function (o) { return o.project === id; }).length + ' orders'],
+      ['Workshop', 'hammer', 'woodart/production/jobs', productionOf(id).length + ' jobs'],
+      ['Site & Install', 'truck', 'woodart/installation/schedule', installsOf(id).length + ' site visits'],
+      ['Accounts', 'cash-stack', 'woodart/accounts/pnl', 'income, expenses and P&L']
+    ];
+    var grid = el('div.grid-auto');
+    links.forEach(function (l) {
+      grid.appendChild(el('a.card.hover', { href:'#/' + l[2] + (l[2].indexOf('scope') >= 0 ? '?p=' + id : '') }, [
+        el('div.card-pad', null, [
+          el('div.flex.items-center.gap-2', null, [
+            ui.frag(ui.icon(l[1])),
+            el('div.flex-1', null, [
+              el('div.fw-600', { text: l[0] }),
+              el('div.text-mute.xs', { text: l[3] })
+            ]),
+            ui.frag(ui.icon('chevron-right'))
+          ])
+        ])
+      ]));
+    });
+    return grid;
   }
 
   /* ============================================================ ACTIVE SITES */
@@ -169,7 +512,7 @@
         var dlTone = isNaN(dl) ? '' : dl < 0 ? 'text-bad' : dl < 30 ? 'text-warn' : '';
         var dlLbl = isNaN(dl) ? '—' : (dl < 0 ? Math.abs(dl) + 'd overdue' : dl + 'd left');
         var col = STAGE_COLOR[p.stage] || '#6f9c1c';
-        grid.appendChild(el('div.card.hover', { style:{ cursor:'pointer' }, onclick: (function (pid) { return function () { projectDrawer(pid, draw); }; })(p.id) }, [
+        grid.appendChild(el('div.card.hover', { style:{ cursor:'pointer' }, onclick: (function (pid) { return function () { EPAL.router.navigate('woodart/projects/' + pid); }; })(p.id) }, [
           el('div.card-pad', null, [
             el('div.flex.items-center.gap-2', null, [
               el('div.flex-1', null, [

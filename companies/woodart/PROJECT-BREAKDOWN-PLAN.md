@@ -10,10 +10,12 @@ yet) and `ROOT-MAP.md` (the phase model).
 > |---|---|
 > | **1 · `scope` module — spaces, phase board, assignment** | ✅ **built** — `companies/woodart/modules/scope/` · sweep 257/257 both themes · probe `tools/verify/scope.mjs` 20/20 |
 > | **2 · `wa_requirements` + Material Demand** | ✅ **built** — per-phase material · labour · contract lines, the drawer's line editor, `#/woodart/scope/materials` · sweep 258/258 · probe 34/34 |
-> | 3 · Estimates → Quotation Builder | ⬜ next |
-> | 4 · `contractors` module — hiring + labour estimate | ⬜ |
-> | 5 · budget lines derived; committed cost | ⬜ |
-> | 6 · Laravel slice per module | ⬜ (contracts frozen in each `backend/endpoints.md`) |
+> | **3 · Project profile** (`#/woodart/projects/<id>`) | ✅ **built** — brought forward at the owner's request: progress, quoted vs spent by head, rooms, material use. Read-only; every desk that owns a number is linked |
+> | **· Interior backend** | ✅ **built** — the scope Laravel slice + one-project seeders + `epal:reseed woodart`, because the live site runs in API mode |
+> | 4 · Estimates → Quotation Builder | ⬜ next |
+> | 5 · `contractors` module — hiring + labour estimate | ⬜ |
+> | 6 · purchase-order lines → ordered/received per material | ⬜ (what the profile's trajectory still lacks) |
+> | 7 · committed cost on the profile | ⬜ |
 
 > **The owner's words (2026-08-06):** *"There will be option to register a new
 > project, where we will divide the project into subproject like Bed Room,

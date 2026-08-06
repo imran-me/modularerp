@@ -147,7 +147,27 @@ what is needed; it deliberately does not buy anything by itself.
 
 ---
 
-## 7 · Watch the money
+## 7 · The project profile — the whole job on one page
+
+**Projects → click any project** (or go straight to `#/woodart/projects/WAP-101`).
+
+This is the monitoring page. Nothing is entered here — every figure is derived
+from the desks that own it, so it cannot drift from them:
+
+- **Header** — contract, quoted cost, spent so far, billed, left to spend,
+  progress, days left
+- **One line in plain English** telling you what needs attention today
+  ("Rod is 101% spent · 1 phase past its finish date · 11 phases with nobody
+  responsible"). Silence on that line means the job is healthy.
+- **Quoted vs Spent, by head** — Rod, Cement, Contractor, Electrical…, each with
+  what is left and the percentage used. Red only where spent has passed quoted.
+- **Rooms** — each space: phases done, % complete (weighted by what each phase
+  is worth), planned cost
+- **Materials** — quoted quantity against what has actually been used, per item
+- **The desks** — links to Spaces & Phases, BOQ, Design, Procurement, Workshop,
+  Site and Accounts, each showing what it holds for this project
+
+## 8 · Watch the money
 
 **Accounts → Project P&L** — one row per project:
 
@@ -169,14 +189,15 @@ workshop rent, and wrong for a delivery to site.
 
 ---
 
-## 8 · What to look at each morning
+## 9 · What to look at each morning
 
-1. **Phase Board** — anything overdue? anyone unassigned?
-2. **Team Load** — who is carrying too much, and who is free
-3. **Material Demand** — anything in the To Buy column
-4. **Design → Approvals** — what is sitting with the client
-5. **Site & Install → Snags** — what is blocking a handover
-6. **Accounts → Project P&L** — is the margin still what you sold
+1. **The project profile** — the attention line at the top says it in a sentence
+2. **Phase Board** — anything overdue? anyone unassigned?
+3. **Team Load** — who is carrying too much, and who is free
+4. **Material Demand** — anything in the To Buy column
+5. **Design → Approvals** — what is sitting with the client
+6. **Site & Install → Snags** — what is blocking a handover
+7. **Accounts → Project P&L** — is the margin still what you sold
 
 ---
 
@@ -195,6 +216,10 @@ Being straight about the edges:
   expenses do.
 - **Billing is per project, not per room.** A room's cost is visible; invoicing
   one room on its own is not.
+- **Ordered and received quantities are not tracked per material.** A purchase
+  order records a supplier, a total and an item count — so the profile shows
+  quoted against *used*, not against *bought*. That column arrives when purchase
+  orders get real lines.
 
 ---
 
