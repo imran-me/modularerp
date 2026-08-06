@@ -1,0 +1,77 @@
+/* ============================================================================
+ * WOODART · SPACES & PHASES (scope) · MODULE STYLESHEET
+ * ----------------------------------------------------------------------------
+ * ONE CONCEPT ONLY: the PHASE STRIP — the run of steps a space moves through
+ * (Design → Colour → Wood Work → Furniture), shown in order with its status.
+ *
+ * WHY THIS FILE EXISTS AT ALL. Per UI-CONTRACT §5 a module stylesheet is for
+ * "effects and concepts unique to this module", never for restyling shared
+ * components — and nothing here touches .card, .btn, .badge or any other shared
+ * class. A sequence of ordered, status-toned steps is genuinely a concept the
+ * shared vocabulary has no word for: a .badge says WHAT something is, it does
+ * not say "third of seven, in progress". Expressing it with utilities instead
+ * would mean adding new tw- classes for one screen's ornament.
+ *
+ * EVERY COLOUR IS A TOKEN, so both themes and every company accent work for
+ * free — there is not a single hex in this file (UI-CONTRACT §5).
+ * Namespace: .wa-scope-… (module-owned, per MODULE-STANDARD §2.2).
+ * ==========================================================================*/
+
+/* The strip itself — wraps rather than scrolls, because a kitchen can carry ten
+ * phases and a hidden phase is a phase nobody assigns. */
+.wa-scope-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* One step. Sized off the same tokens as .badge so the two read as siblings
+ * rather than as two different design languages on one card. */
+.wa-scope-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  color: var(--text-mute);
+  white-space: nowrap;
+}
+
+.wa-scope-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-mute);
+}
+
+/* ACTIVE — the phase the space is on right now. Carries the company accent, so
+ * a Woodart board is green and a Travels one is blue without a second rule. */
+.wa-scope-step.is-active {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: var(--text);
+}
+.wa-scope-step.is-active .wa-scope-dot { background: var(--accent); }
+
+/* COMPLETE — done and behind us. */
+.wa-scope-step.is-complete {
+  border-color: color-mix(in srgb, var(--good) 35%, transparent);
+  color: var(--good);
+}
+.wa-scope-step.is-complete .wa-scope-dot { background: var(--good); }
+
+/* LATE — open, and past its finish date. Deliberately only the DOT changes:
+ * the step still reads as its own status, with the alarm sitting on top of it
+ * rather than replacing it. */
+.wa-scope-step.is-late { border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.wa-scope-step.is-late .wa-scope-dot { background: var(--bad); }
+
+/* UNASSIGNED — nobody is responsible yet. A dashed edge, so it reads as "not
+ * settled" at a glance without competing with the status colours above. */
+.wa-scope-step.is-unassigned { border-style: dashed; }

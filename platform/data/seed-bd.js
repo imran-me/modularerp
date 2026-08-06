@@ -320,25 +320,162 @@
       S.set('wa_budget_lines', budget);
     }
 
-    /* Phases as PARALLEL rows. Status is DERIVED from the project's headline
-     * stage, so the phase strip agrees with the stage badge instead of
-     * contradicting it. Structure is skipped for anything that is not civil
-     * work — an empty "Structure 0%" row on a fit-out is noise. */
-    if (localStorage.getItem(S.namespace + 'wa_phases') === null) {
-      var PHASES = ['Design','Structure','Joinery','Services','Finishes','Site'];
-      var STAGE2PHASE = { Design:'Design', Production:'Joinery', Installation:'Site', Handover:'Site', Completed:'Site' };
-      var rows = [];
+    /* ==================== WOODART · SPACES → PHASES ==========================
+     * The owner's shape (2026-08-06, companies/woodart/PROJECT-BREAKDOWN-PLAN.md):
+     * a project is divided into SPACES (Master Bed Room · Kitchen · Dining Room),
+     * and each space runs its own PHASES (Design → Colour → Wood Work →
+     * Furniture), each with one person responsible.
+     *
+     *   wa_projects → wa_spaces → wa_phases          (wa_phase_templates seeds
+     *                                                 the phase list per kind)
+     *
+     * ⚠️ `wa_phases` CHANGED SHAPE HERE. It was seeded on 2026-07-28 as
+     * PROJECT-level parallel rows for the cost-control plan and read by NO
+     * screen — grep the repo, the only mentions were this seeder and the plan
+     * document. Phases now belong to a SPACE (a fit-out finishes the kitchen
+     * while the bedroom has not started; one flat list per project cannot say
+     * that), and the project-level view is DERIVED, so the two levels can never
+     * disagree. Because nothing consumed the old rows, replacing them cannot
+     * change a pixel — see the re-seed guard below, which also upgrades a
+     * browser that still holds the old shape. */
+
+    /* The phase list per space kind. DATA, NOT CODE — adding "Smart Home" to a
+     * bedroom is a row here, not a deploy, exactly like the cost-code list.
+     * Every `code` is an id from wa_cost_codes above, so plan, purchase and
+     * actual all speak one vocabulary. */
+    if (localStorage.getItem(S.namespace + 'wa_phase_templates') === null) {
+      var TPL = [
+        ['Bedroom',   [['Design','Design Fee'],['Electrical','Electrical'],['False Ceiling','False Ceiling'],
+                       ['Wood Work','Wood Work'],['Colour & Paint','Paint'],['Furniture','Boards & Ply'],
+                       ['Handover','Installation']]],
+        ['Kitchen',   [['Design','Design Fee'],['Civil & Breaking','Bricks & Breaking'],['Plumbing','Sanitary'],
+                       ['Electrical','Electrical'],['Tiles','Tiles Work'],['Wood Work','Wood Work'],
+                       ['Counter & Stone','Metal'],['Colour & Paint','Paint'],['Appliances & Fit-out','Hardware'],
+                       ['Handover','Installation']]],
+        ['Dining',    [['Design','Design Fee'],['Electrical','Electrical'],['False Ceiling','False Ceiling'],
+                       ['Wood Work','Wood Work'],['Colour & Paint','Paint'],['Furniture','Boards & Ply'],
+                       ['Handover','Installation']]],
+        ['Living',    [['Design','Design Fee'],['3D & Visualisation','3D & Visualisation'],['Electrical','Electrical'],
+                       ['False Ceiling','False Ceiling'],['Wood Work','Wood Work'],['Colour & Paint','Paint'],
+                       ['Furniture','Fabric & Foam'],['Handover','Installation']]],
+        ['Bath',      [['Design','Design Fee'],['Civil & Breaking','Bricks & Breaking'],['Plumbing','Sanitary'],
+                       ['Tiles','Tiles Work'],['Electrical','Electrical'],['Fittings','Hardware'],
+                       ['Handover','Installation']]],
+        ['Balcony',   [['Design','Design Fee'],['Tiles','Tiles Work'],['Aluminium & Glazing','Aluminium'],
+                       ['Colour & Paint','Paint'],['Handover','Installation']]],
+        ['Office',    [['Design','Design Fee'],['Electrical','Electrical'],['False Ceiling','False Ceiling'],
+                       ['Wood Work','Wood Work'],['Colour & Paint','Paint'],['Furniture','Boards & Ply'],
+                       ['Handover','Installation']]],
+        ['Reception', [['Design','Design Fee'],['3D & Visualisation','3D & Visualisation'],['Electrical','Electrical'],
+                       ['False Ceiling','False Ceiling'],['Wood Work','Wood Work'],['Metal & Signage','Metal'],
+                       ['Colour & Paint','Paint'],['Handover','Installation']]],
+        ['Retail',    [['Design','Design Fee'],['Electrical','Electrical'],['False Ceiling','False Ceiling'],
+                       ['Wood Work','Wood Work'],['Metal & Signage','Metal'],['Colour & Paint','Paint'],
+                       ['Handover','Installation']]],
+        ['Common',    [['Design','Design Fee'],['Electrical','Electrical'],['Wood Work','Wood Work'],
+                       ['Colour & Paint','Paint'],['Handover','Installation']]]
+      ];
+      S.set('wa_phase_templates', TPL.map(function (t, i) {
+        return { id: seq('TPL', i, 3), companyId: 'woodart', kind: t[0], sort: i,
+          phases: t[1].map(function (p) { return { name: p[0], code: p[1] }; }) };
+      }));
+    }
+
+    /* SPACES per project, chosen by the project TYPE — a duplex is broken down
+     * into rooms, an office into work areas. Deliberately not random names: a
+     * "Space 3" in a demo teaches nobody what the screen is for. */
+    if (localStorage.getItem(S.namespace + 'wa_spaces') === null) {
+      var LAYOUT = {
+        Residential: [['Master Bed Room','Bedroom',320],['Kitchen','Kitchen',140],['Dining Room','Dining',210],
+                      ['Living Room','Living',280],['Guest Bed Room','Bedroom',240],['Master Bath','Bath',80]],
+        Office:      [['Reception','Reception',180],['Workstation Area','Office',620],['MD Room','Office',260],
+                      ['Meeting Room','Office',240],['Pantry','Kitchen',110]],
+        Retail:      [['Display Floor','Retail',540],['Cash Counter','Retail',90],['Trial & Fitting','Retail',120],
+                      ['Store Room','Common',150]],
+        Restaurant:  [['Dining Hall','Dining',680],['Kitchen','Kitchen',320],['Reception & Waiting','Reception',140],
+                      ['Wash Area','Bath',90]]
+      };
+      var spaces = [], sn = 0;
       S.list('wa_projects').forEach(function (p) {
-        var cur = STAGE2PHASE[p.stage] || 'Design';
-        var ci = PHASES.indexOf(cur); if (ci < 0) ci = 0;
-        PHASES.forEach(function (name, i) {
-          if (name === 'Structure' && p.type !== 'Civil') return;
-          rows.push({ id: p.id + '::' + name, companyId: 'woodart', project: p.id, name: name, sort: i,
-            status: i < ci ? 'Complete' : (i === ci ? 'Active' : 'Not started'),
-            start: i <= ci ? p.start : null, finish: i < ci ? p.start : null });
+        var plan = LAYOUT[p.type] || LAYOUT.Residential;
+        // 3..N spaces per project — enough to show the hierarchy, never so many
+        // that a demo card grid stops being readable.
+        var count = Math.min(plan.length, ri(3, 5));
+        for (var i = 0; i < count; i++) {
+          spaces.push({ id: seq('SPC', sn++, 3), companyId: 'woodart', project: p.id,
+            name: plan[i][0], kind: plan[i][1], area: plan[i][2], sort: i + 1,
+            note: '', created: p.start || p.created });
+        }
+      });
+      S.set('wa_spaces', spaces);
+    }
+
+    /* PHASES per space, from the template for its kind. Status is DERIVED from
+     * the project's headline stage, so the phase strip agrees with the stage
+     * badge instead of contradicting it, and the responsible person comes from
+     * the REAL Woodart roster (design phases → the designer, wood work → the
+     * production supervisor, site work → the installation foreman) rather than
+     * from a random name generator.
+     *
+     * The guard re-seeds a browser still holding the pre-2026-08-06 project-level
+     * rows (no `space` key). That is safe precisely because no screen ever read
+     * them; it is the difference between an upgrade and a data loss. */
+    var phasesRaw = localStorage.getItem(S.namespace + 'wa_phases');
+    var phasesLegacy = phasesRaw !== null && (S.list('wa_phases')[0] || {}).space === undefined;
+    if (phasesRaw === null || phasesLegacy) {
+      /* The REAL Woodart roster (platform/data/database.js seedEmployees):
+       * EPL-0007 Imtiaz Chowdhury · Lead Interior Designer
+       * EPL-0008 Sumaiya Akter    · Production Supervisor
+       * EPL-0009 Jahangir Alam    · Installation Foreman
+       * Anything not named here falls to the production supervisor, who is the
+       * person a workshop phase belongs to by default. */
+      var OWNER_BY_PHASE = {
+        /* the drawing board */
+        'Design': 'EPL-0007', '3D & Visualisation': 'EPL-0007',
+        /* the workshop — anything fabricated or finished */
+        'False Ceiling': 'EPL-0008', 'Wood Work': 'EPL-0008', 'Furniture': 'EPL-0008',
+        'Counter & Stone': 'EPL-0008', 'Metal & Signage': 'EPL-0008', 'Colour & Paint': 'EPL-0008',
+        /* the site — trades, services and the handover */
+        'Civil & Breaking': 'EPL-0009', 'Electrical': 'EPL-0009', 'Plumbing': 'EPL-0009',
+        'Tiles': 'EPL-0009', 'Aluminium & Glazing': 'EPL-0009', 'Fittings': 'EPL-0009',
+        'Appliances & Fit-out': 'EPL-0009', 'Handover': 'EPL-0009'
+      };
+      var DEFAULT_OWNER = 'EPL-0008';
+      // How far through its phase list a space is, from the project's stage.
+      var STAGE_PCT = { Design: 0.15, Production: 0.5, Installation: 0.8, Handover: 0.92, Completed: 1 };
+      var tplByKind = {};
+      S.list('wa_phase_templates').forEach(function (t) { tplByKind[t.kind] = t.phases; });
+
+      var phaseRows = [], pn = 0;
+      S.list('wa_spaces').forEach(function (sp) {
+        var proj = S.list('wa_projects').filter(function (p) { return p.id === sp.project; })[0] || {};
+        var list = tplByKind[sp.kind] || tplByKind.Common || [];
+        var through = Math.round(list.length * (STAGE_PCT[proj.stage] != null ? STAGE_PCT[proj.stage] : 0.15));
+        list.forEach(function (t, i) {
+          // Every space of a Completed project is done; otherwise the phases
+          // before the cut are complete, the one at the cut is active.
+          var status = i < through ? 'Complete' : (i === through ? 'Active' : 'Not started');
+          // Some work with nobody on it is REAL, and only ever ahead of the
+          // current phase: it is the queue the board exists to shrink, and a
+          // demo where everything is already assigned teaches nothing. Work
+          // that has started always has a name against it.
+          var unowned = i > through + 1 && rnd() < 0.45;
+          phaseRows.push({ id: seq('PHS', pn++, 4), companyId: 'woodart', project: sp.project, space: sp.id,
+            name: t.name, code: t.code || '', sort: i + 1, status: status,
+            ownerId: unowned ? '' : (OWNER_BY_PHASE[t.name] || DEFAULT_OWNER),
+            start: i <= through ? (proj.start || null) : null,
+            /* A finish must never precede its start. Some seeded projects carry
+             * a deadline earlier than their start date (wa_projects is generated
+             * from two independent date helpers), and a phase row reading
+             * "22 Jul → 11 Jul" would look like a bug in the board rather than
+             * like the project data it came from. */
+            finish: i < through ? (proj.start || null)
+                  : (i === through && proj.deadline && proj.start && proj.deadline > proj.start
+                      ? proj.deadline : null),
+            note: '' });
         });
       });
-      S.set('wa_phases', rows);
+      S.set('wa_phases', phaseRows);
     }
 
     /* Woodart RECURRING COSTS — the bills that arrive every month whether or not

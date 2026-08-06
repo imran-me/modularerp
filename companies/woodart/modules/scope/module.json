@@ -1,0 +1,51 @@
+{
+  "key": "scope",
+  "company": "woodart",
+  "title": "Spaces & Phases",
+  "icon": "diagram-3-fill",
+  "desc": "Divide a project into spaces, run each through its phases, assign the person responsible.",
+  "route": "#/woodart/scope",
+  "enabled": true,
+  "menu": [
+    {
+      "id": "spaces",
+      "label": "Spaces",
+      "route": "#/woodart/scope",
+      "enabled": true
+    },
+    {
+      "id": "phases",
+      "label": "Phase Board",
+      "route": "#/woodart/scope/phases",
+      "enabled": true
+    },
+    {
+      "id": "load",
+      "label": "Team Load",
+      "route": "#/woodart/scope/load",
+      "enabled": true
+    }
+  ],
+  "stores": [
+    "wa_spaces",
+    "wa_phases",
+    "wa_phase_templates"
+  ],
+  "reads": [
+    "wa_projects",
+    "wa_cost_codes",
+    "employees"
+  ],
+  "files": {
+    "template": "frontend/template.html",
+    "api": "frontend/api.js",
+    "logic": "frontend/scope.js",
+    "style": "frontend/scope.css",
+    "view": "view.js",
+    "contract": "backend/endpoints.md",
+    "backend": "backend/LARAVEL-BLUEPRINT.md"
+  },
+  "note": "MODULE MANIFEST — the presence of THIS file is what auto-discovery HEAD-probes (platform/discovery/discovery.js). A module registered built:true in the company manifest but missing this file is treated as deleted, and every route renders empty with zero console errors.",
+  "ownership": "wa_phases was SEEDED for the cost-control plan on 2026-07-28 as project-level rows and read by no screen. This module owns it now and re-seeded it with a `space` foreign key, so there is one phase table rather than two competing ones; the project-level view is derived. wa_projects stays owned by `projects` — registering a project is still done there, so there is only ever one creation path.",
+  "plan": "companies/woodart/PROJECT-BREAKDOWN-PLAN.md — slice 1 of 6. Slice 2 adds wa_requirements (materials · labour · contracted work per phase) and the Material Demand screen."
+}

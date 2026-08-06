@@ -9,6 +9,7 @@
     "verify": "node tools/verify/sweep.mjs both",
     "verify:tw": "node tools/verify/tailwind.mjs",
     "verify:books": "node tools/verify/books.mjs trial",
+    "verify:scope": "node tools/verify/scope.mjs",
     "verify:all": "npm run verify:tw && npm run verify && npm run verify:books"
   },
   "devDependencies": {

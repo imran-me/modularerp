@@ -1,0 +1,333 @@
+<!-- ============================================================================
+  WOODART · SPACES & PHASES (scope) · MARKUP
+  ----------------------------------------------------------------------------
+  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.
+  Nothing here is built by JavaScript. There is no <script> tag and no <template>
+  tag in this file, by standing owner rule (companies/woodart/MODULE-STANDARD.md).
+
+  WHAT THE LOGIC FILE (frontend/scope.js) IS ALLOWED TO DO WITH THIS MARKUP
+  ---------------------------------------------------------------------------
+    [data-shell="x"]   reusable chrome (head bar, tab band)  → shell('x') clones it
+    [data-screen="x"]  a whole screen                        → screen('x') clones it
+    [data-fill="x"]    a slot a built widget drops into (a data grid, a select)
+    [data-k="x"]       a live scalar slot (a KPI number)     → fillK(node,'x',v)
+    [data-tab="x"]     a tab button — the logic marks .active, wires the click,
+                       then STRIPS the hook so it never ships to the DOM
+    [data-act="x"]     a button the logic wires an action onto
+    [data-when="x"]    a block the logic REMOVES when the condition is false
+    [data-proto="x"]   a hidden prototype element — cloned once per record,
+                       because the COUNT is data. This replaces <template>.
+    [data-slot="x"]    a fill point INSIDE a cloned [data-proto] element
+
+  THE HIERARCHY THIS SCREEN SHOWS (PROJECT-BREAKDOWN-PLAN.md)
+    PROJECT  →  SPACE (Master Bed Room · Kitchen · Dining)  →  PHASE (Design →
+    Colour → Wood Work → Furniture), each phase owned by one person.
+
+  STYLING = house component classes (what a thing IS: card, kpi-card, badge,
+  progress) + Tailwind tw- utilities (where it sits / how it looks) + the module
+  stylesheet frontend/scope.css for the ONE concept the shared vocabulary has no
+  word for: the phase strip (.wa-scope-…). Never a hard-coded colour — tokens
+  only. Bar widths are computed VALUES, so the logic sets them inline
+  (UI-CONTRACT §4.3).
+  ============================================================================ -->
+
+
+<!-- ============================================================================
+     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup exactly)
+     and the 3-tab section band. Authored once, used by all three screens.
+     NOTE: the <h1> inner run stays on ONE line — a newline between those inline
+     tags clones as a real space and shifts pixels.
+     ============================================================================ -->
+<div data-shell="head" class="page-head">
+  <div>
+    <h1 class="page-title" data-fill="title"><span class="eyebrow" data-fill="eyebrow"></span><i class="bi bi-diagram-3-fill"></i></h1>
+    <p class="page-sub" data-fill="sub"></p>
+  </div>
+  <div class="page-actions">
+    <!-- The project picker. It writes ?p=<id> into the URL, so a broken-down
+         project is a link you can send to site (router.parse reads params). -->
+    <select class="select tw-max-w-[360px]" data-fill="project" aria-label="Project"></select>
+    <a class="btn btn-ghost" href="#/woodart/projects/active"><i class="bi bi-easel2"></i> Projects</a>
+    <button class="btn btn-primary" data-act="new"><i class="bi bi-plus-lg"></i> Add Space</button>
+  </div>
+</div>
+
+<div data-shell="tabs" class="tab-underline mb-3">
+  <button data-tab="spaces">Spaces</button>
+  <button data-tab="phases">Phase Board</button>
+  <button data-tab="load">Team Load</button>
+</div>
+
+
+<!-- ============================================================================
+     SCREEN 1 · SPACES — what this project is divided into.
+     Three mutually exclusive states, ALL authored here; the logic removes the
+     two that do not apply. Nothing is assembled on demand.
+     ============================================================================ -->
+<section data-screen="spaces">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Spaces</span><span class="kpi-ico"><i class="bi bi-door-open"></i></span></div>
+      <div class="kpi-value" data-k="spaces">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Phases</span><span class="kpi-ico"><i class="bi bi-diagram-3"></i></span></div>
+      <div class="kpi-value" data-k="phases">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Phases Complete</span><span class="kpi-ico"><i class="bi bi-check2-circle"></i></span></div>
+      <div class="kpi-value" data-k="complete">—</div>
+      <div class="kpi-foot" data-k="completeFoot"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Unassigned</span><span class="kpi-ico"><i class="bi bi-person-dash"></i></span></div>
+      <div class="kpi-value" data-k="unassigned">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Area Planned</span><span class="kpi-ico"><i class="bi bi-rulers"></i></span></div>
+      <div class="kpi-value" data-k="area">—</div>
+    </div>
+  </div>
+
+  <!-- Shown only while some open phase has nobody against it. Work with no name
+       on it is the one thing this screen exists to make impossible to miss. -->
+  <div class="build-banner" data-when="unassigned">
+    <i class="bi bi-person-dash"></i>
+    <div><strong data-k="unassignedInline">0</strong> open phase(s) have nobody responsible.
+      <button class="link-btn" data-act="goBoard">Open the phase board</button> to assign them.</div>
+  </div>
+
+  <!-- STATE A · this company has no projects at all -->
+  <div class="empty-state" data-when="noproject">
+    <i class="bi bi-easel2"></i>
+    <h3>No projects yet</h3>
+    <p class="tw-text-ink-dim">A space belongs to a project. Register one on
+      <a href="#/woodart/projects/active">Projects</a> first, then divide it into rooms here.</p>
+  </div>
+
+  <!-- STATE B · a project is picked but nothing has been broken down yet -->
+  <div class="empty-state" data-when="empty">
+    <i class="bi bi-door-closed"></i>
+    <h3>This project has no spaces yet</h3>
+    <p class="tw-text-ink-dim">Divide it into the rooms and areas it will be built in —
+      Master Bed Room, Kitchen, Dining Room. Each space gets its own phase list.</p>
+    <button class="btn btn-primary" data-act="addFirst"><i class="bi bi-plus-lg"></i> Add the first space</button>
+  </div>
+
+  <!-- STATE C · the real thing -->
+  <div data-when="some">
+    <div class="section-label">SPACES IN THIS PROJECT</div>
+    <div class="grid-auto" data-fill="spaces">
+
+      <!-- PROTOTYPE CARD — one per space; the count is DATA, not layout. -->
+      <!-- The KIND rides in the card head beside the name, and the counts sit on
+           their own muted line in the body. Four cards fit across a 1440px fold,
+           so a card is ~245px wide: a long .card-sub there squeezes a two-word
+           space name onto two lines and then overlaps it. -->
+      <div class="card hover" data-proto="space" hidden>
+        <div class="card-head">
+          <h3><i class="bi bi-door-open"></i> <span data-slot="name"></span></h3>
+          <span class="badge" data-slot="kind"></span>
+        </div>
+        <div class="card-body">
+          <div class="data-row">
+            <span class="badge" data-slot="status"></span>
+            <span class="num tw-font-semibold tw-ml-auto" data-slot="pct"></span>
+          </div>
+          <div class="progress tw-mt-[6px]"><div class="progress-bar" data-slot="bar"></div></div>
+          <div class="tw-text-ink-mute tw-text-[11px] tw-mt-[6px]" data-slot="meta"></div>
+
+          <!-- THE PHASE STRIP — the sequence, in order, with its status tone.
+               One step per phase; again a count, so again a prototype. -->
+          <div class="wa-scope-strip tw-mt-[6px]" data-slot="strip">
+            <span class="wa-scope-step" data-proto="step" hidden>
+              <span class="wa-scope-dot"></span><span data-slot="label"></span>
+            </span>
+          </div>
+        </div>
+        <div class="card-foot">
+          <button class="btn btn-sm btn-ghost" data-act="board"><i class="bi bi-diagram-3"></i> Phases</button>
+          <button class="btn btn-sm btn-ghost" data-act="edit"><i class="bi bi-pencil"></i> Edit</button>
+          <button class="btn btn-sm btn-ghost" data-act="del"><i class="bi bi-trash"></i> Delete</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 2 · PHASE BOARD — where every space is right now, and who is on it.
+     One card per space; one row per phase, in running order. Clicking a phase
+     row opens the phase drawer (assign the person, set status and dates).
+     ============================================================================ -->
+<section data-screen="phases">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Not Started</span><span class="kpi-ico"><i class="bi bi-circle"></i></span></div>
+      <div class="kpi-value" data-k="notStarted">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Active</span><span class="kpi-ico"><i class="bi bi-play-circle"></i></span></div>
+      <div class="kpi-value" data-k="active">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Complete</span><span class="kpi-ico"><i class="bi bi-check2-circle"></i></span></div>
+      <div class="kpi-value" data-k="complete">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Unassigned</span><span class="kpi-ico"><i class="bi bi-person-dash"></i></span></div>
+      <div class="kpi-value" data-k="unassigned">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Overdue</span><span class="kpi-ico"><i class="bi bi-exclamation-diamond"></i></span></div>
+      <div class="kpi-value" data-k="overdue">—</div>
+    </div>
+  </div>
+
+  <div class="build-banner" data-when="overdue">
+    <i class="bi bi-exclamation-diamond"></i>
+    <div><strong data-k="overdueInline">0</strong> phase(s) passed their finish date and are
+      still open. The date is measured against the demo clock, not the machine clock.</div>
+  </div>
+
+  <!-- Only data drift can produce an orphan (deleting a space takes its phases
+       with it), which is exactly when it must be visible rather than hidden. -->
+  <div class="build-banner" data-when="orphan">
+    <i class="bi bi-exclamation-octagon"></i>
+    <div><strong data-k="orphanInline">0</strong> phase(s) point at a space that no longer
+      exists. They are kept and counted here rather than silently dropped —
+      <button class="link-btn" data-act="showOrphans">show which</button>.</div>
+  </div>
+
+  <div class="empty-state" data-when="empty">
+    <i class="bi bi-diagram-3"></i>
+    <h3>Nothing to show on the board</h3>
+    <p class="tw-text-ink-dim">Add a space to this project and its phase list appears here.</p>
+    <button class="btn btn-primary" data-act="addFirst"><i class="bi bi-plus-lg"></i> Add a space</button>
+  </div>
+
+  <div data-when="some">
+
+    <!-- PROTOTYPE BLOCK — one card per space. -->
+    <div class="card" data-proto="spaceBlock" hidden>
+      <div class="card-head">
+        <h3><i class="bi bi-door-open"></i> <span data-slot="name"></span></h3>
+        <span class="card-sub" data-slot="meta"></span>
+      </div>
+      <div class="card-body">
+        <div class="data-list" data-slot="phases">
+
+          <!-- PROTOTYPE ROW — one per phase, in running order. -->
+          <div class="data-row tw-cursor-pointer" data-proto="phase" hidden>
+            <span class="badge" data-slot="seq"></span>
+            <div class="tw-flex-1">
+              <div class="tw-font-semibold" data-slot="name"></div>
+              <div class="tw-text-ink-mute tw-text-[11px]" data-slot="code"></div>
+            </div>
+            <span class="badge" data-slot="owner"></span>
+            <span class="badge" data-slot="status"></span>
+            <span class="tw-text-ink-mute tw-text-[11px] tw-text-right tw-min-w-[180px]" data-slot="dates"></span>
+            <!-- Deleting a phase is a row action, not a drawer action: the drawer
+                 is where a phase is EDITED, and a destructive control living
+                 beside Save is how people delete things they meant to rename. -->
+            <button class="icon-btn" data-slot="del" title="Delete this phase"><i class="bi bi-trash"></i></button>
+          </div>
+
+        </div>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-sm btn-ghost" data-act="addPhase"><i class="bi bi-plus-lg"></i> Add phase</button>
+        <button class="btn btn-sm btn-ghost" data-act="template"><i class="bi bi-magic"></i> Apply template</button>
+      </div>
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 3 · TEAM LOAD — who is carrying what, across every project.
+     Deliberately NOT scoped to one project: the question "is Sumaiya free?"
+     is not answerable one project at a time, so the picker is removed here.
+     ============================================================================ -->
+<section data-screen="load">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">People</span><span class="kpi-ico"><i class="bi bi-people-fill"></i></span></div>
+      <div class="kpi-value" data-k="people">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Open Phases</span><span class="kpi-ico"><i class="bi bi-diagram-3"></i></span></div>
+      <div class="kpi-value" data-k="open">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Unassigned</span><span class="kpi-ico"><i class="bi bi-person-dash"></i></span></div>
+      <div class="kpi-value" data-k="unassigned">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Overdue</span><span class="kpi-ico"><i class="bi bi-exclamation-diamond"></i></span></div>
+      <div class="kpi-value" data-k="overdue">—</div>
+    </div>
+  </div>
+
+  <div class="build-banner" data-when="unassigned">
+    <i class="bi bi-person-dash"></i>
+    <div><strong data-k="unassignedInline">0</strong> open phase(s) across the company have
+      nobody responsible. They are listed at the bottom of this screen.</div>
+  </div>
+
+  <div class="two-col">
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-people-fill"></i> Load by Person</h3>
+        <span class="card-sub">Open phases each person is responsible for — busiest first</span>
+      </div>
+      <div class="card-body">
+        <div class="data-list" data-fill="people">
+
+          <!-- PROTOTYPE ROW — one per person on the roster, including people
+               with nothing open: "who is free" is half of what this answers. -->
+          <div class="data-row" data-proto="person" hidden>
+            <div class="tw-flex-1">
+              <div class="tw-font-semibold" data-slot="name"></div>
+              <div class="progress tw-mt-[6px]"><div class="progress-bar" data-slot="bar"></div></div>
+            </div>
+            <div class="tw-ml-auto tw-text-right">
+              <div class="num tw-font-semibold" data-slot="open"></div>
+              <div class="tw-text-ink-mute tw-text-[11px]" data-slot="detail"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-pie-chart-fill"></i> Where the Work Is</h3>
+        <span class="card-sub">Every phase by status, across all projects</span>
+      </div>
+      <div class="card-body">
+        <div class="tw-relative tw-h-[260px]"><canvas data-fill="chart"></canvas></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3><i class="bi bi-list-columns-reverse"></i> Open Phases</h3>
+      <span class="card-sub">Every phase still running, across all projects — click one to assign it</span>
+    </div>
+    <div class="card-body" data-fill="register"></div>
+  </div>
+
+</section>

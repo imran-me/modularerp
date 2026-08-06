@@ -45,6 +45,13 @@
 | `INS` | Install / site visit | installation |
 | `WAP` | Project | projects *(pre-existing)* |
 | `EST` | Estimate | estimates *(pre-existing)* |
+| `SPC` | Space | scope |
+| `PHS` | Phase | scope |
+| `TPL` | Phase template | scope |
+
+`PHS` is 4-digit (`PHS-0014`), not 3: a project carries a phase per space per
+stage, so the series passes 999 on real data. Same exception `MOV` already
+takes in materials.
 
 ### 1.2 Seam method names
 
@@ -97,6 +104,10 @@ the other; both docblocks say so.
 | **Handover** | completion, sign-off, closeout | The moment the client accepts the site. |
 | **Estimate** | quote, quotation | The *record* is an estimate; the printed document is a quotation. Both are correct in their place. |
 | **Project** | job, site, contract | The thing sold and billed. |
+| **Space** | room, sub-project, unit, package, zone, area | A division of a project's scope — Master Bed Room, Kitchen, Lobby. *Space planning* is the interior industry's own term for this breakdown, and unlike "room" it does not lie about a balcony, a corridor or an open-plan zone. Owner decision 2026-08-06. |
+| **Phase** | stage, step, task | A stage of work **inside one space** — Design, Electrical, Wood Work, Colour & Paint, Furniture. **`stage` stays reserved** for `wa_projects.stage`, the project's five-value headline field: two words, two levels, no collision. |
+| **Kind** *(of a space)* | type, category | Bedroom · Kitchen · Dining · Living · Bath · Balcony · Office · Reception · Retail · Common. It selects the phase template. |
+| **Responsible** | assignee, owner *(in UI copy)*, in-charge | The one person accountable for a phase. The field is `ownerId` because it is an `employees.id`; the label a user reads is **Responsible**. |
 | **Segment** | type, category *(for clients)* | Client segmentation: Homeowner · Developer · Corporate · Retail. |
 | **Category** | type *(for materials/vendors)* | Board · Laminate · Hardware · Adhesive · Finish · Fabric · General. |
 | **Open / Outstanding** | pending, active, live | `open` = not in its terminal state. `outstanding` = money still owed. |
@@ -111,6 +122,7 @@ the other; both docblocks say so.
 | production | job | status ≠ `Done` | `Done` |
 | installation | install | status ≠ `Handover` | `Handover` |
 | materials | material | *n/a* — `low` is `stock <= reorder` | — |
+| scope | phase | status ≠ `Complete` | `Complete` |
 
 **Module id vs display label.** They may differ where the business word differs
 from the domain word, but the pairing is fixed here and nowhere else:

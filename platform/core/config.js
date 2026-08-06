@@ -161,6 +161,13 @@
     m('crm',          'Leads & CRM',      'person-lines-fill', { desc:'Design enquiries → site visits → deals.', sectionEnd:true }),
     m('projects',     'Projects',         'easel2-fill', { desc:'Design-build projects, phases & milestones.',
         subs:[['active','Active Projects'],['design','Design Studio'],['milestones','Milestones'],['gallery','Gallery']] }),
+    /* The project BREAKDOWN, sitting next to `projects` because that is the
+     * hierarchy it extends: project → space (Bed Room · Kitchen · Dining) →
+     * phase (Design → Colour → Wood Work → Furniture), each phase owned by one
+     * person. Registering a project stays on Projects — one creation path.
+     * See companies/woodart/PROJECT-BREAKDOWN-PLAN.md. */
+    m('scope',        'Spaces & Phases',  'diagram-3-fill', { desc:'Divide a project into spaces; run each through its phases with one person responsible.',
+        subs:[['spaces','Spaces'],['phases','Phase Board'],['load','Team Load']] }),
     m('design',       'Design & 3D',      'vector-pen', { desc:'Drawings, 3D models, revisions and client approval — the architecture phase.',
         subs:[['register','Drawing Register'],['approvals','Approvals'],['load','Design Load']] }),
     m('estimates',    'Estimates & BOQ',  'calculator-fill', { desc:'Quotations, bill of materials, costing.',
