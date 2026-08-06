@@ -82,6 +82,50 @@
 
 ---
 
+## 📍 WHERE THINGS STAND — 2026-08-07 (read this first)
+
+**The focus is INTERIOR** (`companies/woodart/`). Its own
+`companies/woodart/CONTEXT.md` carries the detail; the roadmap is
+`companies/woodart/PROJECT-BREAKDOWN-PLAN.md`. Three things a new session needs
+before touching anything:
+
+**1 · The deployed site reads MySQL, not the browser seed.** `dev.epal.com.bd`
+answers `/api/health`, so the SPA boots in **API mode** and
+`platform/core/app.js` **skips `EPAL.db.seed()` entirely**. Every change to
+`platform/data/seed-bd.js` is invisible there — that data lives in the database,
+put there by each module's PHP seeder. **So ship the Laravel half in the same
+pass**: migration · model · resource · controller · route · seeder, plus the
+store wired into `platform/data/api.js` HYDRATE and CONDITIONAL. A clean
+headless-browser sweep proves demo mode only. This cost two rounds of "nothing
+changed" on 2026-08-06 before it was spotted.
+
+**2 · Code deploys itself; the database never does.** The host pulls on its own,
+so screens and calculations go live with no terminal step. Schema and demo data
+do not: `deploy.sh` reports pending migrations and then stops, on purpose, and
+the owner runs them. Steps: `docs/RESEED-INTERIOR.md`. Connection details live
+in hPanel, deliberately not in this public repo.
+
+**3 · One demo project, and only Interior's data may be reset.** Woodart carries
+exactly `WAP-101` Munshi Villa Duplex at the real figures in
+`companies/woodart/Assets/MUNSHI-VILLA-SHEET.md` — `node tools/verify/books.mjs
+story` fails if a second project appears or a figure drifts. Reseeding is
+per-company: `php artisan epal:reseed woodart` clears only what
+`companies/woodart/app/backend/seeders.php` claims. **Never `migrate:fresh`** —
+owner, 2026-08-06: *"not the whole database, but only the interior one"*.
+
+Built since 2026-08-06: the `scope` module (spaces → phases → who is responsible
+→ what each phase needs), Material Demand, the one-project demo across browser
+**and** database, the read-only project profile, and a material ledger where
+stock arrives in dated deliveries against an order and leaves room by room.
+Next: the forms that let staff **record** those two things (a purchase order has
+no line editor; issuing stock has no room picker), then the quotation builder,
+then contractor hiring.
+
+Verify with: `node tools/verify/sweep.mjs both` · `node tools/verify/scope.mjs` ·
+`node tools/verify/books.mjs story|refs|stock`.
+
+---
+
 ## ⭐ PRIORITY ORDER (owner, 2026-07-26) + LOOP DISCIPLINE
 
 Owner set the order: **(1) Group Master Accounts → (2) Travels Accounts → (3) rest of
