@@ -23,6 +23,10 @@ class Movement extends Model
     protected $fillable = [
         'ext_id', 'company_id', 'material', 'kind', 'qty',
         'location', 'ref', 'note', 'by', 'date',
+        /* WHERE it went and WHAT bought it (2026-08-06): a room, and the order a
+         * delivery came in against. Both nullable — a workshop receipt is not
+         * 'for' a room, and an opening balance came from no order. */
+        'phase', 'space', 'order_ext',
     ];
 
     protected $casts = [

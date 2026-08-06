@@ -32,3 +32,10 @@ Route::delete('woodart/procurement/vendors/{id}', [VendorController::class, 'des
 // outstanding rule have ONE authoritative server-side definition, and for
 // reports or any future client that cannot hold both tables in memory.
 Route::get('woodart/procurement/spend', [PurchaseOrderController::class, 'spend']);
+
+/* ORDER LINES (2026-08-06) — what an order actually orders, per material. An
+ * order used to carry only a total and an item count, so a part-delivery of 100
+ * bricks had nothing to be part of. */
+Route::get('woodart/procurement/lines', [PurchaseLineController::class, 'index']);
+Route::post('woodart/procurement/lines', [PurchaseLineController::class, 'store']);
+Route::delete('woodart/procurement/lines/{id}', [PurchaseLineController::class, 'destroy']);

@@ -57,8 +57,13 @@ New module migrations only — nothing belonging to another company is touched.
 php artisan migrate
 ```
 
-Expect four: `create_wa_spaces_table`, `reshape_wa_phases_for_spaces`,
-`create_wa_requirements_table`, `create_wa_phase_templates_table`.
+Expect these: `create_wa_spaces_table`, `reshape_wa_phases_for_spaces`,
+`create_wa_requirements_table`, `create_wa_phase_templates_table`, and — added
+2026-08-07 — `create_wa_purchase_lines_table` and `add_room_to_wa_movements`.
+
+> **Interior only?** Those last two live in the procurement and materials module
+> folders, so the four `--path` commands in step 3 of the guide you were given
+> cover them. Nothing outside `wa_*` is touched either way.
 
 ### 3 · See what the reseed would do (optional, but it costs nothing)
 

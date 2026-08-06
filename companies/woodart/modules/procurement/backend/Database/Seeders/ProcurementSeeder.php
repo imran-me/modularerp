@@ -2,6 +2,7 @@
 
 namespace Epal\Modules\Woodart\Procurement\Database\Seeders;
 
+use Epal\Modules\Woodart\Procurement\Models\PurchaseLine;
 use Epal\Modules\Woodart\Procurement\Models\PurchaseOrder;
 use Epal\Modules\Woodart\Procurement\Models\Vendor;
 use Illuminate\Database\Seeder;
@@ -88,6 +89,31 @@ class ProcurementSeeder extends Seeder
                     'date'       => $date,
                     'created_on' => $date,
                 ]
+            );
+        }
+
+        /* WHAT EACH ORDER ACTUALLY ORDERS (2026-08-06). Without lines, "ordered
+         * 500 bricks" is not a fact the system holds and a part-delivery of 100
+         * has nothing to be part of. Quantity is the order's own amount divided
+         * by the rate, so a line and its order can never disagree.
+         *
+         * [order, material ext_id, item, qty, unit, rate] */
+        $lines = [
+            ['WPO-101', 'MAT-013', 'Rod — BSRM 60 grade',      10075, 'kg',    85],
+            ['WPO-102', 'MAT-014', 'Cement — 50 kg bag',         502, 'bag',  545],
+            ['WPO-103', 'MAT-015', 'Bricks (1st class)',       34500, 'pcs',   12],
+            ['WPO-104', 'MAT-016', 'Sand & bali',               3768, 'cft',   65],
+            ['WPO-105', null,      'Civil hardware & fixings',      1, 'lot', 24160],
+            ['WPO-106', null,      'Electrical points & wiring',    8, 'point', 2850],
+            ['WPO-107', null,      'Sanitary & plumbing set',       1, 'set',  7530],
+        ];
+
+        $ln = 0;
+        foreach ($lines as [$order, $material, $item, $qty, $unit, $rate]) {
+            PurchaseLine::updateOrCreate(
+                ['company_id' => 'woodart', 'ext_id' => 'POL-'.str_pad((string) ++$ln, 4, '0', STR_PAD_LEFT)],
+                ['order' => $order, 'project' => 'WAP-101', 'material' => $material,
+                 'item' => $item, 'qty' => $qty, 'unit' => $unit, 'unit_cost' => $rate]
             );
         }
     }

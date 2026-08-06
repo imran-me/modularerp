@@ -99,6 +99,9 @@
     wa_drawings:   'woodart/design/drawings',
     wa_revisions:  'woodart/design/revisions',
     wa_movements:  'woodart/materials/movements',
+    // what an order actually orders, per material (2026-08-06) — the other half
+    // of the delivery history: ordered here, received in the movement ledger.
+    wa_purchase_lines: 'woodart/procurement/lines',
     wa_locations:  'woodart/materials/locations',
     // READ-ONLY (absent from WRITABLE and CONDITIONAL on purpose): the portfolio
     // screen still writes through EPAL.db to localStorage until the projects
@@ -222,7 +225,8 @@
      * not by whoever last opened a project. It hydrates read-only. */
     wa_spaces:       'woodart/scope/spaces',
     wa_phases:       'woodart/scope/phases',
-    wa_requirements: 'woodart/scope/requirements'
+    wa_requirements: 'woodart/scope/requirements',
+    wa_purchase_lines: 'woodart/procurement/lines'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()
