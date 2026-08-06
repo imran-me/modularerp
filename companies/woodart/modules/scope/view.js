@@ -1253,12 +1253,22 @@ function demandTable(rows) {
 
 /** Labour and contracted work, grouped by what it is — the money that is hired
  *  rather than bought, and which the quotation has to carry too. */
+/** "1 lot" reads as one of something. A contract is a LUMP SUM and labour is
+ *  man-days — say so, rather than printing a quantity of 1 that invites the
+ *  reader to think the system cannot count (owner, 2026-08-07). */
+function workQtyLabel(r) {
+  if (r.kind === 'contract') return 'lump sum';
+  if (r.kind === 'labour') return ui.num(r.qty) + ' man-day' + (+r.qty === 1 ? '' : 's');
+  return ui.num(r.qty) + (r.unit ? ' ' + r.unit : '');
+}
+
 function paintWorkLines(host, projectId) {
   var bag = {};
   Scope.projectRequirements(projectId).forEach(function (r) {
     if (r.kind === 'material') return;
     var key = r.kind + '::' + r.item;
-    if (!bag[key]) bag[key] = { kind: r.kind, item: r.item, cost: 0, quote: 0, phases: 0, spaces: {} };
+    if (!bag[key]) bag[key] = { kind: r.kind, item: r.item, cost: 0, quote: 0, phases: 0, spaces: {},
+                                label: workQtyLabel(r) };
     bag[key].cost += Scope.amount(r);
     bag[key].quote += Scope.quote(r);
     bag[key].phases += 1;
@@ -1274,7 +1284,7 @@ function paintWorkLines(host, projectId) {
     kind.textContent = r.kind;
     kind.className = 'badge' + (r.kind === 'labour' ? ' badge-info' : '');
     slot(row, 'item').textContent = r.item;
-    slot(row, 'where').textContent = r.phases + ' phase' + (r.phases === 1 ? '' : 's') +
+    slot(row, 'where').textContent = r.label + ' · ' + r.phases + ' phase' + (r.phases === 1 ? '' : 's') +
       ' · ' + Object.keys(r.spaces).length + ' room' + (Object.keys(r.spaces).length === 1 ? '' : 's');
     slot(row, 'amount').textContent = ui.money(r.cost);
     slot(row, 'quote').textContent = 'quoted ' + ui.money(r.quote);

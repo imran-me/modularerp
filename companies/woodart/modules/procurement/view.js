@@ -59,6 +59,7 @@
 var EPAL = window.EPAL, db = EPAL.db;
 
 var ORDERS = 'wa_purchases';   /* ← the one place these collections are named */
+var LINES  = 'wa_purchase_lines';  /* what an order actually orders, per material */
 var VENDORS = 'wa_vendors';
 
 /* The order lifecycle and the vendor categories. The backend validates against
@@ -81,6 +82,32 @@ var Procurement = {
   isOpen: function (o) { return o.status !== 'Received'; },
 
   /** Every purchase order, newest first. */
+  /** The lines of one order — material, quantity, rate. Empty for an order
+   *  raised before lines existed, which is why every caller treats "no lines"
+   *  as "quantity not recorded" rather than as zero. */
+  linesOf: function (orderId) {
+    return db.col(LINES).filter(function (l) { return l.order === orderId; });
+  },
+
+  /**
+   * WHAT AN ORDER ORDERED, as a readable quantity.
+   *
+   * The register used to show the number of LINES here, and a one-line order for
+   * 34,500 bricks read as "1" — which is exactly how somebody concludes the
+   * system thinks a truck of brick is one brick (owner, 2026-08-07). When every
+   * line shares a unit, the real quantity is shown with it; when they differ,
+   * a summed number would be meaningless, so the line count is labelled as such.
+   */
+  quantityOf: function (orderId) {
+    var lines = this.linesOf(orderId);
+    if (!lines.length) return null;
+    var units = {};
+    var total = 0;
+    lines.forEach(function (l) { units[l.unit || ''] = 1; total += (+l.qty || 0); });
+    var keys = Object.keys(units);
+    return keys.length === 1 ? { qty: total, unit: keys[0] } : { lines: lines.length };
+  },
+
   orders: function () {
     return db.col(ORDERS).slice().sort(function (a, b) {
       return String(b.date || '').localeCompare(String(a.date || ''));
@@ -576,7 +603,17 @@ function ordersScreen(page) {
           return ui.escapeHtml(r.supplier || '—') +
             (v ? '' : ' <span class="badge badge-warn">unlisted</span>');
         } },
-      { key: 'items', label: 'Lines', num: true },
+      { key: 'items', label: 'Ordered', num: true,
+        sortVal: function (r) { var q = Procurement.quantityOf(r.id); return q && q.qty ? q.qty : 0; },
+        render: function (r) {
+          /* the QUANTITY, not the number of lines: "1" against a truck of brick
+             is how a reader concludes the system cannot count (owner 2026-08-07) */
+          var q = Procurement.quantityOf(r.id);
+          if (!q) return '<span class="tw-text-ink-mute">' + ui.num(+r.items || 0) + ' line(s)</span>';
+          if (q.lines) return '<span class="tw-text-ink-mute">' + q.lines + ' lines</span>';
+          return '<span class="num strong">' + ui.num(q.qty) + '</span> <span class="tw-text-ink-mute tw-text-[11px]">' +
+            ui.escapeHtml(q.unit || '') + '</span>';
+        } },
       { key: 'amount', label: 'Order Value', num: true, money: true },
       { key: 'status', label: 'Status', badge: STATUS_TONE },
       { key: 'outstanding', label: 'Outstanding', num: true,

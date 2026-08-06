@@ -158,7 +158,17 @@ function ordersScreen(page) {
           return ui.escapeHtml(r.supplier || '—') +
             (v ? '' : ' <span class="badge badge-warn">unlisted</span>');
         } },
-      { key: 'items', label: 'Lines', num: true },
+      { key: 'items', label: 'Ordered', num: true,
+        sortVal: function (r) { var q = Procurement.quantityOf(r.id); return q && q.qty ? q.qty : 0; },
+        render: function (r) {
+          /* the QUANTITY, not the number of lines: "1" against a truck of brick
+             is how a reader concludes the system cannot count (owner 2026-08-07) */
+          var q = Procurement.quantityOf(r.id);
+          if (!q) return '<span class="tw-text-ink-mute">' + ui.num(+r.items || 0) + ' line(s)</span>';
+          if (q.lines) return '<span class="tw-text-ink-mute">' + q.lines + ' lines</span>';
+          return '<span class="num strong">' + ui.num(q.qty) + '</span> <span class="tw-text-ink-mute tw-text-[11px]">' +
+            ui.escapeHtml(q.unit || '') + '</span>';
+        } },
       { key: 'amount', label: 'Order Value', num: true, money: true },
       { key: 'status', label: 'Status', badge: STATUS_TONE },
       { key: 'outstanding', label: 'Outstanding', num: true,

@@ -479,6 +479,12 @@
     var m = db.col('wa_materials').filter(function (x) { return x.id === matId; })[0];
     return m ? m.name : matId;
   }
+  /** A quantity is meaningless without its unit — 1,000 of rod is kilos, of
+   *  brick is pieces. Taken from the material so it cannot contradict stock. */
+  function materialUnit(matId) {
+    var m = db.col('wa_materials').filter(function (x) { return x.id === matId; })[0];
+    return m && m.unit ? m.unit : '';
+  }
   function spaceName(spaceId) {
     var s = db.col('wa_spaces').filter(function (x) { return x.id === spaceId; })[0];
     return s ? s.name : '';
@@ -487,8 +493,8 @@
   function ledgerTable(id) {
     var rows = projectMovements(id).map(function (m) {
       return { id:m.id, date:m.date, kind:m.kind, material:materialName(m.material),
-        qty:+m.qty || 0, room:spaceName(m.space), against:m.order || m.ref || '',
-        by:m.by || '', note:m.note || '' };
+        qty:+m.qty || 0, unit:materialUnit(m.material), room:spaceName(m.space),
+        against:m.order || m.ref || '', by:m.by || '', note:m.note || '' };
     });
     return el('div.card', null, [ el('div.card-body', null, [ EPAL.table({
       columns: [
@@ -498,7 +504,8 @@
         { key:'qty', label:'Qty', num:true,
           render: function (r) {
             return '<span class="num ' + (r.qty >= 0 ? 'text-good' : 'text-bad') + '">' +
-              (r.qty >= 0 ? '+' : '') + ui.num(r.qty) + '</span>';
+              (r.qty >= 0 ? '+' : '') + ui.num(r.qty) + '</span>' +
+              (r.unit ? ' <span class="text-mute xs">' + ui.escapeHtml(r.unit) + '</span>' : '');
           } },
         { key:'room', label:'Room', render: function (r) { return r.room ? '<span class="badge">' + ui.escapeHtml(r.room) + '</span>' : '<span class="text-mute">—</span>'; } },
         { key:'against', label:'Against' },
@@ -578,7 +585,8 @@
         list.appendChild(el('div.data-row', null, [
           el('span.badge' + (MOVE_TONE[m.kind] ? '.badge-' + MOVE_TONE[m.kind] : ''), { text:m.kind }),
           el('div.flex-1', null, [
-            el('div.fw-600', { text: (q >= 0 ? '+' : '') + ui.num(q) + (m.space ? ' · ' + spaceName(m.space) : '') }),
+            el('div.fw-600', { text: (q >= 0 ? '+' : '') + ui.num(q) + ' ' + materialUnit(m.material) +
+            (m.space ? ' · ' + spaceName(m.space) : '') }),
             el('div.text-mute.xs', { text: (m.order || m.ref || '') + (m.note ? ' · ' + m.note : '') + (m.by ? ' — ' + m.by : '') })
           ]),
           el('span.text-mute.xs', { text: m.date ? ui.date(m.date) : '' })

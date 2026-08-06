@@ -340,9 +340,14 @@ function movementsScreen(page) {
       { key: 'kind', label: 'Kind', badge: KIND_TONE },
       { key: 'qty', label: 'Qty', num: true,
         render: function (r) {
+          /* A quantity without its unit is a number nobody can act on: 1,000 of
+             rod is kilos, of brick is pieces, of lacquer is litres. The unit
+             comes from the material, so it can never contradict the register. */
           var q = +r.qty || 0;
+          var m = Materials.find(r.material);
           return '<span class="num ' + (q >= 0 ? 'text-good' : 'text-bad') + '">' +
-            (q >= 0 ? '+' : '') + ui.num(q) + '</span>';
+            (q >= 0 ? '+' : '') + ui.num(q) + '</span>' +
+            (m && m.unit ? ' <span class="tw-text-ink-mute tw-text-[11px]">' + ui.escapeHtml(m.unit) + '</span>' : '');
         } },
       { key: 'location', label: 'Location', render: function (r) { return '<span class="badge">' + ui.escapeHtml(Materials.locationName(r.location)) + '</span>'; } },
       { key: 'ref', label: 'Against' },
@@ -408,7 +413,8 @@ function moveStock(material, kind) {
     fields: [
       { key: 'material', label: 'Material', type: 'select', required: true, searchable: true,
         options: Materials.all().map(function (x) { return [x.id, x.name + ' · ' + ui.num(x.stock) + ' ' + (x.unit || '')]; }) },
-      { key: 'qty', label: kind === 'Adjustment' ? 'Adjust by (+/-)' : 'Quantity', type: 'number', required: true,
+      { key: 'qty', label: (kind === 'Adjustment' ? 'Adjust by (+/-)' : 'Quantity') +
+          (m && m.unit ? ' — in ' + m.unit : ''), type: 'number', required: true,
         hint: kind === 'Receipt' ? 'Adds to stock.'
             : kind === 'Adjustment' ? 'A count correction. Negative reduces, positive increases.'
             : 'Comes out of stock — enter a positive number.' },

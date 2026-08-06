@@ -39,6 +39,7 @@
 var EPAL = window.EPAL, db = EPAL.db;
 
 var ORDERS = 'wa_purchases';   /* ← the one place these collections are named */
+var LINES  = 'wa_purchase_lines';  /* what an order actually orders, per material */
 var VENDORS = 'wa_vendors';
 
 /* The order lifecycle and the vendor categories. The backend validates against
@@ -61,6 +62,32 @@ var Procurement = {
   isOpen: function (o) { return o.status !== 'Received'; },
 
   /** Every purchase order, newest first. */
+  /** The lines of one order — material, quantity, rate. Empty for an order
+   *  raised before lines existed, which is why every caller treats "no lines"
+   *  as "quantity not recorded" rather than as zero. */
+  linesOf: function (orderId) {
+    return db.col(LINES).filter(function (l) { return l.order === orderId; });
+  },
+
+  /**
+   * WHAT AN ORDER ORDERED, as a readable quantity.
+   *
+   * The register used to show the number of LINES here, and a one-line order for
+   * 34,500 bricks read as "1" — which is exactly how somebody concludes the
+   * system thinks a truck of brick is one brick (owner, 2026-08-07). When every
+   * line shares a unit, the real quantity is shown with it; when they differ,
+   * a summed number would be meaningless, so the line count is labelled as such.
+   */
+  quantityOf: function (orderId) {
+    var lines = this.linesOf(orderId);
+    if (!lines.length) return null;
+    var units = {};
+    var total = 0;
+    lines.forEach(function (l) { units[l.unit || ''] = 1; total += (+l.qty || 0); });
+    var keys = Object.keys(units);
+    return keys.length === 1 ? { qty: total, unit: keys[0] } : { lines: lines.length };
+  },
+
   orders: function () {
     return db.col(ORDERS).slice().sort(function (a, b) {
       return String(b.date || '').localeCompare(String(a.date || ''));
