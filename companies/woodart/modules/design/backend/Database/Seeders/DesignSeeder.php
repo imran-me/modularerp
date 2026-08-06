@@ -21,40 +21,22 @@ class DesignSeeder extends Seeder
 {
     public function run(): void
     {
+        /* THE VILLA'S DRAWING SET. The build drawings are approved — the shell is
+         * already up, and you cannot pour a structure from drawings nobody
+         * signed. The joinery ones are still moving, which is what a project at
+         * this phase looks like: the client approved the shell and is still
+         * choosing what goes inside it. `Issued` is the only state where the
+         * wait is the CLIENT's, so the approvals queue has exactly one row.
+         *
+         * [ext_id, project, title, kind, designer, rev, status, issued, approved] */
         $drawings = [
-            // [ext_id, project, title, kind, designer, rev, status, issued, approved]
-            ['DWG-001', 'WAP-001', 'Ground floor plan',      'Plan',      'Nasrin Sultana', 'A', 'Approved',  '2026-05-20', '2026-05-28'],
-            ['DWG-002', 'WAP-001', 'Reception elevation',    'Elevation', 'Nasrin Sultana', 'B', 'Approved',  '2026-06-02', '2026-06-11'],
-            ['DWG-003', 'WAP-001', 'Lobby render',           'Render',    'Farzana Yasmin', 'A', 'Approved',  '2026-06-06', '2026-06-14'],
-            // WAP-002: one still with the client for a long time — heads the queue
-            ['DWG-004', 'WAP-002', 'Workstation layout',     'Plan',      'Touhidul Alam',  'A', 'Issued',    '2026-06-04', null],
-            ['DWG-005', 'WAP-002', 'Conference 3D model',    '3D Model',  'Touhidul Alam',  'C', 'Commented', '2026-06-24', null],
-            // WAP-003: fresh work, still on our side of the fence
-            ['DWG-006', 'WAP-003', 'Wardrobe detail',        'Detail',    'Sharmin Jahan',  'A', 'Draft',     null,         null],
-            ['DWG-007', 'WAP-003', 'Bedroom section',        'Section',   'Sharmin Jahan',  'A', 'Issued',    '2026-07-01', null],
-            // an orphan — its project no longer exists. Kept and flagged.
-            ['DWG-008', 'WAP-999', 'Salvaged concept model', '3D Model',  'Farzana Yasmin', 'A', 'Issued',    '2026-06-18', null],
-            // WAP-101 is IN the design phase — so it is mid-approval, which is
-            // what a design-phase project must look like.
-            ['DWG-101', 'WAP-101', 'Ground floor plan',       'Plan',      'Nasrin Sultana', 'B', 'Approved',  '2026-06-16', '2026-06-24'],
-            ['DWG-102', 'WAP-101', 'Living room 3D model',    '3D Model',  'Nasrin Sultana', 'C', 'Commented', '2026-06-28', null],
-            ['DWG-103', 'WAP-101', 'Master bedroom render',   'Render',    'Farzana Yasmin', 'A', 'Issued',    '2026-06-22', null],
-            ['DWG-104', 'WAP-101', 'Kitchen joinery detail',  'Detail',    'Nasrin Sultana', 'A', 'Draft',     null,         null],
-            // WAP-102 is in PRODUCTION, so its design must be fully signed off —
-            // you cannot be building from drawings the client never approved.
-            ['DWG-105', 'WAP-102', 'Floor plate layout',      'Plan',      'Touhidul Alam',  'B', 'Approved',  '2026-04-22', '2026-05-02'],
-            ['DWG-106', 'WAP-102', 'Reception elevation',     'Elevation', 'Touhidul Alam',  'A', 'Approved',  '2026-04-25', '2026-05-02'],
-            ['DWG-107', 'WAP-102', 'Boardroom 3D model',      '3D Model',  'Farzana Yasmin', 'B', 'Approved',  '2026-05-04', '2026-05-14'],
-            // WAP-103 is at HANDOVER — approved long ago.
-            ['DWG-108', 'WAP-103', 'Duplex plan — both levels','Plan',     'Sharmin Jahan',  'A', 'Approved',  '2026-02-10', '2026-02-18'],
-            ['DWG-109', 'WAP-103', 'Staircase section',       'Section',   'Sharmin Jahan',  'B', 'Approved',  '2026-02-24', '2026-03-04'],
-            // WAP-004 is at Design stage and had NO drawings — a design-stage
-            // project with nothing drawn is the clearest possible contradiction.
-            ['DWG-110', 'WAP-004', 'Showroom layout',         'Plan',      'Sharmin Jahan',  'A', 'Issued',    '2026-06-12', null],
-            ['DWG-111', 'WAP-004', 'Display wall render',     'Render',    'Farzana Yasmin', 'A', 'Draft',     null,         null],
-            // WAP-005 is in production, so again: approved.
-            ['DWG-112', 'WAP-005', 'Branch floor plan',       'Plan',      'Touhidul Alam',  'B', 'Approved',  '2026-04-14', '2026-04-26'],
-            ['DWG-113', 'WAP-005', 'Teller counter detail',   'Detail',    'Touhidul Alam',  'A', 'Approved',  '2026-04-20', '2026-04-30'],
+            ['DWG-101', 'WAP-101', 'Ground floor plan',         'Plan',      'Imtiaz Chowdhury', 'B', 'Approved',  '2026-03-02', '2026-03-10'],
+            ['DWG-102', 'WAP-101', 'Upper floor plan',          'Plan',      'Imtiaz Chowdhury', 'B', 'Approved',  '2026-03-02', '2026-03-10'],
+            ['DWG-103', 'WAP-101', 'Front elevation',           'Elevation', 'Imtiaz Chowdhury', 'A', 'Approved',  '2026-03-04', '2026-03-10'],
+            ['DWG-104', 'WAP-101', 'Staircase & lobby section', 'Section',   'Imtiaz Chowdhury', 'A', 'Approved',  '2026-03-06', '2026-03-12'],
+            ['DWG-105', 'WAP-101', 'Living room — 3D view',     '3D Model',  'Imtiaz Chowdhury', 'C', 'Commented', '2026-06-24', null],
+            ['DWG-106', 'WAP-101', 'Master wardrobe detail',    'Detail',    'Imtiaz Chowdhury', 'A', 'Issued',    '2026-06-28', null],
+            ['DWG-107', 'WAP-101', 'Kitchen joinery detail',    'Detail',    'Imtiaz Chowdhury', 'A', 'Draft',     null,         null],
         ];
 
         foreach ($drawings as [$extId, $project, $title, $kind, $designer, $rev, $status, $issued, $approved]) {
@@ -76,37 +58,24 @@ class DesignSeeder extends Seeder
 
         // The trail. DWG-002 was revised once and DWG-005 twice, so the counts
         // the register shows have real evidence behind them.
+        /* THE TRAIL IS EVIDENCE — one row per revision letter, up to the current
+         * one, so how a drawing reached its state is still readable months
+         * later. Every row belongs to a drawing above; a trail pointing at a
+         * drawing that does not exist is worse than no trail.
+         *
+         * [ext_id, drawing, rev, action, by, note, date] */
         $revisions = [
-            ['RVN-001', 'DWG-001', 'A', 'Issued',    'Nasrin Sultana', '',                              '2026-05-20'],
-            ['RVN-002', 'DWG-001', 'A', 'Approved',  'Nasrin Sultana', '',                              '2026-05-28'],
-            ['RVN-003', 'DWG-002', 'A', 'Revised',   'Nasrin Sultana', 'Client asked for a wider desk', '2026-05-29'],
-            ['RVN-004', 'DWG-002', 'B', 'Approved',  'Nasrin Sultana', '',                              '2026-06-11'],
-            ['RVN-005', 'DWG-003', 'A', 'Approved',  'Farzana Yasmin', '',                              '2026-06-14'],
-            ['RVN-006', 'DWG-004', 'A', 'Issued',    'Touhidul Alam',  '',                              '2026-06-04'],
-            ['RVN-007', 'DWG-005', 'A', 'Revised',   'Touhidul Alam',  'Ceiling height corrected',      '2026-06-12'],
-            ['RVN-008', 'DWG-005', 'B', 'Revised',   'Touhidul Alam',  'Glazing line moved',            '2026-06-20'],
-            ['RVN-009', 'DWG-005', 'C', 'Commented', 'Touhidul Alam',  'Client wants a darker veneer',  '2026-06-28'],
-            ['RVN-010', 'DWG-006', 'A', 'Drafted',   'Sharmin Jahan',  '',                              '2026-06-30'],
-            ['RVN-011', 'DWG-007', 'A', 'Issued',    'Sharmin Jahan',  '',                              '2026-07-01'],
-            ['RVN-012', 'DWG-008', 'A', 'Issued',    'Farzana Yasmin', '',                              '2026-06-18'],
-            ['RVN-101', 'DWG-101', 'A', 'Revised',   'Nasrin Sultana', 'Client wanted the study moved',  '2026-06-14'],
-            ['RVN-102', 'DWG-101', 'B', 'Approved',  'Nasrin Sultana', '',                                '2026-06-24'],
-            ['RVN-103', 'DWG-102', 'A', 'Revised',   'Nasrin Sultana', 'Ceiling height corrected',        '2026-06-18'],
-            ['RVN-104', 'DWG-102', 'B', 'Revised',   'Nasrin Sultana', 'Veneer tone changed to walnut',   '2026-06-25'],
-            ['RVN-105', 'DWG-102', 'C', 'Commented', 'Nasrin Sultana', 'Client wants the TV wall reworked','2026-07-02'],
-            ['RVN-106', 'DWG-103', 'A', 'Issued',    'Farzana Yasmin', '',                                '2026-06-22'],
-            ['RVN-107', 'DWG-104', 'A', 'Drafted',   'Nasrin Sultana', '',                                '2026-07-01'],
-            ['RVN-108', 'DWG-105', 'A', 'Revised',   'Touhidul Alam',  'Extra workstation bay added',     '2026-04-28'],
-            ['RVN-109', 'DWG-105', 'B', 'Approved',  'Touhidul Alam',  '',                                '2026-05-02'],
-            ['RVN-110', 'DWG-106', 'A', 'Approved',  'Touhidul Alam',  '',                                '2026-05-02'],
-            ['RVN-111', 'DWG-107', 'B', 'Approved',  'Farzana Yasmin', '',                                '2026-05-14'],
-            ['RVN-112', 'DWG-108', 'A', 'Approved',  'Sharmin Jahan',  '',                                '2026-02-18'],
-            ['RVN-113', 'DWG-109', 'B', 'Approved',  'Sharmin Jahan',  '',                                '2026-03-04'],
-            ['RVN-114', 'DWG-110', 'A', 'Issued',    'Sharmin Jahan',  '',                                '2026-06-12'],
-            ['RVN-115', 'DWG-111', 'A', 'Drafted',   'Farzana Yasmin', '',                                '2026-06-30'],
-            ['RVN-116', 'DWG-112', 'A', 'Revised',   'Touhidul Alam',  'Vault wall relocated',            '2026-04-18'],
-            ['RVN-117', 'DWG-112', 'B', 'Approved',  'Touhidul Alam',  '',                                '2026-04-26'],
-            ['RVN-118', 'DWG-113', 'A', 'Approved',  'Touhidul Alam',  '',                                '2026-04-30'],
+            ['RVN-101', 'DWG-101', 'A', 'Revised',   'Imtiaz Chowdhury', 'Store room moved under the stair',   '2026-02-29'],
+            ['RVN-102', 'DWG-101', 'B', 'Approved',  'Imtiaz Chowdhury', '',                                   '2026-03-10'],
+            ['RVN-103', 'DWG-102', 'A', 'Revised',   'Imtiaz Chowdhury', 'Kids bed room widened by 1 ft',      '2026-03-01'],
+            ['RVN-104', 'DWG-102', 'B', 'Approved',  'Imtiaz Chowdhury', '',                                   '2026-03-10'],
+            ['RVN-105', 'DWG-103', 'A', 'Approved',  'Imtiaz Chowdhury', '',                                   '2026-03-10'],
+            ['RVN-106', 'DWG-104', 'A', 'Approved',  'Imtiaz Chowdhury', '',                                   '2026-03-12'],
+            ['RVN-107', 'DWG-105', 'A', 'Revised',   'Imtiaz Chowdhury', 'Ceiling height corrected to 9 ft',   '2026-05-30'],
+            ['RVN-108', 'DWG-105', 'B', 'Revised',   'Imtiaz Chowdhury', 'Veneer tone changed to walnut',      '2026-06-14'],
+            ['RVN-109', 'DWG-105', 'C', 'Commented', 'Imtiaz Chowdhury', 'Client wants the TV wall reworked',  '2026-07-02'],
+            ['RVN-110', 'DWG-106', 'A', 'Issued',    'Imtiaz Chowdhury', '',                                   '2026-06-28'],
+            ['RVN-111', 'DWG-107', 'A', 'Drafted',   'Imtiaz Chowdhury', '',                                   '2026-07-01'],
         ];
 
         foreach ($revisions as [$extId, $drawing, $rev, $action, $by, $note, $date]) {

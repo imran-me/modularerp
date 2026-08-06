@@ -26,18 +26,13 @@ class ClientSeeder extends Seeder
 {
     public function run(): void
     {
+        /* ONE PROJECT, ONE CLIENT. The directory used to carry ten names, nine
+         * of which had no work against them once Interior was cut back to a
+         * single job — a directory of strangers reads as a broken join.
+         *
+         * [ext_id, name, type, contact, phone, area, since] */
         $rows = [
-            // [ext_id, name, type, contact, phone, area, since]
-            ['CLI-001', 'ACI Limited',            'Corporate', 'Nasrin Sultana', '+8801712000001', 'Tejgaon I/A',               '2024-03-11'],
-            ['CLI-002', 'Akij Group',             'Developer', 'Mahmudul Hasan', '+8801712000002', 'Motijheel C/A',             '2023-11-02'],
-            ['CLI-003', 'Ashraful Karim',         'Homeowner', 'Ashraful Karim', '+8801712000003', 'Gulshan-2',                 '2025-01-19'],
-            ['CLI-004', 'Bashundhara Group',      'Developer', 'Farzana Yasmin', '+8801712000004', 'Bashundhara R/A',           '2023-06-24'],
-            ['CLI-005', 'Concord Group',          'Developer', 'Omar Faruk',     '+8801712000005', 'Banani DOHS',               '2024-08-30'],
-            ['CLI-006', 'Farzana Yasmin',         'Homeowner', 'Farzana Yasmin', '+8801712000006', 'Dhanmondi 27',              '2025-05-14'],
-            ['CLI-007', 'Rahimafrooz',            'Corporate', 'Kamrul Islam',   '+8801712000007', 'Mohakhali DOHS',            '2024-01-08'],
-            ['CLI-008', 'Shanta Holdings',        'Developer', 'Sharmin Jahan',  '+8801712000008', 'Baridhara Diplomatic Zone', '2023-09-17'],
-            ['CLI-009', 'Square Pharmaceuticals', 'Corporate', 'Touhidul Alam',  '+8801712000009', 'Uttara Sector 7',           '2024-12-01'],
-            ['CLI-010', 'Taslima Begum',          'Homeowner', 'Taslima Begum',  '+8801712000010', 'Mirpur DOHS',               '2025-07-03'],
+            ['CLI-001', 'Munshi Billah', 'Homeowner', 'Munshi Billah', '+8801712000001', 'Munshiganj', '2026-02-20'],
         ];
 
         foreach ($rows as [$extId, $name, $type, $contact, $phone, $area, $since]) {

@@ -31,14 +31,18 @@ class RecurringSeeder extends Seeder
 {
     public function run(): void
     {
+        /* SALARIES ARE THE REAL ROSTER, not a round number: Woodart employs three
+         * people (Imtiaz ৳72,000 · Sumaiya ৳42,000 · Jahangir ৳34,000 =
+         * ৳1,48,000). The old rows claimed ৳3,85,000 of designers plus ৳2,68,000
+         * of site crew, which no payslip in this system could ever match.
+         *
+         * [ext_id, name, category, party, amount, day_of_month, method, status] */
         $rows = [
-            // [ext_id, name, category, amount, party, day, method, status]
-            ['REC-WA001', 'Workshop rent — Tejgaon',    'Office Rent',       180000, 'Tejgaon Industrial Estate', 5,  'Bank',   'Active'],
-            ['REC-WA002', 'Workshop power & utilities', 'Utilities',          64200, 'DESCO',                     12, 'Bank',   'Active'],
-            ['REC-WA003', 'Design team salaries',       'Salaries',          385000, 'Payroll',                   28, 'Bank',   'Active'],
-            ['REC-WA004', 'Site crew salaries',         'Salaries',          268000, 'Payroll',                   28, 'Bank',   'Active'],
-            ['REC-WA005', 'Delivery van lease',         'Fuel & Transport',   42000, 'Rangs Motors',              8,  'Bank',   'Active'],
-            ['REC-WA006', 'CNC service retainer',       'Tools & Equipment',  25000, 'Homag Bangladesh',          20, 'Cheque', 'Paused'],
+            ['REC-WA001', 'Workshop rent — Tejgaon',    'Office Rent',       'Tejgaon Industrial Estate', 180000,  5, 'Bank',   'Active'],
+            ['REC-WA002', 'Workshop power & utilities', 'Utilities',         'DESCO',                      64200, 12, 'Bank',   'Active'],
+            ['REC-WA003', 'Salaries — design & site',   'Salaries',          'Payroll',                   148000, 28, 'Bank',   'Active'],
+            ['REC-WA004', 'Delivery van lease',         'Fuel & Transport',  'Rangs Motors',               42000,  8, 'Bank',   'Active'],
+            ['REC-WA005', 'CNC service retainer',       'Tools & Equipment', 'Homag Bangladesh',           25000, 20, 'Cheque', 'Paused'],
         ];
 
         foreach ($rows as [$extId, $name, $category, $amount, $party, $day, $method, $status]) {

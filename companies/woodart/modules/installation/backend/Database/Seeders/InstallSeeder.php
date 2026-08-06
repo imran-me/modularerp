@@ -20,33 +20,21 @@ class InstallSeeder extends Seeder
 {
     public function run(): void
     {
+        /* THE VILLA IS A BUILDING SITE, not a delivery address, so these are
+         * site visits: civil supervision running, the electrical first-fix
+         * inspection booked, and the ground-floor civil handover being snagged.
+         * The snag list is ITEMISED — openSnags() reads the list, never the
+         * stored number, so a stale count cannot corrupt the handover queue.
+         *
+         * [ext_id, project, site, team, status, date, snags, snag_list] */
         $rows = [
-            // [ext_id, project, site, team, status, date, snags, snag_list]
-            ['INS-001', 'WAP-001', 'Gulshan-2',        'Team Alpha',   'Handover',    '2026-06-14', 0, null],
-            ['INS-002', 'WAP-002', 'Banani DOHS',      'Team Bravo',   'Snagging',    '2026-06-28', 3, null],
-            ['INS-003', 'WAP-003', 'Dhanmondi 27',     'Team Alpha',   'In Progress', '2026-07-08', 0, null],
-            ['INS-004', 'WAP-004', 'Uttara Sector 7',  'Team Charlie', 'Scheduled',   '2026-07-22', 0, null],
-            // Itemised snag list: 2 of 4 still open. openSnags() must read the
-            // LIST (2), not any stale number — the stored count is derived.
-            ['INS-005', 'WAP-005', 'Bashundhara R/A',  'Team Bravo',   'Snagging',    '2026-07-01', 2, [
-                ['text' => 'Hinge alignment on wardrobe shutter', 'done' => false],
-                ['text' => 'Skirting gap in living room',        'done' => true],
-                ['text' => 'Touch-up polish on TV unit',         'done' => false],
-                ['text' => 'Loose handle, kitchen drawer 3',     'done' => true],
+            ['INS-101', 'WAP-101', 'Munshiganj', 'Team Alpha', 'In Progress', '2026-07-02', 0, null],
+            ['INS-102', 'WAP-101', 'Munshiganj', 'Team Alpha', 'Scheduled',   '2026-07-14', 0, null],
+            ['INS-103', 'WAP-101', 'Munshiganj', 'Team Bravo', 'Snagging',    '2026-06-26', 2, [
+                ['text' => 'Plaster crack — dining room north wall', 'done' => false],
+                ['text' => 'Floor level off by 8mm — guest bath',    'done' => false],
+                ['text' => 'Window opening 2" narrow — kids room',   'done' => true],
             ]],
-            ['INS-006', 'WAP-001', 'Mirpur DOHS',      'Team Delta',   'Handover',    '2026-05-30', 0, null],
-            // Deliberately orphaned: the project does not exist. Kept + flagged.
-            ['INS-007', 'WAP-999', 'Wari',             'Team Charlie', 'Scheduled',   null,         0, null],
-            // WAP-102 is in production — its fit-out is scheduled, not started.
-            ['INS-101', 'WAP-102', 'Tejgaon I/A',  'Team Alpha', 'Scheduled', '2026-08-04', 0, null],
-            // WAP-103 is AT handover: one visit closed out, one still snagging.
-            ['INS-102', 'WAP-103', 'Dhanmondi 27', 'Team Bravo', 'Snagging',  '2026-06-28', 2, [
-                ['text' => 'Wardrobe shutter alignment — master bedroom', 'done' => false],
-                ['text' => 'Polish touch-up on staircase handrail',       'done' => false],
-                ['text' => 'Skirting gap in the living room',             'done' => true],
-                ['text' => 'Drawer channel replaced — kitchen unit 3',    'done' => true],
-            ]],
-            ['INS-103', 'WAP-103', 'Dhanmondi 27', 'Team Bravo', 'Handover',  '2026-05-30', 0, null],
         ];
 
         foreach ($rows as [$extId, $project, $site, $team, $status, $date, $snags, $list]) {

@@ -23,13 +23,22 @@ class ProcurementSeeder extends Seeder
 {
     public function run(): void
     {
+        /* THE VILLA'S SUPPLIERS. The four civil merchants are the ones the sheet
+         * names; the joinery merchants stay because the register stocks their
+         * material and the wood-work phase will buy from them next.
+         *
+         * [ext_id, name, category, contact, phone, area, terms, since] */
         $vendors = [
-            // [ext_id, name, category, contact, phone, area, terms, since]
-            ['VEN-001', 'Akij Board',      'Board',    'Omar Faruk',      '+8801812000001', 'Tejgaon I/A',   'Net 30',  '2024-02-11'],
-            ['VEN-002', 'Hatil Trade',     'Fabric',   'Sharmin Jahan',   '+8801812000002', 'Mohakhali DOHS','Net 45',  '2023-08-19'],
-            ['VEN-003', 'Partex Star',     'Board',    'Kamrul Islam',    '+8801812000003', 'Motijheel C/A', 'Net 15',  '2024-06-02'],
-            ['VEN-004', 'RFL Hardware',    'Hardware', 'Nasrin Sultana',  '+8801812000004', 'Mirpur DOHS',   'Advance', '2023-05-27'],
-            ['VEN-005', 'Timber World BD', 'Board',    'Mahmudul Hasan',  '+8801812000005', 'Wari',          'Net 30',  '2022-11-14'],
+            ['VEN-001', 'Haji Enterprise',        'Civil',    'Mohsin Boss',    '+8801812000001', 'Munshiganj',     'Advance', '2026-03-01'],
+            ['VEN-002', 'Meghna Cement Depot',    'Civil',    'Eman Vai',       '+8801812000002', 'Munshiganj',     'Net 15',  '2026-03-05'],
+            ['VEN-003', 'Munshiganj Brick Field', 'Civil',    'Nayeem',         '+8801812000003', 'Munshiganj',     'Advance', '2026-03-02'],
+            ['VEN-004', 'Buriganga Sand Traders', 'Civil',    'Azizul Vai',     '+8801812000004', 'Keraniganj',     'Advance', '2026-03-02'],
+            ['VEN-005', 'RFL Hardware',           'Hardware', 'Nasrin Sultana', '+8801812000005', 'Mirpur DOHS',    'Advance', '2023-05-27'],
+            ['VEN-006', 'Dhaka Electric House',   'General',  'Kamrul Islam',   '+8801812000006', 'Nawabpur',       'Net 15',  '2025-01-12'],
+            ['VEN-007', 'Sanitary World BD',      'General',  'Sharmin Jahan',  '+8801812000007', 'Nawabpur',       'Net 15',  '2025-04-08'],
+            ['VEN-008', 'Timber World BD',        'Board',    'Mahmudul Hasan', '+8801812000008', 'Wari',           'Net 30',  '2022-11-14'],
+            ['VEN-009', 'Akij Board',             'Board',    'Omar Faruk',     '+8801812000009', 'Tejgaon I/A',    'Net 30',  '2024-02-11'],
+            ['VEN-010', 'Hatil Trade',            'Laminate', 'Sharmin Jahan',  '+8801812000010', 'Mohakhali DOHS', 'Net 45',  '2023-08-19'],
         ];
 
         foreach ($vendors as [$extId, $name, $category, $contact, $phone, $area, $terms, $since]) {
@@ -51,18 +60,20 @@ class ProcurementSeeder extends Seeder
             );
         }
 
+        /* EVERY ORDER THIS PROJECT RAISED, at the sheet's own amounts. The four
+         * civil orders are received (the shell is built); the electrical one is
+         * part-delivered and the sanitary one only just placed, which is why
+         * those two heads have barely any spend against a large budget.
+         *
+         * [ext_id, supplier, project, items, amount, status, date] */
         $orders = [
-            // [ext_id, supplier, project, items, amount, status, date]
-            ['WPO-001', 'Timber World BD', 'WAP-102',8,  340000, 'Received', '2026-04-02'],
-            ['WPO-002', 'Akij Board', 'WAP-102',     5,  186000, 'Received', '2026-04-19'],
-            ['WPO-003', 'RFL Hardware', 'WAP-101',  12,   96000, 'Partial',  '2026-05-06'],
-            ['WPO-004', 'Partex Star', 'WAP-101',    4,  128000, 'Ordered',  '2026-05-21'],
-            ['WPO-005', 'Hatil Trade', 'WAP-103',    6,  212000, 'Received', '2026-06-03'],
-            ['WPO-006', 'Timber World BD', 'WAP-102',9,  405000, 'Ordered',  '2026-06-18'],
-            ['WPO-007', 'RFL Hardware', null,   7,   74000, 'Received', '2026-06-29'],
-            // Deliberately raised on a supplier with NO vendor record, so the
-            // "unlisted" path has data. Money left the business either way.
-            ['WPO-008', 'Dhaka Glass Co', 'WAP-004', 3,   58000, 'Ordered',  '2026-07-01'],
+            ['WPO-101', 'Haji Enterprise',        'WAP-101', 3, 856397, 'Received', '2026-03-14'],
+            ['WPO-102', 'Meghna Cement Depot',    'WAP-101', 1, 273780, 'Received', '2026-03-22'],
+            ['WPO-103', 'Munshiganj Brick Field', 'WAP-101', 1, 414000, 'Received', '2026-03-08'],
+            ['WPO-104', 'Buriganga Sand Traders', 'WAP-101', 1, 244920, 'Received', '2026-03-05'],
+            ['WPO-105', 'RFL Hardware',           'WAP-101', 4,  24160, 'Received', '2026-05-18'],
+            ['WPO-106', 'Dhaka Electric House',   'WAP-101', 6,  22800, 'Partial',  '2026-06-20'],
+            ['WPO-107', 'Sanitary World BD',      'WAP-101', 5,   7530, 'Ordered',  '2026-06-28'],
         ];
 
         foreach ($orders as [$extId, $supplier, $project, $items, $amount, $status, $date]) {

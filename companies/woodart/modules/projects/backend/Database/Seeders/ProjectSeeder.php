@@ -2,117 +2,126 @@
 
 namespace Epal\Modules\Woodart\Projects\Database\Seeders;
 
-use Epal\Modules\Woodart\Projects\Models\Project;
 use Epal\Modules\Woodart\Projects\Models\Estimate;
+use Epal\Modules\Woodart\Projects\Models\Project;
 use Illuminate\Database\Seeder;
 
 /**
- * THE SPINE — the projects every other Woodart seeder already points at.
+ * THE SPINE — Interior's ONE project, and the BOQ every other seeder points at.
  *
- * Seeded LAST in intent but first in dependency: wa_production, wa_installs,
- * wa_drawings and wa_movements all name a project id, and until this existed
- * those references dangled in MySQL. Every id used by any other seeder appears
- * here, so the database is referentially honest:
+ * Owner, 2026-08-06: *"remove demo data from interior only, and make only one
+ * demo project across all the system of interior."* Woodart used to seed five
+ * generated projects plus three story projects; it now seeds exactly one, and
+ * every other Woodart seeder hangs its rows off it.
  *
- *   WAP-001 … WAP-005   the projects JobSeeder / DesignSeeder / InstallSeeder use
- *   WAP-101 … WAP-103   the three story projects, each at a different phase,
- *                       which StockLedgerSeeder issues material against
- *   WAP-999             deliberately ABSENT — the orphan those seeders reference
- *                       on purpose, so the "orphan" badge has real data
+ * THE NUMBERS ARE THE BUSINESS'S OWN, from companies/woodart/Assets/
+ * MUNSHI-VILLA-SHEET.md — the spreadsheet this project actually runs on:
  *
- * Clients are the names ClientSeeder holds, so the Clients portfolio join
- * resolves too rather than showing ten clients with no work.
+ *     contract   ৳70,00,000
+ *     received   ৳40,00,000   three payments   (WoodartMoneySeeder)
+ *     spent      ৳23,48,257   thirteen heads   (WoodartMoneySeeder)
+ *
+ * THE SCOPE OF WORK (WORK below) is the single source for BOTH the BOQ and the
+ * per-head budget, and the scope module reads these same lines back out of the
+ * database to allocate them across the rooms. One table, three consumers — so a
+ * budget can never disagree with the quotation it came from.
+ *
+ * Every line carries a cost CODE (wa_cost_codes) and a KIND. A `material` line
+ * names a material in the register exactly, so the bill of materials resolves
+ * it; a `work` line prices labour or a contract, and nobody stocks a rajmistri.
+ *
+ * Idempotent: keyed on (company_id, ext_id) via updateOrCreate.
  *
  * Run: php artisan db:seed --class="Epal\Modules\Woodart\Projects\Database\Seeders\ProjectSeeder"
  */
 class ProjectSeeder extends Seeder
 {
+    private const COMPANY = 'woodart';
+
+    /** Contract ÷ budgeted cost — this villa's margin, as one constant. */
+    public const MARKUP = 1.1492;
+
+    /** [ cost code, line item, qty, unit, unit cost, kind ] */
+    public const WORK = [
+        ['3D & Visualisation', '3D design, walkthrough & drawings',     1, 'lot',      50000, 'work'],
+        ['Soil & Excavation',  'Soil excavation, cutting & fill',       1, 'lot',      75000, 'work'],
+        ['Bricks & Breaking',  'Bricks (1st class)',                37500, 'pcs',         12, 'material'],
+        ['Cement',             'Cement — 50 kg bag',                  550, 'bag',        545, 'material'],
+        ['Rod',                'Rod — BSRM 60 grade',               10000, 'kg',          85, 'material'],
+        ['Sand & Bali',        'Sand & bali',                        4000, 'cft',         65, 'material'],
+        ['Contractor',         'Rajmistri contract — Younus Mia',       1, 'lot',    1344000, 'work'],
+        ['Electrical',         'Electrical points & wiring',          120, 'point',     2900, 'work'],
+        ['Sanitary',           'Sanitary & plumbing set',               5, 'set',      80000, 'work'],
+        ['Tiles Work',         'Floor & wall tiles — supply & lay',  2000, 'sft',        160, 'work'],
+        ['Paint',              'Putty, primer & paint',              6000, 'sft',         30, 'work'],
+        ['Aluminium',          'Aluminium windows & glazing',         400, 'sft',        400, 'work'],
+        ['Metal',              'MS railing & grill',                   60, 'rft',       1500, 'work'],
+        ['Wood Work',          'Joinery labour & site fitting',         1, 'lot',     350000, 'work'],
+        ['Boards & Ply',       'Marine Plywood 18mm',                  90, 'sheet',     3610, 'material'],
+        ['Boards & Ply',       'Veneer Board',                         30, 'sheet',     4200, 'material'],
+        ['Laminates & Veneer', 'Formica Laminate',                     45, 'sheet',     1250, 'material'],
+        ['Hardware',           'German Hinge (Hettich)',              200, 'pcs',        335, 'material'],
+        ['Hardware',           'Drawer Channel 18"',                   70, 'pcs',        540, 'material'],
+        ['Hardware',           'SS Handle',                           110, 'pcs',        185, 'material'],
+        ['Finishes',           'NC Lacquer',                           30, 'litre',     1065, 'material'],
+        ['Extra Labour',       'Extra labour — call-outs',              1, 'lot',      60000, 'work'],
+        ['Transport & Visit',  'Transport & site visits',               1, 'lot',     100000, 'work'],
+        ['Other Expense',      'Extra / others',                        1, 'lot',      90215, 'work'],
+    ];
+
+    /** The BOQ lines, in the exact frontend `wa_estimates.lines` shape. */
+    public static function boqLines(): array
+    {
+        return array_map(fn ($w) => [
+            'item'     => $w[1],
+            'qty'      => $w[2],
+            'unit'     => $w[3],
+            'unitCost' => $w[4],
+            'unitSale' => (int) round($w[4] * self::MARKUP),
+            'code'     => $w[0],
+            'kind'     => $w[5],
+        ], self::WORK);
+    }
+
     public function run(): void
     {
-        $projects = [
-            // [ext_id, name, client, type, area, value, cost, stage, phase, progress, designer, start, deadline]
-            ['WAP-001', 'Office Fit-out · Tejgaon I/A',        'ACI Limited',            'Office',      6200, 5400000, 3510000, 'Production',   'Production',   62, 'Nasrin Sultana', '2026-03-04', '2026-08-28'],
-            ['WAP-002', 'Penthouse Remodel · Wari',            'Ashraful Karim',         'Residential', 3800, 4100000, 2665000, 'Handover',     'Handover',     94, 'Touhidul Alam',  '2026-02-11', '2026-07-24'],
-            ['WAP-003', 'Penthouse Remodel · Tejgaon I/A',     'Square Pharmaceuticals', 'Residential', 4400, 6200000, 4030000, 'Installation', 'Installation', 81, 'Farzana Yasmin', '2026-03-18', '2026-09-12'],
-            ['WAP-004', 'Showroom Design · Uttara Sector 7',   'Rahimafrooz',            'Retail',      2900, 3350000, 2177500, 'Design',       'Design & 3D',  22, 'Sharmin Jahan',  '2026-05-26', '2026-10-30'],
-            ['WAP-005', 'Bank Branch Fit-out · Motijheel C/A', 'Akij Group',             'Office',      5100, 7100000, 4615000, 'Production',   'Production',   48, 'Touhidul Alam',  '2026-04-02', '2026-09-26'],
-
-            // the three story projects — one per phase, threaded end to end
-            ['WAP-101', 'Full Interior · Gulshan Penthouse',   'Bashundhara Group',      'Residential', 4200, 4800000, 3120000, 'Design',       'Design & 3D',  18, 'Nasrin Sultana', '2026-06-08', '2026-11-20'],
-            ['WAP-102', 'Office Fit-out · Square Pharma HQ',   'Square Pharmaceuticals', 'Office',      9800, 9200000, 5980000, 'Production',   'Production',   56, 'Touhidul Alam',  '2026-04-14', '2026-09-30'],
-            ['WAP-103', 'Duplex Interior · Dhanmondi 27',      'Ashraful Karim',         'Residential', 3100, 3650000, 2372500, 'Handover',     'Handover',     96, 'Sharmin Jahan',  '2026-02-02', '2026-07-18'],
-        ];
-
-        foreach ($projects as [$extId, $name, $client, $type, $area, $value, $cost, $stage, $phase, $progress, $designer, $start, $deadline]) {
-            Project::updateOrCreate(
-                ['company_id' => 'woodart', 'ext_id' => $extId],
-                ['name' => $name, 'client' => $client, 'type' => $type, 'area' => $area,
-                 'value' => $value, 'cost' => $cost, 'stage' => $stage, 'phase' => $phase,
-                 'progress' => $progress, 'designer' => $designer, 'start' => $start,
-                 'deadline' => $deadline, 'billed' => $stage === 'Completed',
-                 'created_on' => $start]
-            );
+        $lines = self::boqLines();
+        $budget = 0;
+        foreach ($lines as $l) {
+            $budget += $l['qty'] * $l['unitCost'];
         }
 
-        /* The BOQs. Each line quotes a material the register actually stocks, so
-         * Estimates, Materials and Procurement describe ONE business. This is
-         * also each project's budget: unit cost against unit sale, line by line. */
-        $estimates = [
-            ['EST-101', 'Full Interior — Gulshan Penthouse', 'Bashundhara Group', 'WAP-101', 'Sent', '2026-08-15', [
-                ['item' => 'Marine Plywood 18mm',     'qty' => 180, 'unitCost' => 3400, 'unitSale' => 4600],
-                ['item' => 'Veneer Board',            'qty' => 90,  'unitCost' => 4200, 'unitSale' => 5900],
-                ['item' => 'German Hinge (Hettich)',  'qty' => 320, 'unitCost' => 310,  'unitSale' => 480],
-                ['item' => 'PU Polish',               'qty' => 70,  'unitCost' => 1420, 'unitSale' => 2050],
-                ['item' => 'Fabric — Velvet',         'qty' => 140, 'unitCost' => 420,  'unitSale' => 690],
-            ]],
-            ['EST-102', 'Office Fit-out — Square Pharma HQ', 'Square Pharmaceuticals', 'WAP-102', 'Approved', '2026-06-30', [
-                ['item' => 'Marine Plywood 18mm',     'qty' => 420, 'unitCost' => 3400, 'unitSale' => 4500],
-                ['item' => 'Formica Laminate',        'qty' => 360, 'unitCost' => 1250, 'unitSale' => 1850],
-                ['item' => 'MDF 12mm',                'qty' => 210, 'unitCost' => 1850, 'unitSale' => 2600],
-                ['item' => 'Drawer Channel 18"',      'qty' => 260, 'unitCost' => 540,  'unitSale' => 820],
-                ['item' => 'SS Handle',               'qty' => 480, 'unitCost' => 185,  'unitSale' => 310],
-                ['item' => 'NC Lacquer',              'qty' => 120, 'unitCost' => 980,  'unitSale' => 1480],
-            ]],
-            ['EST-103', 'Duplex Interior — Dhanmondi 27', 'Ashraful Karim', 'WAP-103', 'Approved', '2026-03-31', [
-                ['item' => 'Marine Plywood 18mm',     'qty' => 150, 'unitCost' => 3400, 'unitSale' => 4550],
-                ['item' => 'Veneer Board',            'qty' => 70,  'unitCost' => 4200, 'unitSale' => 5800],
-                ['item' => 'Wood Glue 5kg',           'qty' => 40,  'unitCost' => 760,  'unitSale' => 1120],
-                ['item' => 'Foam 4"',                 'qty' => 120, 'unitCost' => 260,  'unitSale' => 430],
-            ]],
-            ['EST-001', 'Reception & Workstations — ACI', 'ACI Limited', 'WAP-001', 'Approved', '2026-04-30', [
-                ['item' => 'Marine Plywood 18mm',     'qty' => 240, 'unitCost' => 3400, 'unitSale' => 4520],
-                ['item' => 'Formica Laminate',        'qty' => 190, 'unitCost' => 1250, 'unitSale' => 1820],
-            ]],
-            ['EST-002', 'Penthouse Remodel — Wari', 'Ashraful Karim', 'WAP-002', 'Approved', '2026-03-31', [
-                ['item' => 'Marine Plywood 18mm', 'qty' => 170, 'unitCost' => 3400, 'unitSale' => 4560],
-                ['item' => 'Veneer Board',        'qty' => 80,  'unitCost' => 4200, 'unitSale' => 5850],
-                ['item' => 'PU Polish',           'qty' => 55,  'unitCost' => 1420, 'unitSale' => 2050],
-            ]],
-            ['EST-003', 'Penthouse Remodel — Tejgaon I/A', 'Square Pharmaceuticals', 'WAP-003', 'Approved', '2026-05-15', [
-                ['item' => 'Marine Plywood 18mm', 'qty' => 260, 'unitCost' => 3400, 'unitSale' => 4540],
-                ['item' => 'Formica Laminate',    'qty' => 150, 'unitCost' => 1250, 'unitSale' => 1830],
-                ['item' => 'SS Handle',           'qty' => 260, 'unitCost' => 185,  'unitSale' => 305],
-            ]],
-            ['EST-004', 'Showroom Design — Uttara Sector 7', 'Rahimafrooz', 'WAP-004', 'Sent', '2026-08-31', [
-                ['item' => 'MDF 12mm',            'qty' => 140, 'unitCost' => 1850, 'unitSale' => 2610],
-                ['item' => 'Formica Laminate',    'qty' => 120, 'unitCost' => 1250, 'unitSale' => 1840],
-                ['item' => 'NC Lacquer',          'qty' => 45,  'unitCost' => 980,  'unitSale' => 1470],
-            ]],
-            ['EST-005', 'Bank Branch Fit-out — Motijheel C/A', 'Akij Group', 'WAP-005', 'Approved', '2026-06-30', [
-                ['item' => 'Marine Plywood 18mm', 'qty' => 310, 'unitCost' => 3400, 'unitSale' => 4530],
-                ['item' => 'Veneer Board',        'qty' => 110, 'unitCost' => 4200, 'unitSale' => 5820],
-                ['item' => 'Drawer Channel 18"',  'qty' => 180, 'unitCost' => 540,  'unitSale' => 815],
-                ['item' => 'German Hinge (Hettich)', 'qty' => 240, 'unitCost' => 310, 'unitSale' => 475],
-            ]],
-        ];
+        Project::updateOrCreate(
+            ['company_id' => self::COMPANY, 'ext_id' => 'WAP-101'],
+            [
+                'name'       => 'Munshi Villa Duplex — build & full interior',
+                'client'     => 'Munshi Billah',
+                'type'       => 'Residential',
+                'area'       => 2520,               // the eleven rooms, summed
+                'value'      => 7000000,            // the contract, from the sheet
+                'cost'       => (int) round($budget),
+                'stage'      => 'Production',       // civil done, services running
+                'phase'      => 'Production',
+                'progress'   => 42,
+                'designer'   => 'Imtiaz Chowdhury',
+                'start'      => '2026-02-27',
+                'deadline'   => '2026-11-30',
+                'billed'     => false,
+                'created_on' => '2026-02-20',
+            ]
+        );
 
-        foreach ($estimates as [$extId, $title, $client, $project, $status, $validTill, $lines]) {
-            Estimate::updateOrCreate(
-                ['company_id' => 'woodart', 'ext_id' => $extId],
-                ['title' => $title, 'client' => $client, 'project_ext' => $project,
-                 'status' => $status, 'lines' => $lines, 'valid_till' => $validTill,
-                 'created_on' => '2026-04-18']
-            );
-        }
+        Estimate::updateOrCreate(
+            ['company_id' => self::COMPANY, 'ext_id' => 'EST-101'],
+            [
+                'title'       => 'Munshi Villa Duplex — bill of quantities',
+                'client'      => 'Munshi Billah',
+                'project_ext' => 'WAP-101',
+                'status'      => 'Approved',
+                'lines'       => $lines,
+                'valid_till'  => '2026-12-31',
+                'created_on'  => '2026-02-24',
+            ]
+        );
     }
 }

@@ -107,6 +107,14 @@
     // migrated host show "No projects yet".
     wa_projects:   'woodart/projects/portfolio',
     wa_estimates:  'woodart/projects/estimates',
+    // The project BREAKDOWN (2026-08-06): rooms, their phases, and what each
+    // phase needs. Hydrating these is what makes Spaces & Phases show anything
+    // at all on a migrated host — in API mode the demo seeder never runs, so a
+    // store nobody hydrates is a screen that is simply empty.
+    wa_spaces:          'woodart/scope/spaces',
+    wa_phases:          'woodart/scope/phases',
+    wa_requirements:    'woodart/scope/requirements',
+    wa_phase_templates: 'woodart/scope/templates',
     // CONDITIONAL (see below): brand-new table, so a host that has pulled the
     // code but not run the migration keeps its seeded rows instead of being
     // blanked by an endpoint that honestly has nothing to give yet.
@@ -204,7 +212,17 @@
     wa_revisions: 'woodart/design/revisions',
     wa_movements: 'woodart/materials/movements',
     wa_locations: 'woodart/materials/locations',
-    wa_recurring: 'woodart/accounts/recurring'
+    wa_recurring: 'woodart/accounts/recurring',
+    /* The scope tables (2026-08-06) — brand-new module migrations, so exactly
+     * the case this list exists for: writable the moment the host reports the
+     * table present, and until then a space or a phase saved in the browser
+     * stays in the browser instead of vanishing on reload.
+     * `wa_phase_templates` is deliberately absent: a template is the company's
+     * standard sequence, edited from settings with a name against the change,
+     * not by whoever last opened a project. It hydrates read-only. */
+    wa_spaces:       'woodart/scope/spaces',
+    wa_phases:       'woodart/scope/phases',
+    wa_requirements: 'woodart/scope/requirements'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()

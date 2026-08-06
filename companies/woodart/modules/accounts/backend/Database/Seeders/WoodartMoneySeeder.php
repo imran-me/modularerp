@@ -86,33 +86,50 @@ class WoodartMoneySeeder extends Seeder
             return;
         }
 
+        /* INTERIOR'S BOOKS ARE THIS PROJECT'S BOOKS (owner, 2026-08-06).
+         *
+         * Every income row is one of the three payments the client has made, and
+         * every project expense is one of the thirteen heads on the sheet's cost
+         * summary, at the sheet's own figures — they sum to exactly ৳23,48,257,
+         * which is what the spreadsheet says has been spent:
+         *
+         *     received   ৳40,00,000  of a ৳70,00,000 contract
+         *     spent      ৳23,48,257  across 13 heads
+         *     to collect ৳30,00,000  (RecurringSeeder aside, this is the job)
+         *
+         * `ref` carries the project id, because that is what Project P&L joins
+         * on. The standing costs at the end deliberately have none: workshop
+         * rent is the concern's overhead, not this villa's cost, and charging it
+         * to the job would overstate this one and understate the next.
+         *
+         * WHO MOVED THE MONEY is kept in the description — the sheet's REF. NAME
+         * column (MOHSIN BOSS · NAYEEM · EMAN VAI · AZIZUL VAI) is an audit trail
+         * the business relies on, and the ERP has no handler field yet. Recorded
+         * where it can be read rather than dropped, and no column invented.
+         *
+         * [ext_id, kind, category, description, amount, method, date, ref] */
         $rows = [
-            // [ext_id, kind, category, description, amount, method, date, ref]
-            ['JV-WA101', 'Expense', 'Fuel & Transport', 'Site survey — Gulshan (WAP-101)',                  14500,   'Cash', '2026-06-10', 'WAP-101'],
-            ['JV-WA102', 'Expense', 'Salaries',         'Design team — June',                               385000,  'Bank', '2026-06-30', ''],
-            ['JV-WA103', 'Expense', 'Vendor Payment',   'Akij Board — settles WPO-002 in full',             186000,  'Bank', '2026-05-06', 'WPO-002'],
-            ['JV-WA104', 'Expense', 'Fuel & Transport', 'Delivery to site — WAP-103',                       26800,   'Cash', '2026-06-12', 'WAP-103'],
-            ['JV-WA105', 'Expense', 'Office Rent',      'Workshop — Tejgaon, June',                         180000,  'Bank', '2026-06-05', ''],
-            ['JV-WA106', 'Expense', 'Utilities',        'Workshop power — June',                            64200,   'Bank', '2026-07-02', ''],
-            ['JV-WA107', 'Income',  'Design Fee',       'Concept + 3D — Bashundhara Group (WAP-101)',       320000,  'Bank', '2026-06-26', 'WAP-101'],
-            ['JV-WA108', 'Income',  'Project Billing',  'Stage 2 — Square Pharmaceuticals (WAP-102)',       3600000, 'Bank', '2026-06-18', 'WAP-102'],
-            // a little more history, so a month-on-month chart is not a single spike
-            ['JV-WA109', 'Expense', 'Salaries',         'Workshop crew — May',                              412000,  'Bank', '2026-05-31', ''],
-            ['JV-WA110', 'Expense', 'Office Rent',      'Workshop — Tejgaon, May',                          180000,  'Bank', '2026-05-05', ''],
-            ['JV-WA111', 'Expense', 'Vendor Payment',   'Timber World BD — settles WPO-001 in full',        340000,  'Bank', '2026-02-26', 'WPO-001'],
-            ['JV-WA113', 'Expense', 'Vendor Payment',   'Hatil Trade — settles WPO-005 in full',            212000,  'Bank', '2026-06-10', 'WPO-005'],
-            ['JV-WA112', 'Income',  'Project Billing',  'Final — Ashraful Karim (WAP-103)',                 1850000, 'Bank', '2026-07-02', 'WAP-103'],
-            // WAP-001..005 had drawings, jobs and installs but not a single
-            // rupee recorded against them. Work that costs nothing and earns
-            // nothing is not work — every project now shows in the books.
-            ['JV-WA120', 'Income',  'Project Billing',  'Stage 1 — ACI Limited (WAP-001)',                  1620000, 'Bank', '2026-04-12', 'WAP-001'],
-            ['JV-WA121', 'Expense', 'Fuel & Transport', 'Delivery to site — WAP-001',                       31500,   'Cash', '2026-05-20', 'WAP-001'],
-            ['JV-WA122', 'Income',  'Project Billing',  'Final — Ashraful Karim (WAP-002)',                 4100000, 'Bank', '2026-07-01', 'WAP-002'],
-            ['JV-WA123', 'Expense', 'Fuel & Transport', 'Site handover run — WAP-002',                      18200,   'Cash', '2026-06-30', 'WAP-002'],
-            ['JV-WA124', 'Income',  'Project Billing',  'Stage 2 — Square Pharmaceuticals (WAP-003)',       2480000, 'Bank', '2026-06-08', 'WAP-003'],
-            ['JV-WA125', 'Income',  'Design Fee',       'Concept — Rahimafrooz (WAP-004)',                  185000,  'Bank', '2026-06-14', 'WAP-004'],
-            ['JV-WA126', 'Income',  'Project Billing',  'Mobilisation — Akij Group (WAP-005)',              2130000, 'Bank', '2026-04-20', 'WAP-005'],
-            ['JV-WA127', 'Expense', 'Salaries',         'Site crew — June',                                 268000,  'Bank', '2026-06-30', ''],
+            ['JV-WA101', 'Income',  'Project Billing',    'Munshi Villa Duplex — 1st payment, on signing',                  1000000, 'Bank', '2026-03-05', 'WAP-101'],
+            ['JV-WA102', 'Income',  'Project Billing',    'Munshi Villa Duplex — 2nd payment, on structure',                2000000, 'Bank', '2026-04-22', 'WAP-101'],
+            ['JV-WA103', 'Income',  'Project Billing',    'Munshi Villa Duplex — 3rd payment, on brickwork',                1000000, 'Bank', '2026-06-10', 'WAP-101'],
+
+            ['JV-WA104', 'Expense', '3D & Visualisation', '3D design office — concept & walkthrough · handled by MOHSIN BOSS',  30000, 'Bank', '2026-03-04', 'WAP-101'],
+            ['JV-WA105', 'Expense', 'Soil & Excavation',  'Soil test, cutting & fill · handled by NAYEEM',                      59980, 'Cash', '2026-03-06', 'WAP-101'],
+            ['JV-WA106', 'Expense', 'Sand & Bali',        'Sand & bali — Buriganga Sand Traders (WPO-104) · AZIZUL VAI',       244920, 'Bank', '2026-03-09', 'WAP-101'],
+            ['JV-WA107', 'Expense', 'Bricks & Breaking',  'Bricks & breaking — Munshiganj Brick Field (WPO-103) · EMAN VAI',   414000, 'Bank', '2026-03-16', 'WAP-101'],
+            ['JV-WA108', 'Expense', 'Rod',                'BSRM rod — Haji Enterprise (WPO-101) · handled by MOHSIN BOSS',     856397, 'Bank', '2026-03-24', 'WAP-101'],
+            ['JV-WA109', 'Expense', 'Cement',             'Cement — Meghna Cement Depot (WPO-102) · handled by EMAN VAI',      273780, 'Bank', '2026-04-02', 'WAP-101'],
+            ['JV-WA110', 'Expense', 'Contractor',         'Rajmistri contract — Younus Mia, part payment · RONY & EMAN VAI',   341000, 'Bank', '2026-05-10', 'WAP-101'],
+            ['JV-WA111', 'Expense', 'Hardware',           'Civil hardware & fixings — RFL Hardware (WPO-105) · NAYEEM',         24160, 'Cash', '2026-05-20', 'WAP-101'],
+            ['JV-WA112', 'Expense', 'Extra Labour',       'Extra labour — call-outs · handled by NAYEEM',                       16300, 'Cash', '2026-06-04', 'WAP-101'],
+            ['JV-WA113', 'Expense', 'Electrical',         'Electrical first fix — Dhaka Electric House (WPO-106) · AZIZUL VAI',  22800, 'Bank', '2026-06-22', 'WAP-101'],
+            ['JV-WA114', 'Expense', 'Transport & Visit',  'Transport & site visits · handled by MOHSIN BOSS',                   43790, 'Cash', '2026-06-26', 'WAP-101'],
+            ['JV-WA115', 'Expense', 'Sanitary',           'Sanitary advance — Sanitary World BD (WPO-107) · NAYEEM',             7530, 'Cash', '2026-06-30', 'WAP-101'],
+            ['JV-WA116', 'Expense', 'Other Expense',      'Extra / others · handled by MOHSIN BOSS',                             13600, 'Cash', '2026-07-02', 'WAP-101'],
+
+            ['JV-WA120', 'Expense', 'Office Rent',        'Workshop rent — Tejgaon, June',                                     180000, 'Bank', '2026-06-05', ''],
+            ['JV-WA121', 'Expense', 'Salaries',           'Salaries — design & site team, June',                                148000, 'Bank', '2026-06-28', ''],
+            ['JV-WA122', 'Expense', 'Utilities',          'Workshop power — June',                                              64200, 'Bank', '2026-07-02', ''],
         ];
 
         foreach ($rows as [$extId, $kind, $category, $desc, $amount, $method, $date, $ref]) {

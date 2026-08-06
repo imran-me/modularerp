@@ -37,7 +37,7 @@ hiring are slices 2–4 of `companies/woodart/PROJECT-BREAKDOWN-PLAN.md`.
 | Registry | ✅ `platform/core/config.js` · `companies/woodart/module.json` (`built:true`) · this folder's `module.json` · `index.html` script tag |
 | Seeds | ✅ `wa_spaces`, `wa_phases` (reshaped, with an upgrade guard for browsers holding the old shape), `wa_phase_templates` |
 | Verification | ✅ sweep **257/257 both themes, 0 errors** · tailwind gate green (0 new classes) · `tools/verify/scope.mjs` **20/20** |
-| Backend | ⬜ **owed** — `endpoints.md` + blueprint are written and frozen; the PHP slice is slice 6 of the plan |
+| Backend | ✅ **built 2026-08-06** — 4 migrations, 4 models, `ScopeService`, 4 controllers, 3 form requests, 4 resources, routes, `ScopeSeeder`; `php -l` clean. Brought forward from slice 6 because the owner's live site runs in **API mode**, where the browser seeder never runs and an unhydrated store is an empty screen. Wired into `platform/data/api.js` HYDRATE + CONDITIONAL. Not yet migrated against MySQL — the host steps are `docs/RESEED-INTERIOR.md`. |
 | Screens shot | ✅ dark + light, read against `platform/design-system/UI-CONTRACT.md` |
 
 ## Data

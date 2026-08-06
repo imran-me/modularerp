@@ -37,15 +37,19 @@ class StockLedgerSeeder extends Seeder
             );
         }
 
-        // What the story projects consumed, by material ext_id.
+        /* WHAT THE VILLA HAS ACTUALLY CONSUMED, by material. Only the four civil
+         * bulk materials appear: the joinery phases have not started, so not one
+         * sheet of plywood has left the workshop for this job — which is exactly
+         * what the sheet's empty Wood Work page says.
+         *
+         * The quantities are derived from the SPEND, not invented: rod ৳8,56,397
+         * at ৳85/kg is 10,075 kg received, of which 9,700 went to site and 194
+         * (2%) was cutting waste, leaving the 181 kg the register shows. */
         $consumed = [
-            'MAT-001' => [['WAP-102', 210, '2026-05-06'], ['WAP-103', 96, '2026-03-12']],
-            'MAT-004' => [['WAP-102', 188, '2026-05-18']],
-            'MAT-003' => [['WAP-102', 104, '2026-05-22']],
-            'MAT-006' => [['WAP-102', 142, '2026-06-02']],
-            'MAT-009' => [['WAP-102', 58,  '2026-06-14']],
-            'MAT-002' => [['WAP-103', 44,  '2026-03-20']],
-            'MAT-008' => [['WAP-103', 18,  '2026-03-26']],
+            'MAT-013' => [['WAP-101', 9700,  '2026-03-26']],
+            'MAT-014' => [['WAP-101', 480,   '2026-04-04']],
+            'MAT-015' => [['WAP-101', 33333, '2026-03-18']],
+            'MAT-016' => [['WAP-101', 3627,  '2026-03-12']],
         ];
 
         $n = 0;
