@@ -10,7 +10,7 @@
  *   node tools/verify/books.mjs paid      # prove paid → Cash, due → Receivable
  *   node tools/verify/books.mjs salary    # salary charged per month (double-book check)
  *   node tools/verify/books.mjs receipt   # woodart goods receipt: balance-sheet only, reverses
- *   node tools/verify/books.mjs story     # the 3 Woodart story projects thread every module
+ *   node tools/verify/books.mjs story     # the ONE Woodart project threads every module
  *   node tools/verify/books.mjs stock     # stock == sum(movements), and a receipt moves both
  *   node tools/verify/books.mjs refs      # every cross-store reference points at something real
  *
@@ -199,50 +199,107 @@ if (PROBE === 'receipt') {
   console.log(ok ? '✓ goods receipt books correctly' : '✗ goods receipt is wrong');
 }
 if (PROBE === 'story') {
-  // Three hand-authored Woodart projects are supposed to thread through every
-  // module at a DIFFERENT phase. A demo that does not cross-reference is just
-  // more random data, so assert the joins rather than eyeball them.
+  // Interior runs ONE project (owner, 2026-08-06) and it is supposed to thread
+  // every module: spaces → phases → drawings → BOQ → budgets → orders → stock →
+  // workshop → site → money. A demo that does not cross-reference is just more
+  // random data, so assert the joins and the sheet's own figures rather than
+  // eyeball them. The figures come from companies/woodart/Assets/
+  // MUNSHI-VILLA-SHEET.md: ৳70,00,000 contract, ৳40,00,000 received,
+  // ৳23,48,257 spent.
   const out = await evalJs(`(function(){
     var db = EPAL.db, col = function(k){ return db.col(k); };
+    var ID = 'WAP-101';
+    var wa = function(k){ return col(k).filter(function(r){ return !r.companyId || r.companyId==='woodart'; }); };
     function of(store, key, id){ return col(store).filter(function(r){ return r[key]===id; }); }
-    return ['WAP-101','WAP-102','WAP-103'].map(function(id){
-      var p = col('wa_projects').filter(function(x){ return x.id===id; })[0];
-      var dw = of('wa_drawings','project',id);
-      var est = of('wa_estimates','projectId',id)[0];
-      var boq = (est && est.lines) || [];
-      var names = col('wa_materials').map(function(m){ return m.name; });
-      return {
-        id:id, found:!!p, stage:p&&p.stage, value:p&&p.value,
-        drawings:dw.length,
-        approved:dw.filter(function(d){ return d.status==='Approved'; }).length,
-        trail: col('wa_revisions').filter(function(r){ return dw.some(function(d){ return d.id===r.drawing; }); }).length,
-        boqLines:boq.length,
-        boqValue:boq.reduce(function(s,l){ return s+l.qty*l.unitSale; },0),
-        boqCost:boq.reduce(function(s,l){ return s+l.qty*l.unitCost; },0),
-        boqUnknown:boq.filter(function(l){ return names.indexOf(l.item)<0; }).map(function(l){ return l.item; }),
-        jobs:of('wa_production','project',id).length,
-        installs:of('wa_installs','project',id).length
-      };
+
+    var projects = col('wa_projects');
+    var p = projects.filter(function(x){ return x.id===ID; })[0];
+    var spaces = of('wa_spaces','project',ID);
+    var phases = of('wa_phases','project',ID);
+    var spaceIds = {}; spaces.forEach(function(s){ spaceIds[s.id]=1; });
+    var est = of('wa_estimates','project',ID)[0];
+    var boq = (est && est.lines) || [];
+    var names = col('wa_materials').map(function(m){ return m.name; });
+    var entries = wa('acc_entries');
+    var byStatus = function(st){ return phases.filter(function(f){ return f.status===st; }).length; };
+
+    /* every woodart record that names a project, and whether it names OURS */
+    var strays = [];
+    [['wa_spaces','project'],['wa_phases','project'],['wa_estimates','project'],
+     ['wa_drawings','project'],['wa_production','project'],['wa_installs','project'],
+     ['wa_purchases','project'],['wa_budget_lines','project']].forEach(function(t){
+      col(t[0]).forEach(function(r){ if (r[t[1]] && r[t[1]] !== ID) strays.push(t[0]+':'+r.id+'→'+r[t[1]]); });
     });
+    wa('acc_entries').concat(wa('sales')).forEach(function(r){
+      if (r.ref && String(r.ref).indexOf('WAP-') === 0 && r.ref !== ID) strays.push('ref:'+r.id+'→'+r.ref);
+    });
+
+    return {
+      projectCount: projects.length,
+      found: !!p, name: p&&p.name, stage: p&&p.stage, value: p&&p.value, budget: p&&p.cost,
+      spaces: spaces.length,
+      phases: phases.length,
+      phasesOrphan: phases.filter(function(f){ return !spaceIds[f.space]; }).length,
+      complete: byStatus('Complete'), active: byStatus('Active'), notStarted: byStatus('Not started'),
+      unassigned: phases.filter(function(f){ return !f.ownerId && f.status!=='Complete'; }).length,
+      drawings: of('wa_drawings','project',ID).length,
+      trail: col('wa_revisions').length,
+      boqLines: boq.length,
+      boqCost: boq.reduce(function(s,l){ return s+l.qty*l.unitCost; },0),
+      boqValue: boq.reduce(function(s,l){ return s+l.qty*l.unitSale; },0),
+      boqCoded: boq.filter(function(l){ return !!l.code; }).length,
+      budgetHeads: of('wa_budget_lines','project',ID).length,
+      budgetTotal: of('wa_budget_lines','project',ID).reduce(function(s,b){ return s+b.budget; },0),
+      stockedLines: boq.filter(function(l){ return names.indexOf(l.item)>=0; }).length,
+      orders: of('wa_purchases','project',ID).length,
+      issued: col('wa_movements').filter(function(m){ return m.ref===ID; }).length,
+      jobs: of('wa_production','project',ID).length,
+      installs: of('wa_installs','project',ID).length,
+      billed: entries.filter(function(e){ return e.kind==='Income' && e.ref===ID; })
+                     .reduce(function(s,e){ return s+e.amount; },0),
+      spent: entries.filter(function(e){ return e.kind==='Expense' && e.ref===ID; })
+                    .reduce(function(s,e){ return s+e.amount; },0),
+      overhead: entries.filter(function(e){ return e.kind==='Expense' && !e.ref; }).length,
+      receivable: wa('acc_schedules').filter(function(s){ return s.kind==='Receivable'; })
+                    .reduce(function(s,r){ return s+r.amount; },0),
+      strays: strays
+    };
   })()`);
-  const [a,b,c] = out;
   const money = n => '৳' + Math.round(n).toLocaleString('en-IN');
-  ok = out.every(r => r.found)
-    && a.stage==='Design' && b.stage==='Production' && c.stage==='Handover'
-    && out.every(r => r.drawings>0 && r.trail>0 && r.boqLines>0)
-    && out.every(r => r.boqUnknown.length===0)
-    && out.every(r => r.boqValue > r.boqCost)
-    && b.jobs>0 && c.installs>0 && a.jobs===0;
-  console.log('WOODART STORY PROJECTS');
-  out.forEach(r => {
-    console.log('  ' + r.id + '  ' + String(r.stage).padEnd(11) + ' ' + money(r.value).padStart(12));
-    console.log('     design ' + r.approved + '/' + r.drawings + ' approved · ' + r.trail + ' trail rows' +
-                ' · BOQ ' + r.boqLines + ' lines ' + money(r.boqValue) + ' (cost ' + money(r.boqCost) + ')');
-    console.log('     workshop ' + r.jobs + ' jobs · site ' + r.installs + ' visit(s)' +
-                (r.boqUnknown.length ? '   ← BOQ quotes unstocked: ' + r.boqUnknown.join(', ') : '   ✓ every BOQ item is a real material'));
-  });
-  console.log(ok ? '✓ each story sits at its own phase and every join resolves'
-                 : '✗ a story does not thread');
+  const SHEET_CONTRACT = 7000000, SHEET_BILLED = 4000000, SHEET_SPENT = 2348257, SHEET_DUE = 3000000;
+
+  ok = out.found && out.projectCount === 1
+    && out.spaces > 0 && out.phases > 0 && out.phasesOrphan === 0
+    && out.complete > 0 && out.active > 0 && out.notStarted > 0      // "in different phase"
+    && out.drawings > 0 && out.trail > 0
+    && out.boqLines > 0 && out.boqCoded === out.boqLines
+    && out.boqValue > out.boqCost && out.budget === out.boqCost
+    && out.budgetHeads > 0 && out.budgetTotal === out.boqCost
+    && out.orders > 0 && out.issued > 0 && out.jobs > 0 && out.installs > 0
+    && out.value === SHEET_CONTRACT && out.billed === SHEET_BILLED
+    && out.spent === SHEET_SPENT && out.receivable === SHEET_DUE
+    && out.strays.length === 0;
+
+  console.log('WOODART — THE ONE PROJECT');
+  console.log('  ' + out.name + '  ·  ' + out.stage + '  ·  ' + money(out.value));
+  console.log('  projects in Interior : ' + out.projectCount + (out.projectCount === 1 ? '  ✓' : '  ← should be 1'));
+  console.log('  spaces / phases      : ' + out.spaces + ' spaces · ' + out.phases + ' phases (' +
+              out.complete + ' complete · ' + out.active + ' active · ' + out.notStarted + ' not started · ' +
+              out.unassigned + ' unassigned)');
+  console.log('  design               : ' + out.drawings + ' drawings · ' + out.trail + ' revision rows');
+  console.log('  BOQ                  : ' + out.boqLines + ' lines, all coded · quote ' + money(out.boqValue) +
+              ' vs cost ' + money(out.boqCost) + ' · ' + out.stockedLines + ' name a stocked material');
+  console.log('  budget               : ' + out.budgetHeads + ' heads · ' + money(out.budgetTotal) +
+              (out.budgetTotal === out.boqCost ? '  ✓ equals the BOQ' : '  ← drifts from the BOQ'));
+  console.log('  supply               : ' + out.orders + ' orders · ' + out.issued + ' stock issues');
+  console.log('  make & deliver       : ' + out.jobs + ' workshop jobs · ' + out.installs + ' site visits');
+  console.log('  money vs the sheet   : billed ' + money(out.billed) + ' / ' + money(SHEET_BILLED) +
+              ' · spent ' + money(out.spent) + ' / ' + money(SHEET_SPENT) +
+              ' · due ' + money(out.receivable) + ' / ' + money(SHEET_DUE));
+  console.log('  overheads (no ref)   : ' + out.overhead + ' entries — rent, salaries, utilities');
+  if (out.strays.length) console.log('  ✗ records naming another project: ' + out.strays.slice(0, 6).join(' · '));
+  console.log(ok ? "✓ one project, threaded through every module, at the sheet's own figures"
+                 : '✗ the one-project demo does not thread');
 }
 if (PROBE === 'stock') {
   // THE INVARIANT: a material's stored stock must equal the sum of its
@@ -355,10 +412,16 @@ if (PROBE === 'refs') {
     check('wa_purchases','supplier', vendors,   'a vendor', true);
     check('wa_projects','client',    clients,   'a client', true);
 
-    // BOQ lines quote material NAMES, not ids — the one place a name is the key
+    // BOQ lines quote material NAMES, not ids — the one place a name is the key.
+    // Only lines that CLAIM to be a material are checked: a bill of quantities
+    // also prices labour and contracted work ("Rajmistri contract — Younus
+    // Mia"), and nobody stocks a contractor. Lines carry kind:'material' for
+    // exactly this reason; a line with no kind is treated as a material, so an
+    // untagged typo still fails rather than slipping through.
     var names = {}; col('wa_materials').forEach(function(m){ names[m.name] = 1; });
     col('wa_estimates').forEach(function(e){
       (e.lines || []).forEach(function(l){
+        if (l.kind && l.kind !== 'material') return;
         if (l.item && !names[l.item]) bad.push({ store:'wa_estimates', field:'lines[].item', value:l.item, points_at:'a material' });
       });
     });

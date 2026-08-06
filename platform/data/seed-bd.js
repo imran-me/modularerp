@@ -79,6 +79,47 @@
       S.set(store, out);
     }
 
+    /* ========================================================================
+     * ONE-TIME INTERIOR RESET (owner, 2026-08-06)
+     * ------------------------------------------------------------------------
+     * A seed is written once and never again — that is what makes it safe to
+     * ship next to live data. But the Interior demo has just been replaced
+     * wholesale (16 random projects + 3 story projects → the single Munshi
+     * Villa job), and a browser that already holds the old rows would never see
+     * it: every block below is guarded on "has this store ever been written".
+     *
+     * So the reset is versioned. When the marker does not match, every `wa_*`
+     * store is dropped and every woodart row is removed from the three SHARED
+     * money stores, and the blocks below rebuild them from scratch. It runs
+     * exactly once per version, and it touches nothing belonging to Travels,
+     * IT, Shop, Construction or the Group — "interior only", literally.
+     *
+     * Bump WA_DEMO_VERSION to force the next reset. Do not reuse a version
+     * string: a browser that already ran it will skip it.
+     * ====================================================================== */
+    var WA_DEMO_VERSION = 'munshi-villa-v1';
+    if (S.get('wa.demo.version', null) !== WA_DEMO_VERSION) {
+      Object.keys(localStorage)
+        .filter(function (k) { return k.indexOf(S.namespace + 'wa_') === 0; })
+        .forEach(function (k) { localStorage.removeItem(k); });
+
+      ['acc_entries', 'acc_schedules', 'sales'].forEach(function (store) {
+        if (localStorage.getItem(S.namespace + store) === null) return;
+        S.set(store, S.list(store).filter(function (r) { return r.companyId !== 'woodart'; }));
+      });
+
+      /* Interiors must own a bank account (PROJECT-PROFILE-PLAN §7). If the old
+       * random draw left it with none, give it the one the fixed list assigns
+       * rather than re-seeding every company's banks over it. */
+      var bk = S.list('banks');
+      if (bk.length > 2 && !bk.some(function (b) { return b.companyId === 'woodart'; })) {
+        bk[2].companyId = 'woodart';
+        S.set('banks', bk);
+      }
+
+      S.set('wa.demo.version', WA_DEMO_VERSION);
+    }
+
     /* ---- shared BD vocab ---------------------------------------------------*/
     var PEOPLE = ['Ashraful Karim','Nasrin Sultana','Mahmudul Hasan','Farzana Yasmin','Shafiqur Rahman',
       'Taslima Begum','Omar Faruk','Sharmin Jahan','Kamrul Islam','Rukhsana Parvin','Alamgir Hossain',
@@ -100,8 +141,12 @@
     gen('banks', 8, function (i) {
       var banks = [['City Bank','Gulshan Avenue'],['BRAC Bank','Banani'],['Dutch-Bangla','Uttara'],['Eastern Bank','Motijheel'],
         ['Prime Bank','Dhanmondi'],['Islami Bank','Mohakhali'],['Standard Chartered','Gulshan-1'],['bKash Merchant','—']];
+      /* Ownership is FIXED, not picked at random: Interiors was given its own
+       * account (PROJECT-PROFILE-PLAN §7), and a random draw could leave it
+       * with three accounts or none. */
+      var bankOwner = ['group','travels','woodart','it','shop','construction','travels','group'];
       return { id: seq('BNK', i, 2), name: banks[i][0], branch: banks[i][1],
-        account: '15' + ri(10000000, 99999999), companyId: pick(['group','travels','woodart','it','shop','construction']),
+        account: '15' + ri(10000000, 99999999), companyId: bankOwner[i],
         balance: ri(4, 90) * 100000, created: dt(7) };
     });
     // CRM activities (calls/meetings against leads)
@@ -112,12 +157,19 @@
           'Scheduled demo','Waiting for budget approval','Interested — call next week']),
         outcome: pick(['Positive','Neutral','Positive','Needs follow-up']), date: dt(), created: dt() };
     });
-    // Accounts journal entries per company (income/expense feed for Accounts modules)
+    /* Accounts journal entries per company (income/expense feed for Accounts
+     * modules).
+     *
+     * ⚠️ WOODART IS DELIBERATELY ABSENT from this random feed (owner,
+     * 2026-08-06: "remove demo data from interior only"). Interior's books are
+     * authored from the Munshi Villa sheet further down, so a random ৳4L
+     * "Project Billing" here would reference no project and quietly break the
+     * one thing that section exists to prove: every taka traces to the job. */
     gen('acc_entries', 180, function (i) {
-      var cid = pick(['travels','woodart','it','shop','construction']);
+      var cid = pick(['travels','it','shop','construction']);
       var isIncome = rnd() > 0.45;
       var cats = isIncome
-        ? { travels:['Ticket Sales','Visa Fees','Consultancy'], woodart:['Project Billing','Design Fee'],
+        ? { travels:['Ticket Sales','Visa Fees','Consultancy'],
             it:['Project Milestone','Subscription','Support Retainer'], shop:['Counter Sales','Online Sales'],
             construction:['IPC Certified','Mobilization Advance'] }[cid]
         : ['Office Rent','Salaries','Utilities','Fuel & Transport','Vendor Payment','Marketing','Equipment','Entertainment','Bank Charges'];
@@ -130,7 +182,9 @@
     // Payable / receivable schedules per company (Accounts ▸ Schedules)
     gen('acc_schedules', 30, function (i) {
       var kind = rnd() > 0.5 ? 'Payable' : 'Receivable';
-      return { id: seq('SCH', i, 3), companyId: pick(['travels','woodart','it','shop','construction']),
+      /* woodart excluded — its two payables and one receivable are authored
+         against the villa's own orders (see THE VILLA'S MONEY below). */
+      return { id: seq('SCH', i, 3), companyId: pick(['travels','it','shop','construction']),
         party: kind === 'Payable' ? pick(['Galaxy GSA','BSRM Steels','Walton Distribution','Timber World BD','Data Center BD']) : pick(CORPORATES),
         kind: kind, amount: ri(20, 600) * 1000, due: rnd() > 0.35 ? future(60) : dt(1),
         status: pick(['Pending','Pending','Partial','Paid']), ref: 'INV-' + ri(1000, 9999), created: dt() };
@@ -139,7 +193,8 @@
     // seeded rows are already reflected inside the seeded financials, so they
     // do NOT mutate financials here).
     gen('sales', 40, function (i) {
-      var cid = pick(['travels','travels','woodart','it','shop','shop','construction']);
+      /* woodart excluded — its three sales ARE the client's three payments. */
+      var cid = pick(['travels','travels','it','shop','shop','construction']);
       var amount = ri(8, 700) * 1000, cost = Math.round(amount * (0.55 + rnd() * 0.3));
       return { id: seq('SL', i, 4), companyId: cid, date: dt(),
         amount: amount, cost: cost, profit: amount - cost,
@@ -225,20 +280,114 @@
         phone: phone(), created: dt() };
     });
 
-    /* ============================== WOODART =================================*/
-    gen('wa_projects', 16, function (i) {
-      var value = ri(6, 120) * 100000;
-      return { id: seq('WAP', i, 3),
-        name: pick(['Apartment Interior','Office Fit-out','Showroom Design','Restaurant Interior','Penthouse Remodel','Duplex Interior','Bank Branch Fit-out']) + ' · ' + pick(AREAS),
-        client: rnd() > 0.5 ? pick(CORPORATES) : pick(PEOPLE), type: pick(['Residential','Residential','Office','Retail','Restaurant']),
-        area: ri(8, 60) * 100, value: value, cost: Math.round(value * (0.62 + rnd() * 0.15)),
-        stage: pick(['Design','Design','Production','Production','Installation','Handover','Completed']),
-        progress: ri(5, 100), start: dt(), deadline: future(180), designer: pick(PEOPLE), created: dt() };
+    /* ========================================================================
+     * WOODART — ONE PROJECT, THREADED THROUGH THE WHOLE CONCERN
+     * (owner, 2026-08-06: "remove demo data from interior only, and make only
+     *  one demo project across all the system of interior, in different phase,
+     *  related fields")
+     * ------------------------------------------------------------------------
+     * Interior used to carry 16 randomly generated projects PLUS three hand-
+     * written "story" projects. It now carries exactly ONE — Munshi Villa
+     * Duplex — and every record in every Woodart module hangs off it: spaces,
+     * phases, drawings, BOQ, per-head budgets, purchase orders, stock movements,
+     * workshop jobs, site visits, income, expenses and schedules. Open any
+     * Interior screen and you are looking at the same job.
+     *
+     * THE NUMBERS ARE REAL. They come from companies/woodart/Assets/
+     * MUNSHI-VILLA-SHEET.md — the analysis of the spreadsheet the business runs
+     * this project on today:
+     *
+     *     contract               ৳70,00,000
+     *     received (3 payments)  ৳40,00,000    10L + 20L + 10L
+     *     still to collect       ৳30,00,000
+     *     spent to date          ৳23,48,257    the 13 heads in WA_SPENT below,
+     *                                          which sum to exactly that figure
+     *
+     * WHAT IS THE SHEET AND WHAT IS NOT: the contract, the three receipts, the
+     * spend per head, and six of the budgets are the sheet's own figures. Room
+     * names, areas, drawing titles, and budgets for the heads the sheet leaves
+     * blank are demo detail — the sheet carries no room schedule.
+     *
+     * THE PHASES THE SHEET LEAVES EMPTY ARE THE POINT. Tiles · Paint · Metal ·
+     * Aluminium · Wood Work sit in its summary with no rows because the project
+     * has not reached them (sheet §3a). They are seeded as `Not started` phases,
+     * so the Phase Board shows exactly what the spreadsheet shows.
+     * ====================================================================== */
+
+    /* THE SCOPE OF WORK — the single source for BOTH the BOQ and the per-head
+     * budget, so a budget can never disagree with the quotation it came from.
+     *
+     *     [ cost code, line item, qty, unit, unit cost, kind ]
+     *
+     * Cost codes are ids from wa_cost_codes above: one vocabulary for the
+     * estimate, the purchase order and the expense (PROJECT-PROFILE-PLAN §2).
+     *
+     * KIND is what makes the bill honest. A `material` line names a material in
+     * the register EXACTLY, so Estimates › Bill of Materials resolves it and
+     * `books.mjs refs` fails if a name is ever mistyped. A `work` line prices
+     * labour or a contract — nobody stocks a rajmistri — and is exempt from
+     * that check by design rather than by accident. */
+    /* The markup that turns the costed scope into the ৳70,00,000 the client
+     * signed for. It is a constant rather than 24 typed sale prices so the
+     * quotation can never drift from the contract by more than per-line
+     * rounding (it lands within ৳1,000 of it). */
+    var WA_MARKUP = 1.1492;
+    var WA_WORK = [
+      ['3D & Visualisation', '3D design, walkthrough & drawings',     1, 'lot',      50000, 'work'],
+      ['Soil & Excavation',  'Soil excavation, cutting & fill',       1, 'lot',      75000, 'work'],
+      ['Bricks & Breaking',  'Bricks (1st class)',                37500, 'pcs',         12, 'material'],
+      ['Cement',             'Cement — 50 kg bag',                  550, 'bag',        545, 'material'],
+      ['Rod',                'Rod — BSRM 60 grade',               10000, 'kg',          85, 'material'],
+      ['Sand & Bali',        'Sand & bali',                        4000, 'cft',         65, 'material'],
+      ['Contractor',         'Rajmistri contract — Younus Mia',       1, 'lot',    1344000, 'work'],
+      ['Electrical',         'Electrical points & wiring',          120, 'point',     2900, 'work'],
+      ['Sanitary',           'Sanitary & plumbing set',               5, 'set',      80000, 'work'],
+      ['Tiles Work',         'Floor & wall tiles — supply & lay',  2000, 'sft',        160, 'work'],
+      ['Paint',              'Putty, primer & paint',              6000, 'sft',         30, 'work'],
+      ['Aluminium',          'Aluminium windows & glazing',         400, 'sft',        400, 'work'],
+      ['Metal',              'MS railing & grill',                   60, 'rft',       1500, 'work'],
+      ['Wood Work',          'Joinery labour & site fitting',         1, 'lot',     350000, 'work'],
+      ['Boards & Ply',       'Marine Plywood 18mm',                  90, 'sheet',     3610, 'material'],
+      ['Boards & Ply',       'Veneer Board',                         30, 'sheet',     4200, 'material'],
+      ['Laminates & Veneer', 'Formica Laminate',                     45, 'sheet',     1250, 'material'],
+      ['Hardware',           'German Hinge (Hettich)',              200, 'pcs',        335, 'material'],
+      ['Hardware',           'Drawer Channel 18"',                   70, 'pcs',        540, 'material'],
+      ['Hardware',           'SS Handle',                           110, 'pcs',        185, 'material'],
+      ['Finishes',           'NC Lacquer',                           30, 'litre',     1065, 'material'],
+      ['Extra Labour',       'Extra labour — call-outs',              1, 'lot',      60000, 'work'],
+      ['Transport & Visit',  'Transport & site visits',               1, 'lot',     100000, 'work'],
+      ['Other Expense',      'Extra / others',                        1, 'lot',      90215, 'work']
+    ];
+
+    /* The BOQ lines and the budgeted cost, computed from ONE table so no
+     * arithmetic can drift between the quotation, the budget and the project. */
+    var waBoqLines = WA_WORK.map(function (w) {
+      return { item: w[1], qty: w[2], unit: w[3], unitCost: w[4],
+               unitSale: Math.round(w[4] * WA_MARKUP), code: w[0], kind: w[5] };
     });
-    gen('wa_estimates', 14, function (i) {
-      return { id: seq('EST', i, 3), title: pick(['Kitchen Cabinets','Full Interior','Office Workstations','Wardrobe Package','False Ceiling & Lighting','Reception Desk']) + ' — ' + pick(AREAS),
-        client: rnd() > 0.5 ? pick(CORPORATES) : pick(PEOPLE), items: ri(4, 28), value: ri(2, 60) * 100000,
-        status: pick(['Draft','Sent','Sent','Approved','Approved','Rejected']), validTill: future(45), created: dt() };
+    var waBudget = waBoqLines.reduce(function (t, l) { return t + l.qty * l.unitCost; }, 0);
+    var waQuoted = waBoqLines.reduce(function (t, l) { return t + l.qty * l.unitSale; }, 0);
+
+    gen('wa_projects', 1, function () {
+      return { id: 'WAP-101', companyId: 'woodart',
+        name: 'Munshi Villa Duplex — build & full interior', client: 'Munshi Billah',
+        type: 'Residential', area: 2520,
+        value: 7000000,            /* the contract, from the sheet            */
+        cost: waBudget,            /* the budget, from the scope of work      */
+        stage: 'Production',       /* civil done, services running, joinery next */
+        progress: 42, start: '2026-02-27', deadline: '2026-11-30',
+        designer: 'Imtiaz Chowdhury', created: '2026-02-20' };
+    });
+
+    /* ONE approved BOQ. `project` (not `projectId`) is the field every reader
+     * joins on — Accounts' Project P&L, the budget derivation and the Estimates
+     * seam all use it. */
+    gen('wa_estimates', 1, function () {
+      return { id: 'EST-101', companyId: 'woodart',
+        title: 'Munshi Villa Duplex — bill of quantities', client: 'Munshi Billah',
+        project: 'WAP-101', status: 'Approved', validTill: '2026-12-31',
+        items: waBoqLines.length, value: waQuoted, cost: waBudget,
+        lines: waBoqLines, created: '2026-02-24' };
     });
     /* Woodart COST CONTROL — codes, per-code budgets and phases.
      *
@@ -298,18 +447,17 @@
      * approved BOQ gets no rows, which is correct: the Munshi sheet budgets only
      * 6 of its 18 heads. */
     if (localStorage.getItem(S.namespace + 'wa_budget_lines') === null) {
-      var CAT2CODE = { Board:'Boards & Ply', Laminate:'Laminates & Veneer', Hardware:'Hardware',
-                       Adhesive:'Adhesives', Finish:'Finishes', Fabric:'Fabric & Foam' };
-      var codeOf = {};
-      S.list('wa_materials').forEach(function (m) { codeOf[m.name] = CAT2CODE[m.category] || 'Other Expense'; });
-
+      /* Each BOQ line now carries its own cost code (WA_WORK), so the budget is
+       * a straight roll-up of the quotation rather than a guess made by mapping
+       * a material's category. Budget and quotation cannot disagree: they are
+       * the same rows added up two ways. */
       var budget = [];
       S.list('wa_estimates').forEach(function (e) {
         if (e.status !== 'Approved' && e.status !== 'Sent') return;
         if (!e.project) return;
         var bag = {};
         (e.lines || []).forEach(function (l) {
-          var code = codeOf[l.item] || 'Other Expense';
+          var code = l.code || 'Other Expense';
           bag[code] = (bag[code] || 0) + (+l.qty || 0) * (+l.unitCost || 0);
         });
         Object.keys(bag).forEach(function (code) {
@@ -381,98 +529,106 @@
       }));
     }
 
-    /* SPACES per project, chosen by the project TYPE — a duplex is broken down
-     * into rooms, an office into work areas. Deliberately not random names: a
-     * "Space 3" in a demo teaches nobody what the screen is for. */
+    /* THE VILLA'S ROOMS — the project's spaces, ground floor then upper floor.
+     * Their areas sum to the 2,520 sft on the project record, so the Spaces
+     * screen's "Area Planned" KPI and the project's own area agree. The sheet
+     * carries no room schedule, so the names and areas are demo detail; every
+     * figure that touches money is not. */
+    var WA_SPACES = [
+      ['Living Room',       'Living',  420, 'Ground'],
+      ['Dining Room',       'Dining',  300, 'Ground'],
+      ['Kitchen',           'Kitchen', 180, 'Ground'],
+      ['Guest Bed Room',    'Bedroom', 240, 'Ground'],
+      ['Guest Bath',        'Bath',     70, 'Ground'],
+      ['Master Bed Room',   'Bedroom', 360, 'Upper'],
+      ['Master Bath',       'Bath',     90, 'Upper'],
+      ['Kids Bed Room',     'Bedroom', 260, 'Upper'],
+      ['Family Lounge',     'Living',  280, 'Upper'],
+      ['Staircase & Lobby', 'Common',  200, 'Upper'],
+      ['Balcony — Upper',   'Balcony', 120, 'Upper']
+    ];
     if (localStorage.getItem(S.namespace + 'wa_spaces') === null) {
-      var LAYOUT = {
-        Residential: [['Master Bed Room','Bedroom',320],['Kitchen','Kitchen',140],['Dining Room','Dining',210],
-                      ['Living Room','Living',280],['Guest Bed Room','Bedroom',240],['Master Bath','Bath',80]],
-        Office:      [['Reception','Reception',180],['Workstation Area','Office',620],['MD Room','Office',260],
-                      ['Meeting Room','Office',240],['Pantry','Kitchen',110]],
-        Retail:      [['Display Floor','Retail',540],['Cash Counter','Retail',90],['Trial & Fitting','Retail',120],
-                      ['Store Room','Common',150]],
-        Restaurant:  [['Dining Hall','Dining',680],['Kitchen','Kitchen',320],['Reception & Waiting','Reception',140],
-                      ['Wash Area','Bath',90]]
-      };
-      var spaces = [], sn = 0;
-      S.list('wa_projects').forEach(function (p) {
-        var plan = LAYOUT[p.type] || LAYOUT.Residential;
-        // 3..N spaces per project — enough to show the hierarchy, never so many
-        // that a demo card grid stops being readable.
-        var count = Math.min(plan.length, ri(3, 5));
-        for (var i = 0; i < count; i++) {
-          spaces.push({ id: seq('SPC', sn++, 3), companyId: 'woodart', project: p.id,
-            name: plan[i][0], kind: plan[i][1], area: plan[i][2], sort: i + 1,
-            note: '', created: p.start || p.created });
-        }
-      });
-      S.set('wa_spaces', spaces);
+      S.set('wa_spaces', WA_SPACES.map(function (s, i) {
+        return { id: seq('SPC', i, 3), companyId: 'woodart', project: 'WAP-101',
+          name: s[0], kind: s[1], area: s[2], sort: i + 1,
+          note: s[3] + ' floor', created: '2026-02-27' };
+      }));
     }
 
-    /* PHASES per space, from the template for its kind. Status is DERIVED from
-     * the project's headline stage, so the phase strip agrees with the stage
-     * badge instead of contradicting it, and the responsible person comes from
-     * the REAL Woodart roster (design phases → the designer, wood work → the
-     * production supervisor, site work → the installation foreman) rather than
-     * from a random name generator.
+    /* THE PHASES OF EACH ROOM — what it runs through, and where the villa
+     * actually stands today (demo clock 2026-07-05).
      *
-     * The guard re-seeds a browser still holding the pre-2026-08-06 project-level
-     * rows (no `space` key). That is safe precisely because no screen ever read
-     * them; it is the difference between an upgrade and a data loss. */
+     * THE STATUSES ARE THE SHEET'S, not a generator's (MUNSHI-VILLA-SHEET §2/§3a):
+     *   Design            complete    3D design office ৳30,000 of ৳50,000 spent
+     *   Civil & Breaking  complete    bricks, cement, rod and sand are ~95% spent
+     *   Electrical        RUNNING     ৳22,800 of ৳3,50,000 — first fix, ground floor
+     *   Plumbing          RUNNING     ৳7,530 of ৳4,00,000 — kitchen + master bath
+     *   Tiles · Paint · Metal · Aluminium · Wood Work · Furniture   NOT STARTED
+     *                                 — the five empty sheets in its summary
+     *
+     * COLOUR & PAINT IS DELIBERATELY LEFT UNASSIGNED on every room: it is far
+     * enough out that nobody has been put on it, which is exactly the queue the
+     * Phase Board's "unassigned" banner exists to surface. The kitchen's
+     * plumbing finish date has passed with the phase still open, so the overdue
+     * rule has one real row to report instead of always showing zero.
+     *
+     * The guard also re-seeds a browser still holding the pre-2026-08-06
+     * project-level rows (no `space` key). */
+    var WA_PHASE_PLAN = {
+      Living:  ['Design','Civil & Breaking','Electrical','Tiles','Wood Work','Colour & Paint','Furniture','Handover'],
+      Dining:  ['Design','Civil & Breaking','Electrical','Tiles','Wood Work','Colour & Paint','Furniture','Handover'],
+      Bedroom: ['Design','Civil & Breaking','Electrical','Tiles','Wood Work','Colour & Paint','Furniture','Handover'],
+      Kitchen: ['Design','Civil & Breaking','Plumbing','Electrical','Tiles','Wood Work','Counter & Stone','Colour & Paint','Handover'],
+      Bath:    ['Design','Civil & Breaking','Plumbing','Electrical','Tiles','Fittings','Colour & Paint','Handover'],
+      Balcony: ['Design','Civil & Breaking','Tiles','Aluminium & Glazing','Colour & Paint','Handover'],
+      Common:  ['Design','Civil & Breaking','Electrical','Tiles','MS Railing','Colour & Paint','Handover']
+    };
+    /* Every phase carries a cost code, so the plan, the purchase order and the
+     * expense against it are all filed under one head. */
+    var WA_PHASE_CODE = {
+      'Design':'3D & Visualisation', 'Civil & Breaking':'Bricks & Breaking',
+      'Plumbing':'Sanitary',         'Electrical':'Electrical',
+      'Tiles':'Tiles Work',          'Wood Work':'Wood Work',
+      'Counter & Stone':'Metal',     'MS Railing':'Metal',
+      'Aluminium & Glazing':'Aluminium', 'Fittings':'Sanitary',
+      'Colour & Paint':'Paint',      'Furniture':'Boards & Ply',
+      'Handover':'Installation'
+    };
+    /* Who is responsible — the REAL Woodart roster (database.js seedEmployees):
+     *   EPL-0007 Imtiaz Chowdhury · Lead Interior Designer  → the drawing board
+     *   EPL-0008 Sumaiya Akter    · Production Supervisor   → the workshop
+     *   EPL-0009 Jahangir Alam    · Installation Foreman    → the site */
+    var WA_PHASE_OWNER = {
+      'Design':'EPL-0007',
+      'Wood Work':'EPL-0008', 'Counter & Stone':'EPL-0008', 'Furniture':'EPL-0008',
+      'Civil & Breaking':'EPL-0009', 'Plumbing':'EPL-0009', 'Electrical':'EPL-0009',
+      'Tiles':'EPL-0009', 'Fittings':'EPL-0009', 'MS Railing':'EPL-0009',
+      'Aluminium & Glazing':'EPL-0009', 'Handover':'EPL-0009'
+      /* 'Colour & Paint' is absent on purpose — see the block comment above. */
+    };
     var phasesRaw = localStorage.getItem(S.namespace + 'wa_phases');
     var phasesLegacy = phasesRaw !== null && (S.list('wa_phases')[0] || {}).space === undefined;
     if (phasesRaw === null || phasesLegacy) {
-      /* The REAL Woodart roster (platform/data/database.js seedEmployees):
-       * EPL-0007 Imtiaz Chowdhury · Lead Interior Designer
-       * EPL-0008 Sumaiya Akter    · Production Supervisor
-       * EPL-0009 Jahangir Alam    · Installation Foreman
-       * Anything not named here falls to the production supervisor, who is the
-       * person a workshop phase belongs to by default. */
-      var OWNER_BY_PHASE = {
-        /* the drawing board */
-        'Design': 'EPL-0007', '3D & Visualisation': 'EPL-0007',
-        /* the workshop — anything fabricated or finished */
-        'False Ceiling': 'EPL-0008', 'Wood Work': 'EPL-0008', 'Furniture': 'EPL-0008',
-        'Counter & Stone': 'EPL-0008', 'Metal & Signage': 'EPL-0008', 'Colour & Paint': 'EPL-0008',
-        /* the site — trades, services and the handover */
-        'Civil & Breaking': 'EPL-0009', 'Electrical': 'EPL-0009', 'Plumbing': 'EPL-0009',
-        'Tiles': 'EPL-0009', 'Aluminium & Glazing': 'EPL-0009', 'Fittings': 'EPL-0009',
-        'Appliances & Fit-out': 'EPL-0009', 'Handover': 'EPL-0009'
-      };
-      var DEFAULT_OWNER = 'EPL-0008';
-      // How far through its phase list a space is, from the project's stage.
-      var STAGE_PCT = { Design: 0.15, Production: 0.5, Installation: 0.8, Handover: 0.92, Completed: 1 };
-      var tplByKind = {};
-      S.list('wa_phase_templates').forEach(function (t) { tplByKind[t.kind] = t.phases; });
-
       var phaseRows = [], pn = 0;
       S.list('wa_spaces').forEach(function (sp) {
-        var proj = S.list('wa_projects').filter(function (p) { return p.id === sp.project; })[0] || {};
-        var list = tplByKind[sp.kind] || tplByKind.Common || [];
-        var through = Math.round(list.length * (STAGE_PCT[proj.stage] != null ? STAGE_PCT[proj.stage] : 0.15));
-        list.forEach(function (t, i) {
-          // Every space of a Completed project is done; otherwise the phases
-          // before the cut are complete, the one at the cut is active.
-          var status = i < through ? 'Complete' : (i === through ? 'Active' : 'Not started');
-          // Some work with nobody on it is REAL, and only ever ahead of the
-          // current phase: it is the queue the board exists to shrink, and a
-          // demo where everything is already assigned teaches nothing. Work
-          // that has started always has a name against it.
-          var unowned = i > through + 1 && rnd() < 0.45;
-          phaseRows.push({ id: seq('PHS', pn++, 4), companyId: 'woodart', project: sp.project, space: sp.id,
-            name: t.name, code: t.code || '', sort: i + 1, status: status,
-            ownerId: unowned ? '' : (OWNER_BY_PHASE[t.name] || DEFAULT_OWNER),
-            start: i <= through ? (proj.start || null) : null,
-            /* A finish must never precede its start. Some seeded projects carry
-             * a deadline earlier than their start date (wa_projects is generated
-             * from two independent date helpers), and a phase row reading
-             * "22 Jul → 11 Jul" would look like a bug in the board rather than
-             * like the project data it came from. */
-            finish: i < through ? (proj.start || null)
-                  : (i === through && proj.deadline && proj.start && proj.deadline > proj.start
-                      ? proj.deadline : null),
-            note: '' });
+        var plan = WA_PHASE_PLAN[sp.kind] || WA_PHASE_PLAN.Common;
+        var ground = /Ground/.test(sp.note || '');
+        plan.forEach(function (name, i) {
+          var status = 'Not started', start = null, finish = null;
+          if (name === 'Design') {
+            status = 'Complete'; start = '2026-02-27'; finish = '2026-03-10';
+          } else if (name === 'Civil & Breaking') {
+            status = 'Complete'; start = '2026-03-12'; finish = '2026-06-20';
+          } else if (name === 'Electrical' && ground) {
+            status = 'Active';   start = '2026-06-22'; finish = '2026-07-31';
+          } else if (name === 'Plumbing' && (sp.name === 'Kitchen' || sp.name === 'Master Bath')) {
+            status = 'Active';   start = '2026-06-18';
+            finish = sp.name === 'Kitchen' ? '2026-06-30' : '2026-07-20';
+          }
+          phaseRows.push({ id: seq('PHS', pn++, 4), companyId: 'woodart', project: sp.project,
+            space: sp.id, name: name, code: WA_PHASE_CODE[name] || '', sort: i + 1,
+            status: status, ownerId: WA_PHASE_OWNER[name] || '',
+            start: start, finish: finish, note: '' });
         });
       });
       S.set('wa_phases', phaseRows);
@@ -484,12 +640,15 @@
      * design-team salaries), so the Recurring tab and the Expense register
      * describe one business rather than two. A standing cost with no matching
      * history would read as a data-entry error the first time anyone checked. */
-    gen('wa_recurring', 6, function (i) {
+    /* SALARIES ARE THE REAL ROSTER, not a round number: Woodart employs three
+     * people (Imtiaz ৳72,000 · Sumaiya ৳42,000 · Jahangir ৳34,000 = ৳1,48,000).
+     * The old rows claimed ৳3,85,000 of designers plus ৳2,68,000 of site crew,
+     * which no payslip in the system could ever match. */
+    gen('wa_recurring', 5, function (i) {
       var rows = [
         { name: 'Workshop rent — Tejgaon',    category: 'Office Rent',      amount: 180000, party: 'Tejgaon Industrial Estate', dayOfMonth: 5,  method: 'Bank', status: 'Active' },
         { name: 'Workshop power & utilities', category: 'Utilities',        amount: 64200,  party: 'DESCO',                     dayOfMonth: 12, method: 'Bank', status: 'Active' },
-        { name: 'Design team salaries',       category: 'Salaries',         amount: 385000, party: 'Payroll',                   dayOfMonth: 28, method: 'Bank', status: 'Active' },
-        { name: 'Site crew salaries',         category: 'Salaries',         amount: 268000, party: 'Payroll',                   dayOfMonth: 28, method: 'Bank', status: 'Active' },
+        { name: 'Salaries — design & site',   category: 'Salaries',         amount: 148000, party: 'Payroll',                   dayOfMonth: 28, method: 'Bank', status: 'Active' },
         { name: 'Delivery van lease',         category: 'Fuel & Transport', amount: 42000,  party: 'Rangs Motors',              dayOfMonth: 8,  method: 'Bank', status: 'Active' },
         { name: 'CNC service retainer',       category: 'Tools & Equipment',amount: 25000,  party: 'Homag Bangladesh',          dayOfMonth: 20, method: 'Cheque', status: 'Paused' }
       ];
@@ -531,38 +690,35 @@
      * (the "not started" state has to be visible), and the last drawing points
      * at a project id that does not exist so the orphan path has real data. */
     if (localStorage.getItem(S.namespace + 'wa_drawings') === null) {
-      var KINDS = ['Plan', 'Elevation', 'Section', 'Detail', '3D Model', 'Render'];
-      var STATES = ['Approved', 'Issued', 'Commented', 'Draft', 'Approved', 'Issued'];
-      var waProjects = S.list('wa_projects');
-      var dwgs = [], rvns = [], n = 0, r = 0;
-      waProjects.slice(0, 9).forEach(function (p, pi) {
-        var count = 2 + (pi % 3);                       // 2..4 deliverables each
-        for (var k = 0; k < count; k++) {
-          var kind = KINDS[(pi + k) % KINDS.length];
-          var status = STATES[(pi + k) % STATES.length];
-          var revIdx = (pi + k) % 3;                    // A / B / C
-          var rev = String.fromCharCode(65 + revIdx);
-          var id = seq('DWG', n++, 3);
-          dwgs.push({ id: id, project: p.id, title: kind + ' — ' + (p.name || '').split(' · ')[0],
-            kind: kind, rev: rev, status: status, designer: p.designer || pick(PEOPLE),
-            issued: status === 'Draft' ? null : dt(1),
-            approved: status === 'Approved' ? dt() : null, created: dt(1) });
-          /* the trail: one row per revision letter up to the current one */
-          for (var q = 0; q <= revIdx; q++) {
-            rvns.push({ id: seq('RVN', r++, 3), drawing: id, rev: String.fromCharCode(65 + q),
-              action: q < revIdx ? 'Revised' : (status === 'Draft' ? 'Drafted' : status),
-              by: p.designer || pick(PEOPLE),
-              note: q < revIdx ? 'Client comments incorporated' : '',
-              date: dt(1) });
-          }
-        }
-      });
-      /* an orphan — its project no longer exists. Kept and flagged, never hidden. */
-      dwgs.push({ id: seq('DWG', n++, 3), project: 'WAP-999', title: '3D Model — Salvaged concept',
-        kind: '3D Model', rev: 'A', status: 'Issued', designer: pick(PEOPLE),
-        issued: dt(2), approved: null, created: dt(2) });
-      S.set('wa_drawings', dwgs);
-      S.set('wa_revisions', rvns);
+      /* The villa's drawing set. The build ones are approved (the site is
+       * already up), the joinery ones are still moving — which is what a
+       * project at this phase looks like: the client signed off the shell and
+       * is still choosing what goes inside it. `Issued` is the only state where
+       * the wait is the CLIENT's, so the Approvals queue has exactly one row. */
+      S.set('wa_drawings', [
+        { id:'DWG-101', project:'WAP-101', title:'Ground floor plan',           kind:'Plan',      rev:'B', status:'Approved',  designer:'Imtiaz Chowdhury', issued:'2026-03-02', approved:'2026-03-10', created:'2026-02-27' },
+        { id:'DWG-102', project:'WAP-101', title:'Upper floor plan',            kind:'Plan',      rev:'B', status:'Approved',  designer:'Imtiaz Chowdhury', issued:'2026-03-02', approved:'2026-03-10', created:'2026-02-27' },
+        { id:'DWG-103', project:'WAP-101', title:'Front elevation',             kind:'Elevation', rev:'A', status:'Approved',  designer:'Imtiaz Chowdhury', issued:'2026-03-04', approved:'2026-03-10', created:'2026-03-01' },
+        { id:'DWG-104', project:'WAP-101', title:'Staircase & lobby section',   kind:'Section',   rev:'A', status:'Approved',  designer:'Imtiaz Chowdhury', issued:'2026-03-06', approved:'2026-03-12', created:'2026-03-02' },
+        { id:'DWG-105', project:'WAP-101', title:'Living room — 3D view',       kind:'3D Model',  rev:'C', status:'Commented', designer:'Imtiaz Chowdhury', issued:'2026-06-24', approved:null,         created:'2026-05-18' },
+        { id:'DWG-106', project:'WAP-101', title:'Master wardrobe detail',      kind:'Detail',    rev:'A', status:'Issued',    designer:'Imtiaz Chowdhury', issued:'2026-06-28', approved:null,         created:'2026-06-20' },
+        { id:'DWG-107', project:'WAP-101', title:'Kitchen joinery detail',      kind:'Detail',    rev:'A', status:'Draft',     designer:'Imtiaz Chowdhury', issued:null,         approved:null,         created:'2026-07-01' }
+      ]);
+      /* The trail is EVIDENCE — one row per revision letter, up to the current
+       * one, so how a drawing reached its state is readable months later. */
+      S.set('wa_revisions', [
+        { id:'RVN-101', drawing:'DWG-101', rev:'A', action:'Revised',   by:'Imtiaz Chowdhury', note:'Store room moved under the stair', date:'2026-02-29' },
+        { id:'RVN-102', drawing:'DWG-101', rev:'B', action:'Approved',  by:'Imtiaz Chowdhury', note:'', date:'2026-03-10' },
+        { id:'RVN-103', drawing:'DWG-102', rev:'A', action:'Revised',   by:'Imtiaz Chowdhury', note:'Kids bed room widened by 1 ft', date:'2026-03-01' },
+        { id:'RVN-104', drawing:'DWG-102', rev:'B', action:'Approved',  by:'Imtiaz Chowdhury', note:'', date:'2026-03-10' },
+        { id:'RVN-105', drawing:'DWG-103', rev:'A', action:'Approved',  by:'Imtiaz Chowdhury', note:'', date:'2026-03-10' },
+        { id:'RVN-106', drawing:'DWG-104', rev:'A', action:'Approved',  by:'Imtiaz Chowdhury', note:'', date:'2026-03-12' },
+        { id:'RVN-107', drawing:'DWG-105', rev:'A', action:'Revised',   by:'Imtiaz Chowdhury', note:'Ceiling height corrected to 9 ft', date:'2026-05-30' },
+        { id:'RVN-108', drawing:'DWG-105', rev:'B', action:'Revised',   by:'Imtiaz Chowdhury', note:'Veneer tone changed to walnut', date:'2026-06-14' },
+        { id:'RVN-109', drawing:'DWG-105', rev:'C', action:'Commented', by:'Imtiaz Chowdhury', note:'Client wants the TV wall reworked', date:'2026-07-02' },
+        { id:'RVN-110', drawing:'DWG-106', rev:'A', action:'Issued',    by:'Imtiaz Chowdhury', note:'', date:'2026-06-28' },
+        { id:'RVN-111', drawing:'DWG-107', rev:'A', action:'Drafted',   by:'Imtiaz Chowdhury', note:'', date:'2026-07-01' }
+      ]);
     }
 
     /* Woodart MATERIALS — a MIRROR of the backend MaterialSeeder, not a generator.
@@ -586,7 +742,7 @@
      * business between quoting and building, and the Drift column exists to
      * catch it. Every other item sits exactly at its quoted cost, so a non-zero
      * drift always means something. */
-    gen('wa_materials', 12, function (i) {
+    gen('wa_materials', 16, function (i) {
       var mats = [
         ['MAT-001','Marine Plywood 18mm',    'Board',   'sheet', 142,  40, 3610, 'Timber World BD'],
         ['MAT-002','Veneer Board',           'Board',   'sheet',  38,  25, 4200, 'Akij Board'],
@@ -599,25 +755,79 @@
         ['MAT-009','NC Lacquer',             'Finish',  'litre',  28,  30, 1065, 'Akij Board'],
         ['MAT-010','PU Polish',              'Finish',  'litre',  44,  20, 1420, 'Akij Board'],
         ['MAT-011','Fabric — Velvet',        'Fabric',  'sft',   160,  60,  420, 'Hatil Trade'],
-        ['MAT-012','Foam 4"',                'Fabric',  'sft',     0,  50,  260, 'Hatil Trade']
+        ['MAT-012','Foam 4"',                'Fabric',  'sft',     0,  50,  260, 'Hatil Trade'],
+        /* CIVIL BULK — the four materials the Munshi Villa build actually
+         * bought and consumed (MUNSHI-VILLA-SHEET §2). Their unit costs are the
+         * sheet's own rates, so a purchase order, the BOQ line and the stock
+         * value all quote the same number. Almost everything is issued to site,
+         * which is why the register shows them nearly empty: a villa does not
+         * warehouse its rod. */
+        ['MAT-013','Rod — BSRM 60 grade',    'Civil',   'kg',    181, 500,   85, 'Haji Enterprise'],
+        ['MAT-014','Cement — 50 kg bag',     'Civil',   'bag',    12,  50,  545, 'Meghna Cement Depot'],
+        ['MAT-015','Bricks (1st class)',     'Civil',   'pcs',   500,2000,   12, 'Munshiganj Brick Field'],
+        ['MAT-016','Sand & bali',            'Civil',   'cft',    68, 300,   65, 'Buriganga Sand Traders']
       ];
       var m = mats[i];
       return { id: m[0], name: m[1], category: m[2], unit: m[3],
         stock: m[4], reorder: m[5], unitCost: m[6], supplier: m[7], created: '2026-01-12' };
     });
-    gen('wa_production', 12, function (i) {
-      return { id: seq('JOB', i, 3), job: pick(['Cabinet carcass','Wardrobe shutters','Conference table','Wall paneling','Reception desk','Bed frame','TV unit']),
-        project: seq('WAP', ri(0, 15), 3), station: pick(['CNC','Cutting','Edge Banding','Assembly','Finishing']),
-        assignedTo: pick(PEOPLE), due: future(30), status: pick(['Queued','Running','Running','Done','Blocked']), created: dt(1) };
+    /* WORKSHOP — the joinery phase has NOT started on site (the sheet's Wood
+     * Work sheet is empty), so what the workshop is doing is preparing for it:
+     * a sample door for the client to approve, two carcasses queued behind it,
+     * and the handrail cap blocked until the MS railing goes in. That is an
+     * honest board for a project at this phase — four jobs, four states. */
+    gen('wa_production', 4, function (i) {
+      var jobs = [
+        ['JOB-101','Kitchen cabinet — sample door',  'Finishing','Sumaiya Akter',  '2026-07-12','Running','2026-06-24'],
+        ['JOB-102','Master wardrobe carcass',        'Cutting',  'Sumaiya Akter',  '2026-08-05','Queued', '2026-06-30'],
+        ['JOB-103','TV wall panel — living room',    'CNC',      'Sumaiya Akter',  '2026-08-18','Queued', '2026-07-02'],
+        ['JOB-104','Staircase handrail — wood cap',  'Assembly', 'Jahangir Alam',  '2026-07-20','Blocked','2026-06-18']
+      ];
+      var j = jobs[i];
+      return { id: j[0], companyId: 'woodart', job: j[1], project: 'WAP-101', station: j[2],
+        assignedTo: j[3], due: j[4], status: j[5], created: j[6] };
     });
-    gen('wa_installs', 10, function (i) {
-      return { id: seq('INS', i, 3), project: seq('WAP', ri(0, 15), 3), site: pick(AREAS),
-        team: 'Team ' + pick(['Alpha','Bravo','Charlie','Delta']), date: rnd() > 0.5 ? future(30) : dt(1),
-        status: pick(['Scheduled','In Progress','Snagging','Handover']), snags: ri(0, 6), created: dt(1) };
+
+    /* SITE & INSTALL — the villa is a live building site, so these are site
+     * visits rather than deliveries: civil supervision running, the electrical
+     * first-fix inspection booked, and the ground-floor civil handover being
+     * snagged. The snag list is itemised, which is the shape the Installation
+     * module recomputes its count from. */
+    gen('wa_installs', 3, function (i) {
+      var rows = [
+        { id:'INS-101', site:'Munshiganj', team:'Team Alpha', date:'2026-07-02', status:'In Progress', snags:0, created:'2026-06-20' },
+        { id:'INS-102', site:'Munshiganj', team:'Team Alpha', date:'2026-07-14', status:'Scheduled',   snags:0, created:'2026-06-28' },
+        { id:'INS-103', site:'Munshiganj', team:'Team Bravo', date:'2026-06-26', status:'Snagging',    snags:2, created:'2026-06-22',
+          snagList:[
+            { text:'Plaster crack — dining room north wall', done:false },
+            { text:'Floor level off by 8mm — guest bath',    done:false },
+            { text:'Window opening 2" narrow — kids room',   done:true }
+          ] }
+      ];
+      var r = rows[i];
+      return { id: r.id, companyId: 'woodart', project: 'WAP-101', site: r.site, team: r.team,
+        date: r.date, status: r.status, snags: r.snags, snagList: r.snagList, created: r.created };
     });
-    gen('wa_purchases', 12, function (i) {
-      return { id: seq('WPO', i, 3), supplier: pick(['Timber World BD','Hatil Trade','RFL Hardware','Akij Board','Partex Star']),
-        items: ri(2, 12), amount: ri(20, 400) * 1000, status: pick(['Ordered','Received','Received','Partial']), date: dt(), created: dt() };
+
+    /* PROCUREMENT — every order this project raised, at the sheet's own
+     * amounts. The four civil orders are received (the shell is built); the
+     * electrical order is part-delivered and the sanitary one is only just
+     * placed, which is why those two heads have barely any spend against a
+     * large budget. Together with the contractor, transport, labour, soil and
+     * design payments these add up to the sheet's ৳23,48,257. */
+    gen('wa_purchases', 7, function (i) {
+      var pos = [
+        ['WPO-101','Haji Enterprise',        3, 856397,'Received','2026-03-14'],
+        ['WPO-102','Meghna Cement Depot',    1, 273780,'Received','2026-03-22'],
+        ['WPO-103','Munshiganj Brick Field', 1, 414000,'Received','2026-03-08'],
+        ['WPO-104','Buriganga Sand Traders', 1, 244920,'Received','2026-03-05'],
+        ['WPO-105','RFL Hardware',           4,  24160,'Received','2026-05-18'],
+        ['WPO-106','Dhaka Electric House',   6,  22800,'Partial', '2026-06-20'],
+        ['WPO-107','Sanitary World BD',      5,   7530,'Ordered', '2026-06-28']
+      ];
+      var p = pos[i];
+      return { id: p[0], companyId: 'woodart', project: 'WAP-101', supplier: p[1],
+        items: p[2], amount: p[3], status: p[4], date: p[5], created: p[5] };
     });
 
     /* Woodart VENDORS — DERIVED, exactly like wa_clients above. Every vendor
@@ -648,237 +858,105 @@
     }
 
     /* ========================================================================
-     * WOODART — THREE REAL PROJECT STORIES (owner, 2026-07-27)
+     * WOODART — THE VILLA'S MONEY (owner, 2026-08-06)
      * ------------------------------------------------------------------------
-     * The generated data above is deliberately random: it fills every screen,
-     * but no single project THREADS through the whole business, so you cannot
-     * follow one job from the drawing board to the client's signature.
+     * Interior's books are this project's books. Every income row is one of the
+     * three payments the client has made, and every project expense is one of
+     * the thirteen heads on the sheet's cost summary, at the sheet's own
+     * figures — they sum to exactly ৳23,48,257, which is what the spreadsheet
+     * says has been spent.
      *
-     * These three do. Each sits at a different phase, so every module shows
-     * something real at once, and every record cross-references the others by
-     * the ids the modules actually join on:
+     *     received   ৳40,00,000   of a ৳70,00,000 contract
+     *     spent      ৳23,48,257   across 13 heads
+     *     to collect ৳30,00,000   sitting on the schedule as a receivable
      *
-     *   WAP-101  Gulshan Penthouse   · DESIGN      — drawings out for approval,
-     *            ৳48L                              BOQ quoted, first PO placed
-     *   WAP-102  Square Pharma HQ    · PRODUCTION  — design signed off, goods
-     *            ৳92L                              received, workshop running
-     *   WAP-103  Dhanmondi Duplex    · HANDOVER    — everything done, snags
-     *            ৳36.5L                            being closed out
+     * `ref` carries the project id, because that is the field Accounts › Project
+     * P&L joins on (billed and spent per ref). An entry without it reads as
+     * company overhead rather than job cost — which is exactly why the standing
+     * costs at the end deliberately have none: workshop rent is not this
+     * villa's cost.
      *
-     * The BOQ lines quote the SAME material names the register carries, and the
-     * purchase orders are raised on the SAME vendors — so Materials, Estimates
-     * and Procurement agree with each other instead of each telling its own
-     * random story. The budget for each project IS its BOQ: unit cost against
-     * unit sale, line by line.
-     *
-     * Idempotent by design: guarded on WAP-101 already existing, and it APPENDS
-     * to the generated lists rather than replacing them.
+     * WHO MOVED THE MONEY is kept in the description. The sheet's REF. NAME
+     * column (MOHSIN BOSS · NAYEEM · EMAN VAI · AZIZUL VAI) is an audit trail
+     * the business actually relies on, and the ERP has no handler field yet
+     * (MUNSHI-VILLA-SHEET §4) — so it is written where it can still be read,
+     * and no column is invented to hold it.
      * ====================================================================== */
-    (function seedWoodartStories() {
-      var projects = S.list('wa_projects');
-      if (projects.some(function (p) { return p.id === 'WAP-101'; })) return;
-
+    (function seedMunshiVillaMoney() {
+      if (S.list('acc_entries').some(function (e) { return e.id === 'JV-WA101'; })) return;
       function add(store, rows) { S.set(store, S.list(store).concat(rows)); }
 
-      /* ---- the three projects, each at a different phase ------------------ */
-      add('wa_projects', [
-        { id:'WAP-101', name:'Full Interior · Gulshan Penthouse', client:'Bashundhara Group',
-          type:'Residential', area:4200, value:4800000, cost:3120000, stage:'Design',
-          progress:18, start:'2026-06-08', deadline:'2026-11-20', designer:'Nasrin Sultana',
-          created:'2026-06-08' },
-        { id:'WAP-102', name:'Office Fit-out · Square Pharma HQ', client:'Square Pharmaceuticals',
-          type:'Office', area:9800, value:9200000, cost:5980000, stage:'Production',
-          progress:56, start:'2026-04-14', deadline:'2026-09-30', designer:'Touhidul Alam',
-          created:'2026-04-14' },
-        { id:'WAP-103', name:'Duplex Interior · Dhanmondi 27', client:'Ashraful Karim',
-          type:'Residential', area:3100, value:3650000, cost:2372500, stage:'Handover',
-          progress:96, start:'2026-02-02', deadline:'2026-07-18', designer:'Sharmin Jahan',
-          created:'2026-02-02' }
+      /* THE CLIENT'S PAYMENTS — sheet §1, rows 77-85 of Over all Accounts. */
+      var WA_RECEIPTS = [
+        ['2026-03-05', 1000000, '1st payment — on signing'],
+        ['2026-04-22', 2000000, '2nd payment — on structure'],
+        ['2026-06-10', 1000000, '3rd payment — on brickwork']
+      ];
+
+      /* THE 13 HEADS THAT HAVE SPEND — sheet §2, Over All Cost Summary.
+       * [ cost code, amount, date, method, who moved it, what for ] */
+      var WA_SPENT = [
+        ['3D & Visualisation',  30000, '2026-03-04', 'Bank', 'MOHSIN BOSS',     '3D design office — concept & walkthrough'],
+        ['Soil & Excavation',   59980, '2026-03-06', 'Cash', 'NAYEEM',          'Soil test, cutting & fill'],
+        ['Sand & Bali',        244920, '2026-03-09', 'Bank', 'AZIZUL VAI',      'Sand & bali — Buriganga Sand Traders (WPO-104)'],
+        ['Bricks & Breaking',  414000, '2026-03-16', 'Bank', 'EMAN VAI',        'Bricks & breaking — Munshiganj Brick Field (WPO-103)'],
+        ['Rod',                856397, '2026-03-24', 'Bank', 'MOHSIN BOSS',     'BSRM rod — Haji Enterprise (WPO-101)'],
+        ['Cement',             273780, '2026-04-02', 'Bank', 'EMAN VAI',        'Cement — Meghna Cement Depot (WPO-102)'],
+        ['Contractor',         341000, '2026-05-10', 'Bank', 'RONY & EMAN VAI', 'Rajmistri contract — Younus Mia, part payment'],
+        ['Hardware',            24160, '2026-05-20', 'Cash', 'NAYEEM',          'Civil hardware & fixings — RFL Hardware (WPO-105)'],
+        ['Extra Labour',        16300, '2026-06-04', 'Cash', 'NAYEEM',          'Extra labour — call-outs'],
+        ['Electrical',          22800, '2026-06-22', 'Bank', 'AZIZUL VAI',      'Electrical first fix — Dhaka Electric House (WPO-106)'],
+        ['Transport & Visit',   43790, '2026-06-26', 'Cash', 'MOHSIN BOSS',     'Transport & site visits'],
+        ['Sanitary',             7530, '2026-06-30', 'Cash', 'NAYEEM',          'Sanitary advance — Sanitary World BD (WPO-107)'],
+        ['Other Expense',       13600, '2026-07-02', 'Cash', 'MOHSIN BOSS',     'Extra / others']
+      ];
+
+      var n = 100;
+      function jv() { return 'JV-WA' + (++n); }
+
+      add('acc_entries', WA_RECEIPTS.map(function (r) {
+        return { id: jv(), companyId: 'woodart', kind: 'Income', category: 'Project Billing',
+          desc: 'Munshi Villa Duplex — ' + r[2], amount: r[1], method: 'Bank',
+          ref: 'WAP-101', date: r[0], created: r[0] };
+      }).concat(WA_SPENT.map(function (s) {
+        return { id: jv(), companyId: 'woodart', kind: 'Expense', category: s[0],
+          desc: s[5] + ' · handled by ' + s[4], amount: s[1], method: s[3],
+          ref: 'WAP-101', date: s[2], created: s[2] };
+      })).concat([
+        /* Standing costs — the concern's own overheads. NO ref: charging the
+         * workshop's rent to the villa would overstate the job and understate
+         * every job after it. */
+        { id: jv(), companyId:'woodart', kind:'Expense', category:'Office Rent',
+          desc:'Workshop rent — Tejgaon, June', amount:180000, method:'Bank', date:'2026-06-05', created:'2026-06-05' },
+        { id: jv(), companyId:'woodart', kind:'Expense', category:'Salaries',
+          desc:'Salaries — design & site team, June', amount:148000, method:'Bank', date:'2026-06-28', created:'2026-06-28' },
+        { id: jv(), companyId:'woodart', kind:'Expense', category:'Utilities',
+          desc:'Workshop power — June', amount:64200, method:'Bank', date:'2026-07-02', created:'2026-07-02' }
+      ]));
+
+      /* WHAT IS STILL OWED, both ways. The contractor figure is not typed: it
+       * is the ৳13,44,000 contract in the BOQ minus the ৳3,41,000 already paid,
+       * so it cannot drift from either. */
+      add('acc_schedules', [
+        { id:'SCH-WA1', companyId:'woodart', party:'Munshi Billah', kind:'Receivable',
+          amount:3000000, due:'2026-09-15', status:'Pending', ref:'WAP-101', created:'2026-06-10' },
+        { id:'SCH-WA2', companyId:'woodart', party:'Younus Mia', kind:'Payable',
+          amount:1344000 - 341000, due:'2026-08-10', status:'Partial', ref:'WAP-101', created:'2026-05-10' },
+        { id:'SCH-WA3', companyId:'woodart', party:'Dhaka Electric House', kind:'Payable',
+          amount:22800, due:'2026-07-20', status:'Partial', ref:'WPO-106', created:'2026-06-20' }
       ]);
 
-      /* ---- DESIGN & 3D — the architecture phase --------------------------
-       * 101 is mid-approval (that is what a design-phase project looks like);
-       * 102 and 103 are fully approved, so the phase gate has real examples of
-       * "complete" as well as "still open". */
-      add('wa_drawings', [
-        { id:'DWG-101', project:'WAP-101', title:'Ground floor plan', kind:'Plan',
-          rev:'B', status:'Approved', designer:'Nasrin Sultana', issued:'2026-06-16', approved:'2026-06-24', created:'2026-06-10' },
-        { id:'DWG-102', project:'WAP-101', title:'Living room 3D model', kind:'3D Model',
-          rev:'C', status:'Commented', designer:'Nasrin Sultana', issued:'2026-06-28', approved:null, created:'2026-06-12' },
-        { id:'DWG-103', project:'WAP-101', title:'Master bedroom render', kind:'Render',
-          rev:'A', status:'Issued', designer:'Farzana Yasmin', issued:'2026-06-22', approved:null, created:'2026-06-18' },
-        { id:'DWG-104', project:'WAP-101', title:'Kitchen joinery detail', kind:'Detail',
-          rev:'A', status:'Draft', designer:'Nasrin Sultana', issued:null, approved:null, created:'2026-07-01' },
-
-        { id:'DWG-105', project:'WAP-102', title:'Floor plate layout', kind:'Plan',
-          rev:'B', status:'Approved', designer:'Touhidul Alam', issued:'2026-04-22', approved:'2026-05-02', created:'2026-04-16' },
-        { id:'DWG-106', project:'WAP-102', title:'Reception elevation', kind:'Elevation',
-          rev:'A', status:'Approved', designer:'Touhidul Alam', issued:'2026-04-25', approved:'2026-05-02', created:'2026-04-18' },
-        { id:'DWG-107', project:'WAP-102', title:'Boardroom 3D model', kind:'3D Model',
-          rev:'B', status:'Approved', designer:'Farzana Yasmin', issued:'2026-05-04', approved:'2026-05-14', created:'2026-04-20' },
-
-        { id:'DWG-108', project:'WAP-103', title:'Duplex plan — both levels', kind:'Plan',
-          rev:'A', status:'Approved', designer:'Sharmin Jahan', issued:'2026-02-10', approved:'2026-02-18', created:'2026-02-04' },
-        { id:'DWG-109', project:'WAP-103', title:'Staircase section', kind:'Section',
-          rev:'B', status:'Approved', designer:'Sharmin Jahan', issued:'2026-02-24', approved:'2026-03-04', created:'2026-02-08' }
-      ]);
-      add('wa_revisions', [
-        { id:'RVN-101', drawing:'DWG-101', rev:'A', action:'Revised',   by:'Nasrin Sultana', note:'Client wanted the study moved', date:'2026-06-14' },
-        { id:'RVN-102', drawing:'DWG-101', rev:'B', action:'Approved',  by:'Nasrin Sultana', note:'', date:'2026-06-24' },
-        { id:'RVN-103', drawing:'DWG-102', rev:'A', action:'Revised',   by:'Nasrin Sultana', note:'Ceiling height corrected', date:'2026-06-18' },
-        { id:'RVN-104', drawing:'DWG-102', rev:'B', action:'Revised',   by:'Nasrin Sultana', note:'Veneer tone changed to walnut', date:'2026-06-25' },
-        { id:'RVN-105', drawing:'DWG-102', rev:'C', action:'Commented', by:'Nasrin Sultana', note:'Client wants the TV wall reworked', date:'2026-07-02' },
-        { id:'RVN-106', drawing:'DWG-103', rev:'A', action:'Issued',    by:'Farzana Yasmin', note:'', date:'2026-06-22' },
-        { id:'RVN-107', drawing:'DWG-104', rev:'A', action:'Drafted',   by:'Nasrin Sultana', note:'', date:'2026-07-01' },
-        { id:'RVN-108', drawing:'DWG-105', rev:'A', action:'Revised',   by:'Touhidul Alam',  note:'Extra workstation bay added', date:'2026-04-28' },
-        { id:'RVN-109', drawing:'DWG-105', rev:'B', action:'Approved',  by:'Touhidul Alam',  note:'', date:'2026-05-02' },
-        { id:'RVN-110', drawing:'DWG-106', rev:'A', action:'Approved',  by:'Touhidul Alam',  note:'', date:'2026-05-02' },
-        { id:'RVN-111', drawing:'DWG-107', rev:'B', action:'Approved',  by:'Farzana Yasmin', note:'', date:'2026-05-14' },
-        { id:'RVN-112', drawing:'DWG-108', rev:'A', action:'Approved',  by:'Sharmin Jahan',  note:'', date:'2026-02-18' },
-        { id:'RVN-113', drawing:'DWG-109', rev:'B', action:'Approved',  by:'Sharmin Jahan',  note:'', date:'2026-03-04' }
-      ]);
-
-      /* ---- ESTIMATES / BOQ — this IS each project's budget -----------------
-       * Every line quotes a material the register actually stocks, so the BOQ,
-       * the purchase orders and the stock levels describe one business. */
-      add('wa_estimates', [
-        { id:'EST-101', title:'Full Interior — Gulshan Penthouse', client:'Bashundhara Group',
-          projectId:'WAP-101', status:'Sent', validTill:'2026-08-15', created:'2026-06-12',
-          lines:[
-            { item:'Marine Plywood 18mm', qty:180, unitCost:3400, unitSale:4600 },
-            { item:'Veneer Board',        qty:90,  unitCost:4200, unitSale:5900 },
-            { item:'German Hinge (Hettich)', qty:320, unitCost:310, unitSale:480 },
-            { item:'PU Polish',           qty:70,  unitCost:1420, unitSale:2050 },
-            { item:'Fabric — Velvet',     qty:140, unitCost:420,  unitSale:690 }
-          ] },
-        { id:'EST-102', title:'Office Fit-out — Square Pharma HQ', client:'Square Pharmaceuticals',
-          projectId:'WAP-102', status:'Approved', validTill:'2026-06-30', created:'2026-04-18',
-          lines:[
-            { item:'Marine Plywood 18mm', qty:420, unitCost:3400, unitSale:4500 },
-            { item:'Formica Laminate',    qty:360, unitCost:1250, unitSale:1850 },
-            { item:'MDF 12mm',            qty:210, unitCost:1850, unitSale:2600 },
-            { item:'Drawer Channel 18"',  qty:260, unitCost:540,  unitSale:820 },
-            { item:'SS Handle',           qty:480, unitCost:185,  unitSale:310 },
-            { item:'NC Lacquer',          qty:120, unitCost:980,  unitSale:1480 }
-          ] },
-        { id:'EST-103', title:'Duplex Interior — Dhanmondi 27', client:'Ashraful Karim',
-          projectId:'WAP-103', status:'Approved', validTill:'2026-03-31', created:'2026-02-06',
-          lines:[
-            { item:'Marine Plywood 18mm', qty:150, unitCost:3400, unitSale:4550 },
-            { item:'Veneer Board',        qty:70,  unitCost:4200, unitSale:5800 },
-            { item:'Wood Glue 5kg',       qty:40,  unitCost:760,  unitSale:1120 },
-            { item:'Foam 4"',             qty:120, unitCost:260,  unitSale:430 }
-          ] }
-      ]);
-
-      /* ---- PROCUREMENT — the buying that those BOQs required ---------------
-       * 101 has one order placed and nothing delivered (design phase).
-       * 102 has most of it received, one part-delivered.
-       * 103 is fully received — the project is at handover. */
-      add('wa_purchases', [
-        { id:'WPO-101', supplier:'Timber World BD', items:5, amount:612000, status:'Ordered',  date:'2026-06-30', created:'2026-06-30' },
-        { id:'WPO-102', supplier:'Akij Board',      items:6, amount:1428000, status:'Received', date:'2026-04-28', created:'2026-04-28' },
-        { id:'WPO-103', supplier:'RFL Hardware',    items:4, amount:229000, status:'Received', date:'2026-05-12', created:'2026-05-12' },
-        { id:'WPO-104', supplier:'Partex Star',     items:3, amount:388500, status:'Partial',  date:'2026-06-16', created:'2026-06-16' },
-        { id:'WPO-105', supplier:'Timber World BD', items:4, amount:510000, status:'Received', date:'2026-02-20', created:'2026-02-20' },
-        { id:'WPO-106', supplier:'Hatil Trade',     items:2, amount:31200,  status:'Received', date:'2026-03-08', created:'2026-03-08' }
-      ]);
-
-      /* ---- WORKSHOP — 102 is the project actually on the floor ------------- */
-      add('wa_production', [
-        { id:'JOB-101', job:'Reception desk carcass', project:'WAP-102', station:'CNC',
-          assignedTo:'Omar Faruk',     due:'2026-07-10', status:'Running', created:'2026-06-20' },
-        { id:'JOB-102', job:'Workstation tops',       project:'WAP-102', station:'Cutting',
-          assignedTo:'Delwar Mia',     due:'2026-07-14', status:'Running', created:'2026-06-22' },
-        { id:'JOB-103', job:'Storage unit shutters',  project:'WAP-102', station:'Edge Banding',
-          assignedTo:'Kamrul Islam',   due:'2026-06-30', status:'Blocked', created:'2026-06-18' },
-        { id:'JOB-104', job:'Boardroom table',        project:'WAP-102', station:'Assembly',
-          assignedTo:'Mahmudul Hasan', due:'2026-06-24', status:'Done',    created:'2026-06-02' },
-        { id:'JOB-105', job:'Panelling — lobby',      project:'WAP-102', station:'Finishing',
-          assignedTo:'Jashim Uddin',   due:'2026-07-22', status:'Queued',  created:'2026-06-26' },
-        { id:'JOB-106', job:'Wardrobe shutters',      project:'WAP-103', station:'Finishing',
-          assignedTo:'Kamrul Islam',   due:'2026-06-20', status:'Done',    created:'2026-05-28' },
-        { id:'JOB-107', job:'Staircase handrail',     project:'WAP-103', station:'Assembly',
-          assignedTo:'Omar Faruk',     due:'2026-06-26', status:'Done',    created:'2026-06-01' }
-      ]);
-
-      /* ---- SITE & INSTALL — 103 is being handed over ----------------------- */
-      add('wa_installs', [
-        { id:'INS-101', project:'WAP-102', site:'Tejgaon I/A', team:'Team Alpha',
-          date:'2026-08-04', status:'Scheduled', snags:0, created:'2026-06-28' },
-        { id:'INS-102', project:'WAP-103', site:'Dhanmondi 27', team:'Team Bravo',
-          date:'2026-06-28', status:'Snagging', snags:2, created:'2026-06-10',
-          snagList:[
-            { text:'Wardrobe shutter alignment — master bedroom', done:false },
-            { text:'Polish touch-up on staircase handrail',       done:false },
-            { text:'Skirting gap in the living room',             done:true },
-            { text:'Drawer channel replaced — kitchen unit 3',    done:true }
-          ] },
-        { id:'INS-103', project:'WAP-103', site:'Dhanmondi 27', team:'Team Bravo',
-          date:'2026-05-30', status:'Handover', snags:0, created:'2026-05-20' }
-      ]);
-
-      /* ---- WOODART OPERATING EXPENSES — what the phases actually cost ------
-       * Booked in the same `acc_entries` register Master Accounts reads, so
-       * these show up in the Woodart books rather than only in this story. */
-      add('acc_entries', [
-        { id:'JV-WA101', companyId:'woodart', kind:'Expense', category:'Fuel & Transport',
-          desc:'Site survey — Gulshan (WAP-101)', amount:14500, method:'Cash', date:'2026-06-10', created:'2026-06-10' },
-        { id:'JV-WA102', companyId:'woodart', kind:'Expense', category:'Salaries',
-          desc:'Design team — June', amount:385000, method:'Bank', date:'2026-06-30', created:'2026-06-30' },
-        { id:'JV-WA103', companyId:'woodart', kind:'Expense', category:'Vendor Payment',
-          desc:'Akij Board — against WPO-102', amount:1428000, method:'Bank', date:'2026-05-06', created:'2026-05-06' },
-        { id:'JV-WA104', companyId:'woodart', kind:'Expense', category:'Fuel & Transport',
-          desc:'Delivery to site — WAP-103', amount:26800, method:'Cash', date:'2026-06-12', created:'2026-06-12' },
-        { id:'JV-WA105', companyId:'woodart', kind:'Expense', category:'Office Rent',
-          desc:'Workshop — Tejgaon, June', amount:180000, method:'Bank', date:'2026-06-05', created:'2026-06-05' },
-        { id:'JV-WA106', companyId:'woodart', kind:'Expense', category:'Utilities',
-          desc:'Workshop power — June', amount:64200, method:'Bank', date:'2026-07-02', created:'2026-07-02' },
-        { id:'JV-WA107', companyId:'woodart', kind:'Income', category:'Design Fee',
-          desc:'Concept + 3D — Bashundhara Group (WAP-101)', amount:320000, method:'Bank', date:'2026-06-26', created:'2026-06-26' },
-        { id:'JV-WA108', companyId:'woodart', kind:'Income', category:'Project Billing',
-          desc:'Stage 2 — Square Pharmaceuticals (WAP-102)', amount:3600000, method:'Bank', date:'2026-06-18', created:'2026-06-18' }
-      ]);
-
-      /* ---- STOCK, made consistent with the story --------------------------
-       * WPO-102/103/105/106 were RECEIVED and WAP-102/103 consumed most of it,
-       * so the items those BOQs lean on are the ones running low. This is what
-       * puts real entries on the Materials → Reorder tab instead of leaving it
-       * an empty state nobody has seen. */
-      var lowAfterUse = { 'Marine Plywood 18mm':26, 'Formica Laminate':18, 'MDF 12mm':9,
-                          'Drawer Channel 18"':34, 'NC Lacquer':11 };
-      var mats = S.list('wa_materials').map(function (m) {
-        if (Object.prototype.hasOwnProperty.call(lowAfterUse, m.name)) {
-          m = Object.assign({}, m, { stock: lowAfterUse[m.name] });
-        }
-        return m;
-      });
-      S.set('wa_materials', mats);
-
-      /* The client directory is DERIVED from the projects that existed when it
-       * was built — which is before these three. A story project whose client
-       * was not already on a random project would therefore name a client that
-       * does not exist, and `books.mjs refs` caught exactly that
-       * (Bashundhara Group). Top the directory up so every project's client is
-       * a real record. */
-      var cl = S.list('wa_clients');
-      var have = {};
-      cl.forEach(function (c) { have[String(c.name).trim().toLowerCase()] = 1; });
-      var nextCl = cl.length;
-      S.list('wa_projects').forEach(function (p) {
-        var k = String(p.client || '').trim().toLowerCase();
-        if (!k || have[k]) return;
-        have[k] = 1;
-        var corporate = CORPORATES.indexOf(p.client) >= 0;
-        cl.push({ id: seq('CLI', nextCl++, 3), name: p.client,
-          type: corporate ? (/Group|Holdings/.test(p.client) ? 'Developer' : 'Corporate') : 'Homeowner',
-          contact: corporate ? pick(PEOPLE) : p.client,
-          phone: '+88017' + String(ri(10000000, 99999999)).slice(0, 8),
-          email: String(p.client).toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^.|.$/g, '') +
-                 (corporate ? '@corp.example.bd' : '@mail.example.bd'),
-          area: pick(AREAS), since: dt(ri(6, 30)), created: dt() });
-      });
-      S.set('wa_clients', cl);
+      /* The sales register mirrors the three receipts. Cost per receipt is the
+       * project's own spend-to-billing ratio, so Woodart's margin on the group
+       * dashboard is this villa's margin rather than an unrelated number. */
+      var ratio = WA_SPENT.reduce(function (t, s) { return t + s[1]; }, 0) /
+                  WA_RECEIPTS.reduce(function (t, r) { return t + r[1]; }, 0);
+      add('sales', WA_RECEIPTS.map(function (r, i) {
+        var cost = Math.round(r[1] * ratio);
+        return { id: 'SL-WA' + String(i + 1).padStart(2, '0'), companyId: 'woodart', date: r[0],
+          amount: r[1], cost: cost, profit: r[1] - cost, ref: 'WAP-101',
+          desc: 'Munshi Villa Duplex — ' + r[2], customer: 'Munshi Billah', created: r[0] };
+      }));
     })();
 
     /* ========================================================================
@@ -906,22 +984,32 @@
       S.set('wa_locations', [
         { id:'LOC-001', name:'Main Workshop',  kind:'Workshop', area:'Tejgaon I/A',  primary:true,  created:dt(6) },
         { id:'LOC-002', name:'Finishing Bay',  kind:'Workshop', area:'Tejgaon I/A',  primary:false, created:dt(6) },
-        { id:'LOC-003', name:'Site Store',     kind:'Site',     area:'Gulshan-2',    primary:false, created:dt(3) }
+        { id:'LOC-003', name:'Site Store',     kind:'Site',     area:'Munshiganj',   primary:false, created:dt(3) }
       ]);
     }
     if (localStorage.getItem(S.namespace + 'wa_movements') === null) {
       var moves = [], mv = 0;
-      /* the issues the story projects actually consumed, by material name */
+      /* WHAT THE VILLA HAS ACTUALLY CONSUMED, by material name. Only the four
+       * civil bulk materials appear: the joinery phases have not started, so
+       * not one sheet of plywood has left the workshop for this job — which is
+       * exactly what the sheet's empty Wood Work page says.
+       *
+       * The quantities are derived from the SPEND, not invented. Rod: ৳8,56,397
+       * at ৳85/kg is 10,075 kg received, of which 9,700 went to site and 194
+       * (2%) was cutting waste, leaving the 181 kg the register shows. All four
+       * reconcile the same way. */
       var CONSUMED = {
-        'Marine Plywood 18mm': [['WAP-102', 210, '2026-05-06'], ['WAP-103', 96, '2026-03-12']],
-        'Formica Laminate':    [['WAP-102', 188, '2026-05-18']],
-        'MDF 12mm':            [['WAP-102', 104, '2026-05-22']],
-        'Drawer Channel 18"':  [['WAP-102', 142, '2026-06-02']],
-        'NC Lacquer':          [['WAP-102', 58,  '2026-06-14']],
-        'Veneer Board':        [['WAP-103', 44,  '2026-03-20']],
-        'Wood Glue 5kg':       [['WAP-103', 18,  '2026-03-26']]
+        'Rod — BSRM 60 grade': [['WAP-101', 9700,  '2026-03-26']],
+        'Cement — 50 kg bag':  [['WAP-101', 480,   '2026-04-04']],
+        'Bricks (1st class)':  [['WAP-101', 33333, '2026-03-18']],
+        'Sand & bali':         [['WAP-101', 3627,  '2026-03-12']]
       };
+      /* Civil bulk is delivered to the SITE STORE and issued from there; the
+       * workshop materials sit in the workshop. Both legs of a material's
+       * ledger stay in one place, so no location can report a negative balance. */
+      var SITE_STORE = { Civil: 'LOC-003' };
       S.list('wa_materials').forEach(function (m) {
+        var loc = SITE_STORE[m.category] || 'LOC-001';
         var used = CONSUMED[m.name] || [];
         var out = used.reduce(function (s, u) { return s + u[1]; }, 0);
         var wastage = out ? Math.max(1, Math.round(out * 0.02)) : 0;
@@ -929,17 +1017,17 @@
            so the ledger nets EXACTLY to the stock already on the record */
         var opening = (+m.stock || 0) + out + wastage;
         moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Receipt',
-          qty: opening, location: 'LOC-001', ref: 'OPENING',
+          qty: opening, location: loc, ref: 'OPENING',
           note: 'Opening stock on hand', by: 'System', date: dt(5), created: dt(5) });
         used.forEach(function (u) {
           moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Issue',
-            qty: -u[1], location: 'LOC-001', ref: u[0],
-            note: 'Issued to ' + u[0], by: pick(PEOPLE), date: u[2], created: u[2] });
+            qty: -u[1], location: loc, ref: u[0],
+            note: 'Issued to ' + u[0], by: 'Jahangir Alam', date: u[2], created: u[2] });
         });
         if (wastage) {
           moves.push({ id: seq('MOV', mv++, 4), material: m.id, kind: 'Wastage',
-            qty: -wastage, location: 'LOC-001', ref: '',
-            note: 'Offcuts and damage', by: pick(PEOPLE), date: dt(1), created: dt(1) });
+            qty: -wastage, location: loc, ref: '',
+            note: 'Cutting waste and breakage', by: 'Jahangir Alam', date: dt(1), created: dt(1) });
         }
       });
       S.set('wa_movements', moves);

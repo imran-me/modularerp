@@ -125,8 +125,14 @@
   /* ==========================================================================
    * SEED DATA — only written the first time (idempotent).
    * ========================================================================*/
-  var SCALE = { travels: 4200000, woodart: 2600000, it: 3100000, shop: 1900000, construction: 6800000 };
-  var MARGIN = { travels: 0.14, woodart: 0.28, it: 0.42, shop: 0.19, construction: 0.16 };
+  /* WOODART'S SCALE IS THE VILLA'S SCALE (owner, 2026-08-06). Interior now runs
+   * ONE project — Munshi Villa Duplex, ৳70,00,000 over nine months — so a
+   * monthly revenue of ৳26L would have had its dashboard reporting ten times
+   * the work its own books show. ৳7.8L/month is the contract spread across the
+   * build, and the 12% margin is the villa's own (a civil-plus-fit-out job
+   * carrying a ৳13.44L labour contract), not a joinery-only house's 28%. */
+  var SCALE = { travels: 4200000, woodart: 780000, it: 3100000, shop: 1900000, construction: 6800000 };
+  var MARGIN = { travels: 0.14, woodart: 0.12, it: 0.42, shop: 0.19, construction: 0.16 };
   var GROWTH = { travels: 1.9, woodart: 1.2, it: 3.1, shop: 0.8, construction: -0.6 }; // %/mo trend
 
   function seedFinancials() {

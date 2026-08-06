@@ -65,8 +65,14 @@ var TODAY = '2026-07-05';        /* the demo clock — same anchor as every modu
 
 /* The taxonomy the seed data uses. Kept here (not in the screen) because the
  * backend validates against the same list — they are two halves of one contract. */
-var CATEGORIES = ['Board', 'Laminate', 'Hardware', 'Adhesive', 'Finish', 'Fabric'];
-var UNITS = ['pcs', 'sheet', 'kg', 'litre', 'sft'];
+/* `Civil` (and the bag/cft units) landed 2026-08-06 with the Munshi Villa demo:
+ * a design-build house that pours its own structure buys rod, cement, bricks and
+ * sand, and those have to be registered, valued and issued like any other
+ * material. Leaving them out would have meant either a register that cannot
+ * explain the largest spend on the job, or a category typed as free text that
+ * the add/edit form could never offer again. */
+var CATEGORIES = ['Board', 'Laminate', 'Hardware', 'Adhesive', 'Finish', 'Fabric', 'Civil'];
+var UNITS = ['pcs', 'sheet', 'kg', 'litre', 'sft', 'bag', 'cft'];
 var KINDS = ['Receipt', 'Issue', 'Adjustment', 'Wastage'];
 
 var Materials = {

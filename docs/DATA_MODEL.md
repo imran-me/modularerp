@@ -474,12 +474,25 @@ The counterparty subledger; every invoice/payment also posts a balanced GL entry
 
 | Store | Purpose | Fields |
 |---|---|---|
+> **Interior demo data, 2026-08-06 (owner):** Woodart carries **exactly one
+> project** — `WAP-101` Munshi Villa Duplex — and every Woodart record hangs off
+> it. Its figures are the real ones from
+> `companies/woodart/Assets/MUNSHI-VILLA-SHEET.md` (contract ৳70,00,000 ·
+> received ৳40,00,000 · spent ৳23,48,257). `books.mjs story` asserts the whole
+> thread; `seed-bd.js` re-seeds it once per `WA_DEMO_VERSION`.
+
+| Store | Purpose | Fields |
+|---|---|---|
 | `wa_projects` | interior projects | `id(WAP-001…), name, client, type(Residential\|Office\|Retail\|Restaurant), area, value, cost, stage(Design\|Production\|Installation\|Handover\|Completed), progress, start, deadline, designer, created` |
-| `wa_estimates` | quotations | `id(EST-001…), title, client, items(int), value, status(Draft\|Sent\|Approved\|Rejected), validTill, created` |
-| `wa_materials` | material stock | `id(MAT-001…), name, category, unit, stock, reorder, unitCost, supplier, created` |
+| `wa_estimates` | quotations | `id(EST-001…), title, client, project→wa_projects.id, items(int), value, cost, status(Draft\|Sent\|Approved\|Rejected), validTill, created, lines[{item, qty, unit, unitCost, unitSale, code→wa_cost_codes.id, kind(material\|work)}]` |
+| `wa_materials` | material stock | `id(MAT-001…), name, category(Board\|Laminate\|Hardware\|Adhesive\|Finish\|Fabric\|Civil), unit, stock, reorder, unitCost, supplier, created` |
+| `wa_spaces` | rooms & areas of a project | `id(SPC-001…), project→wa_projects.id, name, kind(Bedroom\|Kitchen\|Dining\|Living\|Bath\|Balcony\|Office\|Reception\|Retail\|Common), area, sort, note, created` |
+| `wa_phases` | phases **of a space** | `id(PHS-0001…), project→wa_projects.id, space→wa_spaces.id, name, code→wa_cost_codes.id, sort, status(Not started\|Active\|Complete), ownerId→employees.id, start, finish, note` |
+| `wa_phase_templates` | default phase list per space kind | `id(TPL-001…), kind, sort, phases[{name, code}]` |
+| `wa_budget_lines` | budget per project × cost code | `id(<project>::<code>), project→wa_projects.id, code→wa_cost_codes.id, budget, source, note` |
 | `wa_production` | workshop jobs | `id(JOB-001…), job, project→wa_projects.id, station(CNC\|Cutting\|Edge Banding\|Assembly\|Finishing), assignedTo, due, status(Queued\|Running\|Done\|Blocked), created` |
-| `wa_installs` | site installs | `id(INS-001…), project→wa_projects.id, site, team, date, status(Scheduled\|In Progress\|Snagging\|Handover), snags, created` |
-| `wa_purchases` | purchase orders | `id(WPO-001…), supplier, items, amount, status(Ordered\|Received\|Partial), date, created` |
+| `wa_installs` | site installs | `id(INS-001…), project→wa_projects.id, site, team, date, status(Scheduled\|In Progress\|Snagging\|Handover), snags, snagList[{text,done}], created` |
+| `wa_purchases` | purchase orders | `id(WPO-001…), project→wa_projects.id, supplier, items, amount, status(Ordered\|Received\|Partial), date, created` |
 
 ---
 
