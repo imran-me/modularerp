@@ -634,6 +634,118 @@
       S.set('wa_phases', phaseRows);
     }
 
+    /* ========================================================================
+     * WHAT EACH PHASE NEEDS — wa_requirements (slice 2 of the breakdown plan)
+     * ------------------------------------------------------------------------
+     * The owner's next sentence after phases: *"what materials will be needed
+     * in that specific phase. That materials will be added to the master
+     * quotation builder or material listing."* A requirement is that line.
+     *
+     * THESE ARE NOT NEW NUMBERS. Every requirement is a slice of a BOQ line
+     * (WA_WORK above), allocated to the phases that actually carry that cost
+     * code and split by room area. So:
+     *
+     *     Σ requirements per code  ==  the BOQ per code  ==  the budget per code
+     *
+     * and the three can never disagree, because they are one set of numbers cut
+     * three ways. `books.mjs story` asserts that equality — if a future edit
+     * breaks it, the gate fails rather than the screens quietly lying.
+     *
+     * TWO KINDS ARE SEEDED. `material` lines carry a quantity of a real
+     * material (rod, cement, plywood); `contract` lines carry a lump sum for
+     * work that is bought whole (the rajmistri contract, the joinery labour).
+     * `labour` (men × days) exists in the shape and the editor from day one,
+     * but nothing is seeded as labour — the sheet records contracts, not
+     * timesheets, and inventing man-days would be inventing data.
+     *
+     * TRANSPORT AND EXTRA/OTHERS ARE DELIBERATELY ABSENT. They are project
+     * overheads, not the need of any one room, so they stay in the budget and
+     * never appear as a room's requirement — the same reason workshop rent has
+     * no `ref` in the books.
+     * ====================================================================== */
+    if (localStorage.getItem(S.namespace + 'wa_requirements') === null) {
+      /* Which phase carries which cost code. A code with more than one phase is
+       * shared across all of them (hardware is needed by wood work AND by the
+       * furniture that follows it). */
+      var CODE2PHASE = {
+        '3D & Visualisation': ['Design'],
+        'Soil & Excavation':  ['Civil & Breaking'],
+        'Bricks & Breaking':  ['Civil & Breaking'],
+        'Cement':             ['Civil & Breaking'],
+        'Rod':                ['Civil & Breaking'],
+        'Sand & Bali':        ['Civil & Breaking'],
+        'Contractor':         ['Civil & Breaking'],
+        'Extra Labour':       ['Civil & Breaking'],
+        'Electrical':         ['Electrical'],
+        'Sanitary':           ['Plumbing', 'Fittings'],
+        'Tiles Work':         ['Tiles'],
+        'Paint':              ['Colour & Paint'],
+        'Aluminium':          ['Aluminium & Glazing'],
+        'Metal':              ['MS Railing', 'Counter & Stone'],
+        'Wood Work':          ['Wood Work'],
+        'Boards & Ply':       ['Wood Work', 'Furniture'],
+        'Laminates & Veneer': ['Wood Work'],
+        'Hardware':           ['Wood Work', 'Furniture'],
+        'Finishes':           ['Wood Work']
+      };
+
+      /* Split a whole into integer parts that sum EXACTLY back to it — largest
+       * remainder, so 37,500 bricks across eleven rooms is still 37,500 bricks.
+       * Rounding each share independently would lose or invent material, and
+       * the whole point of this table is that it reconciles. */
+      function splitExact(total, weights) {
+        var sum = weights.reduce(function (t, w) { return t + (w || 0); }, 0) || weights.length;
+        var raw = weights.map(function (w) { return total * ((w || 0) || 1) / sum; });
+        var out = raw.map(function (v) { return Math.floor(v); });
+        var used = out.reduce(function (t, n) { return t + n; }, 0);
+        var order = raw.map(function (v, i) { return [v - Math.floor(v), i]; })
+                       .sort(function (a, b) { return b[0] - a[0]; });
+        for (var k = 0; used < total; k++, used++) out[order[k % order.length][1]]++;
+        return out;
+      }
+
+      var allPhases = S.list('wa_phases');
+      var areaOf = {}, spaceOf = {};
+      S.list('wa_spaces').forEach(function (s) { areaOf[s.id] = s.area; spaceOf[s.id] = s; });
+      var matIdOf = {};
+      S.list('wa_materials').forEach(function (m) { matIdOf[m.name] = m.id; });
+
+      /* A requirement's status follows the phase it belongs to: what is done
+       * has been issued, what is running has been ordered, the rest is planned. */
+      var REQ_STATUS = { 'Complete': 'Issued', 'Active': 'Ordered', 'Not started': 'Planned' };
+
+      var reqs = [], rq = 0;
+      waBoqLines.forEach(function (line) {
+        var names = CODE2PHASE[line.code];
+        if (!names) return;
+        var hosts = allPhases.filter(function (p) { return names.indexOf(p.name) >= 0; });
+        if (!hosts.length) return;
+
+        var weights = hosts.map(function (p) { return areaOf[p.space] || 1; });
+        /* A material is split by QUANTITY; a lump-sum contract has no quantity
+         * to split, so its AMOUNT is split instead and each part stays "1 lot". */
+        var isMaterial = line.kind === 'material';
+        var parts = isMaterial ? splitExact(line.qty, weights)
+                               : splitExact(line.qty * line.unitCost, weights);
+
+        hosts.forEach(function (p, i) {
+          if (!parts[i]) return;
+          var qty = isMaterial ? parts[i] : 1;
+          var unitCost = isMaterial ? line.unitCost : parts[i];
+          var unitSale = Math.round(unitCost * WA_MARKUP);
+          reqs.push({ id: seq('REQ', rq++, 4), companyId: 'woodart', project: p.project,
+            space: p.space, phase: p.id,
+            kind: isMaterial ? 'material' : 'contract',
+            code: line.code, item: line.item,
+            materialId: matIdOf[line.item] || null,
+            qty: qty, unit: isMaterial ? line.unit : 'lot',
+            unitCost: unitCost, unitSale: unitSale,
+            status: REQ_STATUS[p.status] || 'Planned', note: '' });
+        });
+      });
+      S.set('wa_requirements', reqs);
+    }
+
     /* Woodart RECURRING COSTS — the bills that arrive every month whether or not
      * a project is running. Deliberately NOT random: these are the same heads the
      * seeded register already carries (Workshop rent Tejgaon, workshop power,

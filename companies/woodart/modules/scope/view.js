@@ -9,7 +9,7 @@
  * ==========================================================================*/
 (function () {
   'use strict';
-  var TEMPLATE_HTML = "<!-- ============================================================================\n  WOODART · SPACES & PHASES (scope) · MARKUP\n  ----------------------------------------------------------------------------\n  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.\n  Nothing here is built by JavaScript. There is no <script> tag and no <template>\n  tag in this file, by standing owner rule (companies/woodart/MODULE-STANDARD.md).\n\n  WHAT THE LOGIC FILE (frontend/scope.js) IS ALLOWED TO DO WITH THIS MARKUP\n  ---------------------------------------------------------------------------\n    [data-shell=\"x\"]   reusable chrome (head bar, tab band)  → shell('x') clones it\n    [data-screen=\"x\"]  a whole screen                        → screen('x') clones it\n    [data-fill=\"x\"]    a slot a built widget drops into (a data grid, a select)\n    [data-k=\"x\"]       a live scalar slot (a KPI number)     → fillK(node,'x',v)\n    [data-tab=\"x\"]     a tab button — the logic marks .active, wires the click,\n                       then STRIPS the hook so it never ships to the DOM\n    [data-act=\"x\"]     a button the logic wires an action onto\n    [data-when=\"x\"]    a block the logic REMOVES when the condition is false\n    [data-proto=\"x\"]   a hidden prototype element — cloned once per record,\n                       because the COUNT is data. This replaces <template>.\n    [data-slot=\"x\"]    a fill point INSIDE a cloned [data-proto] element\n\n  THE HIERARCHY THIS SCREEN SHOWS (PROJECT-BREAKDOWN-PLAN.md)\n    PROJECT  →  SPACE (Master Bed Room · Kitchen · Dining)  →  PHASE (Design →\n    Colour → Wood Work → Furniture), each phase owned by one person.\n\n  STYLING = house component classes (what a thing IS: card, kpi-card, badge,\n  progress) + Tailwind tw- utilities (where it sits / how it looks) + the module\n  stylesheet frontend/scope.css for the ONE concept the shared vocabulary has no\n  word for: the phase strip (.wa-scope-…). Never a hard-coded colour — tokens\n  only. Bar widths are computed VALUES, so the logic sets them inline\n  (UI-CONTRACT §4.3).\n  ============================================================================ -->\n\n\n<!-- ============================================================================\n     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup exactly)\n     and the 3-tab section band. Authored once, used by all three screens.\n     NOTE: the <h1> inner run stays on ONE line — a newline between those inline\n     tags clones as a real space and shifts pixels.\n     ============================================================================ -->\n<div data-shell=\"head\" class=\"page-head\">\n  <div>\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-diagram-3-fill\"></i></h1>\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\n  </div>\n  <div class=\"page-actions\">\n    <!-- The project picker. It writes ?p=<id> into the URL, so a broken-down\n         project is a link you can send to site (router.parse reads params). -->\n    <select class=\"select tw-max-w-[360px]\" data-fill=\"project\" aria-label=\"Project\"></select>\n    <a class=\"btn btn-ghost\" href=\"#/woodart/projects/active\"><i class=\"bi bi-easel2\"></i> Projects</a>\n    <button class=\"btn btn-primary\" data-act=\"new\"><i class=\"bi bi-plus-lg\"></i> Add Space</button>\n  </div>\n</div>\n\n<div data-shell=\"tabs\" class=\"tab-underline mb-3\">\n  <button data-tab=\"spaces\">Spaces</button>\n  <button data-tab=\"phases\">Phase Board</button>\n  <button data-tab=\"load\">Team Load</button>\n</div>\n\n\n<!-- ============================================================================\n     SCREEN 1 · SPACES — what this project is divided into.\n     Three mutually exclusive states, ALL authored here; the logic removes the\n     two that do not apply. Nothing is assembled on demand.\n     ============================================================================ -->\n<section data-screen=\"spaces\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Spaces</span><span class=\"kpi-ico\"><i class=\"bi bi-door-open\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"spaces\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Phases</span><span class=\"kpi-ico\"><i class=\"bi bi-diagram-3\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"phases\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Phases Complete</span><span class=\"kpi-ico\"><i class=\"bi bi-check2-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"complete\">—</div>\n      <div class=\"kpi-foot\" data-k=\"completeFoot\"></div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Unassigned</span><span class=\"kpi-ico\"><i class=\"bi bi-person-dash\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"unassigned\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Area Planned</span><span class=\"kpi-ico\"><i class=\"bi bi-rulers\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"area\">—</div>\n    </div>\n  </div>\n\n  <!-- Shown only while some open phase has nobody against it. Work with no name\n       on it is the one thing this screen exists to make impossible to miss. -->\n  <div class=\"build-banner\" data-when=\"unassigned\">\n    <i class=\"bi bi-person-dash\"></i>\n    <div><strong data-k=\"unassignedInline\">0</strong> open phase(s) have nobody responsible.\n      <button class=\"link-btn\" data-act=\"goBoard\">Open the phase board</button> to assign them.</div>\n  </div>\n\n  <!-- STATE A · this company has no projects at all -->\n  <div class=\"empty-state\" data-when=\"noproject\">\n    <i class=\"bi bi-easel2\"></i>\n    <h3>No projects yet</h3>\n    <p class=\"tw-text-ink-dim\">A space belongs to a project. Register one on\n      <a href=\"#/woodart/projects/active\">Projects</a> first, then divide it into rooms here.</p>\n  </div>\n\n  <!-- STATE B · a project is picked but nothing has been broken down yet -->\n  <div class=\"empty-state\" data-when=\"empty\">\n    <i class=\"bi bi-door-closed\"></i>\n    <h3>This project has no spaces yet</h3>\n    <p class=\"tw-text-ink-dim\">Divide it into the rooms and areas it will be built in —\n      Master Bed Room, Kitchen, Dining Room. Each space gets its own phase list.</p>\n    <button class=\"btn btn-primary\" data-act=\"addFirst\"><i class=\"bi bi-plus-lg\"></i> Add the first space</button>\n  </div>\n\n  <!-- STATE C · the real thing -->\n  <div data-when=\"some\">\n    <div class=\"section-label\">SPACES IN THIS PROJECT</div>\n    <div class=\"grid-auto\" data-fill=\"spaces\">\n\n      <!-- PROTOTYPE CARD — one per space; the count is DATA, not layout. -->\n      <!-- The KIND rides in the card head beside the name, and the counts sit on\n           their own muted line in the body. Four cards fit across a 1440px fold,\n           so a card is ~245px wide: a long .card-sub there squeezes a two-word\n           space name onto two lines and then overlaps it. -->\n      <div class=\"card hover\" data-proto=\"space\" hidden>\n        <div class=\"card-head\">\n          <h3><i class=\"bi bi-door-open\"></i> <span data-slot=\"name\"></span></h3>\n          <span class=\"badge\" data-slot=\"kind\"></span>\n        </div>\n        <div class=\"card-body\">\n          <div class=\"data-row\">\n            <span class=\"badge\" data-slot=\"status\"></span>\n            <span class=\"num tw-font-semibold tw-ml-auto\" data-slot=\"pct\"></span>\n          </div>\n          <div class=\"progress tw-mt-[6px]\"><div class=\"progress-bar\" data-slot=\"bar\"></div></div>\n          <div class=\"tw-text-ink-mute tw-text-[11px] tw-mt-[6px]\" data-slot=\"meta\"></div>\n\n          <!-- THE PHASE STRIP — the sequence, in order, with its status tone.\n               One step per phase; again a count, so again a prototype. -->\n          <div class=\"wa-scope-strip tw-mt-[6px]\" data-slot=\"strip\">\n            <span class=\"wa-scope-step\" data-proto=\"step\" hidden>\n              <span class=\"wa-scope-dot\"></span><span data-slot=\"label\"></span>\n            </span>\n          </div>\n        </div>\n        <div class=\"card-foot\">\n          <button class=\"btn btn-sm btn-ghost\" data-act=\"board\"><i class=\"bi bi-diagram-3\"></i> Phases</button>\n          <button class=\"btn btn-sm btn-ghost\" data-act=\"edit\"><i class=\"bi bi-pencil\"></i> Edit</button>\n          <button class=\"btn btn-sm btn-ghost\" data-act=\"del\"><i class=\"bi bi-trash\"></i> Delete</button>\n        </div>\n      </div>\n\n    </div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 2 · PHASE BOARD — where every space is right now, and who is on it.\n     One card per space; one row per phase, in running order. Clicking a phase\n     row opens the phase drawer (assign the person, set status and dates).\n     ============================================================================ -->\n<section data-screen=\"phases\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Not Started</span><span class=\"kpi-ico\"><i class=\"bi bi-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"notStarted\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Active</span><span class=\"kpi-ico\"><i class=\"bi bi-play-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"active\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Complete</span><span class=\"kpi-ico\"><i class=\"bi bi-check2-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"complete\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Unassigned</span><span class=\"kpi-ico\"><i class=\"bi bi-person-dash\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"unassigned\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Overdue</span><span class=\"kpi-ico\"><i class=\"bi bi-exclamation-diamond\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"overdue\">—</div>\n    </div>\n  </div>\n\n  <div class=\"build-banner\" data-when=\"overdue\">\n    <i class=\"bi bi-exclamation-diamond\"></i>\n    <div><strong data-k=\"overdueInline\">0</strong> phase(s) passed their finish date and are\n      still open. The date is measured against the demo clock, not the machine clock.</div>\n  </div>\n\n  <!-- Only data drift can produce an orphan (deleting a space takes its phases\n       with it), which is exactly when it must be visible rather than hidden. -->\n  <div class=\"build-banner\" data-when=\"orphan\">\n    <i class=\"bi bi-exclamation-octagon\"></i>\n    <div><strong data-k=\"orphanInline\">0</strong> phase(s) point at a space that no longer\n      exists. They are kept and counted here rather than silently dropped —\n      <button class=\"link-btn\" data-act=\"showOrphans\">show which</button>.</div>\n  </div>\n\n  <div class=\"empty-state\" data-when=\"empty\">\n    <i class=\"bi bi-diagram-3\"></i>\n    <h3>Nothing to show on the board</h3>\n    <p class=\"tw-text-ink-dim\">Add a space to this project and its phase list appears here.</p>\n    <button class=\"btn btn-primary\" data-act=\"addFirst\"><i class=\"bi bi-plus-lg\"></i> Add a space</button>\n  </div>\n\n  <div data-when=\"some\">\n\n    <!-- PROTOTYPE BLOCK — one card per space. -->\n    <div class=\"card\" data-proto=\"spaceBlock\" hidden>\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-door-open\"></i> <span data-slot=\"name\"></span></h3>\n        <span class=\"card-sub\" data-slot=\"meta\"></span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"data-list\" data-slot=\"phases\">\n\n          <!-- PROTOTYPE ROW — one per phase, in running order. -->\n          <div class=\"data-row tw-cursor-pointer\" data-proto=\"phase\" hidden>\n            <span class=\"badge\" data-slot=\"seq\"></span>\n            <div class=\"tw-flex-1\">\n              <div class=\"tw-font-semibold\" data-slot=\"name\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"code\"></div>\n            </div>\n            <span class=\"badge\" data-slot=\"owner\"></span>\n            <span class=\"badge\" data-slot=\"status\"></span>\n            <span class=\"tw-text-ink-mute tw-text-[11px] tw-text-right tw-min-w-[180px]\" data-slot=\"dates\"></span>\n            <!-- Deleting a phase is a row action, not a drawer action: the drawer\n                 is where a phase is EDITED, and a destructive control living\n                 beside Save is how people delete things they meant to rename. -->\n            <button class=\"icon-btn\" data-slot=\"del\" title=\"Delete this phase\"><i class=\"bi bi-trash\"></i></button>\n          </div>\n\n        </div>\n      </div>\n      <div class=\"card-foot\">\n        <button class=\"btn btn-sm btn-ghost\" data-act=\"addPhase\"><i class=\"bi bi-plus-lg\"></i> Add phase</button>\n        <button class=\"btn btn-sm btn-ghost\" data-act=\"template\"><i class=\"bi bi-magic\"></i> Apply template</button>\n      </div>\n    </div>\n\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 3 · TEAM LOAD — who is carrying what, across every project.\n     Deliberately NOT scoped to one project: the question \"is Sumaiya free?\"\n     is not answerable one project at a time, so the picker is removed here.\n     ============================================================================ -->\n<section data-screen=\"load\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">People</span><span class=\"kpi-ico\"><i class=\"bi bi-people-fill\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"people\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Open Phases</span><span class=\"kpi-ico\"><i class=\"bi bi-diagram-3\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"open\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Unassigned</span><span class=\"kpi-ico\"><i class=\"bi bi-person-dash\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"unassigned\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Overdue</span><span class=\"kpi-ico\"><i class=\"bi bi-exclamation-diamond\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"overdue\">—</div>\n    </div>\n  </div>\n\n  <div class=\"build-banner\" data-when=\"unassigned\">\n    <i class=\"bi bi-person-dash\"></i>\n    <div><strong data-k=\"unassignedInline\">0</strong> open phase(s) across the company have\n      nobody responsible. They are listed at the bottom of this screen.</div>\n  </div>\n\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-people-fill\"></i> Load by Person</h3>\n        <span class=\"card-sub\">Open phases each person is responsible for — busiest first</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"data-list\" data-fill=\"people\">\n\n          <!-- PROTOTYPE ROW — one per person on the roster, including people\n               with nothing open: \"who is free\" is half of what this answers. -->\n          <div class=\"data-row\" data-proto=\"person\" hidden>\n            <div class=\"tw-flex-1\">\n              <div class=\"tw-font-semibold\" data-slot=\"name\"></div>\n              <div class=\"progress tw-mt-[6px]\"><div class=\"progress-bar\" data-slot=\"bar\"></div></div>\n            </div>\n            <div class=\"tw-ml-auto tw-text-right\">\n              <div class=\"num tw-font-semibold\" data-slot=\"open\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"detail\"></div>\n            </div>\n          </div>\n\n        </div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-pie-chart-fill\"></i> Where the Work Is</h3>\n        <span class=\"card-sub\">Every phase by status, across all projects</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"tw-relative tw-h-[260px]\"><canvas data-fill=\"chart\"></canvas></div>\n      </div>\n    </div>\n\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-list-columns-reverse\"></i> Open Phases</h3>\n      <span class=\"card-sub\">Every phase still running, across all projects — click one to assign it</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n";
+  var TEMPLATE_HTML = "<!-- ============================================================================\n  WOODART · SPACES & PHASES (scope) · MARKUP\n  ----------------------------------------------------------------------------\n  THIS FILE IS THE SCREEN. Open it and you see the whole UI, head bar to footer.\n  Nothing here is built by JavaScript. There is no <script> tag and no <template>\n  tag in this file, by standing owner rule (companies/woodart/MODULE-STANDARD.md).\n\n  WHAT THE LOGIC FILE (frontend/scope.js) IS ALLOWED TO DO WITH THIS MARKUP\n  ---------------------------------------------------------------------------\n    [data-shell=\"x\"]   reusable chrome (head bar, tab band)  → shell('x') clones it\n    [data-screen=\"x\"]  a whole screen                        → screen('x') clones it\n    [data-fill=\"x\"]    a slot a built widget drops into (a data grid, a select)\n    [data-k=\"x\"]       a live scalar slot (a KPI number)     → fillK(node,'x',v)\n    [data-tab=\"x\"]     a tab button — the logic marks .active, wires the click,\n                       then STRIPS the hook so it never ships to the DOM\n    [data-act=\"x\"]     a button the logic wires an action onto\n    [data-when=\"x\"]    a block the logic REMOVES when the condition is false\n    [data-proto=\"x\"]   a hidden prototype element — cloned once per record,\n                       because the COUNT is data. This replaces <template>.\n    [data-slot=\"x\"]    a fill point INSIDE a cloned [data-proto] element\n\n  THE HIERARCHY THIS SCREEN SHOWS (PROJECT-BREAKDOWN-PLAN.md)\n    PROJECT  →  SPACE (Master Bed Room · Kitchen · Dining)  →  PHASE (Design →\n    Colour → Wood Work → Furniture), each phase owned by one person.\n\n  STYLING = house component classes (what a thing IS: card, kpi-card, badge,\n  progress) + Tailwind tw- utilities (where it sits / how it looks) + the module\n  stylesheet frontend/scope.css for the ONE concept the shared vocabulary has no\n  word for: the phase strip (.wa-scope-…). Never a hard-coded colour — tokens\n  only. Bar widths are computed VALUES, so the logic sets them inline\n  (UI-CONTRACT §4.3).\n  ============================================================================ -->\n\n\n<!-- ============================================================================\n     SHARED CHROME — the page-head bar (mirrors EPAL.pageHead's markup exactly)\n     and the 3-tab section band. Authored once, used by all three screens.\n     NOTE: the <h1> inner run stays on ONE line — a newline between those inline\n     tags clones as a real space and shifts pixels.\n     ============================================================================ -->\n<div data-shell=\"head\" class=\"page-head\">\n  <div>\n    <h1 class=\"page-title\" data-fill=\"title\"><span class=\"eyebrow\" data-fill=\"eyebrow\"></span><i class=\"bi bi-diagram-3-fill\"></i></h1>\n    <p class=\"page-sub\" data-fill=\"sub\"></p>\n  </div>\n  <div class=\"page-actions\">\n    <!-- The project picker. It writes ?p=<id> into the URL, so a broken-down\n         project is a link you can send to site (router.parse reads params). -->\n    <select class=\"select tw-max-w-[360px]\" data-fill=\"project\" aria-label=\"Project\"></select>\n    <a class=\"btn btn-ghost\" href=\"#/woodart/projects/active\"><i class=\"bi bi-easel2\"></i> Projects</a>\n    <button class=\"btn btn-primary\" data-act=\"new\"><i class=\"bi bi-plus-lg\"></i> Add Space</button>\n  </div>\n</div>\n\n<div data-shell=\"tabs\" class=\"tab-underline mb-3\">\n  <button data-tab=\"spaces\">Spaces</button>\n  <button data-tab=\"phases\">Phase Board</button>\n  <button data-tab=\"materials\">Material Demand</button>\n  <button data-tab=\"load\">Team Load</button>\n</div>\n\n\n<!-- ============================================================================\n     SCREEN 1 · SPACES — what this project is divided into.\n     Three mutually exclusive states, ALL authored here; the logic removes the\n     two that do not apply. Nothing is assembled on demand.\n     ============================================================================ -->\n<section data-screen=\"spaces\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Spaces</span><span class=\"kpi-ico\"><i class=\"bi bi-door-open\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"spaces\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Phases</span><span class=\"kpi-ico\"><i class=\"bi bi-diagram-3\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"phases\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Phases Complete</span><span class=\"kpi-ico\"><i class=\"bi bi-check2-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"complete\">—</div>\n      <div class=\"kpi-foot\" data-k=\"completeFoot\"></div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Unassigned</span><span class=\"kpi-ico\"><i class=\"bi bi-person-dash\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"unassigned\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Area Planned</span><span class=\"kpi-ico\"><i class=\"bi bi-rulers\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"area\">—</div>\n    </div>\n  </div>\n\n  <!-- Shown only while some open phase has nobody against it. Work with no name\n       on it is the one thing this screen exists to make impossible to miss. -->\n  <div class=\"build-banner\" data-when=\"unassigned\">\n    <i class=\"bi bi-person-dash\"></i>\n    <div><strong data-k=\"unassignedInline\">0</strong> open phase(s) have nobody responsible.\n      <button class=\"link-btn\" data-act=\"goBoard\">Open the phase board</button> to assign them.</div>\n  </div>\n\n  <!-- STATE A · this company has no projects at all -->\n  <div class=\"empty-state\" data-when=\"noproject\">\n    <i class=\"bi bi-easel2\"></i>\n    <h3>No projects yet</h3>\n    <p class=\"tw-text-ink-dim\">A space belongs to a project. Register one on\n      <a href=\"#/woodart/projects/active\">Projects</a> first, then divide it into rooms here.</p>\n  </div>\n\n  <!-- STATE B · a project is picked but nothing has been broken down yet -->\n  <div class=\"empty-state\" data-when=\"empty\">\n    <i class=\"bi bi-door-closed\"></i>\n    <h3>This project has no spaces yet</h3>\n    <p class=\"tw-text-ink-dim\">Divide it into the rooms and areas it will be built in —\n      Master Bed Room, Kitchen, Dining Room. Each space gets its own phase list.</p>\n    <button class=\"btn btn-primary\" data-act=\"addFirst\"><i class=\"bi bi-plus-lg\"></i> Add the first space</button>\n  </div>\n\n  <!-- STATE C · the real thing -->\n  <div data-when=\"some\">\n    <div class=\"section-label\">SPACES IN THIS PROJECT</div>\n    <div class=\"grid-auto\" data-fill=\"spaces\">\n\n      <!-- PROTOTYPE CARD — one per space; the count is DATA, not layout. -->\n      <!-- The KIND rides in the card head beside the name, and the counts sit on\n           their own muted line in the body. Four cards fit across a 1440px fold,\n           so a card is ~245px wide: a long .card-sub there squeezes a two-word\n           space name onto two lines and then overlaps it. -->\n      <div class=\"card hover\" data-proto=\"space\" hidden>\n        <div class=\"card-head\">\n          <h3><i class=\"bi bi-door-open\"></i> <span data-slot=\"name\"></span></h3>\n          <span class=\"badge\" data-slot=\"kind\"></span>\n        </div>\n        <div class=\"card-body\">\n          <div class=\"data-row\">\n            <span class=\"badge\" data-slot=\"status\"></span>\n            <span class=\"num tw-font-semibold tw-ml-auto\" data-slot=\"pct\"></span>\n          </div>\n          <div class=\"progress tw-mt-[6px]\"><div class=\"progress-bar\" data-slot=\"bar\"></div></div>\n          <div class=\"tw-text-ink-mute tw-text-[11px] tw-mt-[6px]\" data-slot=\"meta\"></div>\n\n          <!-- THE PHASE STRIP — the sequence, in order, with its status tone.\n               One step per phase; again a count, so again a prototype. -->\n          <div class=\"wa-scope-strip tw-mt-[6px]\" data-slot=\"strip\">\n            <span class=\"wa-scope-step\" data-proto=\"step\" hidden>\n              <span class=\"wa-scope-dot\"></span><span data-slot=\"label\"></span>\n            </span>\n          </div>\n        </div>\n        <div class=\"card-foot\">\n          <button class=\"btn btn-sm btn-ghost\" data-act=\"board\"><i class=\"bi bi-diagram-3\"></i> Phases</button>\n          <button class=\"btn btn-sm btn-ghost\" data-act=\"edit\"><i class=\"bi bi-pencil\"></i> Edit</button>\n          <button class=\"btn btn-sm btn-ghost\" data-act=\"del\"><i class=\"bi bi-trash\"></i> Delete</button>\n        </div>\n      </div>\n\n    </div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 2 · PHASE BOARD — where every space is right now, and who is on it.\n     One card per space; one row per phase, in running order. Clicking a phase\n     row opens the phase drawer (assign the person, set status and dates).\n     ============================================================================ -->\n<section data-screen=\"phases\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Not Started</span><span class=\"kpi-ico\"><i class=\"bi bi-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"notStarted\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Active</span><span class=\"kpi-ico\"><i class=\"bi bi-play-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"active\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Complete</span><span class=\"kpi-ico\"><i class=\"bi bi-check2-circle\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"complete\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Unassigned</span><span class=\"kpi-ico\"><i class=\"bi bi-person-dash\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"unassigned\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Overdue</span><span class=\"kpi-ico\"><i class=\"bi bi-exclamation-diamond\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"overdue\">—</div>\n    </div>\n  </div>\n\n  <div class=\"build-banner\" data-when=\"overdue\">\n    <i class=\"bi bi-exclamation-diamond\"></i>\n    <div><strong data-k=\"overdueInline\">0</strong> phase(s) passed their finish date and are\n      still open. The date is measured against the demo clock, not the machine clock.</div>\n  </div>\n\n  <!-- Only data drift can produce an orphan (deleting a space takes its phases\n       with it), which is exactly when it must be visible rather than hidden. -->\n  <div class=\"build-banner\" data-when=\"orphan\">\n    <i class=\"bi bi-exclamation-octagon\"></i>\n    <div><strong data-k=\"orphanInline\">0</strong> phase(s) point at a space that no longer\n      exists. They are kept and counted here rather than silently dropped —\n      <button class=\"link-btn\" data-act=\"showOrphans\">show which</button>.</div>\n  </div>\n\n  <div class=\"empty-state\" data-when=\"empty\">\n    <i class=\"bi bi-diagram-3\"></i>\n    <h3>Nothing to show on the board</h3>\n    <p class=\"tw-text-ink-dim\">Add a space to this project and its phase list appears here.</p>\n    <button class=\"btn btn-primary\" data-act=\"addFirst\"><i class=\"bi bi-plus-lg\"></i> Add a space</button>\n  </div>\n\n  <div data-when=\"some\">\n\n    <!-- PROTOTYPE BLOCK — one card per space. -->\n    <div class=\"card\" data-proto=\"spaceBlock\" hidden>\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-door-open\"></i> <span data-slot=\"name\"></span></h3>\n        <span class=\"card-sub\" data-slot=\"meta\"></span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"data-list\" data-slot=\"phases\">\n\n          <!-- PROTOTYPE ROW — one per phase, in running order. -->\n          <div class=\"data-row tw-cursor-pointer\" data-proto=\"phase\" hidden>\n            <span class=\"badge\" data-slot=\"seq\"></span>\n            <div class=\"tw-flex-1\">\n              <div class=\"tw-font-semibold\" data-slot=\"name\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"code\"></div>\n            </div>\n            <span class=\"badge\" data-slot=\"owner\"></span>\n            <span class=\"badge\" data-slot=\"status\"></span>\n            <span class=\"tw-text-ink-mute tw-text-[11px] tw-text-right tw-min-w-[180px]\" data-slot=\"dates\"></span>\n            <!-- Deleting a phase is a row action, not a drawer action: the drawer\n                 is where a phase is EDITED, and a destructive control living\n                 beside Save is how people delete things they meant to rename. -->\n            <button class=\"icon-btn\" data-slot=\"del\" title=\"Delete this phase\"><i class=\"bi bi-trash\"></i></button>\n          </div>\n\n        </div>\n      </div>\n      <div class=\"card-foot\">\n        <button class=\"btn btn-sm btn-ghost\" data-act=\"addPhase\"><i class=\"bi bi-plus-lg\"></i> Add phase</button>\n        <button class=\"btn btn-sm btn-ghost\" data-act=\"template\"><i class=\"bi bi-magic\"></i> Apply template</button>\n      </div>\n    </div>\n\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 3 · MATERIAL DEMAND — what this project has to buy.\n     Every `material` requirement of every phase, rolled up per item and set\n     against what the register actually holds. The roll-up is by ITEM, across\n     phases, on purpose: asking each phase separately would order the same\n     plywood four times.\n     ============================================================================ -->\n<section data-screen=\"materials\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Materials Needed</span><span class=\"kpi-ico\"><i class=\"bi bi-boxes\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"items\">—</div>\n      <div class=\"kpi-foot\" data-k=\"itemsFoot\"></div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Planned Material Cost</span><span class=\"kpi-ico\"><i class=\"bi bi-cash-stack\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"cost\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Short of Stock</span><span class=\"kpi-ico\"><i class=\"bi bi-exclamation-diamond\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"short\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Cost to Buy</span><span class=\"kpi-ico\"><i class=\"bi bi-cart-plus\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"shortCost\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Labour &amp; Contracts</span><span class=\"kpi-ico\"><i class=\"bi bi-person-workspace\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"work\">—</div>\n      <div class=\"kpi-foot\" data-k=\"workFoot\"></div>\n    </div>\n  </div>\n\n  <div class=\"build-banner\" data-when=\"short\">\n    <i class=\"bi bi-cart-plus\"></i>\n    <div><strong data-k=\"shortInline\">0</strong> material(s) are planned in greater quantity than the\n      register holds. Raise the order in <a href=\"#/woodart/procurement\">Procurement</a> — this screen\n      says what is needed, it does not buy it.</div>\n  </div>\n\n  <!-- An item nobody stocks is COUNTED, never dropped: the house rule for\n       anything unlisted. It is normal here — a villa buys tiles per job. -->\n  <div class=\"build-banner\" data-when=\"unlisted\">\n    <i class=\"bi bi-info-circle\"></i>\n    <div><strong data-k=\"unlistedInline\">0</strong> planned item(s) are not in the material register.\n      They are counted here as demand with no stock to net off — which is what \"bought per job\"\n      looks like.</div>\n  </div>\n\n  <div class=\"empty-state\" data-when=\"empty\">\n    <i class=\"bi bi-clipboard-x\"></i>\n    <h3>Nothing planned yet</h3>\n    <p class=\"tw-text-ink-dim\">Open a phase on the board and add what it needs — material, labour or\n      contracted work. It rolls up here, and into the quotation.</p>\n    <button class=\"btn btn-primary\" data-act=\"goBoard\"><i class=\"bi bi-diagram-3\"></i> Open the phase board</button>\n  </div>\n\n  <div data-when=\"some\">\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-list-columns-reverse\"></i> Material Demand</h3>\n        <span class=\"card-sub\">Every material this project's phases need, against stock — dearest first</span>\n      </div>\n      <div class=\"card-body\" data-fill=\"register\"></div>\n    </div>\n\n    <div class=\"section-label\">LABOUR &amp; CONTRACTED WORK</div>\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-person-workspace\"></i> Work, Not Material</h3>\n        <span class=\"card-sub\">The lines you hire rather than buy — they price into the same quotation</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"data-list\" data-fill=\"work\">\n          <!-- PROTOTYPE ROW — one per work line, grouped by item. -->\n          <div class=\"data-row\" data-proto=\"work\" hidden>\n            <span class=\"badge\" data-slot=\"kind\"></span>\n            <div class=\"tw-flex-1\">\n              <div class=\"tw-font-semibold\" data-slot=\"item\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"where\"></div>\n            </div>\n            <div class=\"tw-ml-auto tw-text-right\">\n              <div class=\"num tw-font-semibold\" data-slot=\"amount\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"quote\"></div>\n            </div>\n          </div>\n        </div>\n      </div>\n    </div>\n  </div>\n\n</section>\n\n\n<!-- ============================================================================\n     SCREEN 4 · TEAM LOAD — who is carrying what, across every project.\n     Deliberately NOT scoped to one project: the question \"is Sumaiya free?\"\n     is not answerable one project at a time, so the picker is removed here.\n     ============================================================================ -->\n<section data-screen=\"load\">\n\n  <div class=\"kpi-grid kpi-compact stagger\">\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">People</span><span class=\"kpi-ico\"><i class=\"bi bi-people-fill\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"people\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Open Phases</span><span class=\"kpi-ico\"><i class=\"bi bi-diagram-3\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"open\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Unassigned</span><span class=\"kpi-ico\"><i class=\"bi bi-person-dash\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"unassigned\">—</div>\n    </div>\n    <div class=\"kpi-card\">\n      <div class=\"kpi-top\"><span class=\"kpi-label\">Overdue</span><span class=\"kpi-ico\"><i class=\"bi bi-exclamation-diamond\"></i></span></div>\n      <div class=\"kpi-value\" data-k=\"overdue\">—</div>\n    </div>\n  </div>\n\n  <div class=\"build-banner\" data-when=\"unassigned\">\n    <i class=\"bi bi-person-dash\"></i>\n    <div><strong data-k=\"unassignedInline\">0</strong> open phase(s) across the company have\n      nobody responsible. They are listed at the bottom of this screen.</div>\n  </div>\n\n  <div class=\"two-col\">\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-people-fill\"></i> Load by Person</h3>\n        <span class=\"card-sub\">Open phases each person is responsible for — busiest first</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"data-list\" data-fill=\"people\">\n\n          <!-- PROTOTYPE ROW — one per person on the roster, including people\n               with nothing open: \"who is free\" is half of what this answers. -->\n          <div class=\"data-row\" data-proto=\"person\" hidden>\n            <div class=\"tw-flex-1\">\n              <div class=\"tw-font-semibold\" data-slot=\"name\"></div>\n              <div class=\"progress tw-mt-[6px]\"><div class=\"progress-bar\" data-slot=\"bar\"></div></div>\n            </div>\n            <div class=\"tw-ml-auto tw-text-right\">\n              <div class=\"num tw-font-semibold\" data-slot=\"open\"></div>\n              <div class=\"tw-text-ink-mute tw-text-[11px]\" data-slot=\"detail\"></div>\n            </div>\n          </div>\n\n        </div>\n      </div>\n    </div>\n\n    <div class=\"card\">\n      <div class=\"card-head\">\n        <h3><i class=\"bi bi-pie-chart-fill\"></i> Where the Work Is</h3>\n        <span class=\"card-sub\">Every phase by status, across all projects</span>\n      </div>\n      <div class=\"card-body\">\n        <div class=\"tw-relative tw-h-[260px]\"><canvas data-fill=\"chart\"></canvas></div>\n      </div>\n    </div>\n\n  </div>\n\n  <div class=\"card\">\n    <div class=\"card-head\">\n      <h3><i class=\"bi bi-list-columns-reverse\"></i> Open Phases</h3>\n      <span class=\"card-sub\">Every phase still running, across all projects — click one to assign it</span>\n    </div>\n    <div class=\"card-body\" data-fill=\"register\"></div>\n  </div>\n\n</section>\n";
   var MODULE_CSS = "/* ============================================================================\n * WOODART · SPACES & PHASES (scope) · MODULE STYLESHEET\n * ----------------------------------------------------------------------------\n * ONE CONCEPT ONLY: the PHASE STRIP — the run of steps a space moves through\n * (Design → Colour → Wood Work → Furniture), shown in order with its status.\n *\n * WHY THIS FILE EXISTS AT ALL. Per UI-CONTRACT §5 a module stylesheet is for\n * \"effects and concepts unique to this module\", never for restyling shared\n * components — and nothing here touches .card, .btn, .badge or any other shared\n * class. A sequence of ordered, status-toned steps is genuinely a concept the\n * shared vocabulary has no word for: a .badge says WHAT something is, it does\n * not say \"third of seven, in progress\". Expressing it with utilities instead\n * would mean adding new tw- classes for one screen's ornament.\n *\n * EVERY COLOUR IS A TOKEN, so both themes and every company accent work for\n * free — there is not a single hex in this file (UI-CONTRACT §5).\n * Namespace: .wa-scope-… (module-owned, per MODULE-STANDARD §2.2).\n * ==========================================================================*/\n\n/* The strip itself — wraps rather than scrolls, because a kitchen can carry ten\n * phases and a hidden phase is a phase nobody assigns. */\n.wa-scope-strip {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 6px;\n}\n\n/* One step. Sized off the same tokens as .badge so the two read as siblings\n * rather than as two different design languages on one card. */\n.wa-scope-step {\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  padding: 3px 9px;\n  border: 1px solid var(--border);\n  border-radius: var(--r-pill);\n  background: var(--surface-2);\n  font-size: var(--fs-micro);\n  font-weight: 600;\n  color: var(--text-mute);\n  white-space: nowrap;\n}\n\n.wa-scope-dot {\n  width: 7px;\n  height: 7px;\n  flex: none;\n  border-radius: 50%;\n  background: var(--text-mute);\n}\n\n/* ACTIVE — the phase the space is on right now. Carries the company accent, so\n * a Woodart board is green and a Travels one is blue without a second rule. */\n.wa-scope-step.is-active {\n  border-color: color-mix(in srgb, var(--accent) 45%, transparent);\n  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));\n  color: var(--text);\n}\n.wa-scope-step.is-active .wa-scope-dot { background: var(--accent); }\n\n/* COMPLETE — done and behind us. */\n.wa-scope-step.is-complete {\n  border-color: color-mix(in srgb, var(--good) 35%, transparent);\n  color: var(--good);\n}\n.wa-scope-step.is-complete .wa-scope-dot { background: var(--good); }\n\n/* LATE — open, and past its finish date. Deliberately only the DOT changes:\n * the step still reads as its own status, with the alarm sitting on top of it\n * rather than replacing it. */\n.wa-scope-step.is-late { border-color: color-mix(in srgb, var(--bad) 40%, transparent); }\n.wa-scope-step.is-late .wa-scope-dot { background: var(--bad); }\n\n/* UNASSIGNED — nobody is responsible yet. A dashed edge, so it reads as \"not\n * settled\" at a glance without competing with the status colours above. */\n.wa-scope-step.is-unassigned { border-style: dashed; }\n";
   if (MODULE_CSS && !document.querySelector('style[data-module-style="woodart/scope"]')) {
     var st = document.createElement('style');
@@ -83,8 +83,11 @@ var EPAL = window.EPAL, db = EPAL.db;
 var SPACES    = 'wa_spaces';           /* ← the one place these collections   */
 var PHASES    = 'wa_phases';           /*   are named. Everything else in the */
 var TEMPLATES = 'wa_phase_templates';  /*   module goes through Scope.*       */
+var REQS      = 'wa_requirements';     /*   what each phase needs (slice 2)   */
 var PROJECTS  = 'wa_projects';         /* read-only: owned by `projects`      */
 var CODES     = 'wa_cost_codes';       /* read-only: the shared cost-code list */
+var MATERIALS = 'wa_materials';        /* read-only: owned by `materials` —
+                                          stock levels, for the shortfall     */
 
 var CID   = 'woodart';
 var TODAY = '2026-07-05';              /* the demo clock — same anchor as every module */
@@ -98,6 +101,25 @@ var KINDS = ['Bedroom', 'Kitchen', 'Dining', 'Living', 'Bath', 'Balcony',
 /* A phase's terminal state is `Complete` (NAMING-AND-TERMINOLOGY §2: "open"
  * means one thing per module — here it means "not Complete"). */
 var STATUSES = ['Not started', 'Active', 'Complete'];
+
+/* WHAT A PHASE CAN NEED. One line table, three kinds — the decision the whole
+ * of slice 2 hangs off (PROJECT-BREAKDOWN-PLAN §4.3): the quotation builder,
+ * the material listing, the labour estimate and the cost matrix are then ONE
+ * query with a filter, instead of four features that can disagree.
+ *
+ *   material  qty of a real material          24 sheet × ৳3,610
+ *   labour    man-days at a day rate          (2 men × 6 days) × ৳900
+ *   contract  work bought whole, as a lump    1 lot × ৳3,41,000
+ *
+ * `labour` keeps men and days in the UNIT ('man-day') and the quantity for now;
+ * the hiring desk that needs them as separate fields is slice 4, and splitting
+ * them before it exists would be a column nothing reads. */
+var REQ_KINDS = ['material', 'labour', 'contract'];
+
+/* A requirement's life: planned → quoted to the client → ordered from a vendor →
+ * issued to the job. It is deliberately NOT the phase's status: a phase can be
+ * running while half its material is still on order. */
+var REQ_STATUSES = ['Planned', 'Quoted', 'Ordered', 'Issued'];
 
 /* The fallback phase list for a space kind with no seeded template. Never
  * silently empty: a space with no phases cannot be planned, assigned or costed,
@@ -211,7 +233,10 @@ var Scope = {
    * material's movement history.
    */
   removeSpace: function (id) {
-    Scope.phases(id).forEach(function (ph) { db.remove(PHASES, ph.id); });
+    Scope.phases(id).forEach(function (ph) { Scope.removePhase(ph.id); });
+    /* belt and braces: a line whose phase was already gone would otherwise
+     * survive its own room and keep counting in the project's demand */
+    Scope.spaceRequirements(id).forEach(function (r) { db.remove(REQS, r.id); });
     return db.remove(SPACES, id);
   },
 
@@ -250,7 +275,14 @@ var Scope = {
   },
 
   savePhase: function (rec) { return db.save(PHASES, rec); },
-  removePhase: function (id) { return db.remove(PHASES, id); },
+
+  /** Deleting a phase takes its requirements with it — a planned line whose
+   *  phase is gone would still be counted by the demand list and the quotation
+   *  while being impossible to open or edit. Same rule as space → phases. */
+  removePhase: function (id) {
+    Scope.requirements(id).forEach(function (r) { db.remove(REQS, r.id); });
+    return db.remove(PHASES, id);
+  },
 
   /** THE open rule, defined once: a phase is open until it is Complete. */
   isOpen: function (ph) { return (ph && ph.status) !== 'Complete'; },
@@ -318,23 +350,206 @@ var Scope = {
   },
 
   /* ======================================================================
+   * REQUIREMENTS — what a phase needs: material, labour or contracted work.
+   * The owner's sentence this implements: "what materials will be needed in
+   * that specific phase — that materials will be added to the master quotation
+   * builder or material listing."
+   * ==================================================================== */
+
+  reqKinds:    function () { return REQ_KINDS.slice(); },
+  reqStatuses: function () { return REQ_STATUSES.slice(); },
+
+  /** One phase's lines, in entry order. */
+  requirements: function (phaseId) {
+    return db.col(REQS).filter(function (r) { return mine(r) && r.phase === phaseId; });
+  },
+
+  spaceRequirements: function (spaceId) {
+    return db.col(REQS).filter(function (r) { return mine(r) && r.space === spaceId; });
+  },
+
+  projectRequirements: function (projectId) {
+    return db.col(REQS).filter(function (r) { return mine(r) && r.project === projectId; });
+  },
+
+  requirement: function (id) {
+    return db.col(REQS).filter(function (r) { return r.id === id; })[0] || null;
+  },
+
+  /** THE line formulas, defined once. Everything downstream — the phase drawer's
+   *  footer, the space card, the demand list, the quotation builder in slice 3 —
+   *  totals with these two and nothing else. */
+  amount: function (r) { return num(r.qty) * num(r.unitCost); },
+  quote:  function (r) { return num(r.qty) * num(r.unitSale); },
+
+  /** Cost and quote of any set of lines, plus its margin. */
+  totals: function (rows) {
+    var cost = 0, quote = 0;
+    (rows || []).forEach(function (r) { cost += Scope.amount(r); quote += Scope.quote(r); });
+    return { lines: (rows || []).length, cost: cost, quote: quote, margin: quote - cost,
+             marginPct: quote > 0 ? Math.round((quote - cost) / quote * 100) : 0 };
+  },
+
+  costOfPhase:   function (phaseId)   { return Scope.totals(Scope.requirements(phaseId)); },
+  costOfSpace:   function (spaceId)   { return Scope.totals(Scope.spaceRequirements(spaceId)); },
+  costOfProject: function (projectId) { return Scope.totals(Scope.projectRequirements(projectId)); },
+
+  nextReqId: function () {
+    var max = 0;
+    db.col(REQS).forEach(function (r) {
+      var n = parseInt(String(r.id || '').replace(/^REQ-?/, ''), 10);
+      if (!isNaN(n) && n > max) max = n;
+    });
+    return 'REQ-' + String(max + 1).padStart(4, '0');
+  },
+
+  saveRequirement: function (rec) { return db.save(REQS, rec); },
+  removeRequirement: function (id) { return db.remove(REQS, id); },
+
+  /**
+   * REPLACE a phase's requirement lines with what the editor returned.
+   *
+   * The platform's line-item repeater hands back only the columns it was given,
+   * so an id cannot survive the round trip. Rather than mint a fresh id for
+   * every line on every save — which would break the engagement → requirement
+   * link the hiring desk needs in slice 4 — ids are reused POSITIONALLY: row 1
+   * keeps row 1's id. Editing a quantity therefore leaves the id alone, and
+   * only genuinely new rows get new ids.
+   */
+  saveRequirements: function (phase, rows) {
+    if (!phase) return [];
+    var existing = Scope.requirements(phase.id);
+    var kept = [];
+
+    (rows || []).forEach(function (row, i) {
+      var item = String(row.item || '').trim();
+      if (!item) return;                                  // a blank line is not a requirement
+      var old = existing[kept.length] || null;
+      var kind = REQ_KINDS.indexOf(row.kind) >= 0 ? row.kind : 'material';
+      var rec = {
+        id: (old && old.id) || Scope.nextReqId(),
+        companyId: CID, project: phase.project, space: phase.space, phase: phase.id,
+        kind: kind,
+        code: row.code || (old && old.code) || phase.code || '',
+        item: item,
+        materialId: kind === 'material' ? (Scope.materialIdOf(item) || null) : null,
+        qty: num(row.qty),
+        unit: row.unit || (kind === 'labour' ? 'man-day' : kind === 'contract' ? 'lot' : ''),
+        unitCost: num(row.unitCost),
+        unitSale: num(row.unitSale),
+        status: REQ_STATUSES.indexOf(row.status) >= 0 ? row.status : ((old && old.status) || 'Planned'),
+        note: row.note || ''
+      };
+      db.save(REQS, rec);
+      kept.push(rec);
+    });
+
+    /* whatever the editor dropped, drop from the store too */
+    existing.slice(kept.length).forEach(function (r) { db.remove(REQS, r.id); });
+    return kept;
+  },
+
+  /* ---- the material listing --------------------------------------------- */
+
+  /** The register, read-only — the picker and the shortfall both need it. */
+  materials: function () {
+    return db.col(MATERIALS).slice().sort(function (a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+  },
+  materialIdOf: function (name) {
+    var m = db.col(MATERIALS).filter(function (x) { return x.name === name; })[0];
+    return m ? m.id : null;
+  },
+  materialByName: function (name) {
+    return db.col(MATERIALS).filter(function (x) { return x.name === name; })[0] || null;
+  },
+
+  /**
+   * MATERIAL DEMAND — every `material` line of a project rolled up per item,
+   * against what the register actually holds.
+   *
+   * `short` is what has to be bought. It is the honest number only because the
+   * roll-up is by ITEM NAME across every phase: asking each phase separately
+   * would order the same plywood four times.
+   */
+  demand: function (projectId) {
+    var bag = {};
+    Scope.projectRequirements(projectId).forEach(function (r) {
+      if (r.kind !== 'material') return;
+      var key = r.item;
+      if (!bag[key]) {
+        bag[key] = { item: r.item, unit: r.unit || '', materialId: r.materialId || null,
+                     qty: 0, committed: 0, cost: 0, quote: 0, phases: 0, spaces: {}, codes: {} };
+      }
+      var row = bag[key];
+      row.qty += num(r.qty);
+      /* Already ordered or already issued is NOT demand. The rod on this villa
+       * was bought and poured months ago; a list that still asked for 9,819 kg
+       * of it would send somebody to buy the building twice. */
+      if (r.status === 'Ordered' || r.status === 'Issued') row.committed += num(r.qty);
+      row.cost += Scope.amount(r);
+      row.quote += Scope.quote(r);
+      row.phases += 1;
+      row.spaces[r.space] = 1;
+      if (r.code) row.codes[r.code] = 1;
+    });
+
+    return Object.keys(bag).map(function (k) {
+      var row = bag[k];
+      var mat = Scope.materialByName(row.item);
+      row.outstanding = Math.max(0, row.qty - row.committed);
+      row.stock = mat ? num(mat.stock) : null;      // null = not a stocked item
+      /* what has to be BOUGHT: what is still to come, less what is on the shelf */
+      row.short = mat ? Math.max(0, row.outstanding - num(mat.stock)) : row.outstanding;
+      row.shortCost = row.short * (mat ? num(mat.unitCost) : (row.qty ? row.cost / row.qty : 0));
+      row.spaceCount = Object.keys(row.spaces).length;
+      row.code = Object.keys(row.codes)[0] || '';
+      row.listed = !!mat;
+      return row;
+    }).sort(function (a, b) { return b.cost - a.cost; });
+  },
+
+  /** The demand screen's header figures. */
+  demandSummary: function (projectId) {
+    var rows = Scope.demand(projectId);
+    var reqs = Scope.projectRequirements(projectId);
+    var short = rows.filter(function (r) { return r.short > 0; });
+    var work = reqs.filter(function (r) { return r.kind !== 'material'; });
+    var stillToBuy = rows.filter(function (r) { return r.outstanding > 0; });
+    return {
+      items: rows.length,
+      lines: reqs.filter(function (r) { return r.kind === 'material'; }).length,
+      cost: rows.reduce(function (t, r) { return t + r.cost; }, 0),
+      openItems: stillToBuy.length,
+      shortItems: short.length,
+      shortCost: short.reduce(function (t, r) { return t + r.shortCost; }, 0),
+      unlisted: rows.filter(function (r) { return !r.listed; }).length,
+      workCost: Scope.totals(work).cost,
+      workLines: work.length
+    };
+  },
+
+  /* ======================================================================
    * DERIVED FIGURES — computed on read, never stored. A stored total is a
    * total that drifts, which is exactly how the Munshi spreadsheet's summary
    * stopped matching its own detail sheets (PROJECT-PROFILE-PLAN §5).
    * ==================================================================== */
 
   /**
-   * A space's progress = phases complete ÷ phases total.
+   * A space's progress — WEIGHTED BY WHAT EACH PHASE IS WORTH (slice 2).
    *
-   * ⚠️ Slice 2 changes this to WEIGHT BY PHASE COST once requirements exist
-   * (a ৳4 lakh wood-work phase should not count the same as a ৳15,000 handover).
-   * It is one function in one file precisely so that change lands in one place.
+   * Counting phases treats a ৳4 lakh wood-work phase and a ৳15,000 handover as
+   * the same thing, which flatters a job that has finished the cheap parts.
+   * Now that a phase carries requirements it carries a cost, so the weight is
+   * that cost. A phase with nothing planned against it still counts as one
+   * unit — otherwise an unpriced phase would silently vanish from the total.
+   *
+   * `done`/`total` stay a COUNT, because "3 of 8 phases" is what a person
+   * wants read back to them; only `pct` is weighted.
    */
   progressOf: function (spaceId) {
-    var list = Scope.phases(spaceId);
-    var done = list.filter(function (p) { return p.status === 'Complete'; }).length;
-    return { done: done, total: list.length,
-             pct: list.length ? Math.round(done / list.length * 100) : 0 };
+    return weightedProgress(Scope.phases(spaceId));
   },
 
   /** A space's status, DERIVED from its phases so the card and the board can
@@ -349,10 +564,7 @@ var Scope = {
 
   /** The same for a whole project — the strip a project profile would show. */
   projectProgress: function (projectId) {
-    var list = Scope.projectPhases(projectId);
-    var done = list.filter(function (p) { return p.status === 'Complete'; }).length;
-    return { done: done, total: list.length,
-             pct: list.length ? Math.round(done / list.length * 100) : 0 };
+    return weightedProgress(Scope.projectPhases(projectId));
   },
 
   /** The header figures every screen in this module quotes. One calculation. */
@@ -376,19 +588,22 @@ var Scope = {
       unassigned: unassigned,
       overdue: overdue,
       area: spaces.reduce(function (t, s) { return t + num(s.area); }, 0),
-      progress: Scope.projectProgress(projectId).pct
+      progress: Scope.projectProgress(projectId).pct,
+      planned: Scope.costOfProject(projectId)
     };
   },
 
   /** One space with everything a card needs, so the screen formats and nothing
    *  more. */
   card: function (space) {
+    var phases = Scope.phases(space.id);
     return {
       rec: space,
-      phases: Scope.phases(space.id),
+      phases: phases,
       progress: Scope.progressOf(space.id),
       status: Scope.statusOf(space.id),
-      unassigned: Scope.phases(space.id).filter(function (p) {
+      planned: Scope.costOfSpace(space.id),
+      unassigned: phases.filter(function (p) {
         return Scope.isUnassigned(p) && Scope.isOpen(p);
       }).length
     };
@@ -496,6 +711,25 @@ var Scope = {
   }
 };
 
+/**
+ * PROGRESS, WEIGHTED BY WHAT EACH PHASE IS WORTH.
+ *
+ * Module-private, and used by both progressOf() and projectProgress() so a
+ * space and its project can never be measured two different ways. A phase with
+ * nothing planned against it weighs 1 — enough to count, not enough to distort
+ * a job where the priced phases are what matter.
+ */
+function weightedProgress(phases) {
+  var done = 0, weightDone = 0, weightAll = 0;
+  phases.forEach(function (p) {
+    var w = Scope.costOfPhase(p.id).cost || 1;
+    weightAll += w;
+    if (p.status === 'Complete') { done++; weightDone += w; }
+  });
+  return { done: done, total: phases.length,
+           pct: weightAll ? Math.round(weightDone / weightAll * 100) : 0 };
+}
+
 /* Exposed READ-ONLY for the verification harness — MODULE-STANDARD §3: a test
  * that re-implements a rule proves nothing, because it passes even when the
  * shipped rule is wrong. Nothing else in this module goes on a global. */
@@ -592,9 +826,10 @@ function muted(text) {
 /* ---- shared chrome -------------------------------------------------------- */
 
 var TAB_COPY = {
-  spaces: ['Spaces', 'The rooms and areas this project is built in — Bed Room, Kitchen, Dining — each with its own phase list.'],
-  phases: ['Phase Board', 'Where every space stands: design, colour, wood work, furniture — and who is responsible for each.'],
-  load:   ['Team Load', 'Who is carrying which phases, across every project — and what nobody has picked up yet.']
+  spaces:    ['Spaces', 'The rooms and areas this project is built in — Bed Room, Kitchen, Dining — each with its own phase list.'],
+  phases:    ['Phase Board', 'Where every space stands: design, colour, wood work, furniture — and who is responsible for each.'],
+  materials: ['Material Demand', 'What this project has to buy — every phase’s material needs, rolled up per item and set against stock.'],
+  load:      ['Team Load', 'Who is carrying which phases, across every project — and what nobody has picked up yet.']
 };
 
 /** Navigate inside this module, carrying the project in the URL. */
@@ -640,7 +875,12 @@ function paintPicker(h, sub, projectId) {
 function paintAction(h, sub, projectId) {
   var btn = act(h, 'new');
   var projects = Scope.projects();
-  if (!canCreate() || sub === 'load' || !projects.length) { btn.parentNode.removeChild(btn); return; }
+  /* Material Demand has no "add" of its own — what it shows is the sum of what
+   * the phases need, and the thing you actually do from it (raise the order)
+   * belongs to Procurement. */
+  if (!canCreate() || sub === 'load' || sub === 'materials' || !projects.length) {
+    btn.parentNode.removeChild(btn); return;
+  }
 
   if (sub === 'phases') {
     btn.innerHTML = '<i class="bi bi-plus-lg"></i> Add Phase';
@@ -673,6 +913,11 @@ function canDelete() { return !EPAL.perm || EPAL.perm.can(CID, 'scope', 'delete'
 var STATUS_TONE = { 'Not started': '', 'Active': 'accent', 'Complete': 'good' };
 var STEP_CLASS  = { 'Not started': '', 'Active': 'is-active', 'Complete': 'is-complete' };
 
+/** Money on a card or a row is COMPACT (৳4.2L): a space card is 245px wide and
+ *  a full figure wraps. The data grid and the drawer footer use the full number,
+ *  because that is where somebody checks it. */
+function money(v) { return ui.money(v, { compact: true }); }
+
 function badgeClass(status) {
   var tone = STATUS_TONE[status];
   return 'badge' + (tone ? ' badge-' + tone : '');
@@ -701,7 +946,8 @@ EPAL.view(ROUTE, {
     page.appendChild(head(sub, projectId));
     page.appendChild(tabs(sub, projectId));
 
-    ({ spaces: spacesScreen, phases: phasesScreen, load: loadScreen }[sub])(page, projectId);
+    ({ spaces: spacesScreen, phases: phasesScreen,
+       materials: materialsScreen, load: loadScreen }[sub])(page, projectId);
 
     ctx.mount.appendChild(page);
   }
@@ -756,6 +1002,7 @@ function spaceCard(host, space) {
   slot(node, 'meta').textContent = space.id +
     (space.area ? ' · ' + ui.num(space.area) + ' sft' : '') +
     ' · ' + c.phases.length + ' phase' + (c.phases.length === 1 ? '' : 's') +
+    (c.planned.cost ? ' · ' + money(c.planned.cost) + ' planned' : '') +
     (c.unassigned ? ' · ' + c.unassigned + ' unassigned' : '');
 
   slot(node, 'kind').textContent = space.kind || 'Common';
@@ -878,9 +1125,13 @@ function spaceBlock(host, space) {
 function phaseRow(list, ph, space, seq) {
   var row = proto(list, 'phase');
 
+  var planned = Scope.costOfPhase(ph.id);
   slot(row, 'seq').textContent = String(seq);
   slot(row, 'name').textContent = ph.name;
-  slot(row, 'code').textContent = ph.code ? Scope.codeLabel(ph.code) : 'No cost code';
+  slot(row, 'code').textContent = (ph.code ? Scope.codeLabel(ph.code) : 'No cost code') +
+    (planned.lines ? ' · ' + planned.lines + ' line' + (planned.lines === 1 ? '' : 's') +
+                     ' · ' + money(planned.cost) + ' planned'
+                   : ' · nothing planned yet');
 
   var owner = slot(row, 'owner');
   if (ph.ownerId) {
@@ -915,6 +1166,122 @@ function phaseRow(list, ph, space, seq) {
   }
 
   return row;
+}
+
+/* ========================================================== SCREEN · DEMAND */
+function materialsScreen(page, projectId) {
+  var s = screen('materials');
+  var rows = projectId ? Scope.demand(projectId) : [];
+  var sum = projectId ? Scope.demandSummary(projectId)
+                      : { items: 0, lines: 0, cost: 0, shortItems: 0, shortCost: 0,
+                          unlisted: 0, workCost: 0, workLines: 0 };
+
+  fillK(s, 'items', ui.num(sum.items));
+  fillK(s, 'itemsFoot', sum.lines + ' line' + (sum.lines === 1 ? '' : 's') + ' · ' +
+    sum.openItems + ' still to come');
+  fillK(s, 'cost', money(sum.cost));
+  fillK(s, 'short', ui.num(sum.shortItems));
+  fillK(s, 'shortCost', money(sum.shortCost));
+  fillK(s, 'work', money(sum.workCost));
+  fillK(s, 'workFoot', sum.workLines + ' line' + (sum.workLines === 1 ? '' : 's') + ' hired, not bought');
+
+  var short = when(s, 'short', sum.shortItems > 0);
+  if (short) fillK(short, 'shortInline', ui.num(sum.shortItems));
+
+  var unlisted = when(s, 'unlisted', sum.unlisted > 0);
+  if (unlisted) fillK(unlisted, 'unlistedInline', ui.num(sum.unlisted));
+
+  var empty = when(s, 'empty', rows.length === 0 && sum.workLines === 0);
+  var body = when(s, 'some', rows.length > 0 || sum.workLines > 0);
+
+  if (empty) {
+    act(empty, 'goBoard').addEventListener('click', function () { go('phases', projectId); });
+  }
+
+  if (body) {
+    fill(body, 'register').appendChild(demandTable(rows));
+    paintWorkLines(fill(body, 'work'), projectId);
+  }
+
+  mountScreen(page, s);
+}
+
+/** The demand grid. Stock and shortfall are the two columns anybody came for. */
+function demandTable(rows) {
+  return EPAL.table({
+    columns: [
+      { key: 'item', label: 'Material',
+        render: function (r) {
+          return '<span class="strong">' + ui.escapeHtml(r.item) + '</span>' +
+            (r.listed ? '' : ' <span class="badge badge-warn">unlisted</span>');
+        } },
+      { key: 'code', label: 'Head', render: function (r) { return r.code ? '<span class="badge">' + ui.escapeHtml(Scope.codeLabel(r.code)) + '</span>' : '—'; } },
+      { key: 'qty', label: 'Needed', num: true,
+        render: function (r) {
+          /* the whole scope on top, what is left to come underneath — a phase
+             that is already built has consumed its share and is not demand */
+          var sub = !r.outstanding ? 'all received'
+                  : r.committed ? ui.num(r.outstanding) + ' still to come'
+                  : 'none ordered yet';
+          return '<span class="num strong">' + ui.num(r.qty) + '</span> <span class="tw-text-ink-mute tw-text-[11px]">' +
+            ui.escapeHtml(r.unit || '') + '</span>' +
+            '<div class="tw-text-ink-mute tw-text-[11px]">' + sub + '</div>';
+        } },
+      { key: 'stock', label: 'In Stock', num: true,
+        render: function (r) {
+          if (r.stock === null) return '<span class="tw-text-ink-mute">not stocked</span>';
+          return '<span class="num">' + ui.num(r.stock) + '</span>';
+        } },
+      { key: 'short', label: 'To Buy', num: true,
+        render: function (r) {
+          if (!r.outstanding) return '<span class="text-good">done</span>';
+          if (!r.short) return '<span class="text-good">covered</span>';
+          return '<span class="num strong text-bad">' + ui.num(r.short) + '</span>';
+        } },
+      { key: 'shortCost', label: 'Cost to Buy', num: true, money: true },
+      { key: 'cost', label: 'Planned Cost', num: true, money: true },
+      { key: 'spaceCount', label: 'Rooms', num: true,
+        render: function (r) { return ui.num(r.spaceCount) + ' <span class="tw-text-ink-mute tw-text-[11px]">' + r.phases + ' phases</span>'; } }
+    ],
+    rows: rows,
+    searchKeys: ['item', 'code', 'unit'],
+    exportName: 'woodart-material-demand.csv',
+    pageSize: 14,
+    empty: { icon: 'boxes', title: 'No material planned', hint: 'Add material lines to a phase and they roll up here.' }
+  }).el;
+}
+
+/** Labour and contracted work, grouped by what it is — the money that is hired
+ *  rather than bought, and which the quotation has to carry too. */
+function paintWorkLines(host, projectId) {
+  var bag = {};
+  Scope.projectRequirements(projectId).forEach(function (r) {
+    if (r.kind === 'material') return;
+    var key = r.kind + '::' + r.item;
+    if (!bag[key]) bag[key] = { kind: r.kind, item: r.item, cost: 0, quote: 0, phases: 0, spaces: {} };
+    bag[key].cost += Scope.amount(r);
+    bag[key].quote += Scope.quote(r);
+    bag[key].phases += 1;
+    bag[key].spaces[r.space] = 1;
+  });
+
+  var rows = Object.keys(bag).map(function (k) { return bag[k]; })
+    .sort(function (a, b) { return b.cost - a.cost; });
+
+  rows.forEach(function (r) {
+    var row = proto(host, 'work');
+    var kind = slot(row, 'kind');
+    kind.textContent = r.kind;
+    kind.className = 'badge' + (r.kind === 'labour' ? ' badge-info' : '');
+    slot(row, 'item').textContent = r.item;
+    slot(row, 'where').textContent = r.phases + ' phase' + (r.phases === 1 ? '' : 's') +
+      ' · ' + Object.keys(r.spaces).length + ' room' + (Object.keys(r.spaces).length === 1 ? '' : 's');
+    slot(row, 'amount').textContent = ui.money(r.cost);
+    slot(row, 'quote').textContent = 'quoted ' + ui.money(r.quote);
+    host.appendChild(row);
+  });
+  dropProtos(host);
+  if (!rows.length) host.appendChild(muted('No labour or contracted work planned yet.'));
 }
 
 /* ============================================================ SCREEN · LOAD */
@@ -1107,12 +1474,21 @@ function editPhase(rec, space) {
   var people = Scope.personOptions();
   var codes = Scope.codeOptions();
 
+  /* The phase's requirement lines, in the shape the repeater understands. The
+   * editor is the whole set for this phase: what comes back replaces what was
+   * there (Scope.saveRequirements), which is why the rows are loaded here. */
+  var reqRows = (rec ? Scope.requirements(rec.id) : []).map(function (r) {
+    return { kind: r.kind, item: r.item, qty: r.qty, unit: r.unit,
+             unitCost: r.unitCost, unitSale: r.unitSale };
+  });
+
   EPAL.formModal({
     title: isNew ? 'Add Phase · ' + space.name : rec.name + ' · ' + space.name,
     icon: 'diagram-3',
-    size: 'md',
-    record: rec || { id: Scope.nextPhaseId(), status: 'Not started', ownerId: '',
-      sort: existing.length + 1, code: '' },
+    size: 'xl',
+    record: rec ? Object.assign({}, rec, { requirements: reqRows })
+                : { id: Scope.nextPhaseId(), status: 'Not started', ownerId: '',
+                    sort: existing.length + 1, code: '', requirements: [] },
     fields: [
       { key: 'id', label: 'Code', type: 'text', required: true, readonly: !isNew, col2: true },
       { key: 'sort', label: 'Order', type: 'number', min: 1, col2: true,
@@ -1129,7 +1505,23 @@ function editPhase(rec, space) {
         hint: 'The shared head this phase’s materials and labour are budgeted under.' },
       { key: 'start', label: 'Start', type: 'date', col2: true },
       { key: 'finish', label: 'Finish by', type: 'date', col2: true },
-      { key: 'note', label: 'Note', type: 'textarea', rows: 2 }
+      { key: 'note', label: 'Note', type: 'textarea', rows: 2 },
+
+      /* WHAT THIS PHASE NEEDS — the owner's second sentence, in the same drawer
+       * as the person responsible, because they are decided together. One line
+       * table, three kinds: what you buy, who you hire, what you contract out.
+       * The repeater is the platform's line-item kit, the same one the estimate
+       * form uses — a form is never hand-rolled here. */
+      { key: 'requirements', type: 'items', label: 'What this phase needs', addLabel: 'Add a line', min: 0,
+        columns: [
+          { key: 'kind', label: 'Kind', type: 'select', options: Scope.reqKinds(), width: '110px' },
+          { key: 'item', label: 'Item / work', type: 'text', width: '2fr' },
+          { key: 'qty', label: 'Qty', type: 'number', width: '80px' },
+          { key: 'unit', label: 'Unit', type: 'text', width: '90px' },
+          { key: 'unitCost', label: 'Unit cost', type: 'money' },
+          { key: 'unitSale', label: 'Quote', type: 'money' }
+        ],
+        footer: requirementsFooter }
     ],
     saveLabel: isNew ? 'Add Phase' : 'Save Changes',
     onSave: function (v) {
@@ -1148,12 +1540,29 @@ function editPhase(rec, space) {
       row.note = v.note || '';
       Scope.savePhase(row);
 
+      /* The phase must exist before its lines can point at it — hence after. */
+      var lines = Scope.saveRequirements(row, v.requirements);
+      var planned = Scope.totals(lines);
+
       ui.toast(row.name + ' · ' + space.name + ' — ' + row.status.toLowerCase() +
-        (row.ownerId ? ' · ' + Scope.personName(row.ownerId) : ' · unassigned'), 'success');
+        (row.ownerId ? ' · ' + Scope.personName(row.ownerId) : ' · unassigned') +
+        (planned.lines ? ' · ' + planned.lines + ' line(s), ' + ui.money(planned.cost) : ''), 'success');
       EPAL.router.render();
       return true;
     }
   });
+}
+
+/** The running total under the requirement lines. Cost is what the job costs
+ *  us, quote is what the client is charged — the margin between them is the
+ *  number this whole hierarchy exists to protect. */
+function requirementsFooter(rows) {
+  var t = Scope.totals((rows || []).map(function (r) {
+    return { qty: r.qty, unitCost: r.unitCost, unitSale: r.unitSale };
+  }));
+  return 'Cost: <strong>' + ui.money(t.cost) + '</strong> · Quote: <strong>' + ui.money(t.quote) +
+    '</strong> · Margin: <strong class="' + (t.margin >= 0 ? 'text-good' : 'text-bad') + '">' +
+    ui.money(t.margin) + '</strong>';
 }
 
 function deletePhase(ph, space) {

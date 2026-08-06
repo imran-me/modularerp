@@ -21,7 +21,8 @@ Plan: [`companies/woodart/PROJECT-BREAKDOWN-PLAN.md`](../../PROJECT-BREAKDOWN-PL
 | Route | Screen | Answers |
 |---|---|---|
 | `#/woodart/scope?p=WAP-102` | **Spaces** | What is this project divided into? A card per space: kind, area, progress, the phase strip in running order. |
-| `#/woodart/scope/phases?p=WAP-102` | **Phase Board** | Where does every space stand, and who is on each phase? Click a row to assign the person, set status and dates. |
+| `#/woodart/scope/phases?p=WAP-101` | **Phase Board** | Where does every space stand, who is on each phase, and what does it need? A row opens the drawer: person, status, dates **and the requirement lines**. |
+| `#/woodart/scope/materials?p=WAP-101` | **Material Demand** | What does this project have to buy? Every phase's material lines rolled up per item — needed · already received · in stock · still to buy — plus the labour and contracts that are hired rather than bought. |
 | `#/woodart/scope/load` | **Team Load** | Who is carrying what, across every project — and what nobody has picked up. Company-wide, so it has no project picker. |
 
 The project lives in the URL as `?p=<id>`, which `platform/core/router.js` already
@@ -34,15 +35,17 @@ parses into `ctx.params` — so a broken-down project is a link you can send to 
 | `wa_spaces` | the project's spaces | `SPC-000` series |
 | `wa_phases` | phases, **per space** | `PHS-0000` series. Re-seeded from the old project-level shape on 2026-08-06 — see `context.md` D2 |
 | `wa_phase_templates` | the phase list per space kind | seeded data, not code: adding a phase type is a row |
+| `wa_requirements` | what each phase needs | `REQ-0000` series. One table, three kinds: `material` · `labour` · `contract` |
 
 **Reads, never writes:** `wa_projects` (owned by `projects`), `wa_cost_codes`
-(the shared budget vocabulary), `employees` (owned by HRM — this module stores
-an id on the phase and nothing else).
+(the shared budget vocabulary), `wa_materials` (owned by `materials` — stock
+levels, for the shortfall), `employees` (owned by HRM — this module stores an id
+on the phase and nothing else).
 
-**No money.** A phase carries no amount in this slice, emits no bridge event and
-posts nothing to the ledger. Materials, labour and contracted work arrive in
-slice 2 as `wa_requirements`, and that is what the quotation builder and the
-cost-control matrix will read.
+**Money is planned here, never posted.** A requirement carries a cost and a
+quote, and they roll up phase → space → project. Nothing in this module emits a
+bridge event or writes to the ledger: the quotation builder (slice 3) turns
+these lines into an estimate, and revenue still posts only from `projects`.
 
 ## The files
 

@@ -1,6 +1,8 @@
 # Woodart · Spaces & Phases (`scope`) — API contract
 
-**Version 1 · frozen 2026-08-06**
+**Version 1.1 · frozen 2026-08-06**
+*(v1 → v1.1: added the Requirement record and its four routes — slice 2. Nothing
+in v1 changed shape.)*
 
 > This document is the agreement between the frontend and the backend. It is
 > split out of `LARAVEL-BLUEPRINT.md` on purpose: the **frontend is built against
@@ -13,11 +15,11 @@
   route below repeats it.
 - **Company scope:** every row is `company_id = 'woodart'`. The service scopes
   reads and stamps writes; a client cannot reach another company's rows.
-- **No money.** Nothing in this module posts to the ledger, raises a payable or
-  emits a bridge event. Amounts arrive in slice 2 (`wa_requirements`).
+- **Money is planned, never posted.** A requirement carries a cost and a quote;
+  nothing here writes to the ledger, raises a payable or emits a bridge event.
 - **Implemented by:** `SpaceController` · `PhaseController` ·
-  `PhaseTemplateController` → one shared `ScopeService` → `SpaceResource` /
-  `PhaseResource`.
+  `RequirementController` · `PhaseTemplateController` → one shared
+  `ScopeService` → `SpaceResource` / `PhaseResource` / `RequirementResource`.
 
 ---
 
@@ -114,6 +116,64 @@ Create or update (upsert by `id`). `project` is derived from `space`.
 
 `204 → no content`
 
+### Requirement  *(added v1.1)*
+
+```json
+{
+  "id":         "REQ-0042",
+  "project":    "WAP-101",
+  "space":      "SPC-001",
+  "phase":      "PHS-0014",
+  "kind":       "material",
+  "code":       "Boards & Ply",
+  "item":       "Marine Plywood 18mm",
+  "materialId": "MAT-001",
+  "qty":        24,
+  "unit":       "sheet",
+  "unitCost":   3610,
+  "unitSale":   4200,
+  "status":     "Planned",
+  "note":       ""
+}
+```
+
+| Field | Type | Rules |
+|---|---|---|
+| `phase` | string | required; `project` and `space` are **derived from it** server-side, never trusted from the client |
+| `kind` | enum | `material · labour · contract`. `labour` carries man-days in `qty` with `unit: "man-day"` until the hiring desk lands |
+| `materialId` | string\|null | set only when `kind = material` **and** `item` exactly matches a register name; `null` otherwise — an unlisted item is kept and counted, never dropped |
+| `qty` · `unitCost` · `unitSale` | number | integer Taka. `amount = qty × unitCost`, `quote = qty × unitSale` — the only two formulas |
+| `status` | enum | `Planned · Quoted · Ordered · Issued` — the line's own life, **not** the phase's |
+
+## GET /requirements?phase={id}
+
+One phase's lines in entry order; `?project={id}` returns the whole project's.
+`200 → { "data": [ { …requirement… } ] }`
+
+## PUT /requirements?phase={id}
+
+**Replaces** that phase's set with the body's lines — the editor always sends the
+whole list. Ids are reused positionally, so an edited line keeps its id and only
+genuinely new rows get new ones; surplus rows are deleted.
+`Body → { "lines": [ { kind*, item*, qty*, unit, unitCost, unitSale, code, status } ] }`
+`200 → { "data": [ { …requirement… } ] }`
+
+## DELETE /requirements/{id}
+
+`204 → no content`
+
+## GET /demand?project={id}
+
+The material listing: every `material` line rolled up per item, against stock.
+`outstanding` excludes what is already `Ordered` or `Issued`; `short` is what
+still has to be bought.
+
+```json
+{ "data": [ { "item":"Rod — BSRM 60 grade", "unit":"kg", "qty":10000, "committed":10000,
+              "outstanding":0, "stock":181, "short":0, "shortCost":0, "cost":850000,
+              "spaceCount":11, "phases":11, "listed":true, "code":"Rod" } ] }
+```
+
 ## GET /templates
 
 The phase list per space kind — seeded data the client applies on space creation.
@@ -157,3 +217,10 @@ unassigned queue.
 6. **`ownerId` is a reference, never a copy.** No employee name, designation or
    department is stored on a phase; an id whose employee no longer exists is
    returned as-is and rendered as an orphan, never blanked.
+7. **Deleting a phase deletes its requirements** (and deleting a space deletes
+   both). A planned line whose phase is gone would still be counted by the
+   demand list and the quotation while being impossible to open.
+8. **Demand nets off what is committed.** `outstanding = qty − (ordered +
+   issued)`, and `short = max(0, outstanding − stock)`. A material already
+   bought and consumed is not demand — asking for it again buys the building
+   twice.

@@ -251,6 +251,21 @@ if (PROBE === 'story') {
       budgetHeads: of('wa_budget_lines','project',ID).length,
       budgetTotal: of('wa_budget_lines','project',ID).reduce(function(s,b){ return s+b.budget; },0),
       stockedLines: boq.filter(function(l){ return names.indexOf(l.item)>=0; }).length,
+      /* slice 2 — what each phase needs, and whether it still equals the BOQ */
+      reqs: of('wa_requirements','project',ID).length,
+      reqMaterial: of('wa_requirements','project',ID).filter(function(r){ return r.kind==='material'; }).length,
+      reqContract: of('wa_requirements','project',ID).filter(function(r){ return r.kind==='contract'; }).length,
+      reqOrphan: of('wa_requirements','project',ID).filter(function(r){
+        return !col('wa_phases').some(function(p){ return p.id===r.phase; }); }).length,
+      reqCost: of('wa_requirements','project',ID).reduce(function(s,r){ return s+r.qty*r.unitCost; },0),
+      /* per code: every taka of a requirement must still be a taka of the BOQ */
+      codeDrift: (function(){
+        var bq = {}, rq = {}, drift = [];
+        boq.forEach(function(l){ bq[l.code] = (bq[l.code]||0) + l.qty*l.unitCost; });
+        of('wa_requirements','project',ID).forEach(function(r){ rq[r.code] = (rq[r.code]||0) + r.qty*r.unitCost; });
+        Object.keys(rq).forEach(function(c){ if (Math.abs(rq[c] - (bq[c]||0)) > 0) drift.push(c+' '+rq[c]+'≠'+(bq[c]||0)); });
+        return drift;
+      })(),
       orders: of('wa_purchases','project',ID).length,
       issued: col('wa_movements').filter(function(m){ return m.ref===ID; }).length,
       jobs: of('wa_production','project',ID).length,
@@ -275,6 +290,8 @@ if (PROBE === 'story') {
     && out.boqLines > 0 && out.boqCoded === out.boqLines
     && out.boqValue > out.boqCost && out.budget === out.boqCost
     && out.budgetHeads > 0 && out.budgetTotal === out.boqCost
+    && out.reqs > 0 && out.reqMaterial > 0 && out.reqContract > 0
+    && out.reqOrphan === 0 && out.codeDrift.length === 0
     && out.orders > 0 && out.issued > 0 && out.jobs > 0 && out.installs > 0
     && out.value === SHEET_CONTRACT && out.billed === SHEET_BILLED
     && out.spent === SHEET_SPENT && out.receivable === SHEET_DUE
@@ -291,6 +308,10 @@ if (PROBE === 'story') {
               ' vs cost ' + money(out.boqCost) + ' · ' + out.stockedLines + ' name a stocked material');
   console.log('  budget               : ' + out.budgetHeads + ' heads · ' + money(out.budgetTotal) +
               (out.budgetTotal === out.boqCost ? '  ✓ equals the BOQ' : '  ← drifts from the BOQ'));
+  console.log('  requirements         : ' + out.reqs + ' lines (' + out.reqMaterial + ' material · ' +
+              out.reqContract + ' contract) · ' + money(out.reqCost) +
+              (out.codeDrift.length ? '  ← drifts from the BOQ: ' + out.codeDrift.join(', ')
+                                    : '  ✓ every head still equals the BOQ'));
   console.log('  supply               : ' + out.orders + ' orders · ' + out.issued + ' stock issues');
   console.log('  make & deliver       : ' + out.jobs + ' workshop jobs · ' + out.installs + ' site visits');
   console.log('  money vs the sheet   : billed ' + money(out.billed) + ' / ' + money(SHEET_BILLED) +

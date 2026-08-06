@@ -55,6 +55,7 @@
 <div data-shell="tabs" class="tab-underline mb-3">
   <button data-tab="spaces">Spaces</button>
   <button data-tab="phases">Phase Board</button>
+  <button data-tab="materials">Material Demand</button>
   <button data-tab="load">Team Load</button>
 </div>
 
@@ -252,7 +253,102 @@
 
 
 <!-- ============================================================================
-     SCREEN 3 · TEAM LOAD — who is carrying what, across every project.
+     SCREEN 3 · MATERIAL DEMAND — what this project has to buy.
+     Every `material` requirement of every phase, rolled up per item and set
+     against what the register actually holds. The roll-up is by ITEM, across
+     phases, on purpose: asking each phase separately would order the same
+     plywood four times.
+     ============================================================================ -->
+<section data-screen="materials">
+
+  <div class="kpi-grid kpi-compact stagger">
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Materials Needed</span><span class="kpi-ico"><i class="bi bi-boxes"></i></span></div>
+      <div class="kpi-value" data-k="items">—</div>
+      <div class="kpi-foot" data-k="itemsFoot"></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Planned Material Cost</span><span class="kpi-ico"><i class="bi bi-cash-stack"></i></span></div>
+      <div class="kpi-value" data-k="cost">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Short of Stock</span><span class="kpi-ico"><i class="bi bi-exclamation-diamond"></i></span></div>
+      <div class="kpi-value" data-k="short">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Cost to Buy</span><span class="kpi-ico"><i class="bi bi-cart-plus"></i></span></div>
+      <div class="kpi-value" data-k="shortCost">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-top"><span class="kpi-label">Labour &amp; Contracts</span><span class="kpi-ico"><i class="bi bi-person-workspace"></i></span></div>
+      <div class="kpi-value" data-k="work">—</div>
+      <div class="kpi-foot" data-k="workFoot"></div>
+    </div>
+  </div>
+
+  <div class="build-banner" data-when="short">
+    <i class="bi bi-cart-plus"></i>
+    <div><strong data-k="shortInline">0</strong> material(s) are planned in greater quantity than the
+      register holds. Raise the order in <a href="#/woodart/procurement">Procurement</a> — this screen
+      says what is needed, it does not buy it.</div>
+  </div>
+
+  <!-- An item nobody stocks is COUNTED, never dropped: the house rule for
+       anything unlisted. It is normal here — a villa buys tiles per job. -->
+  <div class="build-banner" data-when="unlisted">
+    <i class="bi bi-info-circle"></i>
+    <div><strong data-k="unlistedInline">0</strong> planned item(s) are not in the material register.
+      They are counted here as demand with no stock to net off — which is what "bought per job"
+      looks like.</div>
+  </div>
+
+  <div class="empty-state" data-when="empty">
+    <i class="bi bi-clipboard-x"></i>
+    <h3>Nothing planned yet</h3>
+    <p class="tw-text-ink-dim">Open a phase on the board and add what it needs — material, labour or
+      contracted work. It rolls up here, and into the quotation.</p>
+    <button class="btn btn-primary" data-act="goBoard"><i class="bi bi-diagram-3"></i> Open the phase board</button>
+  </div>
+
+  <div data-when="some">
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-list-columns-reverse"></i> Material Demand</h3>
+        <span class="card-sub">Every material this project's phases need, against stock — dearest first</span>
+      </div>
+      <div class="card-body" data-fill="register"></div>
+    </div>
+
+    <div class="section-label">LABOUR &amp; CONTRACTED WORK</div>
+    <div class="card">
+      <div class="card-head">
+        <h3><i class="bi bi-person-workspace"></i> Work, Not Material</h3>
+        <span class="card-sub">The lines you hire rather than buy — they price into the same quotation</span>
+      </div>
+      <div class="card-body">
+        <div class="data-list" data-fill="work">
+          <!-- PROTOTYPE ROW — one per work line, grouped by item. -->
+          <div class="data-row" data-proto="work" hidden>
+            <span class="badge" data-slot="kind"></span>
+            <div class="tw-flex-1">
+              <div class="tw-font-semibold" data-slot="item"></div>
+              <div class="tw-text-ink-mute tw-text-[11px]" data-slot="where"></div>
+            </div>
+            <div class="tw-ml-auto tw-text-right">
+              <div class="num tw-font-semibold" data-slot="amount"></div>
+              <div class="tw-text-ink-mute tw-text-[11px]" data-slot="quote"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ============================================================================
+     SCREEN 4 · TEAM LOAD — who is carrying what, across every project.
      Deliberately NOT scoped to one project: the question "is Sumaiya free?"
      is not answerable one project at a time, so the picker is removed here.
      ============================================================================ -->

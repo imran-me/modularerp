@@ -9,8 +9,8 @@ yet) and `ROOT-MAP.md` (the phase model).
 > | Slice | State |
 > |---|---|
 > | **1 · `scope` module — spaces, phase board, assignment** | ✅ **built** — `companies/woodart/modules/scope/` · sweep 257/257 both themes · probe `tools/verify/scope.mjs` 20/20 |
-> | 2 · `wa_requirements` + Material Demand | ⬜ next |
-> | 3 · Estimates → Quotation Builder | ⬜ |
+> | **2 · `wa_requirements` + Material Demand** | ✅ **built** — per-phase material · labour · contract lines, the drawer's line editor, `#/woodart/scope/materials` · sweep 258/258 · probe 34/34 |
+> | 3 · Estimates → Quotation Builder | ⬜ next |
 > | 4 · `contractors` module — hiring + labour estimate | ⬜ |
 > | 5 · budget lines derived; committed cost | ⬜ |
 > | 6 · Laravel slice per module | ⬜ (contracts frozen in each `backend/endpoints.md`) |

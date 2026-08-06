@@ -63,8 +63,11 @@ var EPAL = window.EPAL, db = EPAL.db;
 var SPACES    = 'wa_spaces';           /* ← the one place these collections   */
 var PHASES    = 'wa_phases';           /*   are named. Everything else in the */
 var TEMPLATES = 'wa_phase_templates';  /*   module goes through Scope.*       */
+var REQS      = 'wa_requirements';     /*   what each phase needs (slice 2)   */
 var PROJECTS  = 'wa_projects';         /* read-only: owned by `projects`      */
 var CODES     = 'wa_cost_codes';       /* read-only: the shared cost-code list */
+var MATERIALS = 'wa_materials';        /* read-only: owned by `materials` —
+                                          stock levels, for the shortfall     */
 
 var CID   = 'woodart';
 var TODAY = '2026-07-05';              /* the demo clock — same anchor as every module */
@@ -78,6 +81,25 @@ var KINDS = ['Bedroom', 'Kitchen', 'Dining', 'Living', 'Bath', 'Balcony',
 /* A phase's terminal state is `Complete` (NAMING-AND-TERMINOLOGY §2: "open"
  * means one thing per module — here it means "not Complete"). */
 var STATUSES = ['Not started', 'Active', 'Complete'];
+
+/* WHAT A PHASE CAN NEED. One line table, three kinds — the decision the whole
+ * of slice 2 hangs off (PROJECT-BREAKDOWN-PLAN §4.3): the quotation builder,
+ * the material listing, the labour estimate and the cost matrix are then ONE
+ * query with a filter, instead of four features that can disagree.
+ *
+ *   material  qty of a real material          24 sheet × ৳3,610
+ *   labour    man-days at a day rate          (2 men × 6 days) × ৳900
+ *   contract  work bought whole, as a lump    1 lot × ৳3,41,000
+ *
+ * `labour` keeps men and days in the UNIT ('man-day') and the quantity for now;
+ * the hiring desk that needs them as separate fields is slice 4, and splitting
+ * them before it exists would be a column nothing reads. */
+var REQ_KINDS = ['material', 'labour', 'contract'];
+
+/* A requirement's life: planned → quoted to the client → ordered from a vendor →
+ * issued to the job. It is deliberately NOT the phase's status: a phase can be
+ * running while half its material is still on order. */
+var REQ_STATUSES = ['Planned', 'Quoted', 'Ordered', 'Issued'];
 
 /* The fallback phase list for a space kind with no seeded template. Never
  * silently empty: a space with no phases cannot be planned, assigned or costed,
@@ -191,7 +213,10 @@ var Scope = {
    * material's movement history.
    */
   removeSpace: function (id) {
-    Scope.phases(id).forEach(function (ph) { db.remove(PHASES, ph.id); });
+    Scope.phases(id).forEach(function (ph) { Scope.removePhase(ph.id); });
+    /* belt and braces: a line whose phase was already gone would otherwise
+     * survive its own room and keep counting in the project's demand */
+    Scope.spaceRequirements(id).forEach(function (r) { db.remove(REQS, r.id); });
     return db.remove(SPACES, id);
   },
 
@@ -230,7 +255,14 @@ var Scope = {
   },
 
   savePhase: function (rec) { return db.save(PHASES, rec); },
-  removePhase: function (id) { return db.remove(PHASES, id); },
+
+  /** Deleting a phase takes its requirements with it — a planned line whose
+   *  phase is gone would still be counted by the demand list and the quotation
+   *  while being impossible to open or edit. Same rule as space → phases. */
+  removePhase: function (id) {
+    Scope.requirements(id).forEach(function (r) { db.remove(REQS, r.id); });
+    return db.remove(PHASES, id);
+  },
 
   /** THE open rule, defined once: a phase is open until it is Complete. */
   isOpen: function (ph) { return (ph && ph.status) !== 'Complete'; },
@@ -298,23 +330,206 @@ var Scope = {
   },
 
   /* ======================================================================
+   * REQUIREMENTS — what a phase needs: material, labour or contracted work.
+   * The owner's sentence this implements: "what materials will be needed in
+   * that specific phase — that materials will be added to the master quotation
+   * builder or material listing."
+   * ==================================================================== */
+
+  reqKinds:    function () { return REQ_KINDS.slice(); },
+  reqStatuses: function () { return REQ_STATUSES.slice(); },
+
+  /** One phase's lines, in entry order. */
+  requirements: function (phaseId) {
+    return db.col(REQS).filter(function (r) { return mine(r) && r.phase === phaseId; });
+  },
+
+  spaceRequirements: function (spaceId) {
+    return db.col(REQS).filter(function (r) { return mine(r) && r.space === spaceId; });
+  },
+
+  projectRequirements: function (projectId) {
+    return db.col(REQS).filter(function (r) { return mine(r) && r.project === projectId; });
+  },
+
+  requirement: function (id) {
+    return db.col(REQS).filter(function (r) { return r.id === id; })[0] || null;
+  },
+
+  /** THE line formulas, defined once. Everything downstream — the phase drawer's
+   *  footer, the space card, the demand list, the quotation builder in slice 3 —
+   *  totals with these two and nothing else. */
+  amount: function (r) { return num(r.qty) * num(r.unitCost); },
+  quote:  function (r) { return num(r.qty) * num(r.unitSale); },
+
+  /** Cost and quote of any set of lines, plus its margin. */
+  totals: function (rows) {
+    var cost = 0, quote = 0;
+    (rows || []).forEach(function (r) { cost += Scope.amount(r); quote += Scope.quote(r); });
+    return { lines: (rows || []).length, cost: cost, quote: quote, margin: quote - cost,
+             marginPct: quote > 0 ? Math.round((quote - cost) / quote * 100) : 0 };
+  },
+
+  costOfPhase:   function (phaseId)   { return Scope.totals(Scope.requirements(phaseId)); },
+  costOfSpace:   function (spaceId)   { return Scope.totals(Scope.spaceRequirements(spaceId)); },
+  costOfProject: function (projectId) { return Scope.totals(Scope.projectRequirements(projectId)); },
+
+  nextReqId: function () {
+    var max = 0;
+    db.col(REQS).forEach(function (r) {
+      var n = parseInt(String(r.id || '').replace(/^REQ-?/, ''), 10);
+      if (!isNaN(n) && n > max) max = n;
+    });
+    return 'REQ-' + String(max + 1).padStart(4, '0');
+  },
+
+  saveRequirement: function (rec) { return db.save(REQS, rec); },
+  removeRequirement: function (id) { return db.remove(REQS, id); },
+
+  /**
+   * REPLACE a phase's requirement lines with what the editor returned.
+   *
+   * The platform's line-item repeater hands back only the columns it was given,
+   * so an id cannot survive the round trip. Rather than mint a fresh id for
+   * every line on every save — which would break the engagement → requirement
+   * link the hiring desk needs in slice 4 — ids are reused POSITIONALLY: row 1
+   * keeps row 1's id. Editing a quantity therefore leaves the id alone, and
+   * only genuinely new rows get new ids.
+   */
+  saveRequirements: function (phase, rows) {
+    if (!phase) return [];
+    var existing = Scope.requirements(phase.id);
+    var kept = [];
+
+    (rows || []).forEach(function (row, i) {
+      var item = String(row.item || '').trim();
+      if (!item) return;                                  // a blank line is not a requirement
+      var old = existing[kept.length] || null;
+      var kind = REQ_KINDS.indexOf(row.kind) >= 0 ? row.kind : 'material';
+      var rec = {
+        id: (old && old.id) || Scope.nextReqId(),
+        companyId: CID, project: phase.project, space: phase.space, phase: phase.id,
+        kind: kind,
+        code: row.code || (old && old.code) || phase.code || '',
+        item: item,
+        materialId: kind === 'material' ? (Scope.materialIdOf(item) || null) : null,
+        qty: num(row.qty),
+        unit: row.unit || (kind === 'labour' ? 'man-day' : kind === 'contract' ? 'lot' : ''),
+        unitCost: num(row.unitCost),
+        unitSale: num(row.unitSale),
+        status: REQ_STATUSES.indexOf(row.status) >= 0 ? row.status : ((old && old.status) || 'Planned'),
+        note: row.note || ''
+      };
+      db.save(REQS, rec);
+      kept.push(rec);
+    });
+
+    /* whatever the editor dropped, drop from the store too */
+    existing.slice(kept.length).forEach(function (r) { db.remove(REQS, r.id); });
+    return kept;
+  },
+
+  /* ---- the material listing --------------------------------------------- */
+
+  /** The register, read-only — the picker and the shortfall both need it. */
+  materials: function () {
+    return db.col(MATERIALS).slice().sort(function (a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+  },
+  materialIdOf: function (name) {
+    var m = db.col(MATERIALS).filter(function (x) { return x.name === name; })[0];
+    return m ? m.id : null;
+  },
+  materialByName: function (name) {
+    return db.col(MATERIALS).filter(function (x) { return x.name === name; })[0] || null;
+  },
+
+  /**
+   * MATERIAL DEMAND — every `material` line of a project rolled up per item,
+   * against what the register actually holds.
+   *
+   * `short` is what has to be bought. It is the honest number only because the
+   * roll-up is by ITEM NAME across every phase: asking each phase separately
+   * would order the same plywood four times.
+   */
+  demand: function (projectId) {
+    var bag = {};
+    Scope.projectRequirements(projectId).forEach(function (r) {
+      if (r.kind !== 'material') return;
+      var key = r.item;
+      if (!bag[key]) {
+        bag[key] = { item: r.item, unit: r.unit || '', materialId: r.materialId || null,
+                     qty: 0, committed: 0, cost: 0, quote: 0, phases: 0, spaces: {}, codes: {} };
+      }
+      var row = bag[key];
+      row.qty += num(r.qty);
+      /* Already ordered or already issued is NOT demand. The rod on this villa
+       * was bought and poured months ago; a list that still asked for 9,819 kg
+       * of it would send somebody to buy the building twice. */
+      if (r.status === 'Ordered' || r.status === 'Issued') row.committed += num(r.qty);
+      row.cost += Scope.amount(r);
+      row.quote += Scope.quote(r);
+      row.phases += 1;
+      row.spaces[r.space] = 1;
+      if (r.code) row.codes[r.code] = 1;
+    });
+
+    return Object.keys(bag).map(function (k) {
+      var row = bag[k];
+      var mat = Scope.materialByName(row.item);
+      row.outstanding = Math.max(0, row.qty - row.committed);
+      row.stock = mat ? num(mat.stock) : null;      // null = not a stocked item
+      /* what has to be BOUGHT: what is still to come, less what is on the shelf */
+      row.short = mat ? Math.max(0, row.outstanding - num(mat.stock)) : row.outstanding;
+      row.shortCost = row.short * (mat ? num(mat.unitCost) : (row.qty ? row.cost / row.qty : 0));
+      row.spaceCount = Object.keys(row.spaces).length;
+      row.code = Object.keys(row.codes)[0] || '';
+      row.listed = !!mat;
+      return row;
+    }).sort(function (a, b) { return b.cost - a.cost; });
+  },
+
+  /** The demand screen's header figures. */
+  demandSummary: function (projectId) {
+    var rows = Scope.demand(projectId);
+    var reqs = Scope.projectRequirements(projectId);
+    var short = rows.filter(function (r) { return r.short > 0; });
+    var work = reqs.filter(function (r) { return r.kind !== 'material'; });
+    var stillToBuy = rows.filter(function (r) { return r.outstanding > 0; });
+    return {
+      items: rows.length,
+      lines: reqs.filter(function (r) { return r.kind === 'material'; }).length,
+      cost: rows.reduce(function (t, r) { return t + r.cost; }, 0),
+      openItems: stillToBuy.length,
+      shortItems: short.length,
+      shortCost: short.reduce(function (t, r) { return t + r.shortCost; }, 0),
+      unlisted: rows.filter(function (r) { return !r.listed; }).length,
+      workCost: Scope.totals(work).cost,
+      workLines: work.length
+    };
+  },
+
+  /* ======================================================================
    * DERIVED FIGURES — computed on read, never stored. A stored total is a
    * total that drifts, which is exactly how the Munshi spreadsheet's summary
    * stopped matching its own detail sheets (PROJECT-PROFILE-PLAN §5).
    * ==================================================================== */
 
   /**
-   * A space's progress = phases complete ÷ phases total.
+   * A space's progress — WEIGHTED BY WHAT EACH PHASE IS WORTH (slice 2).
    *
-   * ⚠️ Slice 2 changes this to WEIGHT BY PHASE COST once requirements exist
-   * (a ৳4 lakh wood-work phase should not count the same as a ৳15,000 handover).
-   * It is one function in one file precisely so that change lands in one place.
+   * Counting phases treats a ৳4 lakh wood-work phase and a ৳15,000 handover as
+   * the same thing, which flatters a job that has finished the cheap parts.
+   * Now that a phase carries requirements it carries a cost, so the weight is
+   * that cost. A phase with nothing planned against it still counts as one
+   * unit — otherwise an unpriced phase would silently vanish from the total.
+   *
+   * `done`/`total` stay a COUNT, because "3 of 8 phases" is what a person
+   * wants read back to them; only `pct` is weighted.
    */
   progressOf: function (spaceId) {
-    var list = Scope.phases(spaceId);
-    var done = list.filter(function (p) { return p.status === 'Complete'; }).length;
-    return { done: done, total: list.length,
-             pct: list.length ? Math.round(done / list.length * 100) : 0 };
+    return weightedProgress(Scope.phases(spaceId));
   },
 
   /** A space's status, DERIVED from its phases so the card and the board can
@@ -329,10 +544,7 @@ var Scope = {
 
   /** The same for a whole project — the strip a project profile would show. */
   projectProgress: function (projectId) {
-    var list = Scope.projectPhases(projectId);
-    var done = list.filter(function (p) { return p.status === 'Complete'; }).length;
-    return { done: done, total: list.length,
-             pct: list.length ? Math.round(done / list.length * 100) : 0 };
+    return weightedProgress(Scope.projectPhases(projectId));
   },
 
   /** The header figures every screen in this module quotes. One calculation. */
@@ -356,19 +568,22 @@ var Scope = {
       unassigned: unassigned,
       overdue: overdue,
       area: spaces.reduce(function (t, s) { return t + num(s.area); }, 0),
-      progress: Scope.projectProgress(projectId).pct
+      progress: Scope.projectProgress(projectId).pct,
+      planned: Scope.costOfProject(projectId)
     };
   },
 
   /** One space with everything a card needs, so the screen formats and nothing
    *  more. */
   card: function (space) {
+    var phases = Scope.phases(space.id);
     return {
       rec: space,
-      phases: Scope.phases(space.id),
+      phases: phases,
       progress: Scope.progressOf(space.id),
       status: Scope.statusOf(space.id),
-      unassigned: Scope.phases(space.id).filter(function (p) {
+      planned: Scope.costOfSpace(space.id),
+      unassigned: phases.filter(function (p) {
         return Scope.isUnassigned(p) && Scope.isOpen(p);
       }).length
     };
@@ -475,6 +690,25 @@ var Scope = {
     return c ? (c.label || c.code || c.id) : id;
   }
 };
+
+/**
+ * PROGRESS, WEIGHTED BY WHAT EACH PHASE IS WORTH.
+ *
+ * Module-private, and used by both progressOf() and projectProgress() so a
+ * space and its project can never be measured two different ways. A phase with
+ * nothing planned against it weighs 1 — enough to count, not enough to distort
+ * a job where the priced phases are what matter.
+ */
+function weightedProgress(phases) {
+  var done = 0, weightDone = 0, weightAll = 0;
+  phases.forEach(function (p) {
+    var w = Scope.costOfPhase(p.id).cost || 1;
+    weightAll += w;
+    if (p.status === 'Complete') { done++; weightDone += w; }
+  });
+  return { done: done, total: phases.length,
+           pct: weightAll ? Math.round(weightDone / weightAll * 100) : 0 };
+}
 
 /* Exposed READ-ONLY for the verification harness — MODULE-STANDARD §3: a test
  * that re-implements a rule proves nothing, because it passes even when the

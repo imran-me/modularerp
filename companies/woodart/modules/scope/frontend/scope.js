@@ -88,9 +88,10 @@ function muted(text) {
 /* ---- shared chrome -------------------------------------------------------- */
 
 var TAB_COPY = {
-  spaces: ['Spaces', 'The rooms and areas this project is built in — Bed Room, Kitchen, Dining — each with its own phase list.'],
-  phases: ['Phase Board', 'Where every space stands: design, colour, wood work, furniture — and who is responsible for each.'],
-  load:   ['Team Load', 'Who is carrying which phases, across every project — and what nobody has picked up yet.']
+  spaces:    ['Spaces', 'The rooms and areas this project is built in — Bed Room, Kitchen, Dining — each with its own phase list.'],
+  phases:    ['Phase Board', 'Where every space stands: design, colour, wood work, furniture — and who is responsible for each.'],
+  materials: ['Material Demand', 'What this project has to buy — every phase’s material needs, rolled up per item and set against stock.'],
+  load:      ['Team Load', 'Who is carrying which phases, across every project — and what nobody has picked up yet.']
 };
 
 /** Navigate inside this module, carrying the project in the URL. */
@@ -136,7 +137,12 @@ function paintPicker(h, sub, projectId) {
 function paintAction(h, sub, projectId) {
   var btn = act(h, 'new');
   var projects = Scope.projects();
-  if (!canCreate() || sub === 'load' || !projects.length) { btn.parentNode.removeChild(btn); return; }
+  /* Material Demand has no "add" of its own — what it shows is the sum of what
+   * the phases need, and the thing you actually do from it (raise the order)
+   * belongs to Procurement. */
+  if (!canCreate() || sub === 'load' || sub === 'materials' || !projects.length) {
+    btn.parentNode.removeChild(btn); return;
+  }
 
   if (sub === 'phases') {
     btn.innerHTML = '<i class="bi bi-plus-lg"></i> Add Phase';
@@ -169,6 +175,11 @@ function canDelete() { return !EPAL.perm || EPAL.perm.can(CID, 'scope', 'delete'
 var STATUS_TONE = { 'Not started': '', 'Active': 'accent', 'Complete': 'good' };
 var STEP_CLASS  = { 'Not started': '', 'Active': 'is-active', 'Complete': 'is-complete' };
 
+/** Money on a card or a row is COMPACT (৳4.2L): a space card is 245px wide and
+ *  a full figure wraps. The data grid and the drawer footer use the full number,
+ *  because that is where somebody checks it. */
+function money(v) { return ui.money(v, { compact: true }); }
+
 function badgeClass(status) {
   var tone = STATUS_TONE[status];
   return 'badge' + (tone ? ' badge-' + tone : '');
@@ -197,7 +208,8 @@ EPAL.view(ROUTE, {
     page.appendChild(head(sub, projectId));
     page.appendChild(tabs(sub, projectId));
 
-    ({ spaces: spacesScreen, phases: phasesScreen, load: loadScreen }[sub])(page, projectId);
+    ({ spaces: spacesScreen, phases: phasesScreen,
+       materials: materialsScreen, load: loadScreen }[sub])(page, projectId);
 
     ctx.mount.appendChild(page);
   }
@@ -252,6 +264,7 @@ function spaceCard(host, space) {
   slot(node, 'meta').textContent = space.id +
     (space.area ? ' · ' + ui.num(space.area) + ' sft' : '') +
     ' · ' + c.phases.length + ' phase' + (c.phases.length === 1 ? '' : 's') +
+    (c.planned.cost ? ' · ' + money(c.planned.cost) + ' planned' : '') +
     (c.unassigned ? ' · ' + c.unassigned + ' unassigned' : '');
 
   slot(node, 'kind').textContent = space.kind || 'Common';
@@ -374,9 +387,13 @@ function spaceBlock(host, space) {
 function phaseRow(list, ph, space, seq) {
   var row = proto(list, 'phase');
 
+  var planned = Scope.costOfPhase(ph.id);
   slot(row, 'seq').textContent = String(seq);
   slot(row, 'name').textContent = ph.name;
-  slot(row, 'code').textContent = ph.code ? Scope.codeLabel(ph.code) : 'No cost code';
+  slot(row, 'code').textContent = (ph.code ? Scope.codeLabel(ph.code) : 'No cost code') +
+    (planned.lines ? ' · ' + planned.lines + ' line' + (planned.lines === 1 ? '' : 's') +
+                     ' · ' + money(planned.cost) + ' planned'
+                   : ' · nothing planned yet');
 
   var owner = slot(row, 'owner');
   if (ph.ownerId) {
@@ -411,6 +428,122 @@ function phaseRow(list, ph, space, seq) {
   }
 
   return row;
+}
+
+/* ========================================================== SCREEN · DEMAND */
+function materialsScreen(page, projectId) {
+  var s = screen('materials');
+  var rows = projectId ? Scope.demand(projectId) : [];
+  var sum = projectId ? Scope.demandSummary(projectId)
+                      : { items: 0, lines: 0, cost: 0, shortItems: 0, shortCost: 0,
+                          unlisted: 0, workCost: 0, workLines: 0 };
+
+  fillK(s, 'items', ui.num(sum.items));
+  fillK(s, 'itemsFoot', sum.lines + ' line' + (sum.lines === 1 ? '' : 's') + ' · ' +
+    sum.openItems + ' still to come');
+  fillK(s, 'cost', money(sum.cost));
+  fillK(s, 'short', ui.num(sum.shortItems));
+  fillK(s, 'shortCost', money(sum.shortCost));
+  fillK(s, 'work', money(sum.workCost));
+  fillK(s, 'workFoot', sum.workLines + ' line' + (sum.workLines === 1 ? '' : 's') + ' hired, not bought');
+
+  var short = when(s, 'short', sum.shortItems > 0);
+  if (short) fillK(short, 'shortInline', ui.num(sum.shortItems));
+
+  var unlisted = when(s, 'unlisted', sum.unlisted > 0);
+  if (unlisted) fillK(unlisted, 'unlistedInline', ui.num(sum.unlisted));
+
+  var empty = when(s, 'empty', rows.length === 0 && sum.workLines === 0);
+  var body = when(s, 'some', rows.length > 0 || sum.workLines > 0);
+
+  if (empty) {
+    act(empty, 'goBoard').addEventListener('click', function () { go('phases', projectId); });
+  }
+
+  if (body) {
+    fill(body, 'register').appendChild(demandTable(rows));
+    paintWorkLines(fill(body, 'work'), projectId);
+  }
+
+  mountScreen(page, s);
+}
+
+/** The demand grid. Stock and shortfall are the two columns anybody came for. */
+function demandTable(rows) {
+  return EPAL.table({
+    columns: [
+      { key: 'item', label: 'Material',
+        render: function (r) {
+          return '<span class="strong">' + ui.escapeHtml(r.item) + '</span>' +
+            (r.listed ? '' : ' <span class="badge badge-warn">unlisted</span>');
+        } },
+      { key: 'code', label: 'Head', render: function (r) { return r.code ? '<span class="badge">' + ui.escapeHtml(Scope.codeLabel(r.code)) + '</span>' : '—'; } },
+      { key: 'qty', label: 'Needed', num: true,
+        render: function (r) {
+          /* the whole scope on top, what is left to come underneath — a phase
+             that is already built has consumed its share and is not demand */
+          var sub = !r.outstanding ? 'all received'
+                  : r.committed ? ui.num(r.outstanding) + ' still to come'
+                  : 'none ordered yet';
+          return '<span class="num strong">' + ui.num(r.qty) + '</span> <span class="tw-text-ink-mute tw-text-[11px]">' +
+            ui.escapeHtml(r.unit || '') + '</span>' +
+            '<div class="tw-text-ink-mute tw-text-[11px]">' + sub + '</div>';
+        } },
+      { key: 'stock', label: 'In Stock', num: true,
+        render: function (r) {
+          if (r.stock === null) return '<span class="tw-text-ink-mute">not stocked</span>';
+          return '<span class="num">' + ui.num(r.stock) + '</span>';
+        } },
+      { key: 'short', label: 'To Buy', num: true,
+        render: function (r) {
+          if (!r.outstanding) return '<span class="text-good">done</span>';
+          if (!r.short) return '<span class="text-good">covered</span>';
+          return '<span class="num strong text-bad">' + ui.num(r.short) + '</span>';
+        } },
+      { key: 'shortCost', label: 'Cost to Buy', num: true, money: true },
+      { key: 'cost', label: 'Planned Cost', num: true, money: true },
+      { key: 'spaceCount', label: 'Rooms', num: true,
+        render: function (r) { return ui.num(r.spaceCount) + ' <span class="tw-text-ink-mute tw-text-[11px]">' + r.phases + ' phases</span>'; } }
+    ],
+    rows: rows,
+    searchKeys: ['item', 'code', 'unit'],
+    exportName: 'woodart-material-demand.csv',
+    pageSize: 14,
+    empty: { icon: 'boxes', title: 'No material planned', hint: 'Add material lines to a phase and they roll up here.' }
+  }).el;
+}
+
+/** Labour and contracted work, grouped by what it is — the money that is hired
+ *  rather than bought, and which the quotation has to carry too. */
+function paintWorkLines(host, projectId) {
+  var bag = {};
+  Scope.projectRequirements(projectId).forEach(function (r) {
+    if (r.kind === 'material') return;
+    var key = r.kind + '::' + r.item;
+    if (!bag[key]) bag[key] = { kind: r.kind, item: r.item, cost: 0, quote: 0, phases: 0, spaces: {} };
+    bag[key].cost += Scope.amount(r);
+    bag[key].quote += Scope.quote(r);
+    bag[key].phases += 1;
+    bag[key].spaces[r.space] = 1;
+  });
+
+  var rows = Object.keys(bag).map(function (k) { return bag[k]; })
+    .sort(function (a, b) { return b.cost - a.cost; });
+
+  rows.forEach(function (r) {
+    var row = proto(host, 'work');
+    var kind = slot(row, 'kind');
+    kind.textContent = r.kind;
+    kind.className = 'badge' + (r.kind === 'labour' ? ' badge-info' : '');
+    slot(row, 'item').textContent = r.item;
+    slot(row, 'where').textContent = r.phases + ' phase' + (r.phases === 1 ? '' : 's') +
+      ' · ' + Object.keys(r.spaces).length + ' room' + (Object.keys(r.spaces).length === 1 ? '' : 's');
+    slot(row, 'amount').textContent = ui.money(r.cost);
+    slot(row, 'quote').textContent = 'quoted ' + ui.money(r.quote);
+    host.appendChild(row);
+  });
+  dropProtos(host);
+  if (!rows.length) host.appendChild(muted('No labour or contracted work planned yet.'));
 }
 
 /* ============================================================ SCREEN · LOAD */
@@ -603,12 +736,21 @@ function editPhase(rec, space) {
   var people = Scope.personOptions();
   var codes = Scope.codeOptions();
 
+  /* The phase's requirement lines, in the shape the repeater understands. The
+   * editor is the whole set for this phase: what comes back replaces what was
+   * there (Scope.saveRequirements), which is why the rows are loaded here. */
+  var reqRows = (rec ? Scope.requirements(rec.id) : []).map(function (r) {
+    return { kind: r.kind, item: r.item, qty: r.qty, unit: r.unit,
+             unitCost: r.unitCost, unitSale: r.unitSale };
+  });
+
   EPAL.formModal({
     title: isNew ? 'Add Phase · ' + space.name : rec.name + ' · ' + space.name,
     icon: 'diagram-3',
-    size: 'md',
-    record: rec || { id: Scope.nextPhaseId(), status: 'Not started', ownerId: '',
-      sort: existing.length + 1, code: '' },
+    size: 'xl',
+    record: rec ? Object.assign({}, rec, { requirements: reqRows })
+                : { id: Scope.nextPhaseId(), status: 'Not started', ownerId: '',
+                    sort: existing.length + 1, code: '', requirements: [] },
     fields: [
       { key: 'id', label: 'Code', type: 'text', required: true, readonly: !isNew, col2: true },
       { key: 'sort', label: 'Order', type: 'number', min: 1, col2: true,
@@ -625,7 +767,23 @@ function editPhase(rec, space) {
         hint: 'The shared head this phase’s materials and labour are budgeted under.' },
       { key: 'start', label: 'Start', type: 'date', col2: true },
       { key: 'finish', label: 'Finish by', type: 'date', col2: true },
-      { key: 'note', label: 'Note', type: 'textarea', rows: 2 }
+      { key: 'note', label: 'Note', type: 'textarea', rows: 2 },
+
+      /* WHAT THIS PHASE NEEDS — the owner's second sentence, in the same drawer
+       * as the person responsible, because they are decided together. One line
+       * table, three kinds: what you buy, who you hire, what you contract out.
+       * The repeater is the platform's line-item kit, the same one the estimate
+       * form uses — a form is never hand-rolled here. */
+      { key: 'requirements', type: 'items', label: 'What this phase needs', addLabel: 'Add a line', min: 0,
+        columns: [
+          { key: 'kind', label: 'Kind', type: 'select', options: Scope.reqKinds(), width: '110px' },
+          { key: 'item', label: 'Item / work', type: 'text', width: '2fr' },
+          { key: 'qty', label: 'Qty', type: 'number', width: '80px' },
+          { key: 'unit', label: 'Unit', type: 'text', width: '90px' },
+          { key: 'unitCost', label: 'Unit cost', type: 'money' },
+          { key: 'unitSale', label: 'Quote', type: 'money' }
+        ],
+        footer: requirementsFooter }
     ],
     saveLabel: isNew ? 'Add Phase' : 'Save Changes',
     onSave: function (v) {
@@ -644,12 +802,29 @@ function editPhase(rec, space) {
       row.note = v.note || '';
       Scope.savePhase(row);
 
+      /* The phase must exist before its lines can point at it — hence after. */
+      var lines = Scope.saveRequirements(row, v.requirements);
+      var planned = Scope.totals(lines);
+
       ui.toast(row.name + ' · ' + space.name + ' — ' + row.status.toLowerCase() +
-        (row.ownerId ? ' · ' + Scope.personName(row.ownerId) : ' · unassigned'), 'success');
+        (row.ownerId ? ' · ' + Scope.personName(row.ownerId) : ' · unassigned') +
+        (planned.lines ? ' · ' + planned.lines + ' line(s), ' + ui.money(planned.cost) : ''), 'success');
       EPAL.router.render();
       return true;
     }
   });
+}
+
+/** The running total under the requirement lines. Cost is what the job costs
+ *  us, quote is what the client is charged — the margin between them is the
+ *  number this whole hierarchy exists to protect. */
+function requirementsFooter(rows) {
+  var t = Scope.totals((rows || []).map(function (r) {
+    return { qty: r.qty, unitCost: r.unitCost, unitSale: r.unitSale };
+  }));
+  return 'Cost: <strong>' + ui.money(t.cost) + '</strong> · Quote: <strong>' + ui.money(t.quote) +
+    '</strong> · Margin: <strong class="' + (t.margin >= 0 ? 'text-good' : 'text-bad') + '">' +
+    ui.money(t.margin) + '</strong>';
 }
 
 function deletePhase(ph, space) {

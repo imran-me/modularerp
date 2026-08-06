@@ -82,6 +82,12 @@
           "enabled": true
         },
         {
+          "id": "materials",
+          "label": "Material Demand",
+          "icon": "dot",
+          "enabled": true
+        },
+        {
           "id": "load",
           "label": "Team Load",
           "icon": "dot",

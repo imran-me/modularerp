@@ -20,6 +20,12 @@
       "enabled": true
     },
     {
+      "id": "materials",
+      "label": "Material Demand",
+      "route": "#/woodart/scope/materials",
+      "enabled": true
+    },
+    {
       "id": "load",
       "label": "Team Load",
       "route": "#/woodart/scope/load",
@@ -29,11 +35,13 @@
   "stores": [
     "wa_spaces",
     "wa_phases",
-    "wa_phase_templates"
+    "wa_phase_templates",
+    "wa_requirements"
   ],
   "reads": [
     "wa_projects",
     "wa_cost_codes",
+    "wa_materials",
     "employees"
   ],
   "files": {

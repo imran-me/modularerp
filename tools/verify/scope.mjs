@@ -157,12 +157,65 @@ const out = await evalJs(`(function () {
   R.loadPlusUnassigned = S.load().reduce(function (t, r) { return t + r.open; }, 0) + S.unassignedPhases().length;
   R.openTotal = S.allPhases().filter(S.isOpen).length;
 
-  /* 8 · deleting a space takes its phases with it --------------------------*/
+  /* 8 · REQUIREMENTS — the seeded set and the roll-ups over it -------------*/
+  var reqs = S.projectRequirements(project);
+  R.seededReqs = reqs.length;
+  R.reqPhasesResolve = reqs.every(function (r) { return !!S.phase(r.phase); });
+  /* the project total must equal the sum of its spaces, which must equal the
+     sum of their phases — three roll-ups of one set of lines */
+  var byProject = S.costOfProject(project).cost;
+  var bySpace = S.spaces(project).reduce(function (t, sp) { return t + S.costOfSpace(sp.id).cost; }, 0);
+  var byPhase = S.projectPhases(project).reduce(function (t, p) { return t + S.costOfPhase(p.id).cost; }, 0);
+  R.rollupAgrees = byProject === bySpace && bySpace === byPhase;
+  R.projectPlanned = byProject;
+
+  /* demand nets off what is already ordered or issued */
+  var dem = S.demand(project);
+  var rod = dem.filter(function (d) { return /Rod/.test(d.item); })[0];
+  R.demandNetsCommitted = !!rod && rod.committed === rod.qty && rod.short === 0;
+  R.rodNeeded = rod && rod.qty;
+  R.openItems = dem.filter(function (d) { return d.outstanding > 0; }).length;
+
+  /* 9 · the requirement editor writes, edits and deletes -------------------*/
+  var editPhase = S.phases(id)[3];
+  S.saveRequirements(editPhase, [
+    { kind: 'material', item: 'Marine Plywood 18mm', qty: 4, unit: 'sheet', unitCost: 3610, unitSale: 4200 },
+    { kind: 'labour',   item: 'Carpenter',           qty: 12, unit: 'man-day', unitCost: 900, unitSale: 1150 }
+  ]);
+  var written = S.requirements(editPhase.id);
+  R.wroteLines = written.length;
+  R.wroteCost = S.costOfPhase(editPhase.id).cost;                  // 4×3610 + 12×900
+  R.materialIdResolved = written[0].materialId;                    // matched to the register
+  R.labourNoMaterialId = written[1].materialId === null;
+  var firstId = written[0].id;
+
+  /* editing keeps the id (slice 4's hiring desk points at it) and a dropped
+     row is dropped from the store, not left behind */
+  S.saveRequirements(editPhase, [
+    { kind: 'material', item: 'Marine Plywood 18mm', qty: 6, unit: 'sheet', unitCost: 3610, unitSale: 4200 }
+  ]);
+  var after = S.requirements(editPhase.id);
+  R.afterEditLines = after.length;
+  R.idPreserved = !!after[0] && after[0].id === firstId;
+  R.afterEditQty = after[0] && after[0].qty;
+
+  /* 10 · progress is WEIGHTED by what each phase is worth ------------------*/
+  R.pctBefore = S.progressOf(id).pct;
+  editPhase.status = 'Complete'; S.savePhase(editPhase);
+  R.pctAfter = S.progressOf(id).pct;
+  R.countShare = Math.round(100 / S.phases(id).length);
+
+  /* 11 · deleting a phase takes its requirements with it -------------------*/
+  S.removePhase(editPhase.id);
+  R.reqsAfterPhaseDelete = S.requirements(editPhase.id).length;
+
+  /* 12 · deleting a space takes its phases with it -------------------------*/
   var before = S.allPhases().length;
   S.removeSpace(id);
   R.phasesRemoved = before - S.allPhases().length;
   R.spaceGone = !S.space(id);
   R.noOrphansLeft = S.allPhases().filter(function (p) { return !S.space(p.space); }).length;
+  R.noReqsLeft = S.spaceRequirements(id).length;
   return R;
 })()`);
 
@@ -199,10 +252,32 @@ check('a Complete phase is never overdue', out.overdueWhenComplete === false);
 check('the summary agrees with the rows', out.summaryMatchesRows);
 check('load + unassigned = every open phase', out.loadPlusUnassigned === out.openTotal, out.loadPlusUnassigned + ' vs ' + out.openTotal);
 
+console.log('\nREQUIREMENTS');
+check('the project carries requirement lines', out.seededReqs > 0, out.seededReqs + ' lines · ' + out.projectPlanned.toLocaleString('en-IN') + ' planned');
+check("every line's phase exists", out.reqPhasesResolve);
+check('project total = Σ spaces = Σ phases', out.rollupAgrees);
+check('demand nets off what is ordered or issued', out.demandNetsCommitted, 'rod ' + out.rodNeeded + ' all committed → 0 to buy');
+check('items still to come are still demanded', out.openItems > 0, out.openItems + ' open item(s)');
+
+console.log('\nTHE EDITOR');
+check('writing two lines stores two', out.wroteLines === 2);
+check('the totals are qty × unit cost', out.wroteCost === 4 * 3610 + 12 * 900, '৳' + out.wroteCost);
+check('a material line resolves to the register', !!out.materialIdResolved, out.materialIdResolved);
+check('a labour line has no material id', out.labourNoMaterialId);
+check('editing keeps the line id', out.idPreserved);
+check('dropping a row deletes it', out.afterEditLines === 1 && out.afterEditQty === 6);
+
+console.log('\nWEIGHTED PROGRESS');
+check('completing an expensive phase moves more than 1/N',
+  out.pctAfter - out.pctBefore > out.countShare,
+  out.pctBefore + '% → ' + out.pctAfter + '% (an unweighted phase would be ' + out.countShare + '%)');
+
 console.log('\nDELETE');
-check('deleting a space removes its phases', out.phasesRemoved === 10, out.phasesRemoved + ' removed');
+check('deleting a phase removes its requirements', out.reqsAfterPhaseDelete === 0);
+check('deleting a space removes its phases', out.phasesRemoved === 9, out.phasesRemoved + ' removed');
 check('the space itself is gone', out.spaceGone);
 check('no orphan phase is left behind', out.noOrphansLeft === 0);
+check('no requirement is left behind', out.noReqsLeft === 0);
 
 const passed = results.filter(Boolean).length;
 const ok = results.every(Boolean);

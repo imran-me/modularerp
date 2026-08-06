@@ -63,8 +63,21 @@ module's seam, not through `db.col`.
    Not touched here (R2 — it drives the kanban, the billing gate and the P&L).
    Worth deciding when `projects` is rebuilt (ROOT-MAP §6 item 9).
 
+## Decisions — slice 2 (locked)
+
+| # | Date | Decision | Why |
+|---|---|---|---|
+| S10 | 2026-08-06 | **One line table, three kinds** (`material · labour · contract`) rather than three tables | The quotation builder, the material listing, the labour estimate and the cost matrix become one query with a filter, instead of four features that can disagree. Straight from the plan's §4.3. |
+| S11 | 2026-08-06 | The seeded requirements are an **allocation of the BOQ**, split by room area | Σ requirements per cost code == the BOQ per code == the budget per code: one set of numbers cut three ways, so no screen can contradict another. `books.mjs story` asserts the equality. |
+| S12 | 2026-08-06 | A **largest-remainder split**, never per-row rounding | 37,500 bricks across eleven rooms must still be 37,500 bricks. Rounding each share independently loses or invents material. |
+| S13 | 2026-08-06 | Demand **nets off `Ordered` and `Issued`** lines | The rod on this villa was bought and poured months ago; a list still asking for 9,819 kg of it would send somebody to buy the building twice. |
+| S14 | 2026-08-06 | Requirement ids are reused **positionally** when the editor saves | The platform's line-item repeater cannot round-trip an id. Minting a fresh one on every save would break the engagement → requirement link the hiring desk needs in slice 4. |
+| S15 | 2026-08-06 | Progress is now **weighted by phase cost**; a phase with nothing planned weighs 1 | Counting phases treats a ৳4 lakh wood-work phase like a ৳15,000 handover, which flatters a job that has finished the cheap parts. Weight 1 keeps an unpriced phase counted instead of vanishing. |
+| S16 | 2026-08-06 | `labour` keeps men × days inside the **quantity** (`unit: 'man-day'`) for now | The hiring desk that needs them as separate fields is slice 4; splitting them earlier would be a column nothing reads. |
+
 ## Log
 
 | Date | What |
 |---|---|
+| 2026-08-06 | **SLICE 2 — what each phase needs.** New store `wa_requirements`: material · labour · contracted work, per phase. The phase drawer gained a line-item editor (the platform repeater, with a live cost / quote / margin footer) so the person responsible and what they need are decided in one place. New screen **Material Demand** (`#/woodart/scope/materials`) rolls every material line up per item across phases — needed, already received, in stock, still to buy — and lists labour and contracted work separately, because it is hired rather than bought. Seeded by allocating the Munshi Villa BOQ across the phases that carry each cost code (214 lines, ৳59,01,000 — the BOQ less its two project overheads), so every head still equals the quotation. Progress switched to cost-weighted; space cards and phase rows now carry planned cost. Deleting a phase takes its requirements with it; deleting a space takes both. Probe extended to **34/34**, sweep **258/258 both themes**, `books story` still reconciles to the sheet. |
 | 2026-08-06 | **Module built (slice 1 of the project-breakdown plan).** Three screens: Spaces (cards + phase strip), Phase Board (a row per phase with its responsible person, status and dates), Team Load (who is carrying what, company-wide). New stores `wa_spaces` + `wa_phase_templates`; `wa_phases` reshaped to belong to a space, with a guard that upgrades a browser still holding the pre-2026-08-06 project-level rows. Seeded phases carry the REAL Woodart roster (design → Imtiaz Chowdhury, workshop → Sumaiya Akter, site → Jahangir Alam) and leave some work ahead of the current phase deliberately unassigned, because that queue is what the board exists to shrink. New probe `tools/verify/scope.mjs` drives the real seam through template → assign → derive → delete (20/20). Sweep 257/257 both themes. |
