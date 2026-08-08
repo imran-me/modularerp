@@ -15,6 +15,7 @@ yet) and `ROOT-MAP.md` (the phase model).
 > | 4 · Estimates → Quotation Builder | ⬜ next |
 > | 5 · `contractors` module — hiring + labour estimate | ⬜ |
 > | **6 · purchase-order lines + issue-to-room** | ✅ **built** — the order form has a line editor (value computed from it), the issue form a room picker; form probe 14/14 |
+> | **· delete where a screen owns a record** | ✅ **built** — a project can be removed and takes its whole job with it; 16/16 owning screens covered. Ledgers excluded on purpose (Adjustment · void) |
 > | 7 · committed cost on the profile | ⬜ |
 
 > **The owner's words (2026-08-06):** *"There will be option to register a new

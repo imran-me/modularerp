@@ -590,6 +590,7 @@ function deleteEstimate(row) {
     title: 'Delete ' + row.id + '?',
     body: 'The quotation "' + (row.title || '') + '" and its ' + (row.lineCount || 0) +
       ' quoted line(s) will be removed.' + linked + ' This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;

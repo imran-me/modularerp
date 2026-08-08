@@ -223,6 +223,42 @@ workshop rent, and wrong for a delivery to site.
 
 ---
 
+## 10 · Deleting things
+
+Every screen that **owns** a record lets you delete it — the trash icon on the
+row, or on the project card's top-right corner. The confirmation always names
+what goes with it before you commit, and the confirm button is red.
+
+**Deleting a project takes the whole job with it** — its rooms, phases, planned
+lines, estimates, budget heads, drawings and their revisions, workshop jobs,
+site visits, purchase orders and order lines. The dialog counts each one first,
+so you see the size of what you are about to remove.
+
+Two things a delete deliberately **keeps**:
+
+| Kept | Why |
+|---|---|
+| **Stock movements** | The material really did leave the store. Erasing the row would silently change your stock levels — so a movement is corrected with an **Adjustment**, which leaves a dated row explaining itself. |
+| **Book entries** | The money really did move. Entries are **voided**, not deleted: a reversing entry is posted and the original stays in the audit trail. |
+
+Both will then reference a job that no longer exists. That is the honest
+outcome — the alternative is books that quietly disagree with what happened.
+
+Some screens are a **read-across view** of records another screen owns, and so
+have no delete of their own:
+
+| Screen | Where to delete instead |
+|---|---|
+| Estimates → BOQ | the quotation the line belongs to |
+| Design → Approvals | Design → Drawings |
+| Site & Install → Snag List | the project drawer, where snags are ticked off |
+| Spaces & Phases → Material Demand | the phase that asked for it |
+
+Inside any drawer, a line in a list — order lines, quotation lines, what a phase
+needs — is removed with the **×** at the end of its row.
+
+---
+
 ## Still done by hand, for now
 
 Being straight about the edges:

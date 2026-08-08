@@ -693,6 +693,7 @@ function deleteDrawing(row) {
     body: (row.title || 'This deliverable') + ' will be removed, along with its ' + n +
       ' revision record(s) — the trail has no meaning without it. The project is not affected. ' +
       'This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;

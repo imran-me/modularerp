@@ -886,6 +886,7 @@ function deleteOrder(row) {
     title: 'Delete ' + row.id + '?',
     body: 'The ' + ui.money(+row.amount || 0) + ' order on ' + (row.supplier || 'this vendor') +
       ' will be removed from the register. This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;
@@ -938,6 +939,7 @@ function deleteVendor(row) {
           ' on record — those are NOT deleted, but they will show as "unlisted" in the register.'
         : ' They have no orders on record.') +
       ' This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;

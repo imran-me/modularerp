@@ -232,11 +232,13 @@
 
   function confirm(opts) {
     opts = typeof opts === 'string' ? { text: opts } : (opts || {});
+    // Callers write the explanation as either `text` or `body`; a node is passed through as-is.
+    var said = opts.text != null ? opts.text : opts.body;
     return new Promise(function (resolve) {
       modal({
         title: opts.title || 'Please confirm', icon: opts.icon || 'question-circle',
         size: 'sm', dismissable: true,
-        body: el('p.text-muted', { text: opts.text || 'Are you sure?' }),
+        body: (said && said.nodeType) ? said : el('p.text-muted', { text: said || 'Are you sure?' }),
         actions: [
           { label: opts.cancelLabel || 'Cancel', variant: 'ghost', onClick: function () { resolve(false); } },
           { label: opts.confirmLabel || 'Confirm', variant: opts.danger ? 'danger' : 'primary',

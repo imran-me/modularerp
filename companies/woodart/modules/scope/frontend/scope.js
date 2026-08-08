@@ -724,6 +724,7 @@ function deleteSpace(space) {
       Scope.projectName(space.project) + '. A phase whose space no longer exists is ' +
       'orphaned work — it would still count in every roll-up while being impossible ' +
       'to open. This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;
@@ -842,6 +843,7 @@ function deletePhase(ph, space) {
     title: 'Delete ' + ph.name + '?',
     body: 'This phase of ' + space.name + ' will be removed. Anything planned against ' +
       'it goes with it. This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;

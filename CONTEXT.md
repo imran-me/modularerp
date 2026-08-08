@@ -115,11 +115,17 @@ owner, 2026-08-06: *"not the whole database, but only the interior one"*.
 
 Built since 2026-08-06: the `scope` module (spaces → phases → who is responsible
 → what each phase needs), Material Demand, the one-project demo across browser
-**and** database, the read-only project profile, and a material ledger where
-stock arrives in dated deliveries against an order and leaves room by room.
-Next: the forms that let staff **record** those two things (a purchase order has
-no line editor; issuing stock has no room picker), then the quotation builder,
-then contractor hiring.
+**and** database, the read-only project profile, a material ledger where stock
+arrives in dated deliveries against an order and leaves room by room, the forms
+that record both (order line editor · room picker on an issue), and delete on
+every screen that owns a record. Next: the quotation builder, then contractor
+hiring.
+
+**A delete never touches a ledger.** A project delete cascades its rooms,
+phases, plans, drawings, jobs, visits and orders, but deliberately keeps stock
+movements and `acc_entries` — the material really did leave the store and the
+money really did move, so the corrections stay an **Adjustment** and a **void**.
+Same reason `epal:reseed` leaves them alone.
 
 Verify with: `node tools/verify/sweep.mjs both` · `node tools/verify/scope.mjs` ·
 `node tools/verify/books.mjs story|refs|stock`.

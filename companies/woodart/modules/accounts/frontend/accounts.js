@@ -625,6 +625,7 @@ function voidEntry(row) {
     title: 'Void ' + row.id + '?',
     body: 'A reversing entry will be posted for ' + ui.money(Math.abs(+row.amount || 0)) +
       '. The original stays in the audit trail — a balance never moves without a row explaining why.',
+    danger: true,
     confirmLabel: 'Void Entry'
   }).then(function (ok) {
     if (!ok) return;
@@ -698,6 +699,7 @@ function deleteRecurring(row) {
     body: 'The standing cost "' + (row.name || '') + '" will be removed. Entries already ' +
       'recorded against it stay in the register — this only stops it being counted as a ' +
       'future commitment.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;

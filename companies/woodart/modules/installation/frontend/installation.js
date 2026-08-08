@@ -344,6 +344,7 @@ function deleteInstall(row) {
     body: 'The visit to ' + (row.site || 'this site') + ' will be removed from the schedule.' +
       (open ? ' It still has ' + open + ' open snag(s) — that history goes with it.' : '') +
       ' The project it belongs to is not affected. This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;

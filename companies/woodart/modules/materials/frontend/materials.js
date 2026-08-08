@@ -284,6 +284,7 @@ function deleteMaterial(row) {
       ui.money(Materials.valueOf(row)) + ') will be removed from the register, along with its ' +
       Materials.historyOf(row.id).length + ' movement record(s) — a ledger for a material nobody ' +
       'can look at is orphaned evidence. This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;

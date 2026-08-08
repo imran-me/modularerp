@@ -13,6 +13,7 @@
  * The frozen contract is in backend/endpoints.md.
  */
 
+use Epal\Modules\Woodart\Procurement\PurchaseLineController;
 use Epal\Modules\Woodart\Procurement\PurchaseOrderController;
 use Epal\Modules\Woodart\Procurement\VendorController;
 use Illuminate\Support\Facades\Route;

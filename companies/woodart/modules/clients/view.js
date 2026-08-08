@@ -492,6 +492,7 @@ function deleteClient(row) {
           ' estimate(s) on record — those are NOT deleted, but they will no longer match a client.'
         : ' They have no projects or estimates on record.') +
       ' This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;

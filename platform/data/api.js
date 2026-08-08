@@ -103,11 +103,10 @@
     // of the delivery history: ordered here, received in the movement ledger.
     wa_purchase_lines: 'woodart/procurement/lines',
     wa_locations:  'woodart/materials/locations',
-    // READ-ONLY (absent from WRITABLE and CONDITIONAL on purpose): the portfolio
-    // screen still writes through EPAL.db to localStorage until the projects
-    // module gets its own build slot. Hydrating the reads is what stops eight
-    // seeded projects sitting in MySQL behind no route — the state that made a
-    // migrated host show "No projects yet".
+    // Read-only until 2026-08-08 (the portfolio wrote to localStorage only,
+    // pending the projects module's own build slot). Now CONDITIONAL as well —
+    // see below: once a project could be DELETED from the register, a read-only
+    // endpoint meant the row left the screen and returned on the next hydrate.
     wa_projects:   'woodart/projects/portfolio',
     wa_estimates:  'woodart/projects/estimates',
     // The project BREAKDOWN (2026-08-06): rooms, their phases, and what each
@@ -226,7 +225,17 @@
     wa_spaces:       'woodart/scope/spaces',
     wa_phases:       'woodart/scope/phases',
     wa_requirements: 'woodart/scope/requirements',
-    wa_purchase_lines: 'woodart/procurement/lines'
+    wa_purchase_lines: 'woodart/procurement/lines',
+    /* The spine (2026-08-08). These two tables have been on every migrated host
+     * since 2026-07-27 and were hydrated read-only, which was honest while the
+     * register only READ them. It stopped being honest the moment a project
+     * could be deleted: the row left the screen and the next hydrate brought it
+     * back. Their build slot (#9) is still owed the frontend/ rebuild — this is
+     * the write half only, keyed on ext_id and idempotent.
+     * `wa_budget_lines` is deliberately NOT here: it has no endpoint of its own,
+     * is never hydrated, and is cleared server-side by the project delete. */
+    wa_projects:     'woodart/projects/portfolio',
+    wa_estimates:    'woodart/projects/estimates'
   };
 
   var mode = null;              // 'api' | 'demo' — resolved once by detect()

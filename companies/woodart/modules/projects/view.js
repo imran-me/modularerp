@@ -129,7 +129,13 @@
             el('button.btn.btn-ghost', { html: ui.icon('layout-sidebar-inset-reverse') + ' Details & Billing',
               onclick: function () { projectDrawer(open.id); } }),
             el('button.btn.btn-primary', { html: ui.icon('pencil') + ' Edit Project',
-              onclick: function () { editProject(open); } })
+              onclick: function () { editProject(open); } }),
+            /* Also here, not only on the card: this is the page you are on when
+             * you conclude a job should not exist. */
+            canDeleteProjects()
+              ? el('button.btn.btn-danger', { html: ui.icon('trash') + ' Delete',
+                  onclick: function () { deleteProject(open); } })
+              : null
           ]
         }));
         projectProfile(page, open);
@@ -675,7 +681,12 @@
                 el('div.fw-700', { text: p.name }),
                 el('div.text-muted.sm', { text: (p.client || '—') + ' · ' + p.id })
               ]),
-              stageBadge(p.stage)
+              stageBadge(p.stage),
+              /* Delete lives ON the card, where your eye already is when you
+               * decide a job should not be there. stopPropagation matters: the
+               * card itself opens the profile, and a delete that also navigates
+               * is how somebody removes the wrong thing and never sees why. */
+              projectDeleteButton(p, draw)
             ]),
             el('div', { style:{ margin:'14px 0 4px', display:'flex', alignItems:'center', gap:'8px' } }, [
               el('div', { style:{ flex:'1', height:'8px', borderRadius:'6px', background:'rgba(255,255,255,.08)', overflow:'hidden' } }, [
@@ -1530,6 +1541,111 @@
   }
 
   /* ============================================================ FORMS */
+  /* ==========================================================================
+   * DELETING A PROJECT
+   * --------------------------------------------------------------------------
+   * A project is the spine — nine other stores point at it — so this is the one
+   * delete in the company that has to say out loud what it takes with it, and
+   * what it deliberately does NOT.
+   *
+   * TAKEN: the operational records that only exist because the project does —
+   * its rooms, their phases, everything planned against them, the BOQ, the
+   * budget, the drawings and their revision trail, workshop jobs, site visits,
+   * purchase orders and their lines. Left behind, each would be a record
+   * pointing at a job nobody can open.
+   *
+   * KEPT, on purpose:
+   *   · STOCK MOVEMENTS. The material really did leave the store. Deleting the
+   *     issues would silently raise every stock level, and the ledger's whole
+   *     promise is that a balance equals its own history.
+   *   · THE BOOKS. Money received and money spent are facts about the business,
+   *     not about the project record. Accounts owns them; a project delete does
+   *     not get to rewrite them.
+   *
+   * The dialog names both lists with counts, because a confirm that only says
+   * "are you sure?" is not consent.
+   * ======================================================================== */
+  function canDeleteProjects() { return !EPAL.perm || EPAL.perm.can(CID, 'projects', 'delete'); }
+
+  function projectDeleteButton(p, redraw) {
+    if (!canDeleteProjects()) return null;
+    return el('button.icon-btn', {
+      title: 'Delete this project',
+      html: ui.icon('trash'),
+      onclick: function (e) { e.stopPropagation(); deleteProject(p, redraw); }
+    });
+  }
+
+  function deleteProject(p, done) {
+    if (!canDeleteProjects()) { ui.toast('You do not have permission to delete projects', 'error'); return; }
+
+    var spaces = db.col('wa_spaces').filter(function (s) { return s.project === p.id; });
+    var phases = db.col('wa_phases').filter(function (f) { return f.project === p.id; });
+    var reqs = db.col('wa_requirements').filter(function (r) { return r.project === p.id; });
+    var ests = estimates().filter(function (e) { return e.project === p.id || e.projectId === p.id; });
+    var budgets = db.col('wa_budget_lines').filter(function (b) { return b.project === p.id; });
+    var dwgs = db.col('wa_drawings').filter(function (d) { return d.project === p.id; });
+    var dwgIds = dwgs.map(function (d) { return d.id; });
+    var revs = db.col('wa_revisions').filter(function (r) { return dwgIds.indexOf(r.drawing) >= 0; });
+    var jobs = productionOf(p.id);
+    var visits = installsOf(p.id);
+    var orders = db.col('wa_purchases').filter(function (o) { return o.project === p.id; });
+    var orderIds = orders.map(function (o) { return o.id; });
+    var poLines = db.col('wa_purchase_lines').filter(function (l) { return orderIds.indexOf(l.order) >= 0; });
+
+    var moves = db.col('wa_movements').filter(function (m) { return m.ref === p.id || orderIds.indexOf(m.order) >= 0; });
+    var money = db.col('acc_entries').filter(function (e) { return e.ref === p.id; });
+
+    function line(n, one, many) { return n ? n + ' ' + (n === 1 ? one : many) : null; }
+    var goes = [
+      line(spaces.length, 'room', 'rooms'), line(phases.length, 'phase', 'phases'),
+      line(reqs.length, 'planned line', 'planned lines'), line(ests.length, 'estimate', 'estimates'),
+      line(budgets.length, 'budget head', 'budget heads'), line(dwgs.length, 'drawing', 'drawings'),
+      line(revs.length, 'revision', 'revisions'), line(jobs.length, 'workshop job', 'workshop jobs'),
+      line(visits.length, 'site visit', 'site visits'), line(orders.length, 'purchase order', 'purchase orders'),
+      line(poLines.length, 'order line', 'order lines')
+    ].filter(Boolean);
+
+    var stays = [
+      line(moves.length, 'stock movement', 'stock movements'),
+      line(money.length, 'book entry', 'book entries')
+    ].filter(Boolean);
+
+    ui.confirm({
+      title: 'Delete ' + p.name + '?',
+      body: p.id + ' will be removed' +
+        (goes.length ? ', and with it ' + goes.join(' · ') + '.' : '.') +
+        (stays.length
+          ? ' KEPT: ' + stays.join(' and ') + ' — the material really did leave the store and the money ' +
+            'really did move, so neither is a project’s to erase. They will reference a job that no ' +
+            'longer exists, which is the honest outcome.'
+          : '') +
+        ' This cannot be undone.',
+      danger: true,
+      confirmLabel: 'Delete project'
+    }).then(function (ok) {
+      if (!ok) return;
+
+      reqs.forEach(function (r) { db.remove('wa_requirements', r.id); });
+      phases.forEach(function (f) { db.remove('wa_phases', f.id); });
+      spaces.forEach(function (s) { db.remove('wa_spaces', s.id); });
+      ests.forEach(function (e) { db.remove('wa_estimates', e.id); });
+      budgets.forEach(function (b) { db.remove('wa_budget_lines', b.id); });
+      revs.forEach(function (r) { db.remove('wa_revisions', r.id); });
+      dwgs.forEach(function (d) { db.remove('wa_drawings', d.id); });
+      jobs.forEach(function (j) { db.remove('wa_production', j.id); });
+      visits.forEach(function (v) { db.remove('wa_installs', v.id); });
+      poLines.forEach(function (l) { db.remove('wa_purchase_lines', l.id); });
+      orders.forEach(function (o) { db.remove('wa_purchases', o.id); });
+      db.remove('wa_projects', p.id);
+
+      ui.toast(p.name + ' deleted', 'success');
+      /* The profile of a deleted project cannot render, so go back to the
+       * register rather than leaving the page on a record that is gone. */
+      if (done) done(); else EPAL.router.navigate('woodart/projects/active');
+    });
+  }
+
   function editProject(rec, done) {
     var isNew = !rec;
     EPAL.formModal({

@@ -330,6 +330,7 @@ function deleteJob(row) {
     body: (row.job || 'This job') + ' (' + (row.station || 'no station') + ', ' +
       (row.status || 'no status').toLowerCase() + ') will be removed from the shop floor. ' +
       'The project it belongs to is not affected. This cannot be undone.',
+    danger: true,
     confirmLabel: 'Delete'
   }).then(function (ok) {
     if (!ok) return;
