@@ -231,12 +231,22 @@ var Scope = {
    * orphaned evidence — it would still count in every roll-up while being
    * impossible to open. Same rule the materials register applies to a deleted
    * material's movement history.
+   *
+   * ONE request. `ScopeService::deleteSpace` runs the same cascade server-side
+   * in a transaction, so the children are cleared from this browser with
+   * `removeLocal` and only the space DELETE travels. Looping `db.remove` here
+   * would fire one HTTP call per phase and per requirement — the shape that
+   * flooded the host's connection cap on 2026-08-08. Change one side, change
+   * the other.
    */
   removeSpace: function (id) {
-    Scope.phases(id).forEach(function (ph) { Scope.removePhase(ph.id); });
+    Scope.phases(id).forEach(function (ph) {
+      Scope.requirements(ph.id).forEach(function (r) { db.removeLocal(REQS, r.id); });
+      db.removeLocal(PHASES, ph.id);
+    });
     /* belt and braces: a line whose phase was already gone would otherwise
      * survive its own room and keep counting in the project's demand */
-    Scope.spaceRequirements(id).forEach(function (r) { db.remove(REQS, r.id); });
+    Scope.spaceRequirements(id).forEach(function (r) { db.removeLocal(REQS, r.id); });
     return db.remove(SPACES, id);
   },
 
@@ -278,9 +288,11 @@ var Scope = {
 
   /** Deleting a phase takes its requirements with it — a planned line whose
    *  phase is gone would still be counted by the demand list and the quotation
-   *  while being impossible to open or edit. Same rule as space → phases. */
+   *  while being impossible to open or edit. Same rule as space → phases, and
+   *  the same one-request rule: `ScopeService::deletePhase` clears the lines
+   *  server-side, so only the phase DELETE travels. */
   removePhase: function (id) {
-    Scope.requirements(id).forEach(function (r) { db.remove(REQS, r.id); });
+    Scope.requirements(id).forEach(function (r) { db.removeLocal(REQS, r.id); });
     return db.remove(PHASES, id);
   },
 

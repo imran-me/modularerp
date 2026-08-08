@@ -119,25 +119,38 @@ class ProjectController
             'createdOn' => ['nullable', 'date'],
         ]);
 
-        $saved = Project::updateOrCreate(
-            ['company_id' => self::COMPANY, 'ext_id' => $v['id']],
-            [
-                'name'       => $v['name'],
-                'client'     => $v['client']   ?? null,
-                'type'       => $v['type']     ?? 'Residential',
-                'area'       => (int) ($v['area']  ?? 0),
-                'value'      => (int) ($v['value'] ?? 0),
-                'cost'       => (int) ($v['cost']  ?? 0),
-                'stage'      => $v['stage']    ?? 'Design',
-                'phase'      => $v['phase']    ?? null,
-                'progress'   => (int) ($v['progress'] ?? 0),
-                'designer'   => $v['designer'] ?? null,
-                'start'      => $v['start']    ?? null,
-                'deadline'   => $v['deadline'] ?? null,
-                'billed'     => (bool) ($v['billed'] ?? false),
-                'created_on' => $v['createdOn'] ?? null,
-            ]
-        );
+        // withTrashed, because a delete is SOFT and the browser numbers the next
+        // project from the rows it can see: delete WAP-101 and the next one is
+        // offered WAP-101 again. A plain insert would hit the (company, ext_id)
+        // unique index on the row still sitting there deleted. Same pattern as
+        // ClientService::upsert — re-posting a deleted id means "this exists again".
+        $saved = Project::withTrashed()->firstOrNew([
+            'company_id' => self::COMPANY,
+            'ext_id'     => $v['id'],
+        ]);
+
+        $saved->fill([
+            'company_id' => self::COMPANY,
+            'ext_id'     => $v['id'],
+            'name'       => $v['name'],
+            'client'     => $v['client']   ?? null,
+            'type'       => $v['type']     ?? 'Residential',
+            'area'       => (int) ($v['area']  ?? 0),
+            'value'      => (int) ($v['value'] ?? 0),
+            'cost'       => (int) ($v['cost']  ?? 0),
+            'stage'      => $v['stage']    ?? 'Design',
+            'phase'      => $v['phase']    ?? null,
+            'progress'   => (int) ($v['progress'] ?? 0),
+            'designer'   => $v['designer'] ?? null,
+            'start'      => $v['start']    ?? null,
+            'deadline'   => $v['deadline'] ?? null,
+            'billed'     => (bool) ($v['billed'] ?? false),
+            'created_on' => $v['createdOn'] ?? null,
+        ]);
+        if ($saved->trashed()) {
+            $saved->deleted_at = null;
+        }
+        $saved->save();
 
         return response()->json([
             'success'     => true,
@@ -159,13 +172,13 @@ class ProjectController
      * reversal, never an erasure. Same rule the browser confirm states aloud and
      * the same rule `epal:reseed` follows.
      *
-     * The rest of the job — rooms, phases, requirements, orders, order lines,
-     * jobs, visits, drawings, revisions — is deleted by the browser through each
-     * module's OWN endpoint as part of the same cascade, so nothing is deleted
-     * here that another module is responsible for. The two exceptions are the
-     * BOQ and the budget heads: they belong to this module, and budget lines
-     * have no endpoint of their own at all, so a project delete is the only
-     * thing that will ever clear them.
+     * THE WHOLE CASCADE HAPPENS HERE, IN ONE TRANSACTION — and that is the point.
+     * It used to happen in the browser, one HTTP DELETE per row: ~350 requests
+     * fired at once for a project with 11 rooms and 86 phases. Shared hosting
+     * caps concurrent PHP workers and MySQL connections, so dev.epal.com.bd
+     * answered the flood with a wall of "Operation not permitted" and deleted
+     * almost nothing (owner, live, 2026-08-08). One request cannot flood
+     * anything, and a transaction cannot half-finish.
      */
     public function destroy(string $id): JsonResponse
     {
@@ -173,24 +186,85 @@ class ProjectController
             return response()->json(['success' => true, 'provisioned' => false]);
         }
 
-        DB::transaction(function () use ($id) {
-            Project::query()
-                ->where('company_id', self::COMPANY)->where('ext_id', $id)
-                ->get()->each->delete();
+        $removed = [];
 
-            if (Schema::hasTable('wa_estimates')) {
-                Estimate::query()
-                    ->where('company_id', self::COMPANY)->where('project_ext', $id)
-                    ->get()->each->delete();
+        DB::transaction(function () use ($id, &$removed) {
+            /* Revisions hang off drawings, and order lines off orders, so both
+             * are resolved to their parents' ids BEFORE the parents go. */
+            $drawings = $this->extIds('wa_drawings', 'project', $id);
+            $orders   = $this->extIds('wa_purchases', 'project', $id);
+
+            $removed['revisions']  = $this->purgeIn('wa_revisions', 'drawing', $drawings);
+            $removed['orderLines'] = $this->purgeIn('wa_purchase_lines', 'order', $orders);
+
+            foreach ([
+                'requirements' => 'wa_requirements',
+                'phases'       => 'wa_phases',
+                'spaces'       => 'wa_spaces',
+                'drawings'     => 'wa_drawings',
+                'jobs'         => 'wa_production',
+                'visits'       => 'wa_installs',
+                'orders'       => 'wa_purchases',
+                'budgetHeads'  => 'wa_budget_lines',
+            ] as $label => $table) {
+                $removed[$label] = $this->purge($table, 'project', $id);
             }
-            if (Schema::hasTable('wa_budget_lines')) {
-                DB::table('wa_budget_lines')
-                    ->where('company_id', self::COMPANY)->where('project', $id)
-                    ->delete();
-            }
+
+            $removed['estimates'] = $this->purge('wa_estimates', 'project_ext', $id);
+            $removed['project']   = $this->purge('wa_projects', 'ext_id', $id);
         });
 
-        return response()->json(['success' => true, 'provisioned' => true]);
+        return response()->json([
+            'success'     => true,
+            'provisioned' => true,
+            'removed'     => $removed,
+        ]);
+    }
+
+    /** The ext_ids of rows pointing at $value — parents whose children go first. */
+    private function extIds(string $table, string $column, string $value): array
+    {
+        if (! Schema::hasTable($table)) {
+            return [];
+        }
+
+        return DB::table($table)
+            ->where('company_id', self::COMPANY)->where($column, $value)
+            ->pluck('ext_id')->all();
+    }
+
+    /**
+     * Remove every row of $table whose $column is $value, and say how many.
+     *
+     * Soft where the table can (`deleted_at` present), hard where it cannot —
+     * checked at runtime rather than assumed, so a table that gains or loses
+     * soft deletes later does not silently change what a delete means. Absent
+     * tables are simply skipped: a host that has not run a module's migration
+     * has nothing of that module's to remove.
+     */
+    private function purge(string $table, string $column, string $value): int
+    {
+        if (! Schema::hasTable($table)) {
+            return 0;
+        }
+        $q = DB::table($table)->where('company_id', self::COMPANY)->where($column, $value);
+
+        return Schema::hasColumn($table, 'deleted_at')
+            ? $q->whereNull('deleted_at')->update(['deleted_at' => now()])
+            : $q->delete();
+    }
+
+    /** Same, for children resolved by a list of parent ids. */
+    private function purgeIn(string $table, string $column, array $values): int
+    {
+        if (! Schema::hasTable($table) || $values === []) {
+            return 0;
+        }
+        $q = DB::table($table)->where('company_id', self::COMPANY)->whereIn($column, $values);
+
+        return Schema::hasColumn($table, 'deleted_at')
+            ? $q->whereNull('deleted_at')->update(['deleted_at' => now()])
+            : $q->delete();
     }
 
     /** POST /api/woodart/projects/estimates — save a quotation and its BOQ. */
@@ -211,18 +285,26 @@ class ProjectController
             'createdOn' => ['nullable', 'date'],
         ]);
 
-        $saved = Estimate::updateOrCreate(
-            ['company_id' => self::COMPANY, 'ext_id' => $v['id']],
-            [
-                'title'       => $v['title'],
-                'client'      => $v['client']  ?? null,
-                'project_ext' => $v['project'] ?? null,
-                'status'      => $v['status']  ?? 'Draft',
-                'lines'       => $v['lines']   ?? [],
-                'valid_till'  => $v['validTill'] ?? null,
-                'created_on'  => $v['createdOn'] ?? null,
-            ]
-        );
+        $saved = Estimate::withTrashed()->firstOrNew([   // see store(): ids get reused
+            'company_id' => self::COMPANY,
+            'ext_id'     => $v['id'],
+        ]);
+
+        $saved->fill([
+            'company_id'  => self::COMPANY,
+            'ext_id'      => $v['id'],
+            'title'       => $v['title'],
+            'client'      => $v['client']  ?? null,
+            'project_ext' => $v['project'] ?? null,
+            'status'      => $v['status']  ?? 'Draft',
+            'lines'       => $v['lines']   ?? [],
+            'valid_till'  => $v['validTill'] ?? null,
+            'created_on'  => $v['createdOn'] ?? null,
+        ]);
+        if ($saved->trashed()) {
+            $saved->deleted_at = null;
+        }
+        $saved->save();
 
         return response()->json([
             'success'     => true,

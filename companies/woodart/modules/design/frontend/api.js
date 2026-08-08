@@ -227,10 +227,14 @@ var Design = {
     return saved;
   },
 
-  /** Delete a deliverable and its trail — the trail has no meaning without it. */
+  /** Delete a deliverable and its trail — the trail has no meaning without it.
+   *  ONE request: `DesignService::delete` already clears the revisions on the
+   *  server, so the trail goes from this browser with `removeLocal` and only the
+   *  drawing DELETE travels. A DELETE per revision is the flood shape that broke
+   *  the project delete on 2026-08-08. */
   remove: function (id) {
     db.col(REVISIONS).filter(function (r) { return r.drawing === id; })
-      .forEach(function (r) { db.remove(REVISIONS, r.id); });
+      .forEach(function (r) { db.removeLocal(REVISIONS, r.id); });
     return db.remove(DRAWINGS, id);
   }
 };

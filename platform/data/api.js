@@ -414,6 +414,7 @@
       // one notice per store, not one per save — a bookkeeper entering twenty
       // expenses should not be told twenty times that the table needs migrating
       var warned = {};
+      var failedDelete = {};        // one "Not deleted" per store — see the delete branch
       function warnUnprovisioned(store, message) {
         if (warned[store]) return;
         warned[store] = true;
@@ -465,6 +466,13 @@
           });
         } else if (e.action === 'delete') {
           call(path + '/' + e.id, { method: 'DELETE' }).catch(function (err) {
+            // ONE notice per store, like the save path — a cascade that removes
+            // many rows of one store must not stack one toast per row. On
+            // 2026-08-08 a project delete produced a screenful of identical
+            // "Operation not permitted" toasts, which buried the single fact
+            // worth reading: this store did not delete.
+            if (failedDelete[e.store]) return;
+            failedDelete[e.store] = true;
             EPAL.bus.emit('notify', { text: 'Delete failed: ' + (err.message || err), level: 'danger', title: 'Not deleted' });
           });
         }

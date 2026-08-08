@@ -192,10 +192,14 @@ var Materials = {
   save: function (rec) { return db.save(STORE, rec); },
 
   /** Delete by id, taking its movement history with it — a ledger for a
-   *  material nobody can look at is orphaned evidence. */
+   *  material nobody can look at is orphaned evidence.
+   *  ONE request: `MaterialService::delete` cascades the movements server-side
+   *  in a transaction, so they leave this browser with `removeLocal` and only
+   *  the material DELETE travels. A DELETE per movement is the flood shape that
+   *  broke the project delete on 2026-08-08. Change one side, change the other. */
   remove: function (id) {
     db.col(MOVEMENTS).filter(function (v) { return v.material === id; })
-      .forEach(function (v) { db.remove(MOVEMENTS, v.id); });
+      .forEach(function (v) { db.removeLocal(MOVEMENTS, v.id); });
     return db.remove(STORE, id);
   },
 

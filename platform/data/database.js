@@ -594,6 +594,22 @@
       S.removeFrom(name, id);
       bus.emit('data:changed', { store: name, action: 'delete', id: id });
     },
+    /* Drop a row from THIS BROWSER only — no DB write.
+     *
+     * For the rows the SERVER is already removing as part of one cascade. A
+     * project delete clears ~350 dependent rows; sending one HTTP DELETE per row
+     * is what took dev.epal.com.bd past its connection cap and answered every
+     * request with "Operation not permitted" (owner, live, 2026-08-08). The
+     * cascade now happens in one server transaction, and the browser just brings
+     * its own copy into line. Same `local` flag the derived-entry writes use, so
+     * api.js already knows to skip it — and every other listener still re-renders.
+     *
+     * ONLY for rows a server-side cascade genuinely covers. Using it anywhere
+     * else means the row comes back on the next hydrate. */
+    removeLocal: function (name, id) {
+      S.removeFrom(name, id);
+      bus.emit('data:changed', { store: name, action: 'delete', id: id, local: true });
+    },
 
     /* --- THE CROSS-COMPANY CHAIN -------------------------------------------
      * Any module that closes a sale calls postSale(). It:

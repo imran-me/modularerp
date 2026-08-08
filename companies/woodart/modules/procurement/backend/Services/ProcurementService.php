@@ -2,9 +2,12 @@
 
 namespace Epal\Modules\Woodart\Procurement\Services;
 
+use Epal\Modules\Woodart\Procurement\Models\PurchaseLine;
 use Epal\Modules\Woodart\Procurement\Models\PurchaseOrder;
 use Epal\Modules\Woodart\Procurement\Models\Vendor;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * ProcurementService — ALL the business logic for Woodart procurement. The two
@@ -87,12 +90,31 @@ class ProcurementService
         return $order;
     }
 
+    /**
+     * Delete an order AND the lines that say what it ordered.
+     *
+     * The lines were being left behind: an order line whose order is gone still
+     * answers "what has been ordered against this material", so a deleted order
+     * kept suppressing its items in Material Demand and they were never bought
+     * again. It is cascaded here in one transaction rather than as a DELETE per
+     * line from the browser — that per-row shape is what took the host past its
+     * connection cap on 2026-08-08.
+     */
     public function deleteOrder(string $extId): void
     {
-        PurchaseOrder::query()
-            ->where('company_id', $this->companyId)
-            ->where('ext_id', $extId)
-            ->delete();
+        DB::transaction(function () use ($extId) {
+            if (Schema::hasTable('wa_purchase_lines')) {
+                PurchaseLine::query()
+                    ->where('company_id', $this->companyId)
+                    ->where('order', $extId)
+                    ->delete();
+            }
+
+            PurchaseOrder::query()
+                ->where('company_id', $this->companyId)
+                ->where('ext_id', $extId)
+                ->delete();
+        });
     }
 
     /* ------------------------------------------------------------ VENDORS */

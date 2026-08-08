@@ -127,6 +127,16 @@ movements and `acc_entries` — the material really did leave the store and the
 money really did move, so the corrections stay an **Adjustment** and a **void**.
 Same reason `epal:reseed` leaves them alone.
 
+**4 · A CASCADE BELONGS ON THE SERVER — one request, not one per row.** Every
+`db.save`/`db.remove` on a WRITABLE store is its own HTTP call, so a browser-side
+cascade becomes N calls fired at once; a project delete was 372 of them and the
+shared host answered the flood with a wall of `Operation not permitted` (owner,
+live, 2026-08-08 — the third time this cap has bitten, after boot hydration and
+the payroll backfill). Cascade in ONE server transaction, and clear the browser's
+copy with **`db.removeLocal`** — same `local` flag api.js already skips. Only ever
+for rows a server cascade genuinely covers, or they come back on the next hydrate.
+Proven by counting `data:changed` events that are not flagged local.
+
 Verify with: `node tools/verify/sweep.mjs both` · `node tools/verify/scope.mjs` ·
 `node tools/verify/books.mjs story|refs|stock`.
 

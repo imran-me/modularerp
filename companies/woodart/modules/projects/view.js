@@ -1626,18 +1626,31 @@
     }).then(function (ok) {
       if (!ok) return;
 
-      reqs.forEach(function (r) { db.remove('wa_requirements', r.id); });
-      phases.forEach(function (f) { db.remove('wa_phases', f.id); });
-      spaces.forEach(function (s) { db.remove('wa_spaces', s.id); });
-      ests.forEach(function (e) { db.remove('wa_estimates', e.id); });
-      budgets.forEach(function (b) { db.remove('wa_budget_lines', b.id); });
-      revs.forEach(function (r) { db.remove('wa_revisions', r.id); });
-      dwgs.forEach(function (d) { db.remove('wa_drawings', d.id); });
-      jobs.forEach(function (j) { db.remove('wa_production', j.id); });
-      visits.forEach(function (v) { db.remove('wa_installs', v.id); });
-      poLines.forEach(function (l) { db.remove('wa_purchase_lines', l.id); });
-      orders.forEach(function (o) { db.remove('wa_purchases', o.id); });
-      db.remove('wa_projects', p.id);
+      /* ONE server request for the whole job, not one per row.
+       *
+       * Every dependent is dropped from this browser only — `removeLocal` — and
+       * the server clears the same rows in a single transaction when the project
+       * DELETE lands (ProjectController::destroy). Sending a DELETE per row is
+       * what this used to do: a project with 11 rooms and 86 phases fired ~350
+       * requests at once, the shared host hit its connection cap, and every one
+       * came back "Operation not permitted" — a wall of failure toasts over an
+       * empty register (owner, live, 2026-08-08). The row count is exactly why
+       * the cascade belongs on the server. */
+      function dropLocal(store, rows) {
+        rows.forEach(function (r) { db.removeLocal(store, r.id); });
+      }
+      dropLocal('wa_requirements', reqs);
+      dropLocal('wa_phases', phases);
+      dropLocal('wa_spaces', spaces);
+      dropLocal('wa_estimates', ests);
+      dropLocal('wa_budget_lines', budgets);
+      dropLocal('wa_revisions', revs);
+      dropLocal('wa_drawings', dwgs);
+      dropLocal('wa_production', jobs);
+      dropLocal('wa_installs', visits);
+      dropLocal('wa_purchase_lines', poLines);
+      dropLocal('wa_purchases', orders);
+      db.remove('wa_projects', p.id);          // the one write that travels
 
       ui.toast(p.name + ' deleted', 'success');
       /* The profile of a deleted project cannot render, so go back to the

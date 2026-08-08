@@ -276,10 +276,18 @@ var Procurement = {
     return saved;
   },
 
-  /** Delete an order and reverse its receipt posting if it had one. */
+  /** Delete an order, its lines, and reverse its receipt posting if it had one.
+   *
+   *  The LINES used to be left behind, and a line outlives its order loudly: it
+   *  still answers "how much of this material is already on order", so Material
+   *  Demand kept netting a deleted order out of the To Buy column and the item
+   *  was never re-ordered. `ProcurementService::deleteOrder` now cascades them
+   *  server-side in one transaction, so they leave this browser with
+   *  `removeLocal` and only the order DELETE travels. */
   removeOrder: function (id) {
     var before = Procurement.order(id);
     if (before && isPosted(before)) reverseReceipt(before, 'order deleted');
+    Procurement.linesOf(id).forEach(function (l) { db.removeLocal(LINES, l.id); });
     return db.remove(ORDERS, id);
   },
 

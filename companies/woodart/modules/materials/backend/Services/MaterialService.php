@@ -115,13 +115,36 @@ class MaterialService
         return $material;
     }
 
-    /** Soft delete by frontend id. Silent when it is already gone (idempotent). */
+    /**
+     * Soft delete by frontend id, TAKING ITS MOVEMENT HISTORY WITH IT. Silent
+     * when it is already gone (idempotent).
+     *
+     * The ledger goes because a ledger for a material nobody can look at is
+     * orphaned evidence — the rule the frontend seam has always stated. It is
+     * cascaded HERE, in one transaction, rather than as one HTTP DELETE per
+     * movement from the browser: that per-row shape is what took the host past
+     * its connection cap on 2026-08-08 and answered a project delete with a wall
+     * of "Operation not permitted".
+     *
+     * This is the one place stock movements are removed at all, and only ever
+     * with the material they describe. Deleting a movement on its own would
+     * silently change a stock level; the correction for that is an Adjustment.
+     */
     public function delete(string $extId): void
     {
-        Material::query()
-            ->where('company_id', $this->companyId)
-            ->where('ext_id', $extId)
-            ->delete();
+        DB::transaction(function () use ($extId) {
+            if (Schema::hasTable('wa_movements')) {
+                Movement::query()
+                    ->where('company_id', $this->companyId)
+                    ->where('material', $extId)
+                    ->delete();
+            }
+
+            Material::query()
+                ->where('company_id', $this->companyId)
+                ->where('ext_id', $extId)
+                ->delete();
+        });
     }
 
     /* ======================================================================
