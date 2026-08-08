@@ -419,8 +419,26 @@ function moveStock(material, kind) {
             : kind === 'Adjustment' ? 'A count correction. Negative reduces, positive increases.'
             : 'Comes out of stock — enter a positive number.' },
       { key: 'location', label: 'Location', type: 'select', required: true, options: Materials.locationOptions() },
+      /* ISSUE — to a ROOM, not just to a job. "Against WAP-101" cannot answer
+       * "how much of this room's 500 bricks have gone", which is the question
+       * the site actually asks (owner, 2026-08-07). Choosing a room fills the
+       * project reference automatically. */
+      { key: 'phase', label: 'Issue to room', type: 'select', col2: true, searchable: true,
+        showIf: function () { return kind === 'Issue'; },
+        options: [['', '— not for a specific room —']].concat(Materials.roomOptions()),
+        hint: 'The room and phase this material is going into.' },
+
+      /* RECEIPT — against the ORDER it arrived on, so a part-delivery has
+       * something to be part of and "received so far" is a fact. */
+      { key: 'order', label: 'Against order', type: 'select', col2: true, searchable: true,
+        showIf: function () { return kind === 'Receipt'; },
+        options: [['', '— no order (opening stock) —']].concat(Materials.orderOptions()),
+        hint: 'Deliveries arrive in instalments; each one is recorded against its order.' },
+
       { key: 'ref', label: 'Against', type: 'text', col2: true,
-        hint: kind === 'Issue' ? 'The project or job this went to, e.g. WAP-102.' : 'Optional reference.' },
+        showIf: function (v) { return !(v && v.phase); },
+        hint: kind === 'Issue' ? 'Only if it is not for a specific room — the job, e.g. WAP-101.'
+                               : 'Optional reference.' },
       { key: 'by', label: 'Recorded by', type: 'text', col2: true },
       { key: 'note', label: 'Note', type: 'text' }
     ],
@@ -428,7 +446,8 @@ function moveStock(material, kind) {
     onSave: function (v) {
       var row = Materials.apply({
         material: v.material, kind: kind, qty: v.qty, location: v.location,
-        ref: v.ref, note: v.note, by: v.by || 'Staff'
+        ref: v.ref, phase: v.phase, order: v.order,
+        note: v.note, by: v.by || 'Staff'
       });
       if (!row) { ui.toast('Nothing to move', 'error'); return true; }
       var mm = Materials.find(v.material);

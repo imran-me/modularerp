@@ -88,6 +88,56 @@ var Procurement = {
     return keys.length === 1 ? { qty: total, unit: keys[0] } : { lines: lines.length };
   },
 
+  /** Material names for the line editor's picker — read-only, owned by
+   *  materials. An item typed by hand still saves; it simply has no stock to
+   *  net against, which is right for anything bought per job. */
+  materialOptions: function () {
+    return db.col('wa_materials').map(function (m) {
+      /* No ui binding in this file — the seam is emitted before the view layer,
+       * and a label is not worth reaching for one. */
+      return [m.name, m.name + ' · ' + (m.unit || '') + ' · ৳' + (+m.unitCost || 0)];
+    });
+  },
+
+  /** Next free id in the POL-0000 series. */
+  nextLineId: function () {
+    var max = 0;
+    db.col(LINES).forEach(function (l) {
+      var n = parseInt(String(l.id || '').replace(/^POL-?/, ''), 10);
+      if (!isNaN(n) && n > max) max = n;
+    });
+    return 'POL-' + String(max + 1).padStart(4, '0');
+  },
+
+  /**
+   * REPLACE an order's lines with what the editor returned.
+   *
+   * Positional id reuse, for the same reason the phase requirements use it: the
+   * repeater cannot round-trip an id, and a fresh id on every save would break
+   * the receipts that point at these lines. Surplus rows are deleted.
+   */
+  saveLines: function (order, rows) {
+    var existing = this.linesOf(order.id);
+    var kept = [];
+    (rows || []).forEach(function (row) {
+      var item = String(row.item || '').trim();
+      if (!item) return;
+      var old = existing[kept.length] || null;
+      var mat = db.col('wa_materials').filter(function (m) { return m.name === item; })[0];
+      var rec = {
+        id: (old && old.id) || Procurement.nextLineId(),
+        companyId: 'woodart', order: order.id, project: order.project || '',
+        material: mat ? mat.id : null, item: item,
+        qty: +row.qty || 0, unit: row.unit || (mat ? mat.unit : ''),
+        unitCost: +row.unitCost || 0
+      };
+      db.save(LINES, rec);
+      kept.push(rec);
+    });
+    existing.slice(kept.length).forEach(function (l) { db.remove(LINES, l.id); });
+    return kept;
+  },
+
   orders: function () {
     return db.col(ORDERS).slice().sort(function (a, b) {
       return String(b.date || '').localeCompare(String(a.date || ''));

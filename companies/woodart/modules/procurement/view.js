@@ -108,6 +108,56 @@ var Procurement = {
     return keys.length === 1 ? { qty: total, unit: keys[0] } : { lines: lines.length };
   },
 
+  /** Material names for the line editor's picker — read-only, owned by
+   *  materials. An item typed by hand still saves; it simply has no stock to
+   *  net against, which is right for anything bought per job. */
+  materialOptions: function () {
+    return db.col('wa_materials').map(function (m) {
+      /* No ui binding in this file — the seam is emitted before the view layer,
+       * and a label is not worth reaching for one. */
+      return [m.name, m.name + ' · ' + (m.unit || '') + ' · ৳' + (+m.unitCost || 0)];
+    });
+  },
+
+  /** Next free id in the POL-0000 series. */
+  nextLineId: function () {
+    var max = 0;
+    db.col(LINES).forEach(function (l) {
+      var n = parseInt(String(l.id || '').replace(/^POL-?/, ''), 10);
+      if (!isNaN(n) && n > max) max = n;
+    });
+    return 'POL-' + String(max + 1).padStart(4, '0');
+  },
+
+  /**
+   * REPLACE an order's lines with what the editor returned.
+   *
+   * Positional id reuse, for the same reason the phase requirements use it: the
+   * repeater cannot round-trip an id, and a fresh id on every save would break
+   * the receipts that point at these lines. Surplus rows are deleted.
+   */
+  saveLines: function (order, rows) {
+    var existing = this.linesOf(order.id);
+    var kept = [];
+    (rows || []).forEach(function (row) {
+      var item = String(row.item || '').trim();
+      if (!item) return;
+      var old = existing[kept.length] || null;
+      var mat = db.col('wa_materials').filter(function (m) { return m.name === item; })[0];
+      var rec = {
+        id: (old && old.id) || Procurement.nextLineId(),
+        companyId: 'woodart', order: order.id, project: order.project || '',
+        material: mat ? mat.id : null, item: item,
+        qty: +row.qty || 0, unit: row.unit || (mat ? mat.unit : ''),
+        unitCost: +row.unitCost || 0
+      };
+      db.save(LINES, rec);
+      kept.push(rec);
+    });
+    existing.slice(kept.length).forEach(function (l) { db.remove(LINES, l.id); });
+    return kept;
+  },
+
   orders: function () {
     return db.col(ORDERS).slice().sort(function (a, b) {
       return String(b.date || '').localeCompare(String(a.date || ''));
@@ -751,11 +801,17 @@ function editOrder(rec) {
 
   var vendors = Procurement.vendorNames();
 
+  /* The order's existing lines, in the shape the repeater understands. */
+  var lineRows = (rec ? Procurement.linesOf(rec.id) : []).map(function (l) {
+    return { item: l.item, qty: l.qty, unit: l.unit, unitCost: l.unitCost };
+  });
+
   EPAL.formModal({
     title: isNew ? 'New Purchase Order' : 'Edit · ' + rec.id,
     icon: 'receipt',
-    size: 'md',
-    record: rec || { id: Procurement.nextOrderId(), status: 'Ordered', date: TODAY, items: 1, amount: 0 },
+    size: 'xl',
+    record: rec ? Object.assign({}, rec, { lines: lineRows })
+                : { id: Procurement.nextOrderId(), status: 'Ordered', date: TODAY, items: 0, amount: 0, lines: [] },
     fields: [
       { key: 'id', label: 'PO Number', type: 'text', required: true, readonly: !isNew, col2: true,
         hint: isNew ? 'Auto-numbered in the WPO-000 series — change it if you use your own numbering.'
@@ -763,19 +819,66 @@ function editOrder(rec) {
       { key: 'date', label: 'Raised On', type: 'date', required: true, col2: true },
       { key: 'supplier', label: 'Vendor', type: 'select', required: true, searchable: true, options: vendors,
         hint: 'Orders link to a vendor by NAME. A name with no vendor record still saves, but the register flags it as unlisted.' },
-      { key: 'items', label: 'Line Count', type: 'number', required: true, min: 1, col2: true },
-      { key: 'amount', label: 'Order Value', type: 'money', required: true, min: 0, col2: true },
+      { key: 'project', label: 'For project', type: 'text', col2: true,
+        hint: 'e.g. WAP-101 — what ties this order to a job and its material demand.' },
       { key: 'status', label: 'Status', type: 'select', required: true, col2: true, options: Procurement.statuses(),
-        hint: 'Anything other than Received counts as outstanding.' }
+        hint: 'Anything other than Received counts as outstanding.' },
+
+      /* WHAT IS ACTUALLY BEING ORDERED (2026-08-07). Before this, an order held
+       * a supplier, a total and a line COUNT — so "500 bricks" was not a fact
+       * the system carried, a part-delivery of 100 had nothing to be part of,
+       * and the register showed "1" against a truck of brick. */
+      { key: 'lines', type: 'items', label: 'What this order is for', addLabel: 'Add a line', min: 0,
+        columns: [
+          { key: 'item', label: 'Material / item', type: 'select', width: '2fr',
+            options: Procurement.materialOptions() },
+          { key: 'qty', label: 'Qty', type: 'number', width: '90px' },
+          { key: 'unit', label: 'Unit', type: 'text', width: '80px' },
+          { key: 'unitCost', label: 'Rate', type: 'money' }
+        ],
+        footer: orderLinesFooter },
+
+      /* Typed only for an order with no lines — see the note in onSave. */
+      { key: 'amount', label: 'Order Value', type: 'money', min: 0, col2: true,
+        showIf: function (v) { return !(v.lines && v.lines.length); },
+        hint: 'Computed from the lines above once you add any.' }
     ],
     saveLabel: isNew ? 'Raise Order' : 'Save Changes',
     onSave: function (v) {
-      Procurement.saveOrder(v);
-      ui.toast(isNew ? v.id + ' raised' : v.id + ' updated', 'success');
+      var lines = (v.lines || []).filter(function (l) { return String(l.item || '').trim(); });
+
+      /* The total and the line count are DERIVED from the lines whenever there
+       * are any — one number, one origin. A total that CAN disagree with its
+       * own lines eventually does; that is the drift this repo keeps refusing.
+       * An order with no lines keeps the typed value, so orders raised before
+       * lines existed still balance. */
+      if (lines.length) {
+        v.amount = lines.reduce(function (t, l) { return t + (+l.qty || 0) * (+l.unitCost || 0); }, 0);
+        v.items = lines.length;
+      }
+
+      var saved = Procurement.saveOrder(v) || v;
+      Procurement.saveLines(saved, lines);
+
+      ui.toast((isNew ? v.id + ' raised' : v.id + ' updated') +
+        (lines.length ? ' · ' + lines.length + ' line(s), ' + ui.money(v.amount) : ''), 'success');
       EPAL.router.render();
       return true;
     }
   });
+}
+
+/** The running total under the order's lines — what the order will be worth. */
+function orderLinesFooter(rows) {
+  var total = 0, count = 0;
+  (rows || []).forEach(function (l) {
+    if (!String(l.item || '').trim()) return;
+    count++;
+    total += (+l.qty || 0) * (+l.unitCost || 0);
+  });
+  return count
+    ? count + ' line(s) · Order value: <strong>' + ui.money(total) + '</strong>'
+    : 'Add what is being ordered — the order value is calculated from these lines.';
 }
 
 function deleteOrder(row) {

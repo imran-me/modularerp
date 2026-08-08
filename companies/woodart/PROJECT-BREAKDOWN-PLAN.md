@@ -14,7 +14,7 @@ yet) and `ROOT-MAP.md` (the phase model).
 > | **· Interior backend** | ✅ **built** — the scope Laravel slice + one-project seeders + `epal:reseed woodart`, because the live site runs in API mode |
 > | 4 · Estimates → Quotation Builder | ⬜ next |
 > | 5 · `contractors` module — hiring + labour estimate | ⬜ |
-> | 6 · purchase-order lines → ordered/received per material | ⬜ (what the profile's trajectory still lacks) |
+> | **6 · purchase-order lines + issue-to-room** | ✅ **built** — the order form has a line editor (value computed from it), the issue form a room picker; form probe 14/14 |
 > | 7 · committed cost on the profile | ⬜ |
 
 > **The owner's words (2026-08-06):** *"There will be option to register a new

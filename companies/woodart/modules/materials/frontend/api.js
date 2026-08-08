@@ -40,6 +40,15 @@ var EPAL = window.EPAL, db = EPAL.db;
 var STORE = 'wa_materials';      /* ← the one place this collection is named */
 var MOVEMENTS = 'wa_movements';  /* the stock ledger — see THE MOVEMENT LEDGER */
 var LOCATIONS = 'wa_locations';  /* where stock sits: workshop, bay, site store */
+/* READ-ONLY, owned by other modules. Stock has to be issued TO somewhere and
+ * received AGAINST something, and those two facts live next door: a room is a
+ * phase of a space (scope), an order is a purchase order (procurement). Read
+ * through db.col so deleting either folder leaves this module working with an
+ * empty picker instead of a crash. */
+var PHASES   = 'wa_phases';
+var SPACES   = 'wa_spaces';
+var PROJECTS = 'wa_projects';
+var ORDERS   = 'wa_purchases';
 
 var TODAY = '2026-07-05';        /* the demo clock — same anchor as every module */
 
@@ -122,6 +131,42 @@ var Materials = {
       suppliers: Object.keys(sups).length,
       avg: list.length ? Math.round(value / list.length) : 0
     };
+  },
+
+  /**
+   * THE ROOMS STOCK CAN BE ISSUED TO — every open phase, labelled with its
+   * project and room: "WAP-101 · Master Bed Room — Wood Work".
+   *
+   * ONE picker, not two dependent ones: the platform's form kit has no dynamic
+   * options, and a project select that repopulates a room select is exactly the
+   * kind of thing that half-works. The phase carries its project and its space,
+   * so choosing a room says everything.
+   */
+  roomOptions: function () {
+    var spaceName = {}, spaceOf = {};
+    db.col(SPACES).forEach(function (s) { spaceName[s.id] = s.name; spaceOf[s.id] = s.project; });
+    return db.col(PHASES)
+      .filter(function (p) { return p.status !== 'Complete'; })
+      .map(function (p) {
+        return [p.id, (p.project || spaceOf[p.space] || '') + ' · ' +
+          (spaceName[p.space] || p.space) + ' — ' + p.name];
+      });
+  },
+
+  /** The project and room a phase belongs to — so a movement files itself. */
+  phaseContext: function (phaseId) {
+    var ph = db.col(PHASES).filter(function (p) { return p.id === phaseId; })[0];
+    if (!ph) return null;
+    return { project: ph.project, space: ph.space, name: ph.name };
+  },
+
+  /** Orders still awaiting delivery — what a receipt can arrive against. */
+  orderOptions: function () {
+    return db.col(ORDERS)
+      .filter(function (o) { return o.status !== 'Received'; })
+      .map(function (o) {
+        return [o.id, o.id + ' · ' + (o.supplier || '') + (o.project ? ' · ' + o.project : '')];
+      });
   },
 
   /** Every supplier name currently in use — for the form's picker. */
@@ -215,10 +260,17 @@ var Materials = {
     var qty = signedQty(kind, spec.qty);
     if (!qty) return null;
 
+    /* A room says which project it is in, so choosing one fills the reference
+     * too — a movement that names a room but not its job would be half-filed. */
+    var ctx = spec.phase ? Materials.phaseContext(spec.phase) : null;
+
     var row = {
       id: nextMovementId(), material: m.id, kind: kind, qty: qty,
       location: spec.location || Materials.defaultLocation(),
-      ref: spec.ref || '', note: spec.note || '', by: spec.by || 'System',
+      ref: (ctx && ctx.project) || spec.ref || '',
+      phase: spec.phase || '', space: (ctx && ctx.space) || '',
+      order: spec.order || '',
+      note: spec.note || '', by: spec.by || 'System',
       date: spec.date || TODAY, created: spec.date || TODAY
     };
     db.save(MOVEMENTS, row);

@@ -203,6 +203,12 @@ class MaterialService
                 'qty'        => $qty,
                 'location'   => $data['location'] ?? $this->defaultLocation(),
                 'ref'        => $data['ref'] ?? null,
+                /* WHERE it went and WHAT bought it. `space` is DERIVED from the
+                 * phase rather than trusted from the client, so a movement can
+                 * never claim to be for a room its phase is not in. */
+                'phase'      => $data['phase'] ?? null,
+                'space'      => $this->spaceOfPhase($data['phase'] ?? null) ?? ($data['space'] ?? null),
+                'order_ext'  => $data['order'] ?? null,
                 'note'       => $data['note'] ?? null,
                 'by'         => $data['by'] ?? 'System',
                 'date'       => $data['date'] ?? now()->toDateString(),
@@ -213,6 +219,37 @@ class MaterialService
 
             return $movement;
         });
+    }
+
+    /**
+     * The room a phase belongs to — read straight from wa_phases, so a movement
+     * cannot be filed under a room its phase is not in.
+     *
+     * Cross-module read through DB::table with a hasTable guard, never through
+     * the scope module's model: deleting that folder must leave stock working
+     * with an empty answer rather than a 500. Drop-in/drop-out is the whole
+     * architecture (see ModuleServiceProvider).
+     */
+    /**
+     * The room a phase belongs to — read straight from `wa_phases`, so a
+     * movement can never be filed under a room its phase is not in.
+     *
+     * A cross-module read through DB::table with a hasTable guard, never through
+     * the scope module's model: deleting that folder must leave stock working
+     * with an honest empty answer rather than a 500. Drop-in/drop-out is the
+     * whole architecture (see ModuleServiceProvider).
+     */
+    private function spaceOfPhase(?string $phaseExtId): ?string
+    {
+        if (! $phaseExtId || ! Schema::hasTable('wa_phases')) {
+            return null;
+        }
+        $row = DB::table('wa_phases')
+            ->where('company_id', $this->companyId)
+            ->where('ext_id', $phaseExtId)
+            ->first(['space']);
+
+        return $row->space ?? null;
     }
 
     /** Stock per location for one material, derived from its movements. */

@@ -133,6 +133,28 @@ material bought months ago is never re-ordered.
 Then raise the order in **Procurement → Purchase Orders**. This screen tells you
 what is needed; it deliberately does not buy anything by itself.
 
+### Raising the order
+
+**New Purchase Order** → vendor, the project (e.g. `WAP-101`), then **Add a
+line** for each material: item, qty, unit, rate. The order value is *calculated*
+from the lines — you never type a total, because a total that can disagree with
+its own lines eventually does.
+
+### Recording a delivery
+
+Deliveries come in instalments: 500 ordered, 100 today, 50 next week. In
+**Materials → Movements → Receive Stock**, pick the material and quantity, then
+**Against order**. Each delivery is its own dated row, so "received so far" is a
+fact rather than an assumption.
+
+### Issuing to a room
+
+From **Materials → Stock**, use the row's issue action → quantity, then **Issue
+to room**: one picker listing every open phase as
+`WAP-101 · Master Bed Room — Wood Work`. Choosing it fills the project reference
+automatically. This is what makes *"this room needed 6,250 bricks and used
+5,800"* answerable.
+
 ---
 
 ## 6 · Run the work
@@ -216,10 +238,10 @@ Being straight about the edges:
   expenses do.
 - **Billing is per project, not per room.** A room's cost is visible; invoicing
   one room on its own is not.
-- **Ordered and received quantities are not tracked per material.** A purchase
-  order records a supplier, a total and an item count — so the profile shows
-  quoted against *used*, not against *bought*. That column arrives when purchase
-  orders get real lines.
+- **The project profile shows quoted against *used*, not against *bought*.** The
+  ordered and received quantities are recorded now (order lines, and deliveries
+  against them), but the profile's material table has not yet been widened to
+  show those two columns beside the others.
 
 ---
 

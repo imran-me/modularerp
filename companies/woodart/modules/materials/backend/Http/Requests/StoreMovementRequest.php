@@ -30,6 +30,11 @@ class StoreMovementRequest extends FormRequest
             'qty'      => ['required', 'integer', 'not_in:0'],
             'location' => ['nullable', 'string', 'max:40'],
             'ref'      => ['nullable', 'string', 'max:60'],
+            /* WHERE it went and WHAT bought it. Both optional: a workshop receipt
+             * is not 'for' a room, and an opening balance came from no order. */
+            'phase'    => ['nullable', 'string', 'max:40'],
+            'space'    => ['nullable', 'string', 'max:40'],
+            'order'    => ['nullable', 'string', 'max:40'],
             'note'     => ['nullable', 'string', 'max:400'],
             'by'       => ['nullable', 'string', 'max:160'],
             'date'     => ['nullable', 'date'],
